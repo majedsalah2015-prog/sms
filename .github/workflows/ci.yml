@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 5.0.x
+      - name: Build
+        run: dotnet build --configuration Release
+      - name: Test (unit + architecture)
+        run: dotnet test --configuration Release --no-build --logger trx
+      # Planned gates (see docs/Implementation/05-Quality-Test-Plan.md):
+      # - BR-coverage report (traits vs docs/ rule ids) — lands with E-001 follow-up
+      # - AR/EN screenshot diff (Playwright) — lands with first screens

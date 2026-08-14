@@ -1,0 +1,12 @@
+<Project>
+  <!-- Solution-wide standards per docs/Implementation/02-Technical-Foundation.md §3 -->
+  <PropertyGroup>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Target stays net5.0 (CR-2). This dev machine has the 5.0 SDK but its 5.0
+         shared runtime was removed; allow executing on the newest installed runtime. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+</Project>
