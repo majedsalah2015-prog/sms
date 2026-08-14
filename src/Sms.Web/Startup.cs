@@ -3,8 +3,12 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Security;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Security;
 
 namespace Sms.Web
 {
@@ -31,6 +35,11 @@ namespace Sms.Web
             services.AddSingleton<IWorkingYearContext>(tenant);
             services.AddSingleton<IClock, SystemClock>();
             services.AddSingleton<ICurrentUser, SystemUser>();
+
+            // E-003 authorization core: deny-by-default policy engine (doc 06).
+            services.AddDbContext<AppDbContext>(options =>
+                options.UseSqlServer(Configuration.GetConnectionString("Sms")));
+            services.AddScoped<IPermissionService, PermissionService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
