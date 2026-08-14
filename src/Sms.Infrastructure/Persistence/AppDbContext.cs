@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Security;
+using Sms.Domain.Workflow;
 
 namespace Sms.Infrastructure.Persistence
 {
@@ -27,6 +28,16 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
 
         public DbSet<ScopeGrant> ScopeGrants => Set<ScopeGrant>();
+
+        public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+
+        public DbSet<WorkflowState> WorkflowStates => Set<WorkflowState>();
+
+        public DbSet<WorkflowTransition> WorkflowTransitions => Set<WorkflowTransition>();
+
+        public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
+
+        public DbSet<WorkflowStep> WorkflowSteps => Set<WorkflowStep>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -7,10 +7,12 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Security;
+using Sms.Application.Workflow;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Workflow;
 
 namespace Sms.Web
 {
@@ -49,6 +51,11 @@ namespace Sms.Web
             services.AddScoped<SmsDbContext>(sp => sp.GetRequiredService<AppDbContext>());
             services.AddScoped<IAuditEventWriter, AuditEventWriter>();
             services.AddScoped<IntegrityCheckpointService>();
+
+            // E-005 workflow engine (doc 05): catalog runtime + approvals inbox.
+            // Modules register their IWorkflowFinalEffect implementations here.
+            services.AddScoped<IWorkflowService, WorkflowService>();
+            services.AddScoped<IApprovalInboxQuery, ApprovalInboxQuery>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
