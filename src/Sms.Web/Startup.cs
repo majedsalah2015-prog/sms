@@ -4,8 +4,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Security;
+using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Security;
@@ -40,6 +42,13 @@ namespace Sms.Web
             services.AddDbContext<AppDbContext>(options =>
                 options.UseSqlServer(Configuration.GetConnectionString("Sms")));
             services.AddScoped<IPermissionService, PermissionService>();
+
+            // E-004 audit framework (doc 07): capture runs inside the context;
+            // these provide the ambient metadata, event API, and integrity ops.
+            services.AddScoped<IAuditContext, AuditContext>();
+            services.AddScoped<SmsDbContext>(sp => sp.GetRequiredService<AppDbContext>());
+            services.AddScoped<IAuditEventWriter, AuditEventWriter>();
+            services.AddScoped<IntegrityCheckpointService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -59,6 +68,16 @@ namespace Sms.Web
             app.UseStaticFiles();
 
             app.UseRouting();
+
+            // Stamp per-request audit metadata (doc 07 §4). IP capture for
+            // portal users pends the country-pack privacy check (doc 07 Q2).
+            app.Use(async (context, next) =>
+            {
+                var audit = context.RequestServices.GetRequiredService<IAuditContext>();
+                audit.SourceScreen = context.Request.Path;
+                audit.ClientIp = context.Connection.RemoteIpAddress?.ToString();
+                await next();
+            });
 
             app.UseAuthorization();
 

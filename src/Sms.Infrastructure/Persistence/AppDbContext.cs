@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Security;
 
@@ -10,8 +11,8 @@ namespace Sms.Infrastructure.Persistence
     /// </summary>
     public class AppDbContext : SmsDbContext
     {
-        public AppDbContext(DbContextOptions options, ITenantContext tenant, ICurrentUser currentUser, IClock clock)
-            : base(options, tenant, currentUser, clock)
+        public AppDbContext(DbContextOptions options, ITenantContext tenant, ICurrentUser currentUser, IClock clock, IAuditContext? auditContext = null)
+            : base(options, tenant, currentUser, clock, auditContext)
         {
         }
 
