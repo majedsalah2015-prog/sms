@@ -45,6 +45,12 @@ namespace Sms.Web
                 options.UseSqlServer(Configuration.GetConnectionString("Sms")));
             services.AddScoped<IPermissionService, PermissionService>();
 
+            // E-003 authentication slice (doc 06 §3, BR-SEC-001..004). The
+            // cookie/session wiring that consumes this (login screen, real
+            // ICurrentUser off the authenticated principal) is a later slice.
+            services.AddSingleton<IPasswordHasher, PasswordHasher>();
+            services.AddScoped<IAuthenticationService, AuthenticationService>();
+
             // E-004 audit framework (doc 07): capture runs inside the context;
             // these provide the ambient metadata, event API, and integrity ops.
             services.AddScoped<IAuditContext, AuditContext>();

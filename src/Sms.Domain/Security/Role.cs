@@ -17,6 +17,12 @@ namespace Sms.Domain.Security
 
         public bool IsActive { get; set; } = true;
 
+        /// <summary>BR-SEC-003: 2FA is mandatory-capable per role (default ON for System Admin/Finance templates).</summary>
+        public bool RequireTwoFactor { get; set; }
+
+        /// <summary>BR-SEC-004: starting a new session revokes this role holder's other active sessions.</summary>
+        public bool EnforceSingleSession { get; set; }
+
         public ICollection<RolePermission> Permissions { get; set; } = new List<RolePermission>();
     }
 }

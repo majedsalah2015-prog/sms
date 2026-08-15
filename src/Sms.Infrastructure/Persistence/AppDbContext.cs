@@ -29,6 +29,14 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<ScopeGrant> ScopeGrants => Set<ScopeGrant>();
 
+        public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
+
+        public DbSet<LoginAttempt> LoginAttempts => Set<LoginAttempt>();
+
+        public DbSet<UserSession> UserSessions => Set<UserSession>();
+
+        public DbSet<TwoFactorEnrollment> TwoFactorEnrollments => Set<TwoFactorEnrollment>();
+
         public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
 
         public DbSet<WorkflowState> WorkflowStates => Set<WorkflowState>();
