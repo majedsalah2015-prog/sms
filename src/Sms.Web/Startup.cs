@@ -130,11 +130,13 @@ namespace Sms.Web
                 .UseSqlServerStorage(Configuration.GetConnectionString("Sms")));
             services.AddHangfireServer();
 
-            // E-102 slice 1: School module (doc/Modules/02, BR-SCH-001..008).
-            // ITenantContext still resolves SchoolId from config (StaticTenantContext,
-            // E-002) — wiring it to a real School row (multi-school resolution,
-            // subdomain/URL routing) is follow-up work, not this slice.
+            // E-102: School module (doc/Modules/02, BR-SCH-001..008) + Academic
+            // Years (doc/Modules/03, BR-AYR-001..010). ITenantContext/
+            // IWorkingYearContext still resolve from config (StaticTenantContext,
+            // E-002) — wiring them to real School/AcademicYear rows (multi-school
+            // resolution, per-session year switching) is follow-up work.
             services.AddScoped<ISchoolAdmin, SchoolAdmin>();
+            services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

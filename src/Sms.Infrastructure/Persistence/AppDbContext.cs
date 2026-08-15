@@ -89,6 +89,12 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<Signatory> Signatories => Set<Signatory>();
 
+        public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
+
+        public DbSet<Semester> Semesters => Set<Semester>();
+
+        public DbSet<Term> Terms => Set<Term>();
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
