@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Notifications;
@@ -11,6 +13,7 @@ using Sms.Application.Numbering;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
 using Sms.Domain.Notifications;
+using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Notifications;
@@ -84,6 +87,16 @@ namespace Sms.Web
             services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Email));
             services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Sms));
             services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.WhatsApp));
+
+            // E-008 attachments core (doc 10): typed upload/version pipeline with a
+            // mandatory scan gate. No virus-scan vendor/ICAP adapter chosen yet
+            // (doc 10 §9 Q3) — NullVirusScanner always reports Clean so the
+            // quarantine pipeline is exercised without overclaiming real scanning.
+            var attachmentsRoot = Path.Combine(Configuration.GetValue("Attachments:RootPath", Path.Combine(Path.GetTempPath(), "sms-attachments")));
+            services.AddSingleton<IFileStore>(new LocalDiskFileStore(attachmentsRoot));
+            services.AddSingleton<IVirusScanner, NullVirusScanner>();
+            services.AddScoped<IAttachmentService, AttachmentService>();
+            services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

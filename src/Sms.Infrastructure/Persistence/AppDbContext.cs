@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Attachments;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Security;
@@ -64,6 +65,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Delivery> Deliveries => Set<Delivery>();
 
         public DbSet<BudgetCounter> BudgetCounters => Set<BudgetCounter>();
+
+        public DbSet<DocumentType> DocumentTypes => Set<DocumentType>();
+
+        public DbSet<Attachment> Attachments => Set<Attachment>();
+
+        public DbSet<AttachmentVersion> AttachmentVersions => Set<AttachmentVersion>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
