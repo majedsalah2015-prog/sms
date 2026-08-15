@@ -8,6 +8,7 @@ using System.IO;
 using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Security;
@@ -16,6 +17,7 @@ using Sms.Domain.Notifications;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
@@ -97,6 +99,12 @@ namespace Sms.Web
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
             services.AddScoped<IAttachmentService, AttachmentService>();
             services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
+
+            // E-010 lookup framework (BR-SET-001/002/007). The seeder harness
+            // (SeedRunner + ISeedContributor implementations) is registered in
+            // the standalone Sms.Seeder tool, not here — seeding must never run
+            // as a side effect of the web app starting.
+            services.AddScoped<ILookupAdmin, LookupAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

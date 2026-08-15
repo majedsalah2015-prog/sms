@@ -1,0 +1,63 @@
+using System.Threading;
+using System.Threading.Tasks;
+using Sms.Application.Common.Interfaces;
+using Sms.Application.Numbering;
+using Sms.Application.Seeding;
+using Sms.Domain.Numbering;
+
+namespace Sms.Infrastructure.Seeding
+{
+    /// <summary>
+    /// doc 08 §4's standard series catalog (E-006's deferred remaining item).
+    /// Only Student No. and Receipt No. have doc-given format templates;
+    /// the rest follow the same {PREFIX}-{YEAR|GYEAR}-{SEQ:n} shape as a
+    /// starter default (doc 08 §6's series designer is where a school
+    /// actually adjusts these). Student No. flat with no year per doc 08 §9
+    /// Q2's own stated default recommendation.
+    /// </summary>
+    public class NumberingCatalogSeedContributor : ISeedContributor
+    {
+        private readonly INumberingSeriesAdmin _admin;
+        private readonly IClock _clock;
+
+        public NumberingCatalogSeedContributor(INumberingSeriesAdmin admin, IClock clock)
+        {
+            _admin = admin;
+            _clock = clock;
+        }
+
+        public string Name => "Numbering series catalog (doc 08 §4)";
+
+        public int Order => 30;
+
+        private static readonly (string Code, string Entity, string Format, ResetPolicy Reset, GapPolicy Gap)[] Catalog =
+        {
+            ("STU", "Student", "STU-{SEQ:6}", ResetPolicy.Never, GapPolicy.Normal),
+            ("EMP", "Employee", "EMP-{SEQ:5}", ResetPolicy.Never, GapPolicy.Normal),
+            ("PAR", "Parent", "PAR-{SEQ:6}", ResetPolicy.Never, GapPolicy.Normal),
+            ("APP", "AdmissionApplication", "APP-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("INV", "Charge", "INV-{GYEAR}-{SEQ:6}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("RCP", "Receipt", "RCP/{SCHOOL}/{GYEAR}/{SEQ:6}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("RFD", "RefundVoucher", "RFD-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("CRN", "CreditNote", "CRN-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("CERT", "Certificate", "CERT-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
+            ("TC", "TransferCertificate", "TC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
+            ("INC", "DisciplineIncident", "INC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("MED", "ClinicVisit", "MED-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("LVE", "EmployeeLeave", "LVE-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("MSG", "OfficialMessage", "MSG-{YEAR}-{SEQ:6}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("EXM", "Exam", "EXM-{YEAR}-{SEQ:3}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+            ("RTE", "TransportRoute", "RTE-{SEQ:3}", ResetPolicy.Never, GapPolicy.Normal),
+            ("AST", "CatalogItem", "AST-{SEQ:6}", ResetPolicy.Never, GapPolicy.Normal),
+        };
+
+        public async Task SeedAsync(CancellationToken cancellationToken = default)
+        {
+            foreach (var entry in Catalog)
+            {
+                await _admin.DefineSeriesAsync(
+                    entry.Code, entry.Entity, entry.Format, entry.Reset, entry.Gap, _clock.UtcNow, cancellationToken);
+            }
+        }
+    }
+}
