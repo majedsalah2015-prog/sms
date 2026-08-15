@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Attachments;
+using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
@@ -76,6 +77,10 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<LookupCategory> LookupCategories => Set<LookupCategory>();
 
         public DbSet<LookupValue> LookupValues => Set<LookupValue>();
+
+        public DbSet<JobDefinition> JobDefinitions => Set<JobDefinition>();
+
+        public DbSet<JobRun> JobRuns => Set<JobRun>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

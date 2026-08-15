@@ -5,18 +5,22 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
+using Hangfire;
 using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
+using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
@@ -105,6 +109,24 @@ namespace Sms.Web
             // the standalone Sms.Seeder tool, not here — seeding must never run
             // as a side effect of the web app starting.
             services.AddScoped<ILookupAdmin, LookupAdmin>();
+
+            // E-011 background jobs (doc 02 T-6, Hangfire per IP-02 §2). Every
+            // recurring job calls IJobRunner — the single path that records
+            // JobRun history and an AuditAction.JobRun event; Hangfire itself
+            // never touches business logic directly. The job admin surface
+            // (WBS) is Hangfire's own dashboard (wired below), not a custom
+            // screen.
+            services.AddScoped<IJobRunner, JobRunner>();
+            services.AddScoped<IJobDefinitionAdmin, JobDefinitionAdmin>();
+            services.AddScoped<IJobHandler, AuditCheckpointJobHandler>();
+            services.AddScoped<IJobHandler, NotificationDispatchJobHandler>();
+
+            services.AddHangfire(config => config
+                .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
+                .UseSimpleAssemblyNameTypeSerializer()
+                .UseRecommendedSerializerSettings()
+                .UseSqlServerStorage(Configuration.GetConnectionString("Sms")));
+            services.AddHangfireServer();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -143,6 +165,25 @@ namespace Sms.Web
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
             });
+
+            // E-011: Hangfire's built-in dashboard is the job admin surface (WBS)
+            // — no custom screen. Access control on this route is deferred with
+            // every other admin screen (doc 06 permission-gating).
+            app.UseHangfireDashboard();
+
+            // Recurring jobs call through IJobRunner by code — see doc comments
+            // on JobRunner/JobDefinitionAdmin. The cron schedules mirror the
+            // JobDefinition rows a real deployment seeds via IJobDefinitionAdmin;
+            // duplicated here as the literal source Hangfire's scheduler reads.
+            RecurringJob.AddOrUpdate<IJobRunner>(
+                "AuditIntegrityCheckpoint",
+                runner => runner.RunAsync("AuditIntegrityCheckpoint", JobTriggerType.Scheduled, default),
+                "0 2 * * *"); // daily 02:00 UTC — matches IntegrityCheckpointService's one-day default period
+
+            RecurringJob.AddOrUpdate<IJobRunner>(
+                "NotificationDispatch",
+                runner => runner.RunAsync("NotificationDispatch", JobTriggerType.Scheduled, default),
+                "*/5 * * * *"); // every 5 minutes
         }
     }
 }
