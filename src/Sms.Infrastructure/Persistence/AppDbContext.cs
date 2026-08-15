@@ -6,6 +6,7 @@ using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
+using Sms.Domain.Schools;
 using Sms.Domain.Security;
 using Sms.Domain.Workflow;
 
@@ -81,6 +82,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<JobDefinition> JobDefinitions => Set<JobDefinition>();
 
         public DbSet<JobRun> JobRuns => Set<JobRun>();
+
+        public DbSet<SchoolGroup> SchoolGroups => Set<SchoolGroup>();
+
+        public DbSet<School> Schools => Set<School>();
+
+        public DbSet<Signatory> Signatories => Set<Signatory>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

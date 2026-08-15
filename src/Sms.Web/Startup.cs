@@ -13,6 +13,7 @@ using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
+using Sms.Application.Schools;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
@@ -25,6 +26,7 @@ using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Workflow;
 
@@ -127,6 +129,12 @@ namespace Sms.Web
                 .UseRecommendedSerializerSettings()
                 .UseSqlServerStorage(Configuration.GetConnectionString("Sms")));
             services.AddHangfireServer();
+
+            // E-102 slice 1: School module (doc/Modules/02, BR-SCH-001..008).
+            // ITenantContext still resolves SchoolId from config (StaticTenantContext,
+            // E-002) — wiring it to a real School row (multi-school resolution,
+            // subdomain/URL routing) is follow-up work, not this slice.
+            services.AddScoped<ISchoolAdmin, SchoolAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
