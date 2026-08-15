@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Attachments;
+using Sms.Domain.Calendar;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
@@ -94,6 +95,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Semester> Semesters => Set<Semester>();
 
         public DbSet<Term> Terms => Set<Term>();
+
+        public DbSet<CalendarDay> CalendarDays => Set<CalendarDay>();
+
+        public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
+
+        public DbSet<CalendarVersion> CalendarVersions => Set<CalendarVersion>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

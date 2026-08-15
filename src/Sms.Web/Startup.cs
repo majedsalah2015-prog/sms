@@ -8,6 +8,7 @@ using System.IO;
 using Hangfire;
 using Sms.Application.Attachments;
 using Sms.Application.Audit;
+using Sms.Application.Calendar;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
@@ -20,6 +21,7 @@ using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
+using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
@@ -137,6 +139,11 @@ namespace Sms.Web
             // resolution, per-session year switching) is follow-up work.
             services.AddScoped<ISchoolAdmin, SchoolAdmin>();
             services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
+
+            // E-103 (slice: Calendar, doc/Modules/04, BR-CAL-001..008). Impact
+            // review on edits touching existing attendance/exam data (BR-CAL-004)
+            // isn't enforced yet — Attendance/Examinations don't exist.
+            services.AddScoped<ICalendarAdmin, CalendarAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
