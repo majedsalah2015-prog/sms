@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Numbering;
 using Sms.Domain.Security;
 using Sms.Domain.Workflow;
 
@@ -46,6 +47,10 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
 
         public DbSet<WorkflowStep> WorkflowSteps => Set<WorkflowStep>();
+
+        public DbSet<NumberingSeries> NumberingSeries => Set<NumberingSeries>();
+
+        public DbSet<SeriesState> SeriesStates => Set<SeriesState>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

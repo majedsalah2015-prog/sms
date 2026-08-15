@@ -6,10 +6,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Numbering;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Workflow;
@@ -62,6 +64,11 @@ namespace Sms.Web
             // Modules register their IWorkflowFinalEffect implementations here.
             services.AddScoped<IWorkflowService, WorkflowService>();
             services.AddScoped<IApprovalInboxQuery, ApprovalInboxQuery>();
+
+            // E-006 numbering framework (doc 08): gap-free issuance for
+            // strict/normal series + admin definition and cutover.
+            services.AddScoped<INumberIssuer, NumberIssuer>();
+            services.AddScoped<INumberingSeriesAdmin, NumberingSeriesAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
