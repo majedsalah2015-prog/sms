@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Security;
 using Sms.Domain.Workflow;
@@ -51,6 +52,18 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<NumberingSeries> NumberingSeries => Set<NumberingSeries>();
 
         public DbSet<SeriesState> SeriesStates => Set<SeriesState>();
+
+        public DbSet<Template> Templates => Set<Template>();
+
+        public DbSet<TemplateVersion> TemplateVersions => Set<TemplateVersion>();
+
+        public DbSet<SubscriptionRule> SubscriptionRules => Set<SubscriptionRule>();
+
+        public DbSet<Provider> Providers => Set<Provider>();
+
+        public DbSet<Delivery> Deliveries => Set<Delivery>();
+
+        public DbSet<BudgetCounter> BudgetCounters => Set<BudgetCounter>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

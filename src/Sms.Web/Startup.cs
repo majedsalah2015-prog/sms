@@ -6,11 +6,14 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
+using Sms.Domain.Notifications;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Security;
@@ -69,6 +72,18 @@ namespace Sms.Web
             // strict/normal series + admin definition and cutover.
             services.AddScoped<INumberIssuer, NumberIssuer>();
             services.AddScoped<INumberingSeriesAdmin, NumberingSeriesAdmin>();
+
+            // E-007 notifications core (doc 09): publish queues Deliveries atomically
+            // with the business event; the dispatcher drains them through whichever
+            // channel senders are registered. Email/SMS/WhatsApp are stub transports
+            // pending a provider decision (doc 09 §9 Q1) — only In-App is live.
+            services.AddScoped<INotificationPublisher, NotificationPublisher>();
+            services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
+            services.AddScoped<INotificationConfigAdmin, NotificationConfigAdmin>();
+            services.AddScoped<IChannelSender, InAppChannelSender>();
+            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Email));
+            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Sms));
+            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.WhatsApp));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
