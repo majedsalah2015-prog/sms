@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
@@ -16,6 +17,7 @@ using Sms.Domain.Security;
 using Sms.Domain.Students;
 using Sms.Domain.Subjects;
 using Sms.Domain.Workflow;
+using AdmissionApplication = Sms.Domain.Admissions.Application;
 
 namespace Sms.Infrastructure.Persistence
 {
@@ -149,6 +151,14 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<RoomAvailabilityException> RoomAvailabilityExceptions => Set<RoomAvailabilityException>();
 
         public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
+
+        public DbSet<AdmissionCampaign> AdmissionCampaigns => Set<AdmissionCampaign>();
+
+        public DbSet<AdmissionApplication> Applications => Set<AdmissionApplication>();
+
+        public DbSet<ApplicationAssessment> ApplicationAssessments => Set<ApplicationAssessment>();
+
+        public DbSet<WaitingListEntry> WaitingListEntries => Set<WaitingListEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

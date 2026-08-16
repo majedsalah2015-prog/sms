@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using Hangfire;
+using Sms.Application.Admissions;
 using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
@@ -25,6 +26,7 @@ using Sms.Application.Subjects;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
+using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
@@ -181,6 +183,12 @@ namespace Sms.Web
             // now fully done (Subjects + Classrooms). Section.DefaultClassroomId got
             // its real FK to core.Room in this slice.
             services.AddScoped<IRoomAdmin, RoomAdmin>();
+
+            // S2/E-201 (Admissions, doc/Modules/09, BR-ADM-001..011). RegisterAsync
+            // composes IStudentAdmin + ISectionAdmin under one explicit transaction
+            // (BR-ADM-007). Parent dedup, offer/expiry sweep, application fee, and
+            // WF-01 approval-authority enforcement are deferred.
+            services.AddScoped<IAdmissionAdmin, AdmissionAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

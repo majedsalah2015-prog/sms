@@ -1,0 +1,224 @@
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Sms.Application.Admissions;
+using Sms.Application.Common.Exceptions;
+using Sms.Application.Grades;
+using Sms.Application.Numbering;
+using Sms.Application.Sections;
+using Sms.Application.Students;
+using Sms.Domain.Admissions;
+using Sms.Domain.Common;
+using Sms.Domain.Students;
+using Sms.Infrastructure.Persistence;
+using AdmissionApplication = Sms.Domain.Admissions.Application;
+
+namespace Sms.Infrastructure.Admissions
+{
+    /// <summary>
+    /// DefineCampaignAsync/SubmitApplicationAsync/ChangeStatusAsync/
+    /// RecordAssessmentAsync/AddToWaitingListAsync are standalone — they
+    /// save themselves. RegisterAsync is the exception: it composes
+    /// IStudentAdmin + ISectionAdmin (both standalone-admin services in
+    /// their own right) under one explicit transaction, so their internal
+    /// SaveChangesAsync calls join it instead of each opening their own
+    /// (per SmsDbContext's ownsTransaction ambient-transaction detection),
+    /// giving BR-ADM-007's "one transaction" requirement.
+    /// </summary>
+    public class AdmissionAdmin : IAdmissionAdmin
+    {
+        private readonly AppDbContext _db;
+        private readonly INumberIssuer _numberIssuer;
+        private readonly IStudentAdmin _studentAdmin;
+        private readonly ISectionAdmin _sectionAdmin;
+
+        public AdmissionAdmin(AppDbContext db, INumberIssuer numberIssuer, IStudentAdmin studentAdmin, ISectionAdmin sectionAdmin)
+        {
+            _db = db;
+            _numberIssuer = numberIssuer;
+            _studentAdmin = studentAdmin;
+            _sectionAdmin = sectionAdmin;
+        }
+
+        public async Task<AdmissionCampaign> DefineCampaignAsync(
+            int gradeYearProfileId, DateTime openDate, DateTime closeDate, bool requiresAssessment,
+            decimal? applicationFeeAmount, CancellationToken cancellationToken = default)
+        {
+            var profile = await _db.GradeYearProfiles.SingleAsync(p => p.Id == gradeYearProfileId, cancellationToken);
+
+            var campaign = new AdmissionCampaign
+            {
+                SchoolId = profile.SchoolId,
+                AcademicYearId = profile.AcademicYearId,
+                GradeYearProfileId = gradeYearProfileId,
+                OpenDate = openDate,
+                CloseDate = closeDate,
+                RequiresAssessment = requiresAssessment,
+                ApplicationFeeAmount = applicationFeeAmount,
+                IsActive = true,
+            };
+            _db.AdmissionCampaigns.Add(campaign);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return campaign;
+        }
+
+        public async Task<AdmissionApplication> SubmitApplicationAsync(
+            int campaignId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
+            string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
+            Gender gender, DateTime dateOfBirth, int nationalityLookupId, int? parentId = null, CancellationToken cancellationToken = default)
+        {
+            var campaign = await _db.AdmissionCampaigns.SingleAsync(c => c.Id == campaignId, cancellationToken);
+            var profile = await _db.GradeYearProfiles.SingleAsync(p => p.Id == campaign.GradeYearProfileId, cancellationToken);
+
+            if (profile.AgeCutoffDate.HasValue)
+            {
+                var eligible = AgeEligibilityEvaluator.IsEligible(
+                    dateOfBirth, profile.AgeCutoffDate.Value, profile.MinAgeAtCutoff, profile.MaxAgeAtCutoff);
+                if (!eligible)
+                {
+                    throw new AgeIneligibleException();
+                }
+            }
+
+            if (parentId.HasValue)
+            {
+                var duplicate = await _db.Applications.FirstOrDefaultAsync(
+                    a => a.CampaignId == campaignId && a.ParentId == parentId
+                        && a.Status != ApplicationStatus.Rejected && a.Status != ApplicationStatus.Lapsed,
+                    cancellationToken);
+                if (duplicate != null)
+                {
+                    throw new DuplicateLiveApplicationException(duplicate.Id);
+                }
+            }
+
+            var applicationNo = await _numberIssuer.IssueAsync("APP", cancellationToken);
+
+            var application = new AdmissionApplication
+            {
+                SchoolId = campaign.SchoolId,
+                AcademicYearId = campaign.AcademicYearId,
+                CampaignId = campaignId,
+                ApplicationNo = applicationNo,
+                FirstNameAr = firstNameAr,
+                FatherNameAr = fatherNameAr,
+                GrandfatherNameAr = grandfatherNameAr,
+                FamilyNameAr = familyNameAr,
+                FirstNameEn = firstNameEn,
+                FatherNameEn = fatherNameEn,
+                GrandfatherNameEn = grandfatherNameEn,
+                FamilyNameEn = familyNameEn,
+                Gender = gender,
+                DateOfBirth = dateOfBirth,
+                NationalityLookupId = nationalityLookupId,
+                ParentId = parentId,
+                Status = ApplicationStatus.Draft,
+            };
+            _db.Applications.Add(application);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return application;
+        }
+
+        public async Task ChangeStatusAsync(int applicationId, ApplicationStatus newStatus, CancellationToken cancellationToken = default)
+        {
+            var application = await _db.Applications.SingleAsync(a => a.Id == applicationId, cancellationToken);
+            if (!ApplicationStatusTransitions.CanTransition(application.Status, newStatus))
+            {
+                throw new InvalidApplicationStatusTransitionException(application.Status, newStatus);
+            }
+
+            application.Status = newStatus;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<ApplicationAssessment> RecordAssessmentAsync(
+            int applicationId, decimal score, int assessedByUserId, string? notes = null, CancellationToken cancellationToken = default)
+        {
+            var application = await _db.Applications.SingleAsync(a => a.Id == applicationId, cancellationToken);
+
+            var assessment = new ApplicationAssessment
+            {
+                SchoolId = application.SchoolId,
+                ApplicationId = applicationId,
+                Score = score,
+                Notes = notes,
+                AssessedByUserId = assessedByUserId,
+                AssessedAtUtc = DateTime.UtcNow,
+            };
+            _db.ApplicationAssessments.Add(assessment);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return assessment;
+        }
+
+        public async Task<WaitingListEntry> AddToWaitingListAsync(int applicationId, int gradeYearProfileId, CancellationToken cancellationToken = default)
+        {
+            var application = await _db.Applications.SingleAsync(a => a.Id == applicationId, cancellationToken);
+
+            var nextRank = await _db.WaitingListEntries
+                .Where(w => w.GradeYearProfileId == gradeYearProfileId)
+                .Select(w => (int?)w.OrderRank)
+                .MaxAsync(cancellationToken) ?? 0;
+
+            var entry = new WaitingListEntry
+            {
+                SchoolId = application.SchoolId,
+                AcademicYearId = application.AcademicYearId,
+                ApplicationId = applicationId,
+                GradeYearProfileId = gradeYearProfileId,
+                OrderRank = nextRank + 1,
+            };
+            _db.WaitingListEntries.Add(entry);
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return entry;
+        }
+
+        public async Task<Student> RegisterAsync(
+            int applicationId, int sectionId, DateTime enrollmentDate, int guardianRelationshipLookupId, CancellationToken cancellationToken = default)
+        {
+            var application = await _db.Applications.SingleAsync(a => a.Id == applicationId, cancellationToken);
+
+            if (application.Status != ApplicationStatus.Approved)
+            {
+                throw new ApplicationNotReadyForRegistrationException($"status is '{application.Status}', not Approved");
+            }
+
+            if (application.ParentId == null)
+            {
+                throw new ApplicationNotReadyForRegistrationException("no parent linked to the application");
+            }
+
+            var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);
+
+            using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+
+            var student = await _studentAdmin.RegisterStudentAsync(
+                application.FirstNameAr, application.FatherNameAr, application.GrandfatherNameAr, application.FamilyNameAr,
+                application.FirstNameEn, application.FatherNameEn, application.GrandfatherNameEn, application.FamilyNameEn,
+                application.Gender, application.DateOfBirth, application.NationalityLookupId,
+                cancellationToken: cancellationToken);
+
+            var enrollment = await _studentAdmin.EnrollAsync(
+                student.Id, section.GradeYearProfileId, enrollmentDate, EnrollmentSourceType.Admission, cancellationToken);
+
+            await _sectionAdmin.AssignMembershipAsync(sectionId, enrollment.Id, enrollmentDate, cancellationToken);
+
+            await _studentAdmin.LinkGuardianAsync(
+                student.Id, application.ParentId.Value, guardianRelationshipLookupId, isPrimaryContact: true,
+                isFinanciallyResponsible: true, isPickupAuthorized: true, isPortalVisible: true,
+                effectiveFromUtc: enrollmentDate, cancellationToken: cancellationToken);
+
+            application.Status = ApplicationStatus.Registered;
+            application.RegisteredStudentId = student.Id;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            await transaction.CommitAsync(cancellationToken);
+            return student;
+        }
+    }
+}
