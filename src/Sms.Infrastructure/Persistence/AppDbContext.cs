@@ -5,6 +5,7 @@ using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
+using Sms.Domain.Employees;
 using Sms.Domain.Grades;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
@@ -16,6 +17,7 @@ using Sms.Domain.Sections;
 using Sms.Domain.Security;
 using Sms.Domain.Students;
 using Sms.Domain.Subjects;
+using Sms.Domain.Teachers;
 using Sms.Domain.Workflow;
 using AdmissionApplication = Sms.Domain.Admissions.Application;
 
@@ -159,6 +161,20 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<ApplicationAssessment> ApplicationAssessments => Set<ApplicationAssessment>();
 
         public DbSet<WaitingListEntry> WaitingListEntries => Set<WaitingListEntry>();
+
+        public DbSet<Employee> Employees => Set<Employee>();
+
+        public DbSet<OrgUnit> OrgUnits => Set<OrgUnit>();
+
+        public DbSet<EmployeeAssignment> EmployeeAssignments => Set<EmployeeAssignment>();
+
+        public DbSet<Contract> Contracts => Set<Contract>();
+
+        public DbSet<Qualification> Qualifications => Set<Qualification>();
+
+        public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
+
+        public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

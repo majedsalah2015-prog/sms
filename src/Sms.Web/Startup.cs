@@ -12,6 +12,7 @@ using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Employees;
 using Sms.Application.Grades;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
@@ -23,6 +24,7 @@ using Sms.Application.Sections;
 using Sms.Application.Security;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
+using Sms.Application.Teachers;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
@@ -32,6 +34,7 @@ using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
@@ -44,6 +47,7 @@ using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
+using Sms.Infrastructure.Teachers;
 using Sms.Infrastructure.Workflow;
 
 namespace Sms.Web
@@ -189,6 +193,15 @@ namespace Sms.Web
             // (BR-ADM-007). Parent dedup, offer/expiry sweep, application fee, and
             // WF-01 approval-authority enforcement are deferred.
             services.AddScoped<IAdmissionAdmin, AdmissionAdmin>();
+
+            // S2/E-203 (Employees + Teachers, doc/Modules/12-13, BR-EMP-001..004/
+            // BR-TCH-001/002/004/005). Salary fields are plain columns, not SQL
+            // Server Always Encrypted (O10) — no SQL Server instance exists in
+            // this environment, flagged explicitly rather than faked. Staff
+            // attendance, leave (WF-10), payroll-prep export, and offboarding
+            // clearance are deferred entirely.
+            services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
+            services.AddScoped<ITeacherAdmin, TeacherAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

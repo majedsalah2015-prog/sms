@@ -45,6 +45,12 @@ namespace Sms.Infrastructure.Seeding
             await SeedValues("RelationshipType", cancellationToken,
                 ("Father", "الأب", "Father"), ("Mother", "الأم", "Mother"), ("Guardian", "ولي أمر", "Guardian"),
                 ("Grandfather", "الجد", "Grandfather"), ("Grandmother", "الجدة", "Grandmother"), ("Other", "أخرى", "Other"));
+
+            await _lookups.DefineCategoryAsync("JobTitle", LookupCategoryTier.ProductSeeded, "المسمى الوظيفي", "Job Title", cancellationToken);
+            await SeedValues("JobTitle", cancellationToken,
+                ("Teacher", "معلم", "Teacher"), ("Administrator", "إداري", "Administrator"), ("Accountant", "محاسب", "Accountant"),
+                ("HrOfficer", "موظف موارد بشرية", "HR Officer"), ("ItSupport", "دعم تقني", "IT Support"),
+                ("Librarian", "أمين مكتبة", "Librarian"), ("Maintenance", "صيانة", "Maintenance"), ("Driver", "سائق", "Driver"));
         }
 
         private async Task SeedValues(string categoryCode, CancellationToken cancellationToken, params (string Code, string Ar, string En)[] values)
