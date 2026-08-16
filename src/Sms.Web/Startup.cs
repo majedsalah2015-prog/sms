@@ -16,6 +16,7 @@ using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Schools;
+using Sms.Application.Sections;
 using Sms.Application.Security;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
@@ -31,6 +32,7 @@ using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
+using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Workflow;
 
@@ -152,6 +154,10 @@ namespace Sms.Web
             // pure validator but not yet wired into AcademicYearAdmin.ActivateAsync
             // — that cross-module integration is follow-up work.
             services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
+
+            // E-103 (slice: Sections, doc/Modules/06, BR-SCN-001..007). SectionMembership.EnrollmentId
+            // is an unconstrained forward reference — ppl.Enrollment doesn't exist yet (S2).
+            services.AddScoped<ISectionAdmin, SectionAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

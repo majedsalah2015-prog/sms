@@ -9,6 +9,7 @@ using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Schools;
+using Sms.Domain.Sections;
 using Sms.Domain.Security;
 using Sms.Domain.Workflow;
 
@@ -108,6 +109,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<GradeLevel> GradeLevels => Set<GradeLevel>();
 
         public DbSet<GradeYearProfile> GradeYearProfiles => Set<GradeYearProfile>();
+
+        public DbSet<Section> Sections => Set<Section>();
+
+        public DbSet<HomeroomAssignment> HomeroomAssignments => Set<HomeroomAssignment>();
+
+        public DbSet<SectionMembership> SectionMemberships => Set<SectionMembership>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
