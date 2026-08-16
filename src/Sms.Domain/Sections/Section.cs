@@ -26,7 +26,7 @@ namespace Sms.Domain.Sections
         /// <summary>BR-SCN-003: narrows the grade's policy, never widens.</summary>
         public GenderPolicy GenderPolicy { get; set; } = GenderPolicy.Mixed;
 
-        /// <summary>Forward reference — Classroom (Module 08/E-104) doesn't exist yet; unconstrained by design, like Attachment.OwningEntityId.</summary>
+        /// <summary>References core.Room (Module 08/E-104 — real FK as of that slice; was an unconstrained forward reference before).</summary>
         public int? DefaultClassroomId { get; set; }
 
         public SectionStatus Status { get; set; } = SectionStatus.Active;

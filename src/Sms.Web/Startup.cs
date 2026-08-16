@@ -9,6 +9,7 @@ using Hangfire;
 using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
+using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Grades;
 using Sms.Application.Jobs;
@@ -27,6 +28,7 @@ using Sms.Domain.Notifications;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
+using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Jobs;
@@ -174,6 +176,11 @@ namespace Sms.Web
             // WF-03 withdrawal clearance workflow are deferred.
             services.AddScoped<IStudentAdmin, StudentAdmin>();
             services.AddScoped<IParentAdmin, ParentAdmin>();
+
+            // E-104 (slice: Classrooms, doc/Modules/08, BR-ROM-001..008) — E-104 is
+            // now fully done (Subjects + Classrooms). Section.DefaultClassroomId got
+            // its real FK to core.Room in this slice.
+            services.AddScoped<IRoomAdmin, RoomAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

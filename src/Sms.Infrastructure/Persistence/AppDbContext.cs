@@ -3,6 +3,7 @@ using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Attachments;
 using Sms.Domain.Calendar;
+using Sms.Domain.Classrooms;
 using Sms.Domain.Grades;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
@@ -136,6 +137,18 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
 
         public DbSet<Parent> Parents => Set<Parent>();
+
+        public DbSet<Building> Buildings => Set<Building>();
+
+        public DbSet<Floor> Floors => Set<Floor>();
+
+        public DbSet<Room> Rooms => Set<Room>();
+
+        public DbSet<RoomFeature> RoomFeatures => Set<RoomFeature>();
+
+        public DbSet<RoomAvailabilityException> RoomAvailabilityExceptions => Set<RoomAvailabilityException>();
+
+        public DbSet<RoomBooking> RoomBookings => Set<RoomBooking>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

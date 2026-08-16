@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Sms.Domain.Classrooms;
 using Sms.Domain.Grades;
 using Sms.Domain.Sections;
 using Sms.Domain.Students;
@@ -16,6 +17,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.NameAr).HasMaxLength(60).IsRequired();
             builder.Property(x => x.NameEn).HasMaxLength(60).IsRequired();
             builder.HasOne<GradeYearProfile>().WithMany().HasForeignKey(x => x.GradeYearProfileId);
+            // Real FK as of E-104 (Classrooms) — was an unconstrained forward
+            // reference until core.Room existed.
+            builder.HasOne<Room>().WithMany().HasForeignKey(x => x.DefaultClassroomId);
             builder.HasIndex(x => new { x.GradeYearProfileId, x.NameEn }).IsUnique();
         }
     }
