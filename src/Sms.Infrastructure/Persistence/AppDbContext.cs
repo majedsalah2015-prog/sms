@@ -3,6 +3,7 @@ using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Attachments;
 using Sms.Domain.Calendar;
+using Sms.Domain.Grades;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
@@ -101,6 +102,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<CalendarEvent> CalendarEvents => Set<CalendarEvent>();
 
         public DbSet<CalendarVersion> CalendarVersions => Set<CalendarVersion>();
+
+        public DbSet<Stage> Stages => Set<Stage>();
+
+        public DbSet<GradeLevel> GradeLevels => Set<GradeLevel>();
+
+        public DbSet<GradeYearProfile> GradeYearProfiles => Set<GradeYearProfile>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

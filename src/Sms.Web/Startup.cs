@@ -10,6 +10,7 @@ using Sms.Application.Attachments;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Grades;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
@@ -23,6 +24,7 @@ using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
@@ -144,6 +146,12 @@ namespace Sms.Web
             // review on edits touching existing attendance/exam data (BR-CAL-004)
             // isn't enforced yet — Attendance/Examinations don't exist.
             services.AddScoped<ICalendarAdmin, CalendarAdmin>();
+
+            // E-103 (slice: Grades, doc/Modules/05, BR-GRD-001..009). Promotion-
+            // path validation (acyclic/complete, BR-GRD-002/009) is exposed as a
+            // pure validator but not yet wired into AcademicYearAdmin.ActivateAsync
+            // — that cross-module integration is follow-up work.
+            services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
