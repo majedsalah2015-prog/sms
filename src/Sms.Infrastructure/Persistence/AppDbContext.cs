@@ -3,6 +3,7 @@ using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
+using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Employees;
@@ -175,6 +176,14 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
 
         public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
+
+        public DbSet<AttendanceDay> AttendanceDays => Set<AttendanceDay>();
+
+        public DbSet<GateEvent> GateEvents => Set<GateEvent>();
+
+        public DbSet<Justification> Justifications => Set<Justification>();
+
+        public DbSet<LeavePass> LeavePasses => Set<LeavePass>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

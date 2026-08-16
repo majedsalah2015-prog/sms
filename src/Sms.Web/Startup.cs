@@ -8,6 +8,7 @@ using System.IO;
 using Hangfire;
 using Sms.Application.Admissions;
 using Sms.Application.Attachments;
+using Sms.Application.Attendance;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Classrooms;
@@ -30,6 +31,7 @@ using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
 using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
+using Sms.Infrastructure.Attendance;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Classrooms;
@@ -202,6 +204,14 @@ namespace Sms.Web
             // clearance are deferred entirely.
             services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
             services.AddScoped<ITeacherAdmin, TeacherAdmin>();
+
+            // S3/E-301 (Attendance, doc/Modules/14, BR-ATD-002/003/005/006/007).
+            // Daily mode only - Period mode needs Module 15's timetable sessions,
+            // which don't exist yet. Escalation thresholds, gate-event auto-flip
+            // of AttendanceDay.Status, and WF-14's P2 approval routing (only the
+            // mandatory-reason half is enforced, via the generic T1 audit
+            // pipeline) are deferred.
+            services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
