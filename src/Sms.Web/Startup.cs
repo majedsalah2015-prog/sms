@@ -23,6 +23,7 @@ using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
 using Sms.Application.Payments;
+using Sms.Application.Portal;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
@@ -50,6 +51,7 @@ using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Portal;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
@@ -240,6 +242,18 @@ namespace Sms.Web
             // dormant per doc itself) are all deferred.
             services.AddScoped<IFeeAdmin, FeeAdmin>();
             services.AddScoped<IPaymentAdmin, PaymentAdmin>();
+
+            // S3/E-304 (Portal essentials, BR-SEC-010..013). Read-only aggregation
+            // over Attendance/Grading/Fees; one requestingUserAccountId covers
+            // both "parent views a linked child" and "student views own record".
+            // Retrofit: Student/Parent both got a nullable UserAccountId bridge
+            // field this slice needed (mirrors Employee.UserAccountId, E-203) -
+            // no admin service provisions portal accounts yet (Module 36).
+            // BR-SEC-010 (portal-vs-staff routing) and BR-SEC-013 (idle re-auth)
+            // are web-layer concerns, deferred with every other epic's screens.
+            // Announcements (read-only) are deferred entirely - no Messaging
+            // module exists yet (M32, S6/S7).
+            services.AddScoped<IParentPortalQuery, ParentPortalQuery>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

@@ -19,6 +19,9 @@ namespace Sms.Domain.Students
         /// <summary>doc 08 STU series — permanent, never re-issued (BR-NUM-004).</summary>
         public string StudentNo { get; set; } = string.Empty;
 
+        /// <summary>BR-SEC-010's portal identity bridge — nullable since student self-service login (older grades) isn't provisioned by any admin service yet (Module 36). Mirrors Employee.UserAccountId's E-203 precedent.</summary>
+        public int? UserAccountId { get; set; }
+
         // Full quad name both languages (Gulf convention): given, father's, grandfather's, family.
         [RequiresAuditReason]
         public string FirstNameAr { get; set; } = string.Empty;

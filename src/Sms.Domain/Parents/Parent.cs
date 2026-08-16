@@ -19,6 +19,9 @@ namespace Sms.Domain.Parents
         /// <summary>doc 08 PAR series — permanent.</summary>
         public string ParentFileNo { get; set; } = string.Empty;
 
+        /// <summary>BR-SEC-010/011's portal identity bridge — nullable since portal account provisioning (Module 36) isn't wired by any admin service yet. Mirrors Employee.UserAccountId's E-203 precedent.</summary>
+        public int? UserAccountId { get; set; }
+
         [RequiresAuditReason]
         public string NameAr { get; set; } = string.Empty;
 
