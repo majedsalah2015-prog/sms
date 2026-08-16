@@ -1,0 +1,20 @@
+using Sms.Domain.Grading;
+
+namespace Sms.Application.Grading
+{
+    /// <summary>Pure BR-GRA-005 WF-07 spine — approval-authority scope checks not enforced here, same precedent as every other status-only workflow substitution in this codebase.</summary>
+    public static class MarksheetStatusTransitions
+    {
+        public static bool CanTransition(MarksheetStatus from, MarksheetStatus to)
+        {
+            return (from, to) switch
+            {
+                (MarksheetStatus.Draft, MarksheetStatus.Submitted) => true,
+                (MarksheetStatus.Submitted, MarksheetStatus.HoDReviewed) => true,
+                (MarksheetStatus.HoDReviewed, MarksheetStatus.Approved) => true,
+                (MarksheetStatus.Approved, MarksheetStatus.Published) => true,
+                _ => false,
+            };
+        }
+    }
+}

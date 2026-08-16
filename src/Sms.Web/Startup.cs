@@ -15,6 +15,7 @@ using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
 using Sms.Application.Grades;
+using Sms.Application.Grading;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
@@ -38,6 +39,7 @@ using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Grades;
+using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
@@ -212,6 +214,16 @@ namespace Sms.Web
             // mandatory-reason half is enforced, via the generic T1 audit
             // pipeline) are deferred.
             services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
+
+            // S3/E-302 (Grading - basic subset, doc/Modules/17, BR-GRA-001/003/
+            // 005). Percentage-band scales only; continuous-assessment blueprints
+            // only (no Module 16 exam-session linkage - doesn't exist yet).
+            // Publishing a marksheet computes TermResult rows, not a PDF report
+            // card - actual PDF rendering needs the O6 engine decision (still
+            // open). Year aggregation, GPA, ranking, promotion proposals,
+            // transcripts, and WF-08 corrections are all deferred to full
+            // Grading (S4/E-402).
+            services.AddScoped<IGradingAdmin, GradingAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

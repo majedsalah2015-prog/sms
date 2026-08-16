@@ -8,6 +8,7 @@ using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Employees;
 using Sms.Domain.Grades;
+using Sms.Domain.Grading;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
@@ -184,6 +185,20 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Justification> Justifications => Set<Justification>();
 
         public DbSet<LeavePass> LeavePasses => Set<LeavePass>();
+
+        public DbSet<GradingScale> GradingScales => Set<GradingScale>();
+
+        public DbSet<ScaleBand> ScaleBands => Set<ScaleBand>();
+
+        public DbSet<Blueprint> Blueprints => Set<Blueprint>();
+
+        public DbSet<BlueprintComponent> BlueprintComponents => Set<BlueprintComponent>();
+
+        public DbSet<Marksheet> Marksheets => Set<Marksheet>();
+
+        public DbSet<MarkEntry> MarkEntries => Set<MarkEntry>();
+
+        public DbSet<TermResult> TermResults => Set<TermResult>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
