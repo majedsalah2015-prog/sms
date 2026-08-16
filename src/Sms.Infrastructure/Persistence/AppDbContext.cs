@@ -8,9 +8,11 @@ using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
+using Sms.Domain.Parents;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
+using Sms.Domain.Students;
 using Sms.Domain.Subjects;
 using Sms.Domain.Workflow;
 
@@ -124,6 +126,16 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<CurriculumOffering> CurriculumOfferings => Set<CurriculumOffering>();
 
         public DbSet<TeacherSubjectQualification> TeacherSubjectQualifications => Set<TeacherSubjectQualification>();
+
+        public DbSet<Student> Students => Set<Student>();
+
+        public DbSet<Enrollment> Enrollments => Set<Enrollment>();
+
+        public DbSet<StudentGuardianLink> StudentGuardianLinks => Set<StudentGuardianLink>();
+
+        public DbSet<EmergencyContact> EmergencyContacts => Set<EmergencyContact>();
+
+        public DbSet<Parent> Parents => Set<Parent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

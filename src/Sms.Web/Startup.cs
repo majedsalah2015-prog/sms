@@ -15,9 +15,11 @@ using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
+using Sms.Application.Parents;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
+using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
@@ -31,10 +33,12 @@ using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
+using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
 using Sms.Infrastructure.Workflow;
 
@@ -158,11 +162,18 @@ namespace Sms.Web
             services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
 
             // E-103 (slice: Sections, doc/Modules/06, BR-SCN-001..007). SectionMembership.EnrollmentId
-            // is an unconstrained forward reference — ppl.Enrollment doesn't exist yet (S2).
+            // got its real FK once E-202 added ppl.Enrollment.
             services.AddScoped<ISectionAdmin, SectionAdmin>();
 
             // E-104 (slice: Subjects, doc/Modules/07, BR-SUB-001..008).
             services.AddScoped<ISubjectAdmin, SubjectAdmin>();
+
+            // S2/E-202 (slice: Students + Parents, doc/Modules/10-11). Both admin
+            // services issue permanent numbers via E-006's INumberIssuer (series
+            // STU/PAR, already seeded by E-010). Dedup engine, merge tool, and
+            // WF-03 withdrawal clearance workflow are deferred.
+            services.AddScoped<IStudentAdmin, StudentAdmin>();
+            services.AddScoped<IParentAdmin, ParentAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

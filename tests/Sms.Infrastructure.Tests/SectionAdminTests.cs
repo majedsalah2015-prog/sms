@@ -9,6 +9,7 @@ using Sms.Domain.Grades;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
+using Sms.Domain.Students;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Sections;
@@ -19,9 +20,10 @@ namespace Sms.Infrastructure.Tests
 {
     /// <summary>
     /// E-103 (slice: Sections, doc/Modules/06, BR-SCN-001..007) over a real
-    /// Sqlite-backed AppDbContext. SectionMembership.EnrollmentId is an
-    /// unconstrained forward reference (ppl.Enrollment doesn't exist, S2) —
-    /// tests just use arbitrary ints for it.
+    /// Sqlite-backed AppDbContext. SectionMembership.EnrollmentId carries a
+    /// real FK to ppl.Enrollment as of E-202 — tests seed real Student +
+    /// Enrollment rows via <see cref="CreateEnrollment"/> rather than the
+    /// arbitrary placeholder ints used before Enrollment existed.
     /// </summary>
     public sealed class SectionAdminTests : IDisposable
     {
@@ -95,6 +97,38 @@ namespace Sms.Infrastructure.Tests
         {
             var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options;
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
+        }
+
+        private int _nextStudentSeq = 1;
+
+        /// <summary>Seeds a Student + an Active Enrollment for the fixture's year, returning the Enrollment id (real FK target since E-202).</summary>
+        private async Task<int> CreateEnrollment(AppDbContext db, int gradeYearProfileId = -1)
+        {
+            var profileId = gradeYearProfileId == -1 ? _profileId : gradeYearProfileId;
+            var seq = _nextStudentSeq++;
+            var student = new Student
+            {
+                StudentNo = $"STU-TEST-{seq}",
+                FirstNameAr = "طالب", FatherNameAr = "أب", GrandfatherNameAr = "جد", FamilyNameAr = "عائلة",
+                FirstNameEn = "Student", FatherNameEn = "Father", GrandfatherNameEn = "Grandfather", FamilyNameEn = "Family",
+                Gender = Sms.Domain.Common.Gender.Male,
+                DateOfBirth = new DateTime(2018, 1, 1),
+                NationalityLookupId = 1,
+            };
+            db.Students.Add(student);
+            await db.SaveChangesAsync();
+
+            var enrollment = new Enrollment
+            {
+                AcademicYearId = _yearId,
+                StudentId = student.Id,
+                GradeYearProfileId = profileId,
+                EnrollmentDate = new DateTime(2026, 9, 1),
+                SourceType = EnrollmentSourceType.Admission,
+            };
+            db.Enrollments.Add(enrollment);
+            await db.SaveChangesAsync();
+            return enrollment.Id;
         }
 
         // --- BR-SCN-001/002/003 section definition ----------------------------
@@ -189,11 +223,11 @@ namespace Sms.Infrastructure.Tests
             using var db = CreateContext();
             var admin = new SectionAdmin(db);
             var section = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", capacity: 2, GenderPolicy.Mixed);
-            await admin.AssignMembershipAsync(section.Id, enrollmentId: 501, new DateTime(2026, 9, 1));
-            await admin.AssignMembershipAsync(section.Id, enrollmentId: 502, new DateTime(2026, 9, 1));
+            await admin.AssignMembershipAsync(section.Id, await CreateEnrollment(db), new DateTime(2026, 9, 1));
+            await admin.AssignMembershipAsync(section.Id, await CreateEnrollment(db), new DateTime(2026, 9, 1));
 
             await Assert.ThrowsAsync<SectionFullException>(() =>
-                admin.AssignMembershipAsync(section.Id, enrollmentId: 503, new DateTime(2026, 9, 1)));
+                admin.AssignMembershipAsync(section.Id, 999, new DateTime(2026, 9, 1)));
         }
 
         [Fact]
@@ -204,9 +238,10 @@ namespace Sms.Infrastructure.Tests
             var admin = new SectionAdmin(db);
             var sectionA = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
             var sectionB = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
-            var original = await admin.AssignMembershipAsync(sectionA.Id, enrollmentId: 501, new DateTime(2026, 9, 1));
+            var enrollmentId = await CreateEnrollment(db);
+            var original = await admin.AssignMembershipAsync(sectionA.Id, enrollmentId, new DateTime(2026, 9, 1));
 
-            var transferred = await admin.TransferMembershipAsync(501, sectionB.Id, "Balancing", new DateTime(2026, 10, 1));
+            var transferred = await admin.TransferMembershipAsync(enrollmentId, sectionB.Id, "Balancing", new DateTime(2026, 10, 1));
 
             Assert.Equal(new DateTime(2026, 10, 1), db.SectionMemberships.Single(m => m.Id == original.Id).EffectiveToUtc);
             Assert.Equal(sectionB.Id, db.SectionMemberships.Single(m => m.Id == transferred.Id).SectionId);
@@ -222,7 +257,7 @@ namespace Sms.Infrastructure.Tests
             using var db = CreateContext();
             var admin = new SectionAdmin(db);
             var section = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
-            await admin.AssignMembershipAsync(section.Id, enrollmentId: 501, new DateTime(2026, 9, 1));
+            await admin.AssignMembershipAsync(section.Id, await CreateEnrollment(db), new DateTime(2026, 9, 1));
 
             await Assert.ThrowsAsync<SectionCloseWithMembersException>(() => admin.CloseSectionAsync(section.Id));
         }

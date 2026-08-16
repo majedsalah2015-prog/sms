@@ -7,10 +7,9 @@ namespace Sms.Domain.Sections
     /// <summary>
     /// core.SectionMembership (BR-SCN-005/006): effective-dated enrollment ×
     /// section link — current section = the open-ended (EffectiveToUtc null)
-    /// row. EnrollmentId is a forward reference: ppl.Enrollment (S2) doesn't
-    /// exist yet, so it's an unconstrained int, matching
-    /// Attachment.OwningEntityId's precedent — a real FK is added once
-    /// Enrollment lands.
+    /// row. EnrollmentId now carries a real FK to ppl.Enrollment (added in
+    /// E-202) — it was an unconstrained forward reference (matching
+    /// Attachment.OwningEntityId's precedent) from E-103 until Enrollment existed.
     /// </summary>
     [Audited(AuditTier.T2)]
     public class SectionMembership : AuditableEntity, ISchoolScoped, IYearScoped
