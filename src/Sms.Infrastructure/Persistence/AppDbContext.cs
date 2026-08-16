@@ -11,6 +11,7 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
+using Sms.Domain.Subjects;
 using Sms.Domain.Workflow;
 
 namespace Sms.Infrastructure.Persistence
@@ -115,6 +116,14 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<HomeroomAssignment> HomeroomAssignments => Set<HomeroomAssignment>();
 
         public DbSet<SectionMembership> SectionMemberships => Set<SectionMembership>();
+
+        public DbSet<Department> Departments => Set<Department>();
+
+        public DbSet<Subject> Subjects => Set<Subject>();
+
+        public DbSet<CurriculumOffering> CurriculumOfferings => Set<CurriculumOffering>();
+
+        public DbSet<TeacherSubjectQualification> TeacherSubjectQualifications => Set<TeacherSubjectQualification>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
