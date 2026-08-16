@@ -14,6 +14,7 @@ using Sms.Application.Calendar;
 using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
+using Sms.Application.Fees;
 using Sms.Application.Grades;
 using Sms.Application.Grading;
 using Sms.Application.Jobs;
@@ -21,6 +22,7 @@ using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
+using Sms.Application.Payments;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
@@ -38,6 +40,7 @@ using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Jobs;
@@ -45,6 +48,7 @@ using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
+using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
@@ -224,6 +228,18 @@ namespace Sms.Web
             // transcripts, and WF-08 corrections are all deferred to full
             // Grading (S4/E-402).
             services.AddScoped<IGradingAdmin, GradingAdmin>();
+
+            // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
+            // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
+            // implement BR-FEE-005's e-invoicing-readiness fields for real
+            // (ZATCA-style TLV QR payload + SHA-256 hash chain) - live
+            // submission to a tax authority is out of scope. Pro-ration
+            // (BR-FEE-006), late fees (BR-FEE-007), opening balances
+            // (BR-FEE-009), discounts (Module 22), installments (Module 20),
+            // bank reconciliation, and the online gateway (BR-PAY-007,
+            // dormant per doc itself) are all deferred.
+            services.AddScoped<IFeeAdmin, FeeAdmin>();
+            services.AddScoped<IPaymentAdmin, PaymentAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

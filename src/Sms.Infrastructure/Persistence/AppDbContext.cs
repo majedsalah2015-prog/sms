@@ -7,6 +7,7 @@ using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Employees;
+using Sms.Domain.Fees;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
 using Sms.Domain.Jobs;
@@ -14,6 +15,7 @@ using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
+using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
@@ -199,6 +201,26 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<MarkEntry> MarkEntries => Set<MarkEntry>();
 
         public DbSet<TermResult> TermResults => Set<TermResult>();
+
+        public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
+
+        public DbSet<FeeStructureLine> FeeStructureLines => Set<FeeStructureLine>();
+
+        public DbSet<Payer> Payers => Set<Payer>();
+
+        public DbSet<Charge> Charges => Set<Charge>();
+
+        public DbSet<CreditNote> CreditNotes => Set<CreditNote>();
+
+        public DbSet<TillSession> TillSessions => Set<TillSession>();
+
+        public DbSet<Receipt> Receipts => Set<Receipt>();
+
+        public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();
+
+        public DbSet<Pdc> Pdcs => Set<Pdc>();
+
+        public DbSet<RefundVoucher> RefundVouchers => Set<RefundVoucher>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
