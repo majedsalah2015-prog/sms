@@ -30,6 +30,7 @@ using Sms.Application.Security;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Teachers;
+using Sms.Application.Timetable;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
@@ -58,6 +59,7 @@ using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
 using Sms.Infrastructure.Teachers;
+using Sms.Infrastructure.Timetable;
 using Sms.Infrastructure.Workflow;
 
 namespace Sms.Web
@@ -254,6 +256,12 @@ namespace Sms.Web
             // Announcements (read-only) are deferred entirely - no Messaging
             // module exists yet (M32, S6/S7).
             services.AddScoped<IParentPortalQuery, ParentPortalQuery>();
+
+            // S4/E-401 (Timetable, doc/Modules/15, BR-TTB-001..009). Assisted-manual
+            // v1 (no auto-generation solver, deliberately Future per the doc's own
+            // scope). PublishAsync reuses E-103's CalendarDayResolver to generate
+            // dated Session rows only on working days.
+            services.AddScoped<ITimetableAdmin, TimetableAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

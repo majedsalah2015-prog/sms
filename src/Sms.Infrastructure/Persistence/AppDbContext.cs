@@ -22,6 +22,7 @@ using Sms.Domain.Security;
 using Sms.Domain.Students;
 using Sms.Domain.Subjects;
 using Sms.Domain.Teachers;
+using Sms.Domain.Timetable;
 using Sms.Domain.Workflow;
 using AdmissionApplication = Sms.Domain.Admissions.Application;
 
@@ -221,6 +222,18 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Pdc> Pdcs => Set<Pdc>();
 
         public DbSet<RefundVoucher> RefundVouchers => Set<RefundVoucher>();
+
+        public DbSet<TimetableShape> TimetableShapes => Set<TimetableShape>();
+
+        public DbSet<PeriodSlot> PeriodSlots => Set<PeriodSlot>();
+
+        public DbSet<TimetableVersion> TimetableVersions => Set<TimetableVersion>();
+
+        public DbSet<Placement> Placements => Set<Placement>();
+
+        public DbSet<Session> Sessions => Set<Session>();
+
+        public DbSet<Substitution> Substitutions => Set<Substitution>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
