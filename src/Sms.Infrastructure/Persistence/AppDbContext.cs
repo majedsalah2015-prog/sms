@@ -20,6 +20,7 @@ using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
+using Sms.Domain.Transport;
 using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
@@ -305,6 +306,26 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<GlExportBatch> GlExportBatches => Set<GlExportBatch>();
 
         public DbSet<GlJournalLine> GlJournalLines => Set<GlJournalLine>();
+
+        public DbSet<Bus> Buses => Set<Bus>();
+
+        public DbSet<BusDocument> BusDocuments => Set<BusDocument>();
+
+        public DbSet<TransportStaff> TransportStaff => Set<TransportStaff>();
+
+        public DbSet<Route> Routes => Set<Route>();
+
+        public DbSet<RouteStop> RouteStops => Set<RouteStop>();
+
+        public DbSet<TransportSubscription> TransportSubscriptions => Set<TransportSubscription>();
+
+        public DbSet<RouteWaitlist> RouteWaitlists => Set<RouteWaitlist>();
+
+        public DbSet<Trip> Trips => Set<Trip>();
+
+        public DbSet<TripLog> TripLogs => Set<TripLog>();
+
+        public DbSet<SafetyEvent> SafetyEvents => Set<SafetyEvent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

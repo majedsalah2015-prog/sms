@@ -37,6 +37,7 @@ using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Teachers;
 using Sms.Application.Timetable;
+using Sms.Application.Transport;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
@@ -72,6 +73,7 @@ using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
 using Sms.Infrastructure.Teachers;
 using Sms.Infrastructure.Timetable;
+using Sms.Infrastructure.Transport;
 using Sms.Infrastructure.Workflow;
 
 namespace Sms.Web
@@ -308,6 +310,19 @@ namespace Sms.Web
             // balanced by construction, numbered "GLX", hashed, and may not
             // overlap a non-voided batch.
             services.AddScoped<IGlExportService, GlExportService>();
+
+            // S6/E-601 (Transportation, doc/Modules/23, BR-TRN-001..009).
+            // Roadworthiness and trip rosters are derived, never stored; trip
+            // open enforces bus documents + driver licence class; trip close
+            // enforces every roster student resolved + "bus empty" sweep.
+            // Subscription posts the zone-priced transport charge through
+            // E-303 (structure line per zone category); pro-ration (BR-FEE-006)
+            // is still E-303's deferral. Not-boarded/route-change/suspension
+            // notifications publish through E-007 (no templates seeded).
+            // Deferred: attendant mandatory per pack (doc Q1), parent
+            // "not riding today" portal declaration (Q3), Hangfire scheduling
+            // of EscalateUnclosedTripsAsync, all doc Sec.8 screens.
+            services.AddScoped<ITransportAdmin, TransportAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
