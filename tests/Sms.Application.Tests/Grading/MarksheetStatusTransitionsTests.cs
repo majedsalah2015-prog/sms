@@ -12,6 +12,7 @@ namespace Sms.Application.Tests.Grading
         [InlineData(MarksheetStatus.Submitted, MarksheetStatus.HoDReviewed)]
         [InlineData(MarksheetStatus.HoDReviewed, MarksheetStatus.Approved)]
         [InlineData(MarksheetStatus.Approved, MarksheetStatus.Published)]
+        [InlineData(MarksheetStatus.Published, MarksheetStatus.Draft)]
         [BusinessRule("BR-GRA-005")]
         public void Legal_moves_are_allowed(MarksheetStatus from, MarksheetStatus to)
         {
@@ -21,8 +22,8 @@ namespace Sms.Application.Tests.Grading
         [Theory]
         [InlineData(MarksheetStatus.Draft, MarksheetStatus.Approved)]
         [InlineData(MarksheetStatus.Draft, MarksheetStatus.Published)]
-        [InlineData(MarksheetStatus.Published, MarksheetStatus.Draft)]
         [InlineData(MarksheetStatus.Submitted, MarksheetStatus.Approved)]
+        [InlineData(MarksheetStatus.Submitted, MarksheetStatus.Draft)]
         [BusinessRule("BR-GRA-005")]
         public void Illegal_moves_are_rejected(MarksheetStatus from, MarksheetStatus to)
         {

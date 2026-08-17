@@ -85,4 +85,24 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasIndex(x => new { x.EnrollmentId, x.CurriculumOfferingId, x.TermId }, "IX_TermResult_Enrollment_Offering_Term").IsUnique();
         }
     }
+
+    public class PromotionCriteriaConfiguration : IEntityTypeConfiguration<PromotionCriteria>
+    {
+        public void Configure(EntityTypeBuilder<PromotionCriteria> builder)
+        {
+            builder.ToTable("PromotionCriteria", "core");
+            builder.Property(x => x.OverallPassMark).HasColumnType("decimal(5,2)");
+            builder.HasIndex(x => x.GradeYearProfileId).IsUnique();
+        }
+    }
+
+    public class YearResultConfiguration : IEntityTypeConfiguration<YearResult>
+    {
+        public void Configure(EntityTypeBuilder<YearResult> builder)
+        {
+            builder.ToTable("YearResult", "core");
+            builder.Property(x => x.Gpa).HasColumnType("decimal(4,2)");
+            builder.HasIndex(x => new { x.EnrollmentId, x.AcademicYearId }, "IX_YearResult_Enrollment_Year").IsUnique();
+        }
+    }
 }

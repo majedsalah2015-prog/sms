@@ -14,6 +14,7 @@ using Sms.Application.Calendar;
 using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
+using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.Grades;
 using Sms.Application.Grading;
@@ -42,6 +43,7 @@ using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Grading;
@@ -223,15 +225,25 @@ namespace Sms.Web
             // pipeline) are deferred.
             services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
 
-            // S3/E-302 (Grading - basic subset, doc/Modules/17, BR-GRA-001/003/
-            // 005). Percentage-band scales only; continuous-assessment blueprints
-            // only (no Module 16 exam-session linkage - doesn't exist yet).
-            // Publishing a marksheet computes TermResult rows, not a PDF report
-            // card - actual PDF rendering needs the O6 engine decision (still
-            // open). Year aggregation, GPA, ranking, promotion proposals,
-            // transcripts, and WF-08 corrections are all deferred to full
-            // Grading (S4/E-402).
+            // S3/E-302 + S4/E-402 (Grading, doc/Modules/17, BR-GRA-001/003/005/
+            // 006/007). Percentage-band scales only. Year aggregation/GPA/
+            // promotion outcome (ComputeYearResultAsync) use the latest
+            // TermResult per offering as a stand-in for full term-weighted
+            // aggregation (BR-GRA-003's configurable term-weight scheme isn't
+            // implemented). WF-08 (CorrectPublishedMarksheetAsync) reopens a
+            // Published marksheet to Draft, reason mandatory. Report-card PDF
+            // rendering still needs the O6 engine decision (open); transcripts,
+            // appeals, and comment banks remain deferred.
             services.AddScoped<IGradingAdmin, GradingAdmin>();
+
+            // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
+            // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
+            // (doc's "single marks store") - this service owns scheduling,
+            // seating, exam-day attendance, incidents, and makeup eligibility.
+            // RecordExamAttendanceAsync writes real cross-module MarkEntry zeros
+            // for unexcused absence per policy. Invigilation duty rosters
+            // (BR-EXM-005) are deferred.
+            services.AddScoped<IExaminationAdmin, ExaminationAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

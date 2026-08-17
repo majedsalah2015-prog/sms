@@ -7,6 +7,7 @@ using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Employees;
+using Sms.Domain.Examinations;
 using Sms.Domain.Fees;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
@@ -234,6 +235,24 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Session> Sessions => Set<Session>();
 
         public DbSet<Substitution> Substitutions => Set<Substitution>();
+
+        public DbSet<ExamType> ExamTypes => Set<ExamType>();
+
+        public DbSet<ExamRound> ExamRounds => Set<ExamRound>();
+
+        public DbSet<Exam> Exams => Set<Exam>();
+
+        public DbSet<ExamSitting> ExamSittings => Set<ExamSitting>();
+
+        public DbSet<ExamAttendance> ExamAttendances => Set<ExamAttendance>();
+
+        public DbSet<ExamIncident> ExamIncidents => Set<ExamIncident>();
+
+        public DbSet<MakeupEligibility> MakeupEligibilities => Set<MakeupEligibility>();
+
+        public DbSet<PromotionCriteria> PromotionCriteria => Set<PromotionCriteria>();
+
+        public DbSet<YearResult> YearResults => Set<YearResult>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

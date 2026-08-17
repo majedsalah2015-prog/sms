@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Audit;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Grading;
@@ -16,11 +17,13 @@ namespace Sms.Infrastructure.Grading
     {
         private readonly AppDbContext _db;
         private readonly IClock _clock;
+        private readonly IAuditContext _audit;
 
-        public GradingAdmin(AppDbContext db, IClock clock)
+        public GradingAdmin(AppDbContext db, IClock clock, IAuditContext audit)
         {
             _db = db;
             _clock = clock;
+            _audit = audit;
         }
 
         public async Task<GradingScale> DefineScaleAsync(
@@ -223,6 +226,92 @@ namespace Sms.Infrastructure.Grading
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task CorrectPublishedMarksheetAsync(int marksheetId, string reason, CancellationToken cancellationToken = default)
+        {
+            var marksheet = await _db.Marksheets.SingleAsync(m => m.Id == marksheetId, cancellationToken);
+            if (!MarksheetStatusTransitions.CanTransition(marksheet.Status, MarksheetStatus.Draft))
+            {
+                throw new InvalidMarksheetStatusTransitionException(marksheet.Status, MarksheetStatus.Draft);
+            }
+
+            _audit.Reason = reason;
+            marksheet.Status = MarksheetStatus.Draft;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<PromotionCriteria> DefinePromotionCriteriaAsync(
+            int gradeYearProfileId, decimal overallPassMark, int maxFailedSubjectsForPromotion, CancellationToken cancellationToken = default)
+        {
+            var criteria = await _db.PromotionCriteria.SingleOrDefaultAsync(c => c.GradeYearProfileId == gradeYearProfileId, cancellationToken);
+            if (criteria == null)
+            {
+                criteria = new PromotionCriteria { GradeYearProfileId = gradeYearProfileId };
+                _db.PromotionCriteria.Add(criteria);
+            }
+
+            criteria.OverallPassMark = overallPassMark;
+            criteria.MaxFailedSubjectsForPromotion = maxFailedSubjectsForPromotion;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return criteria;
+        }
+
+        public async Task<YearResult> ComputeYearResultAsync(
+            int enrollmentId, int academicYearId, int gradeYearProfileId, CancellationToken cancellationToken = default)
+        {
+            var criteria = await _db.PromotionCriteria.SingleAsync(c => c.GradeYearProfileId == gradeYearProfileId, cancellationToken);
+
+            // Latest TermResult per offering stands in for full term-weighted year aggregation (BR-GRA-003's
+            // configurable term-weight scheme isn't implemented in this slice - see IGradingAdmin's doc comment).
+            var results = await _db.TermResults
+                .Where(r => r.EnrollmentId == enrollmentId && r.AcademicYearId == academicYearId)
+                .OrderByDescending(r => r.PublishedAtUtc)
+                .ToListAsync(cancellationToken);
+            var latestPerOffering = results.GroupBy(r => r.CurriculumOfferingId).Select(g => g.First()).ToList();
+
+            var offeringIds = latestPerOffering.Select(r => r.CurriculumOfferingId).ToList();
+            var weightByOffering = await _db.CurriculumOfferings
+                .Where(o => offeringIds.Contains(o.Id))
+                .ToDictionaryAsync(o => o.Id, o => o.GpaWeight, cancellationToken);
+
+            var bandIds = latestPerOffering.Where(r => r.ScaleBandId.HasValue).Select(r => r.ScaleBandId!.Value).Distinct().ToList();
+            var bandsById = await _db.ScaleBands.Where(b => bandIds.Contains(b.Id)).ToDictionaryAsync(b => b.Id, cancellationToken);
+
+            var gpaInputs = latestPerOffering.Select(r =>
+            {
+                var gpaPoints = r.ScaleBandId.HasValue && bandsById.TryGetValue(r.ScaleBandId.Value, out var band) ? band.GpaPoints : null;
+                return new GpaCalculator.OfferingResult(gpaPoints, weightByOffering[r.CurriculumOfferingId]);
+            }).ToList();
+            var gpa = GpaCalculator.Calculate(gpaInputs);
+
+            var failedSubjectCount = latestPerOffering.Count(r =>
+                r.ScaleBandId.HasValue && bandsById.TryGetValue(r.ScaleBandId.Value, out var band) && !band.IsPassing);
+
+            var totalWeight = latestPerOffering.Sum(r => weightByOffering[r.CurriculumOfferingId]);
+            var overallPercent = totalWeight > 0
+                ? latestPerOffering.Sum(r => r.ScorePercent * weightByOffering[r.CurriculumOfferingId]) / totalWeight
+                : 0m;
+            var overallPassed = overallPercent >= criteria.OverallPassMark;
+
+            var outcome = PromotionEvaluator.Evaluate(failedSubjectCount, criteria.MaxFailedSubjectsForPromotion, overallPassed);
+
+            var yearResult = await _db.YearResults.SingleOrDefaultAsync(
+                r => r.EnrollmentId == enrollmentId && r.AcademicYearId == academicYearId, cancellationToken);
+            if (yearResult == null)
+            {
+                yearResult = new YearResult { AcademicYearId = academicYearId, EnrollmentId = enrollmentId };
+                _db.YearResults.Add(yearResult);
+            }
+
+            yearResult.Gpa = gpa;
+            yearResult.FailedSubjectCount = failedSubjectCount;
+            yearResult.PromotionOutcome = outcome;
+            yearResult.ComputedAtUtc = _clock.UtcNow;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return yearResult;
+        }
+
         private async Task PublishResultsAsync(Marksheet marksheet, System.Collections.Generic.List<MarkEntry> entries, CancellationToken cancellationToken)
         {
             var blueprint = await _db.Blueprints.SingleAsync(b => b.Id == marksheet.BlueprintId, cancellationToken);
@@ -254,17 +343,28 @@ namespace Sms.Infrastructure.Grading
                     RoundedPercent = roundedPercent,
                 });
 
-                _db.TermResults.Add(new TermResult
+                // Upsert - WF-08 (BR-GRA-005) reopens a Published marksheet back to Draft for correction, and
+                // re-publishing must update the same TermResult row rather than violate its unique index.
+                var existing = await _db.TermResults.SingleOrDefaultAsync(
+                    r => r.EnrollmentId == group.Key && r.CurriculumOfferingId == blueprint.CurriculumOfferingId && r.TermId == blueprint.TermId,
+                    cancellationToken);
+
+                if (existing == null)
                 {
-                    AcademicYearId = marksheet.AcademicYearId,
-                    EnrollmentId = group.Key,
-                    CurriculumOfferingId = blueprint.CurriculumOfferingId,
-                    TermId = blueprint.TermId,
-                    ScorePercent = roundedPercent,
-                    ScaleBandId = bandId,
-                    CalculationSnapshotJson = snapshot,
-                    PublishedAtUtc = _clock.UtcNow,
-                });
+                    existing = new TermResult
+                    {
+                        AcademicYearId = marksheet.AcademicYearId,
+                        EnrollmentId = group.Key,
+                        CurriculumOfferingId = blueprint.CurriculumOfferingId,
+                        TermId = blueprint.TermId,
+                    };
+                    _db.TermResults.Add(existing);
+                }
+
+                existing.ScorePercent = roundedPercent;
+                existing.ScaleBandId = bandId;
+                existing.CalculationSnapshotJson = snapshot;
+                existing.PublishedAtUtc = _clock.UtcNow;
             }
         }
     }

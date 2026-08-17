@@ -52,6 +52,8 @@ namespace Sms.Infrastructure.Tests
         private int _offeringId;
         private int _sectionId;
         private int _termId;
+        private int _profileId;
+        private int _yearId;
 
         public GradingAdminTests()
         {
@@ -129,6 +131,8 @@ namespace Sms.Infrastructure.Tests
             _offeringId = offering.Id;
             _sectionId = section.Id;
             _termId = term.Id;
+            _profileId = profile.Id;
+            _yearId = year.Id;
         }
 
         public void Dispose() => _connection.Dispose();
@@ -164,7 +168,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Adding_a_band_to_a_locked_scale_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scale = await admin.DefineScaleAsync(_stageId, "نسبة مئوية", "Percentage");
             await admin.LockScaleAsync(scale.Id);
 
@@ -179,7 +183,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Finalizing_a_blueprint_whose_weights_dont_sum_to_100_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprint = await admin.DefineBlueprintAsync(_offeringId, _termId, scaleId);
             await admin.AddBlueprintComponentAsync(blueprint.Id, "اختبار", "Quiz", weight: 30m, maxScore: 20m);
@@ -192,7 +196,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Adding_a_component_to_a_finalized_blueprint_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
 
@@ -207,7 +211,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Creating_a_marksheet_from_an_unfinalized_blueprint_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprint = await admin.DefineBlueprintAsync(_offeringId, _termId, scaleId);
 
@@ -219,7 +223,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Creating_a_marksheet_seeds_one_stub_entry_per_member_per_component()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
 
@@ -233,7 +237,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Publishing_with_unresolved_entries_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
             var marksheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
@@ -250,7 +254,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Publishing_a_fully_resolved_marksheet_computes_a_term_result_with_a_snapshot()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
             var marksheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
@@ -282,13 +286,109 @@ namespace Sms.Infrastructure.Tests
         public async Task Changing_status_along_an_illegal_path_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new GradingAdmin(db, _clock);
+            var admin = new GradingAdmin(db, _clock, _audit);
             var scaleId = await DefineStandardScale(admin);
             var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
             var marksheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
 
             await Assert.ThrowsAsync<InvalidMarksheetStatusTransitionException>(() =>
                 admin.ChangeMarksheetStatusAsync(marksheet.Id, MarksheetStatus.Approved));
+        }
+
+        // --- S4/E-402: BR-GRA-005 WF-08 correction ----------------------------------
+
+        private async Task<(int marksheetId, int enrollmentId)> PublishScoredMarksheetAsync(
+            AppDbContext db, GradingAdmin admin, int blueprintId, decimal midterm, decimal quiz)
+        {
+            var marksheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
+            var components = db.BlueprintComponents.Where(c => c.BlueprintId == blueprintId).OrderBy(c => c.NameEn).ToList();
+            var enrollmentId = db.MarkEntries.First(e => e.MarksheetId == marksheet.Id).EnrollmentId;
+            foreach (var component in components)
+            {
+                var score = component.NameEn == "Midterm" ? midterm : quiz;
+                await admin.EnterMarkAsync(marksheet.Id, component.Id, enrollmentId, score, isAbsent: false, isExempt: false);
+            }
+
+            await admin.ChangeMarksheetStatusAsync(marksheet.Id, MarksheetStatus.Submitted);
+            await admin.ChangeMarksheetStatusAsync(marksheet.Id, MarksheetStatus.HoDReviewed);
+            await admin.ChangeMarksheetStatusAsync(marksheet.Id, MarksheetStatus.Approved);
+            await admin.ChangeMarksheetStatusAsync(marksheet.Id, MarksheetStatus.Published);
+            return (marksheet.Id, enrollmentId);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-005")]
+        public async Task Correcting_a_published_marksheet_and_republishing_updates_the_same_term_result()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
+            var (marksheetId, enrollmentId) = await PublishScoredMarksheetAsync(db, admin, blueprintId, midterm: 80m, quiz: 18m);
+            Assert.Equal(83.00m, db.TermResults.Single(r => r.EnrollmentId == enrollmentId).ScorePercent);
+
+            await admin.CorrectPublishedMarksheetAsync(marksheetId, "typo in midterm score");
+            var midtermComponent = db.BlueprintComponents.Single(c => c.BlueprintId == blueprintId && c.NameEn == "Midterm");
+            await admin.EnterMarkAsync(marksheetId, midtermComponent.Id, enrollmentId, 100m, isAbsent: false, isExempt: false);
+            await admin.ChangeMarksheetStatusAsync(marksheetId, MarksheetStatus.Submitted);
+            await admin.ChangeMarksheetStatusAsync(marksheetId, MarksheetStatus.HoDReviewed);
+            await admin.ChangeMarksheetStatusAsync(marksheetId, MarksheetStatus.Approved);
+            await admin.ChangeMarksheetStatusAsync(marksheetId, MarksheetStatus.Published);
+
+            // weighted = 90*30 + 100*70 = 9700 / 100 = 97.00 - and still exactly one TermResult row (upsert, not a duplicate).
+            var results = db.TermResults.Where(r => r.EnrollmentId == enrollmentId).ToList();
+            Assert.Single(results);
+            Assert.Equal(97.00m, results[0].ScorePercent);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-005")]
+        public async Task Correcting_a_marksheet_that_isnt_published_is_rejected()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
+            var marksheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId); // still Draft
+
+            await Assert.ThrowsAsync<InvalidMarksheetStatusTransitionException>(() =>
+                admin.CorrectPublishedMarksheetAsync(marksheet.Id, "oops"));
+        }
+
+        // --- S4/E-402: BR-GRA-006/007 year result + promotion -----------------------
+
+        [Fact]
+        [BusinessRule("BR-GRA-006")]
+        public async Task A_passing_student_with_no_failed_subjects_is_promoted()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
+            var (_, enrollmentId) = await PublishScoredMarksheetAsync(db, admin, blueprintId, midterm: 80m, quiz: 18m); // 83.00%, band P
+            await admin.DefinePromotionCriteriaAsync(_profileId, overallPassMark: 50m, maxFailedSubjectsForPromotion: 1);
+
+            var yearResult = await admin.ComputeYearResultAsync(enrollmentId, _yearId, _profileId);
+
+            Assert.Equal(0, yearResult.FailedSubjectCount);
+            Assert.Equal(PromotionOutcome.Promote, yearResult.PromotionOutcome);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-006")]
+        public async Task A_student_below_the_overall_pass_mark_is_retained()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
+            var (_, enrollmentId) = await PublishScoredMarksheetAsync(db, admin, blueprintId, midterm: 30m, quiz: 10m); // 36.00%, band F
+            await admin.DefinePromotionCriteriaAsync(_profileId, overallPassMark: 50m, maxFailedSubjectsForPromotion: 1);
+
+            var yearResult = await admin.ComputeYearResultAsync(enrollmentId, _yearId, _profileId);
+
+            Assert.Equal(1, yearResult.FailedSubjectCount);
+            Assert.Equal(PromotionOutcome.Retain, yearResult.PromotionOutcome);
         }
     }
 }

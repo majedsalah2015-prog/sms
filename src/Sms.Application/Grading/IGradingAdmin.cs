@@ -49,5 +49,21 @@ namespace Sms.Application.Grading
         /// unresolved entries. Publishing computes and persists a TermResult per enrollment (BR-GRA-003).
         /// </summary>
         Task ChangeMarksheetStatusAsync(int marksheetId, MarksheetStatus newStatus, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-GRA-005 WF-08: Published -> Draft, reason mandatory (P4 Principal chain not enforced here). Re-entry + re-publish reuse EnterMarkAsync/ChangeMarksheetStatusAsync as normal.</summary>
+        Task CorrectPublishedMarksheetAsync(int marksheetId, string reason, CancellationToken cancellationToken = default);
+
+        Task<PromotionCriteria> DefinePromotionCriteriaAsync(
+            int gradeYearProfileId, decimal overallPassMark, int maxFailedSubjectsForPromotion, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// BR-GRA-006/007: aggregates the enrollment's TermResults for the
+        /// year into a GPA + promotion outcome (latest TermResult per
+        /// offering stands in for full term-weighted year aggregation —
+        /// BR-GRA-003's configurable term-weight scheme isn't implemented
+        /// in this slice). Requires a PromotionCriteria row for the
+        /// enrollment's grade-year profile.
+        /// </summary>
+        Task<YearResult> ComputeYearResultAsync(int enrollmentId, int academicYearId, int gradeYearProfileId, CancellationToken cancellationToken = default);
     }
 }
