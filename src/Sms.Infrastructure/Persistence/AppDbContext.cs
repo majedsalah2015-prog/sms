@@ -14,6 +14,7 @@ using Sms.Domain.Fees;
 using Sms.Domain.GlExport;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
+using Sms.Domain.Health;
 using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
@@ -326,6 +327,36 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<TripLog> TripLogs => Set<TripLog>();
 
         public DbSet<SafetyEvent> SafetyEvents => Set<SafetyEvent>();
+
+        public DbSet<MedicalFile> MedicalFiles => Set<MedicalFile>();
+
+        public DbSet<Allergy> Allergies => Set<Allergy>();
+
+        public DbSet<MedicalCondition> MedicalConditions => Set<MedicalCondition>();
+
+        public DbSet<CarePlan> CarePlans => Set<CarePlan>();
+
+        public DbSet<ClinicVisit> ClinicVisits => Set<ClinicVisit>();
+
+        public DbSet<MedicationAuthorization> MedicationAuthorizations => Set<MedicationAuthorization>();
+
+        public DbSet<AdministrationLog> AdministrationLogs => Set<AdministrationLog>();
+
+        public DbSet<VaccinationScheduleEntry> VaccinationScheduleEntries => Set<VaccinationScheduleEntry>();
+
+        public DbSet<VaccinationRecord> VaccinationRecords => Set<VaccinationRecord>();
+
+        public DbSet<VaccinationCampaign> VaccinationCampaigns => Set<VaccinationCampaign>();
+
+        public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
+
+        public DbSet<ScreeningCampaign> ScreeningCampaigns => Set<ScreeningCampaign>();
+
+        public DbSet<ScreeningResult> ScreeningResults => Set<ScreeningResult>();
+
+        public DbSet<InfectiousCase> InfectiousCases => Set<InfectiousCase>();
+
+        public DbSet<ExposureNotice> ExposureNotices => Set<ExposureNotice>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

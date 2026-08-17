@@ -21,6 +21,7 @@ using Sms.Application.GlExport;
 using Sms.Application.Grades;
 using Sms.Application.Discounts;
 using Sms.Application.Grading;
+using Sms.Application.Health;
 using Sms.Application.Installments;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
@@ -56,6 +57,7 @@ using Sms.Infrastructure.GlExport;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Discounts;
 using Sms.Infrastructure.Grading;
+using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
@@ -323,6 +325,21 @@ namespace Sms.Web
             // "not riding today" portal declaration (Q3), Hangfire scheduling
             // of EscalateUnclosedTripsAsync, all doc Sec.8 screens.
             services.AddScoped<ITransportAdmin, TransportAdmin>();
+
+            // S6/E-602 (Health, doc/Modules/24, BR-HLT-001..010). The medical
+            // file is T0 read-audited via an explicit AuditAction.View event on
+            // every full-file open; the emergency banner is the nurse-curated
+            // denormalized subset read without opening the file. Sent-home
+            // needs a verified pickup-authorized person (BR-PAR-008) or a
+            // documented exception; medication administration only within the
+            // authorization (deviation = reason mandatory); vaccination
+            // campaigns need per-student consent (hard); infectious cases can
+            // pre-capture MedicalLeave via E-301; exposure notices are
+            // Principal-approved and anonymized. Vaccination schedule is a
+            // per-school table (no CountryPack entity). Deferred: session-
+            // teacher auto-notification on visit, referral letters through
+            // the Module 18 register, counseling notes (doc Q3 out), all screens.
+            services.AddScoped<IHealthAdmin, HealthAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
