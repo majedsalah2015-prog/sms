@@ -11,6 +11,7 @@ using Sms.Application.Attachments;
 using Sms.Application.Attendance;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
+using Sms.Application.Certificates;
 using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
@@ -40,6 +41,7 @@ using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Attendance;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
+using Sms.Infrastructure.Certificates;
 using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
@@ -244,6 +246,23 @@ namespace Sms.Web
             // for unexcused absence per policy. Invigilation duty rosters
             // (BR-EXM-005) are deferred.
             services.AddScoped<IExaminationAdmin, ExaminationAdmin>();
+
+            // S4/E-403 (Certificates, doc/Modules/18, BR-CRT-001..010). WF-09
+            // prerequisite checks (published results / fee clearance) are real -
+            // reuse E-302's TermResult and E-303's IFeeAdmin.ComputeStudentPositionAsync
+            // directly. BR-CRT-008's country-pack legal gate ships as the
+            // CertificateWithholdingPolicy constant (KSA-01: TC never fee-gated,
+            // PROVISIONAL pending the doc's Q1 legal review) since no CountryPack
+            // entity exists (E-101 never started); FeeClearanceRule.NoOverdue is
+            // refused at definition time because Charge carries no due date.
+            // Generation is atomic with real doc 08 numbering
+            // (CertificateType.NumberingSeriesCode selects the series per type -
+            // CERT/TC/etc, both already seeded by E-010). PDF rendering still
+            // needs the O6 engine decision (open); employee service-certificate
+            // and report-card official-copy registration through this same
+            // engine (the doc's "one register for everything official") aren't
+            // wired - both source modules already deferred their side of it.
+            services.AddScoped<ICertificateAdmin, CertificateAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

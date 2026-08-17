@@ -5,6 +5,7 @@ using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
+using Sms.Domain.Certificates;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Employees;
 using Sms.Domain.Examinations;
@@ -253,6 +254,14 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<PromotionCriteria> PromotionCriteria => Set<PromotionCriteria>();
 
         public DbSet<YearResult> YearResults => Set<YearResult>();
+
+        public DbSet<CertificateType> CertificateTypes => Set<CertificateType>();
+
+        public DbSet<CertificateRequest> CertificateRequests => Set<CertificateRequest>();
+
+        public DbSet<CertificateIssue> CertificateIssues => Set<CertificateIssue>();
+
+        public DbSet<VerificationLog> VerificationLogs => Set<VerificationLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
