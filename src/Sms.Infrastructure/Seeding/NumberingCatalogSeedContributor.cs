@@ -42,6 +42,7 @@ namespace Sms.Infrastructure.Seeding
             ("CRN", "CreditNote", "CRN-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
             ("DSC", "DiscountDocument", "DSC-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
             ("STM", "StatementIssue", "STM-{GYEAR}-{SEQ:6}", ResetPolicy.PerCalendarYear, GapPolicy.Normal),
+            ("GLX", "GlExportBatch", "GLX-{GYEAR}-{SEQ:4}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
             ("CERT", "Certificate", "CERT-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
             ("TC", "TransferCertificate", "TC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
             ("INC", "DisciplineIncident", "INC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),

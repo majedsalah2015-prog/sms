@@ -11,6 +11,7 @@ using Sms.Domain.Discounts;
 using Sms.Domain.Employees;
 using Sms.Domain.Examinations;
 using Sms.Domain.Fees;
+using Sms.Domain.GlExport;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
 using Sms.Domain.Installments;
@@ -298,6 +299,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<RenewalQueueItem> RenewalQueueItems => Set<RenewalQueueItem>();
 
         public DbSet<StatementIssue> StatementIssues => Set<StatementIssue>();
+
+        public DbSet<GlAccountMapping> GlAccountMappings => Set<GlAccountMapping>();
+
+        public DbSet<GlExportBatch> GlExportBatches => Set<GlExportBatch>();
+
+        public DbSet<GlJournalLine> GlJournalLines => Set<GlJournalLine>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

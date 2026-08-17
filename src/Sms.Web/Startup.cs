@@ -17,6 +17,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
 using Sms.Application.Examinations;
 using Sms.Application.Fees;
+using Sms.Application.GlExport;
 using Sms.Application.Grades;
 using Sms.Application.Discounts;
 using Sms.Application.Grading;
@@ -50,6 +51,7 @@ using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
+using Sms.Infrastructure.GlExport;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Discounts;
 using Sms.Infrastructure.Grading;
@@ -297,6 +299,15 @@ namespace Sms.Web
             // ("STM") separate gross / discounts / credit notes / payments.
             services.AddScoped<IDiscountAdmin, DiscountAdmin>();
             services.AddScoped<IStatementService, StatementService>();
+
+            // S5/E-503 (GL journal-summary export, O3 assumption per
+            // Implementation 01): generic CSV export over a per-school mapping
+            // table (GlAccountMapping keyed by GlAccountKeys + FeeCategory.
+            // GlExportCode for revenue). No named accounting-system adapter -
+            // the pilot school's ERP decides the first one. Batches are
+            // balanced by construction, numbered "GLX", hashed, and may not
+            // overlap a non-voided batch.
+            services.AddScoped<IGlExportService, GlExportService>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
