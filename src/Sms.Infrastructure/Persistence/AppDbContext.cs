@@ -7,6 +7,7 @@ using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
 using Sms.Domain.Certificates;
 using Sms.Domain.Classrooms;
+using Sms.Domain.Discipline;
 using Sms.Domain.Discounts;
 using Sms.Domain.Employees;
 using Sms.Domain.Examinations;
@@ -357,6 +358,36 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<InfectiousCase> InfectiousCases => Set<InfectiousCase>();
 
         public DbSet<ExposureNotice> ExposureNotices => Set<ExposureNotice>();
+
+        public DbSet<BehaviorCode> BehaviorCodes => Set<BehaviorCode>();
+
+        public DbSet<ViolationType> ViolationTypes => Set<ViolationType>();
+
+        public DbSet<MeritType> MeritTypes => Set<MeritType>();
+
+        public DbSet<ConsequenceType> ConsequenceTypes => Set<ConsequenceType>();
+
+        public DbSet<LadderStep> LadderSteps => Set<LadderStep>();
+
+        public DbSet<Incident> Incidents => Set<Incident>();
+
+        public DbSet<Merit> Merits => Set<Merit>();
+
+        public DbSet<DisciplineCase> DisciplineCases => Set<DisciplineCase>();
+
+        public DbSet<CaseStatement> CaseStatements => Set<CaseStatement>();
+
+        public DbSet<ActionApplied> ActionsApplied => Set<ActionApplied>();
+
+        public DbSet<Appeal> Appeals => Set<Appeal>();
+
+        public DbSet<PointLedgerEntry> PointLedgerEntries => Set<PointLedgerEntry>();
+
+        public DbSet<BehaviorContract> BehaviorContracts => Set<BehaviorContract>();
+
+        public DbSet<KeepApartPair> KeepApartPairs => Set<KeepApartPair>();
+
+        public DbSet<ParentMeeting> ParentMeetings => Set<ParentMeeting>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

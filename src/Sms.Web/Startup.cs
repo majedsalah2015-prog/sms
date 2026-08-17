@@ -19,6 +19,7 @@ using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.GlExport;
 using Sms.Application.Grades;
+using Sms.Application.Discipline;
 using Sms.Application.Discounts;
 using Sms.Application.Grading;
 using Sms.Application.Health;
@@ -55,6 +56,7 @@ using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.GlExport;
 using Sms.Infrastructure.Grades;
+using Sms.Infrastructure.Discipline;
 using Sms.Infrastructure.Discounts;
 using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Health;
@@ -340,6 +342,20 @@ namespace Sms.Web
             // teacher auto-notification on visit, referral letters through
             // the Module 18 register, counseling notes (doc Q3 out), all screens.
             services.AddScoped<IHealthAdmin, HealthAdmin>();
+
+            // S6/E-603 (Discipline, doc/Modules/25, BR-DCP-001..010). Year-
+            // versioned behavior code (types, consequence catalog - corporal
+            // punishment not representable - and the severity x repetition
+            // ladder); severity 1 resolves teacher-level, >= 2 opens a WF-11
+            // case; decisions cite an article, need statements at severity
+            // >= 3, a reason below the ladder proposal and the Principal above
+            // it / for suspension-class / severity 4; suspension days capped by
+            // the code's pack limit; one appeal within the window reviewed by a
+            // non-decider; points ledger + flags; parent view masks the
+            // reporter (BR-DCP-010). Country-pack starter code (doc Q1) not
+            // seeded; Sections-balancing consumption of keep-apart pairs and
+            // Module 17 conduct-grade wiring deferred; all screens deferred.
+            services.AddScoped<IDisciplineAdmin, DisciplineAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
