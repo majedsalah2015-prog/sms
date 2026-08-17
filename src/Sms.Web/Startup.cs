@@ -25,6 +25,7 @@ using Sms.Application.Grading;
 using Sms.Application.Health;
 using Sms.Application.Installments;
 using Sms.Application.Jobs;
+using Sms.Application.Library;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
@@ -62,6 +63,7 @@ using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
+using Sms.Infrastructure.Library;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
@@ -356,6 +358,19 @@ namespace Sms.Web
             // seeded; Sections-balancing consumption of keep-apart pairs and
             // Module 17 conduct-grade wiring deferred; all screens deferred.
             services.AddScoped<IDisciplineAdmin, DisciplineAdmin>();
+
+            // S6/E-604 (Library, doc/Modules/26, BR-LIB-001..009). Members are
+            // Student/Employee ids directly; policies per member class x stage;
+            // checkout gates (available copy, loan limit, unpaid library fines)
+            // with a logged librarian override; due dates shift off non-working
+            // days via CalendarDayResolver; FIFO reservation queue with hold
+            // window; overdue notices + optional fines (doc Q1: off by default)
+            // batch-confirmed into Module 19 misc charges (students only - staff
+            // have no payer model); lost/found with credit-note reversal;
+            // stocktake sessions; class-visit batch issue. Clearance status is
+            // exposed for WF-03/BR-EMP-008 checklists (not wired - neither
+            // checklist exists). All doc Sec.8 screens deferred.
+            services.AddScoped<ILibraryAdmin, LibraryAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

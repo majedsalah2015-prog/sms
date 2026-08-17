@@ -18,6 +18,7 @@ using Sms.Domain.Grading;
 using Sms.Domain.Health;
 using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
+using Sms.Domain.Library;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
@@ -388,6 +389,26 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<KeepApartPair> KeepApartPairs => Set<KeepApartPair>();
 
         public DbSet<ParentMeeting> ParentMeetings => Set<ParentMeeting>();
+
+        public DbSet<Title> Titles => Set<Title>();
+
+        public DbSet<Copy> Copies => Set<Copy>();
+
+        public DbSet<MemberPolicy> MemberPolicies => Set<MemberPolicy>();
+
+        public DbSet<Loan> Loans => Set<Loan>();
+
+        public DbSet<CirculationEvent> CirculationEvents => Set<CirculationEvent>();
+
+        public DbSet<Reservation> Reservations => Set<Reservation>();
+
+        public DbSet<FineProposal> FineProposals => Set<FineProposal>();
+
+        public DbSet<StocktakeSession> StocktakeSessions => Set<StocktakeSession>();
+
+        public DbSet<StocktakeLine> StocktakeLines => Set<StocktakeLine>();
+
+        public DbSet<ReadingLog> ReadingLogs => Set<ReadingLog>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
