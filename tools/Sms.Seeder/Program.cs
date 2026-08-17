@@ -3,17 +3,39 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Sms.Application.Attendance;
 using Sms.Application.Audit;
+using Sms.Application.Calendar;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Employees;
+using Sms.Application.Fees;
+using Sms.Application.Grades;
 using Sms.Application.Lookups;
 using Sms.Application.Numbering;
+using Sms.Application.Parents;
+using Sms.Application.Schools;
+using Sms.Application.Sections;
 using Sms.Application.Seeding;
+using Sms.Application.Students;
+using Sms.Application.Subjects;
+using Sms.Application.Teachers;
+using Sms.Infrastructure.Attendance;
 using Sms.Infrastructure.Audit;
+using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Common;
+using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Fees;
+using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Numbering;
+using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Seeding;
+using Sms.Infrastructure.Sections;
+using Sms.Infrastructure.Students;
+using Sms.Infrastructure.Subjects;
+using Sms.Infrastructure.Teachers;
 
 namespace Sms.Seeder
 {
@@ -52,10 +74,27 @@ namespace Sms.Seeder
 
             services.AddScoped<INumberingSeriesAdmin, NumberingSeriesAdmin>();
             services.AddScoped<ILookupAdmin, LookupAdmin>();
+            services.AddScoped<INumberIssuer, NumberIssuer>();
+
+            // S3/E-305 demo tenant - every admin service DemoSeedContributor composes.
+            services.AddScoped<ISchoolAdmin, SchoolAdmin>();
+            services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
+            services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
+            services.AddScoped<ISectionAdmin, SectionAdmin>();
+            services.AddScoped<ISubjectAdmin, SubjectAdmin>();
+            services.AddScoped<ICalendarAdmin, CalendarAdmin>();
+            services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
+            services.AddScoped<ITeacherAdmin, TeacherAdmin>();
+            services.AddScoped<IParentAdmin, ParentAdmin>();
+            services.AddScoped<IStudentAdmin, StudentAdmin>();
+            services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
+            services.AddScoped<IFeeAdmin, FeeAdmin>();
 
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
             services.AddScoped<ISeedContributor, RoleTemplateSeedContributor>();
+            services.AddScoped<ISeedContributor, Ksa01ContentPackSeedContributor>();
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
+            services.AddScoped<ISeedContributor, DemoSeedContributor>();
             services.AddScoped<SeedRunner>();
 
             using var provider = services.BuildServiceProvider();
