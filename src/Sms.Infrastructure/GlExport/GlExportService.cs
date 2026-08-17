@@ -80,21 +80,39 @@ namespace Sms.Infrastructure.GlExport
                 .Where(d => d.IssuedAtUtc >= periodFromUtc && d.IssuedAtUtc <= periodToUtc)
                 .Select(d => d.Amount).ToListAsync(cancellationToken);
             var receipts = await _db.Receipts
-                .Where(r => r.Status == ReceiptStatus.Posted && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc)
+                .Where(r => r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc)
                 .Select(r => new { r.Id, r.Method, r.Amount }).ToListAsync(cancellationToken);
             var receiptIds = receipts.Select(r => r.Id).ToList();
             var allocatedByReceipt = (await _db.PaymentAllocations.Where(a => receiptIds.Contains(a.ReceiptId)).Select(a => new { a.ReceiptId, a.AllocatedAmount }).ToListAsync(cancellationToken))
                 .GroupBy(a => a.ReceiptId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
             var refunds = await _db.RefundVouchers
                 .Where(v => v.Status == RefundVoucherStatus.Paid && (v.ModifiedAtUtc ?? v.CreatedAtUtc) >= periodFromUtc && (v.ModifiedAtUtc ?? v.CreatedAtUtc) <= periodToUtc)
+                .Where(v => !_db.WalletLedgerEntries.Any(e => e.RefundVoucherId == v.Id))   // wallet refunds journal against WalletLiability, below
                 .Select(v => new { v.Method, v.Amount }).ToListAsync(cancellationToken);
+
+            // S6/E-605 BR-CAF-007: wallet money (top-ups, refunds) and cafeteria sales journal separately - wallet liability, cafeteria revenue.
+            var walletTopUps = await _db.Receipts
+                .Where(r => r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.WalletTopUp && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc)
+                .Select(r => new { r.Method, r.Amount }).ToListAsync(cancellationToken);
+            var walletRefunds = await (
+                from e in _db.WalletLedgerEntries
+                join v in _db.RefundVouchers on e.RefundVoucherId equals v.Id
+                where e.Kind == Sms.Domain.Cafeteria.WalletLedgerKind.Refund && v.Status == RefundVoucherStatus.Paid
+                      && (v.ModifiedAtUtc ?? v.CreatedAtUtc) >= periodFromUtc && (v.ModifiedAtUtc ?? v.CreatedAtUtc) <= periodToUtc
+                select new { v.Method, e.Amount }).ToListAsync(cancellationToken);
+            var cafeteriaSales = await _db.Sales
+                .Where(s => s.Status == Sms.Domain.Cafeteria.SaleStatus.Posted && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan && s.AtUtc >= periodFromUtc && s.AtUtc <= periodToUtc)
+                .Select(s => new { s.Tender, s.Total }).ToListAsync(cancellationToken);
 
             var journal = JournalSummaryBuilder.Build(
                 charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
                 creditNotes.Select(n => new JournalSummaryBuilder.CreditNoteDoc(n.FeeCategoryId, categories.TryGetValue(n.FeeCategoryId, out var code) ? code : null, n.Amount, n.VatRate)).ToList(),
                 discounts.Select(d => new JournalSummaryBuilder.DiscountDoc(d)).ToList(),
                 receipts.Select(r => new JournalSummaryBuilder.ReceiptDoc(r.Method.ToString(), r.Amount, allocatedByReceipt.TryGetValue(r.Id, out var a) ? a : 0m)).ToList(),
-                refunds.Select(f => new JournalSummaryBuilder.RefundDoc(f.Method.ToString(), f.Amount)).ToList());
+                refunds.Select(f => new JournalSummaryBuilder.RefundDoc(f.Method.ToString(), f.Amount)).ToList(),
+                walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
+                    .Concat(walletRefunds.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))).ToList(),
+                cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList());
 
             var keys = journal.Lines.Select(l => l.AccountKey).Distinct().ToList();
             var mappings = await _db.GlAccountMappings.Where(m => keys.Contains(m.Key)).ToDictionaryAsync(m => m.Key, m => m.AccountCode, cancellationToken);

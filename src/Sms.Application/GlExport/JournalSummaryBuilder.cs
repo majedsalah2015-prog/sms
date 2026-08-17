@@ -14,6 +14,11 @@ namespace Sms.Application.GlExport
         public const string Discounts = "Discounts";
         public const string AdvancesReceived = "AdvancesReceived";
 
+        /// <summary>S6/E-605 BR-CAF-001/007: wallet balances are payer money held — a liability.</summary>
+        public const string WalletLiability = "WalletLiability";
+
+        public const string CafeteriaRevenue = "CafeteriaRevenue";
+
         public static string Cash(string paymentMethod) => $"Cash:{paymentMethod}";
 
         public static string Revenue(int feeCategoryId, string? glExportCode) => string.IsNullOrWhiteSpace(glExportCode) ? $"Revenue:{feeCategoryId}" : glExportCode!;
@@ -42,6 +47,12 @@ namespace Sms.Application.GlExport
 
         public sealed record RefundDoc(string PaymentMethod, decimal Amount);
 
+        /// <summary>E-605: wallet top-up receipt (Dr Cash[method] / Cr WalletLiability) — a wallet refund is a negative-amount top-up in journal terms (Dr WalletLiability / Cr Cash).</summary>
+        public sealed record WalletTopUpDoc(string PaymentMethod, decimal Amount);
+
+        /// <summary>E-605 BR-CAF-007: a cafeteria sale — wallet-tendered (Dr WalletLiability / Cr CafeteriaRevenue) or cash (Dr Cash:Cash / Cr CafeteriaRevenue). Meal-plan redemptions are not journaled (revenue was recognized on the plan charge).</summary>
+        public sealed record CafeteriaSaleDoc(bool IsWalletTender, decimal Amount);
+
         public sealed record JournalLine(string AccountKey, string Description, decimal Debit, decimal Credit, int SourceDocumentCount);
 
         public sealed class Journal
@@ -60,8 +71,34 @@ namespace Sms.Application.GlExport
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds)
+            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>());
+
+        public static Journal Build(
+            IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
+            IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
+            IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales)
         {
             var acc = new Accumulator();
+
+            foreach (var w in walletTopUps)
+            {
+                if (w.Amount >= 0m)
+                {
+                    acc.Debit(GlAccountKeys.Cash(w.PaymentMethod), $"Wallet top-ups ({w.PaymentMethod})", w.Amount);
+                    acc.Credit(GlAccountKeys.WalletLiability, "Wallet top-ups", w.Amount);
+                }
+                else
+                {
+                    acc.Debit(GlAccountKeys.WalletLiability, "Wallet refunds", -w.Amount);
+                    acc.Credit(GlAccountKeys.Cash(w.PaymentMethod), $"Wallet refunds ({w.PaymentMethod})", -w.Amount);
+                }
+            }
+
+            foreach (var s in cafeteriaSales)
+            {
+                acc.Debit(s.IsWalletTender ? GlAccountKeys.WalletLiability : GlAccountKeys.Cash("Cash"), s.IsWalletTender ? "Cafeteria sales (wallet)" : "Cafeteria sales (cash)", s.Amount);
+                acc.Credit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales", s.Amount);
+            }
 
             foreach (var c in charges)
             {
@@ -101,7 +138,7 @@ namespace Sms.Application.GlExport
             var journal = new Journal
             {
                 Lines = acc.ToLines(),
-                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count,
+                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count + walletTopUps.Count + cafeteriaSales.Count,
             };
             if (!journal.IsBalanced)
             {

@@ -33,6 +33,9 @@ namespace Sms.Domain.Payments
 
         public ReceiptStatus Status { get; set; } = ReceiptStatus.Posted;
 
+        /// <summary>S6/E-605: fee payment (default) vs cafeteria wallet top-up - see <see cref="ReceiptPurpose"/>.</summary>
+        public ReceiptPurpose Purpose { get; set; } = ReceiptPurpose.FeePayment;
+
         public DateTime IssuedAtUtc { get; set; }
     }
 }

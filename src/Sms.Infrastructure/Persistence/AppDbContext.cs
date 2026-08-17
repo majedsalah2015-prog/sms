@@ -4,6 +4,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Attendance;
+using Sms.Domain.Cafeteria;
 using Sms.Domain.Calendar;
 using Sms.Domain.Certificates;
 using Sms.Domain.Classrooms;
@@ -409,6 +410,30 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<StocktakeLine> StocktakeLines => Set<StocktakeLine>();
 
         public DbSet<ReadingLog> ReadingLogs => Set<ReadingLog>();
+
+        public DbSet<CafeteriaItem> CafeteriaItems => Set<CafeteriaItem>();
+
+        public DbSet<Menu> Menus => Set<Menu>();
+
+        public DbSet<MenuLine> MenuLines => Set<MenuLine>();
+
+        public DbSet<Wallet> Wallets => Set<Wallet>();
+
+        public DbSet<WalletLedgerEntry> WalletLedgerEntries => Set<WalletLedgerEntry>();
+
+        public DbSet<SpendControl> SpendControls => Set<SpendControl>();
+
+        public DbSet<Sale> Sales => Set<Sale>();
+
+        public DbSet<SaleLine> SaleLines => Set<SaleLine>();
+
+        public DbSet<MealPlan> MealPlans => Set<MealPlan>();
+
+        public DbSet<MealPlanSubscription> MealPlanSubscriptions => Set<MealPlanSubscription>();
+
+        public DbSet<Redemption> Redemptions => Set<Redemption>();
+
+        public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

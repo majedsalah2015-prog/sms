@@ -39,7 +39,7 @@ namespace Sms.Infrastructure.Statements
 
             var creditNotes = await _db.CreditNotes.Where(n => chargeIds.Contains(n.ChargeId)).ToListAsync(cancellationToken);
             var discounts = await _db.DiscountDocuments.Where(d => chargeIds.Contains(d.ChargeId)).ToListAsync(cancellationToken);
-            var receipts = await _db.Receipts.Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted).ToListAsync(cancellationToken);
+            var receipts = await _db.Receipts.Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment).ToListAsync(cancellationToken);
             var refunds = await _db.RefundVouchers.Where(v => v.PayerId == payerId && v.Status == RefundVoucherStatus.Paid).ToListAsync(cancellationToken);
 
             var lines = new List<StatementLine>();

@@ -219,11 +219,11 @@ namespace Sms.Infrastructure.Payments
         {
             // EF Core's Sqlite provider can't translate Sum() over decimal to SQL (no native DECIMAL type) - materialize then sum in memory.
             var totalReceipts = (await _db.Receipts
-                .Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted)
+                .Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment)
                 .Select(r => r.Amount)
                 .ToListAsync(cancellationToken)).Sum();
             var receiptIds = await _db.Receipts
-                .Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted)
+                .Where(r => r.PayerId == payerId && r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment)
                 .Select(r => r.Id)
                 .ToListAsync(cancellationToken);
             var totalAllocated = (await _db.PaymentAllocations

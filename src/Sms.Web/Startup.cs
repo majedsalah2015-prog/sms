@@ -10,6 +10,7 @@ using Sms.Application.Admissions;
 using Sms.Application.Attachments;
 using Sms.Application.Attendance;
 using Sms.Application.Audit;
+using Sms.Application.Cafeteria;
 using Sms.Application.Calendar;
 using Sms.Application.Certificates;
 using Sms.Application.Classrooms;
@@ -48,6 +49,7 @@ using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Attendance;
 using Sms.Infrastructure.Audit;
+using Sms.Infrastructure.Cafeteria;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Certificates;
 using Sms.Infrastructure.Classrooms;
@@ -371,6 +373,20 @@ namespace Sms.Web
             // exposed for WF-03/BR-EMP-008 checklists (not wired - neither
             // checklist exists). All doc Sec.8 screens deferred.
             services.AddScoped<ILibraryAdmin, LibraryAdmin>();
+
+            // S6/E-605 (Cafeteria, doc/Modules/27, BR-CAF-001..009). Wallet
+            // balance = ledger sum; top-ups are Module 21 receipts with
+            // Purpose = WalletTopUp (excluded from fee allocation / advance /
+            // statements; journaled to WalletLiability by E-503); POS applies
+            // parent spend controls + the Module 24 emergency-banner allergy
+            // feed in real time (warn by default, hard-block on parent opt-in);
+            // plan-first / wallet / cash tenders (cash needs an open Module 21
+            // till session); stock deduct guard; same-session voids (T1 reason);
+            // wallet refunds are Module 21 refund vouchers. Deferred: portal
+            // top-up (gateway dormant), offline-queue sync mechanics (capture
+            // time only), barcode ID cards (doc Q1), pack nutrition lists (Q4),
+            // meal-plan pro-ration/unredeemed credit job, all screens.
+            services.AddScoped<ICafeteriaAdmin, CafeteriaAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash
