@@ -23,5 +23,8 @@ namespace Sms.Domain.Notifications
 
         /// <summary>Disabling the rule is the enable/disable switch (BR-NOT-003) — no separate flag.</summary>
         public bool IsActive { get; set; } = true;
+
+        /// <summary>S7/E-703, BR-NTF-002: added this slice — statutory/safety classes (e.g. absence, safety alerts) can't be disabled below the product floor without a Principal override.</summary>
+        public bool IsStatutory { get; set; }
     }
 }

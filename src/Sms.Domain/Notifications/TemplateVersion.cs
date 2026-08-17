@@ -24,5 +24,8 @@ namespace Sms.Domain.Notifications
         public string BodyAr { get; set; } = string.Empty;
 
         public string BodyEn { get; set; } = string.Empty;
+
+        /// <summary>S7/E-703, BR-NTF-001: added this slice — a mandatory test-send gate before a version can go live.</summary>
+        public TemplatePublishStatus PublishStatus { get; set; } = TemplatePublishStatus.Draft;
     }
 }

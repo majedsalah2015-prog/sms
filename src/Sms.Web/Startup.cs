@@ -30,6 +30,7 @@ using Sms.Application.Installments;
 using Sms.Application.Jobs;
 using Sms.Application.Library;
 using Sms.Application.Lookups;
+using Sms.Application.Messaging;
 using Sms.Application.Notifications;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
@@ -72,6 +73,7 @@ using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Library;
 using Sms.Infrastructure.Lookups;
+using Sms.Infrastructure.Messaging;
 using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
@@ -459,6 +461,22 @@ namespace Sms.Web
             // PermissionService, but for an arbitrary target user.
             services.AddScoped<IDashboardAdmin, DashboardAdmin>();
             services.AddScoped<IDashboardQuery, DashboardQuery>();
+
+            // S7/E-703 (Messaging + Notifications admin, doc/Modules/32+33,
+            // BR-MSG-001/002/004, BR-NTF-001/002/004). Messaging (human-composed:
+            // announcements/threads/official letters) is distinct from E-007's
+            // system-generated Notifications per doc 09's own boundary note -
+            // delivery itself still rides E-007's channel infrastructure, not
+            // reimplemented. Thread/MessageThread avoids colliding with
+            // System.Threading.Thread (same discipline as E-607's renames).
+            // NotificationOpsAdmin extends E-007's existing Template/
+            // SubscriptionRule/BudgetCounter entities with real operational
+            // gates (test-send-before-publish, statutory floor, budget
+            // threshold) rather than adding parallel entities. Provider
+            // credentials/failover (BR-NTF-003) and the delivery ops queue
+            // (BR-NTF-005) are deferred.
+            services.AddScoped<IMessagingAdmin, MessagingAdmin>();
+            services.AddScoped<INotificationOpsAdmin, NotificationOpsAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

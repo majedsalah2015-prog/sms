@@ -23,6 +23,7 @@ using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
 using Sms.Domain.Library;
 using Sms.Domain.Lookups;
+using Sms.Domain.Messaging;
 using Sms.Domain.Notifications;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
@@ -493,6 +494,16 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<LayoutTemplateWidget> LayoutTemplateWidgets => Set<LayoutTemplateWidget>();
 
         public DbSet<UserLayout> UserLayouts => Set<UserLayout>();
+
+        public DbSet<Announcement> Announcements => Set<Announcement>();
+
+        public DbSet<CommunicationMatrix> CommunicationMatrixEntries => Set<CommunicationMatrix>();
+
+        public DbSet<MessageThread> MessageThreads => Set<MessageThread>();
+
+        public DbSet<ThreadMessage> ThreadMessages => Set<ThreadMessage>();
+
+        public DbSet<OfficialLetter> OfficialLetters => Set<OfficialLetter>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
