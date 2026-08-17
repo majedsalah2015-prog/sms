@@ -19,6 +19,7 @@ using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.Grades;
 using Sms.Application.Grading;
+using Sms.Application.Installments;
 using Sms.Application.Jobs;
 using Sms.Application.Lookups;
 using Sms.Application.Notifications;
@@ -49,6 +50,7 @@ using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Grading;
+using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Notifications;
@@ -263,6 +265,21 @@ namespace Sms.Web
             // engine (the doc's "one register for everything official") aren't
             // wired - both source modules already deferred their side of it.
             services.AddScoped<ICertificateAdmin, CertificateAdmin>();
+
+            // S5/E-501 (Installment Plans + PDC lifecycle, doc/Modules/20,
+            // BR-INS-001..010). Installment status is DERIVED from Module 21
+            // allocations + dates on every read (BR-INS-007) - never stored.
+            // Due dates shift off non-working days via CalendarDayResolver;
+            // callers pass weekend days (School still has no weekend-day
+            // config field). PDC coverage suppresses dunning; PaymentAdmin
+            // un-covers on bounce. Dunning ladder timings are the doc's
+            // proposed defaults (its own Q1) and publish through E-007's
+            // INotificationPublisher (InstallmentDueSoon/InstallmentOverdue -
+            // no templates seeded yet, so nothing is delivered until a school
+            // writes them). Deferred: default-template-per-grade config, late
+            // fees (Module 19 policy), service-suspension list (Q2, legal),
+            // Hangfire scheduling of RunDunningAsync, portal screens.
+            services.AddScoped<IInstallmentAdmin, InstallmentAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

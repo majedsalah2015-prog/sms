@@ -191,6 +191,19 @@ namespace Sms.Infrastructure.Payments
                 pdc.ClearedReceiptId = receipt.Id;
             }
 
+            if (newStatus == PdcStatus.Bounced)
+            {
+                // BR-INS-009 (S5/E-501): a bounced cheque no longer covers anything — un-cover the
+                // installments it was suppressing dunning for, so the ladder resumes on the next run.
+                // (E-303 deferred exactly this until Module 20 existed.) Bounce-fee charge generation
+                // is still Module 19 policy, not wired.
+                var covered = await _db.Installments.Where(i => i.CoveringPdcId == pdc.Id).ToListAsync(cancellationToken);
+                foreach (var installment in covered)
+                {
+                    installment.CoveringPdcId = null;
+                }
+            }
+
             await _db.SaveChangesAsync(cancellationToken);
         }
 

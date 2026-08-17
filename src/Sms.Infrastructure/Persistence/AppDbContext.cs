@@ -12,6 +12,7 @@ using Sms.Domain.Examinations;
 using Sms.Domain.Fees;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
+using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
 using Sms.Domain.Lookups;
 using Sms.Domain.Notifications;
@@ -262,6 +263,24 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<CertificateIssue> CertificateIssues => Set<CertificateIssue>();
 
         public DbSet<VerificationLog> VerificationLogs => Set<VerificationLog>();
+
+        public DbSet<PlanTemplate> PlanTemplates => Set<PlanTemplate>();
+
+        public DbSet<TemplateInstallment> TemplateInstallments => Set<TemplateInstallment>();
+
+        public DbSet<PlanAssignment> PlanAssignments => Set<PlanAssignment>();
+
+        public DbSet<Installment> Installments => Set<Installment>();
+
+        public DbSet<InstallmentChargeLine> InstallmentChargeLines => Set<InstallmentChargeLine>();
+
+        public DbSet<ScheduleRevision> ScheduleRevisions => Set<ScheduleRevision>();
+
+        public DbSet<RescheduleCase> RescheduleCases => Set<RescheduleCase>();
+
+        public DbSet<PromiseToPay> PromisesToPay => Set<PromiseToPay>();
+
+        public DbSet<DunningEvent> DunningEvents => Set<DunningEvent>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
