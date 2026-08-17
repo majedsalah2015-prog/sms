@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Activities;
 using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Attendance;
@@ -465,6 +466,24 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<AccountChargePolicy> AccountChargePolicies => Set<AccountChargePolicy>();
 
         public DbSet<StoreStockMovement> StoreStockMovements => Set<StoreStockMovement>();
+
+        public DbSet<ActivityType> ActivityTypes => Set<ActivityType>();
+
+        public DbSet<ActivityProgram> ActivityPrograms => Set<ActivityProgram>();
+
+        public DbSet<ProgramEnrollment> ProgramEnrollments => Set<ProgramEnrollment>();
+
+        public DbSet<ActivityConsentRecord> ActivityConsentRecords => Set<ActivityConsentRecord>();
+
+        public DbSet<ActivitySession> ActivitySessions => Set<ActivitySession>();
+
+        public DbSet<ActivityAttendance> ActivityAttendances => Set<ActivityAttendance>();
+
+        public DbSet<ActivityTrip> ActivityTrips => Set<ActivityTrip>();
+
+        public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
+
+        public DbSet<Achievement> Achievements => Set<Achievement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

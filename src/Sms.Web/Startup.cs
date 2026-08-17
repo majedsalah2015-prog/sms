@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using Hangfire;
+using Sms.Application.Activities;
 using Sms.Application.Admissions;
 using Sms.Application.Attachments;
 using Sms.Application.Attendance;
@@ -46,6 +47,7 @@ using Sms.Application.Transport;
 using Sms.Application.Workflow;
 using Sms.Domain.Jobs;
 using Sms.Domain.Notifications;
+using Sms.Infrastructure.Activities;
 using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Attendance;
@@ -433,6 +435,16 @@ namespace Sms.Web
             // scope). PublishAsync reuses E-103's CalendarDayResolver to generate
             // dated Session rows only on working days.
             services.AddScoped<ITimetableAdmin, TimetableAdmin>();
+
+            // S6/E-607 (Activities, doc/Modules/29, BR-ACT-001..008). Costed
+            // enrollment activation posts a real charge via E-303's IFeeAdmin
+            // (BR-ACT-007); free programs never touch Fees. ActivityProgram/
+            // ActivityTrip are named to avoid colliding with Sms.Web/Sms.Seeder's
+            // own Program entry-point class and E-601's Transport.Trip entity
+            // respectively (same collision-avoidance discipline as E-201's
+            // AdmissionApplication). Venue/timetable conflict surfacing and
+            // in-school attendance reconciliation are deferred.
+            services.AddScoped<IActivityAdmin, ActivityAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
