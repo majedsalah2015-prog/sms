@@ -18,6 +18,7 @@ using Sms.Application.Employees;
 using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.Grades;
+using Sms.Application.Discounts;
 using Sms.Application.Grading;
 using Sms.Application.Installments;
 using Sms.Application.Jobs;
@@ -30,6 +31,7 @@ using Sms.Application.Portal;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
+using Sms.Application.Statements;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Teachers;
@@ -49,6 +51,7 @@ using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Grades;
+using Sms.Infrastructure.Discounts;
 using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
@@ -62,6 +65,7 @@ using Sms.Infrastructure.Portal;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Statements;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
 using Sms.Infrastructure.Teachers;
@@ -280,6 +284,19 @@ namespace Sms.Web
             // fees (Module 19 policy), service-suspension list (Q2, legal),
             // Hangfire scheduling of RunDunningAsync, portal screens.
             services.AddScoped<IInstallmentAdmin, InstallmentAdmin>();
+
+            // S5/E-502 (Discounts + statements, doc/Modules/22, BR-DIS-001..010).
+            // Discount documents are a distinct document type (numbered "DSC")
+            // that every position reader subtracts alongside credit notes -
+            // BR-DIS-010 forbids netting them invisibly. Approval routes by
+            // BR-DIS-003 thresholds (recorded as ApprovalTier, chain not
+            // routed); sibling eligibility reads StudentGuardianLink families;
+            // staff eligibility bridges Parent<->Employee via UserAccountId (the
+            // known identity-bridging seam). Waivers materialize as E-303
+            // credit notes; approvals recompute E-501 schedules. Statements
+            // ("STM") separate gross / discounts / credit notes / payments.
+            services.AddScoped<IDiscountAdmin, DiscountAdmin>();
+            services.AddScoped<IStatementService, StatementService>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

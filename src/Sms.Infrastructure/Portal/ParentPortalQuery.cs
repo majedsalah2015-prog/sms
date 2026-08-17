@@ -137,11 +137,14 @@ namespace Sms.Infrastructure.Portal
             // EF Core's Sqlite provider can't translate Sum() over decimal to SQL - materialize then sum in memory (same fix as E-303's FeeAdmin/PaymentAdmin).
             var totalCharges = chargeRows.Sum(c => c.GrossAmount);
             var totalCreditNotes = (await _db.CreditNotes.Where(n => chargeIds.Contains(n.ChargeId)).Select(n => n.Amount).ToListAsync(cancellationToken)).Sum();
+            var totalDiscounts = (await _db.DiscountDocuments.Where(d => chargeIds.Contains(d.ChargeId)).Select(d => d.Amount).ToListAsync(cancellationToken)).Sum();
             var totalAllocated = (await _db.PaymentAllocations.Where(a => chargeIds.Contains(a.ChargeId)).Select(a => a.AllocatedAmount).ToListAsync(cancellationToken)).Sum();
 
             return new PortalFeePosition
             {
-                Position = StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalAllocated),
+                Position = StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalDiscounts, totalAllocated),
+                GrossCharges = totalCharges,
+                Discounts = totalDiscounts,
                 Charges = chargeRows.Select(c => new PortalChargeLine { ChargeNo = c.ChargeNo, GrossAmount = c.GrossAmount, PostedAtUtc = c.PostedAtUtc }).ToList(),
             };
         }

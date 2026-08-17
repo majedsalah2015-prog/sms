@@ -111,6 +111,13 @@ namespace Sms.Infrastructure.Payments
                 .ToListAsync(cancellationToken);
             var creditedByCharge = creditRows.GroupBy(n => n.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
 
+            // S5/E-502: Module 22 discount documents reduce a charge's remaining balance exactly like credit notes (BR-DIS-005).
+            var discountRows = await _db.DiscountDocuments
+                .Where(d => chargeIds.Contains(d.ChargeId))
+                .Select(d => new { d.ChargeId, d.Amount })
+                .ToListAsync(cancellationToken);
+            var discountedByCharge = discountRows.GroupBy(d => d.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+
             var allocationRows = await _db.PaymentAllocations
                 .Where(a => chargeIds.Contains(a.ChargeId))
                 .Select(a => new { a.ChargeId, a.AllocatedAmount })
@@ -122,7 +129,8 @@ namespace Sms.Infrastructure.Payments
                 {
                     var credited = creditedByCharge.TryGetValue(c.Id, out var cAmt) ? cAmt : 0m;
                     var allocated = allocatedByCharge.TryGetValue(c.Id, out var aAmt) ? aAmt : 0m;
-                    var remaining = c.GrossAmount - credited - allocated;
+                    var discounted = discountedByCharge.TryGetValue(c.Id, out var dAmt) ? dAmt : 0m;
+                    var remaining = c.GrossAmount - credited - discounted - allocated;
                     return new PaymentAllocationEngine.AllocationTarget(c.Id, remaining, c.PostedAtUtc);
                 })
                 .Where(t => t.RemainingBalance > 0);

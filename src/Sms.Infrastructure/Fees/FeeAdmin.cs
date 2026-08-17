@@ -178,9 +178,10 @@ namespace Sms.Infrastructure.Fees
 
             var totalCharges = (await _db.Charges.Where(c => chargeIds.Contains(c.Id)).Select(c => c.GrossAmount).ToListAsync(cancellationToken)).Sum();
             var totalCreditNotes = (await _db.CreditNotes.Where(n => chargeIds.Contains(n.ChargeId)).Select(n => n.Amount).ToListAsync(cancellationToken)).Sum();
+            var totalDiscounts = (await _db.DiscountDocuments.Where(d => chargeIds.Contains(d.ChargeId)).Select(d => d.Amount).ToListAsync(cancellationToken)).Sum();
             var totalAllocated = (await _db.PaymentAllocations.Where(a => chargeIds.Contains(a.ChargeId)).Select(a => a.AllocatedAmount).ToListAsync(cancellationToken)).Sum();
 
-            return StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalAllocated);
+            return StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalDiscounts, totalAllocated);
         }
     }
 }

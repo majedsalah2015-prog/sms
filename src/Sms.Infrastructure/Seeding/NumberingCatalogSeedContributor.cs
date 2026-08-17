@@ -40,6 +40,8 @@ namespace Sms.Infrastructure.Seeding
             ("RCP", "Receipt", "RCP/{SCHOOL}/{GYEAR}/{SEQ:6}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
             ("RFD", "RefundVoucher", "RFD-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
             ("CRN", "CreditNote", "CRN-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("DSC", "DiscountDocument", "DSC-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("STM", "StatementIssue", "STM-{GYEAR}-{SEQ:6}", ResetPolicy.PerCalendarYear, GapPolicy.Normal),
             ("CERT", "Certificate", "CERT-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
             ("TC", "TransferCertificate", "TC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Strict),
             ("INC", "DisciplineIncident", "INC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),

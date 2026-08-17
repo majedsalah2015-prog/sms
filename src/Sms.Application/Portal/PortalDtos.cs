@@ -54,6 +54,11 @@ namespace Sms.Application.Portal
     {
         public decimal Position { get; set; }
 
+        /// <summary>BR-DIS-010: gross and discounts shown separately - never netted invisibly.</summary>
+        public decimal GrossCharges { get; set; }
+
+        public decimal Discounts { get; set; }
+
         public IReadOnlyList<PortalChargeLine> Charges { get; set; } = Array.Empty<PortalChargeLine>();
     }
 }

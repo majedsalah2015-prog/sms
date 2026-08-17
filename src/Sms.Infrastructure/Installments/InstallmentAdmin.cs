@@ -103,8 +103,16 @@ namespace Sms.Infrastructure.Installments
             // EF Core's Sqlite provider can't translate Sum() over decimal - materialize then sum in memory.
             var creditRows = await _db.CreditNotes.Where(n => chargeIds.Contains(n.ChargeId)).Select(n => new { n.ChargeId, n.Amount }).ToListAsync(cancellationToken);
             var creditedByCharge = creditRows.GroupBy(r => r.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            // S5/E-502: discount documents already applied to a charge are net of the schedule too (BR-DIS-005) -
+            // a discount approved AFTER assignment reaches the schedule via ReduceScheduleAsync instead.
+            var discountRows = await _db.DiscountDocuments.Where(d => chargeIds.Contains(d.ChargeId)).Select(d => new { d.ChargeId, d.Amount }).ToListAsync(cancellationToken);
+            var discountedByCharge = discountRows.GroupBy(r => r.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
             return charges
-                .Select(c => new InstallmentScheduleBuilder.ChargePortion(c.Id, c.GrossAmount - (creditedByCharge.TryGetValue(c.Id, out var cr) ? cr : 0m)))
+                .Select(c => new InstallmentScheduleBuilder.ChargePortion(
+                    c.Id,
+                    c.GrossAmount
+                    - (creditedByCharge.TryGetValue(c.Id, out var cr) ? cr : 0m)
+                    - (discountedByCharge.TryGetValue(c.Id, out var ds) ? ds : 0m)))
                 .Where(p => p.Amount > 0m)
                 .ToList();
         }

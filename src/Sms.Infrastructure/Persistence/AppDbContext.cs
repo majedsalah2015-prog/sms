@@ -7,6 +7,7 @@ using Sms.Domain.Attendance;
 using Sms.Domain.Calendar;
 using Sms.Domain.Certificates;
 using Sms.Domain.Classrooms;
+using Sms.Domain.Discounts;
 using Sms.Domain.Employees;
 using Sms.Domain.Examinations;
 using Sms.Domain.Fees;
@@ -281,6 +282,22 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<PromiseToPay> PromisesToPay => Set<PromiseToPay>();
 
         public DbSet<DunningEvent> DunningEvents => Set<DunningEvent>();
+
+        public DbSet<DiscountType> DiscountTypes => Set<DiscountType>();
+
+        public DbSet<EligibilityRule> EligibilityRules => Set<EligibilityRule>();
+
+        public DbSet<DiscountGrant> DiscountGrants => Set<DiscountGrant>();
+
+        public DbSet<DiscountDocument> DiscountDocuments => Set<DiscountDocument>();
+
+        public DbSet<ScholarshipProgram> ScholarshipPrograms => Set<ScholarshipProgram>();
+
+        public DbSet<Waiver> Waivers => Set<Waiver>();
+
+        public DbSet<RenewalQueueItem> RenewalQueueItems => Set<RenewalQueueItem>();
+
+        public DbSet<StatementIssue> StatementIssues => Set<StatementIssue>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

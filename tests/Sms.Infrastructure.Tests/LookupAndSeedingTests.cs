@@ -174,7 +174,7 @@ namespace Sms.Infrastructure.Tests
             var firstVersionCount = db.NumberingSeries.Count();
             await contributor.SeedAsync();
 
-            Assert.Equal(17, db.NumberingSeries.Count(s => s.IsActive));
+            Assert.Equal(19, db.NumberingSeries.Count(s => s.IsActive));
             Assert.Equal(firstVersionCount, db.NumberingSeries.Count()); // no spurious cutover on re-seed
             var student = db.NumberingSeries.Single(s => s.Code == "STU");
             Assert.Equal(ResetPolicy.Never, student.ResetPolicy);
