@@ -29,6 +29,7 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
+using Sms.Domain.Reports;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
@@ -504,6 +505,12 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<ThreadMessage> ThreadMessages => Set<ThreadMessage>();
 
         public DbSet<OfficialLetter> OfficialLetters => Set<OfficialLetter>();
+
+        public DbSet<ReportDefinition> ReportDefinitions => Set<ReportDefinition>();
+
+        public DbSet<ReportExecution> ReportExecutions => Set<ReportExecution>();
+
+        public DbSet<ReportSubscription> ReportSubscriptions => Set<ReportSubscription>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

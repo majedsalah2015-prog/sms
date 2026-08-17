@@ -36,6 +36,7 @@ using Sms.Application.Numbering;
 using Sms.Application.Parents;
 using Sms.Application.Payments;
 using Sms.Application.Portal;
+using Sms.Application.Reports;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
@@ -80,6 +81,7 @@ using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Portal;
+using Sms.Infrastructure.Reports;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
@@ -477,6 +479,19 @@ namespace Sms.Web
             // (BR-NTF-005) are deferred.
             services.AddScoped<IMessagingAdmin, MessagingAdmin>();
             services.AddScoped<INotificationOpsAdmin, NotificationOpsAdmin>();
+
+            // S7/E-701 (Reports platform, doc/Modules/30, BR-RPT-001..006).
+            // Report *content* (the 150+ catalog reports themselves) is
+            // Phase 9, out of scope - this is the registry/run/subscribe
+            // platform: BR-RPT-002 View-permission gate, BR-RPT-003
+            // Export-permission + no-restricted-email-delivery gates,
+            // BR-RPT-005 heavy-report queueing, BR-RPT-006 subscription
+            // recipients must independently hold the report's permission.
+            // Permission checks for an arbitrary target user reuse the
+            // same hand-rolled AssignmentSnapshot pattern as E-702's
+            // DashboardAdmin, since PermissionService only checks the
+            // ambient ICurrentUser.
+            services.AddScoped<IReportAdmin, ReportAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
