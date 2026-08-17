@@ -37,6 +37,7 @@ using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
 using Sms.Application.Statements;
+using Sms.Application.Store;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Teachers;
@@ -77,6 +78,7 @@ using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Statements;
+using Sms.Infrastructure.Store;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
 using Sms.Infrastructure.Teachers;
@@ -387,6 +389,20 @@ namespace Sms.Web
             // time only), barcode ID cards (doc Q1), pack nutrition lists (Q4),
             // meal-plan pro-ration/unredeemed credit job, all screens.
             services.AddScoped<ICafeteriaAdmin, CafeteriaAdmin>();
+
+            // S6/E-606 (School Store, doc/Modules/28, BR-STO-001..008). Items with
+            // variants and versioned price lists (no POS overrides); every sale is
+            // a Module 19 charge - cash/card add a Module 21 receipt allocated to
+            // that charge (open till session), wallet debits the cafeteria ledger,
+            // account-charge is category/cap-gated with a Finance override; bundles
+            // per grade-year assigned+charged in batch, handed out per line with
+            // sizes and e-ack (pay-first gate per doc Q2), undistributed-paid
+            // visible and credited at withdrawal (BR-STO-007); returns/exchanges
+            // per category policy; perpetual stock + reorder report. Deferred:
+            // anonymous walk-in payer, mixed-category VAT split per basket
+            // (first item's category wins - flagged), store stocktake sessions,
+            // pre-orders, all screens.
+            services.AddScoped<IStoreAdmin, StoreAdmin>();
 
             // S3/E-303 (Fees + Payments core, doc/Modules/19+21, BR-FEE-001..
             // 003/005/008, BR-PAY-001..005). Charge.InvoiceUuid/InvoiceHash

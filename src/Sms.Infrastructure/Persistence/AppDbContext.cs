@@ -29,6 +29,7 @@ using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
+using Sms.Domain.Store;
 using Sms.Domain.Students;
 using Sms.Domain.Subjects;
 using Sms.Domain.Teachers;
@@ -434,6 +435,36 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Redemption> Redemptions => Set<Redemption>();
 
         public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+
+        public DbSet<StoreItem> StoreItems => Set<StoreItem>();
+
+        public DbSet<StoreVariant> StoreVariants => Set<StoreVariant>();
+
+        public DbSet<PriceList> PriceLists => Set<PriceList>();
+
+        public DbSet<PriceListLine> PriceListLines => Set<PriceListLine>();
+
+        public DbSet<Bundle> Bundles => Set<Bundle>();
+
+        public DbSet<BundleLine> BundleLines => Set<BundleLine>();
+
+        public DbSet<BundleAssignment> BundleAssignments => Set<BundleAssignment>();
+
+        public DbSet<DistributionSession> DistributionSessions => Set<DistributionSession>();
+
+        public DbSet<HandoutRecord> HandoutRecords => Set<HandoutRecord>();
+
+        public DbSet<StoreSale> StoreSales => Set<StoreSale>();
+
+        public DbSet<StoreSaleLine> StoreSaleLines => Set<StoreSaleLine>();
+
+        public DbSet<ReturnExchange> ReturnExchanges => Set<ReturnExchange>();
+
+        public DbSet<ReturnPolicy> ReturnPolicies => Set<ReturnPolicy>();
+
+        public DbSet<AccountChargePolicy> AccountChargePolicies => Set<AccountChargePolicy>();
+
+        public DbSet<StoreStockMovement> StoreStockMovements => Set<StoreStockMovement>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
