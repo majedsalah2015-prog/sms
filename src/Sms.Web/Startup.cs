@@ -15,6 +15,7 @@ using Sms.Application.Cafeteria;
 using Sms.Application.Calendar;
 using Sms.Application.Certificates;
 using Sms.Application.Classrooms;
+using Sms.Application.Dashboards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
 using Sms.Application.Examinations;
@@ -56,6 +57,7 @@ using Sms.Infrastructure.Cafeteria;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Certificates;
 using Sms.Infrastructure.Classrooms;
+using Sms.Infrastructure.Dashboards;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Examinations;
@@ -445,6 +447,18 @@ namespace Sms.Web
             // AdmissionApplication). Venue/timetable conflict surfacing and
             // in-school attendance reconciliation are deferred.
             services.AddScoped<IActivityAdmin, ActivityAdmin>();
+
+            // S7/E-702 (Dashboards, doc/Modules/31, BR-DSH-001/002/003/006/007).
+            // Widget *content* (the consolidated widget->data-source->drill-path
+            // spec) is Phase 9, out of scope - this is the registry/personalization
+            // platform plus a handful of real widget computations (IDashboardQuery)
+            // that each reuse their owning module's own calculator, so BR-DSH-002's
+            // "one computation source" holds by construction rather than by
+            // discipline. PersonalizeAsync server-enforces the permission check
+            // (doc §9) via the same AssignmentSnapshot pattern as E-003's
+            // PermissionService, but for an arbitrary target user.
+            services.AddScoped<IDashboardAdmin, DashboardAdmin>();
+            services.AddScoped<IDashboardQuery, DashboardQuery>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

@@ -9,6 +9,7 @@ using Sms.Domain.Cafeteria;
 using Sms.Domain.Calendar;
 using Sms.Domain.Certificates;
 using Sms.Domain.Classrooms;
+using Sms.Domain.Dashboards;
 using Sms.Domain.Discipline;
 using Sms.Domain.Discounts;
 using Sms.Domain.Employees;
@@ -484,6 +485,14 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<CompetitionEvent> CompetitionEvents => Set<CompetitionEvent>();
 
         public DbSet<Achievement> Achievements => Set<Achievement>();
+
+        public DbSet<WidgetDefinition> WidgetDefinitions => Set<WidgetDefinition>();
+
+        public DbSet<LayoutTemplate> LayoutTemplates => Set<LayoutTemplate>();
+
+        public DbSet<LayoutTemplateWidget> LayoutTemplateWidgets => Set<LayoutTemplateWidget>();
+
+        public DbSet<UserLayout> UserLayouts => Set<UserLayout>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
