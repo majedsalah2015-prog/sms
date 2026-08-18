@@ -1,8 +1,69 @@
+@using System.Globalization
+@using Sms.Web.Navigation
+@model Sms.Web.Models.HomeDashboardViewModel
 @{
-    ViewData["Title"] = "Home Page";
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
+    ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
+    string T(string en, string ar) => isRtl ? ar : en;
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@(Model.HasSchool ? (isRtl ? Model.SchoolNameAr : Model.SchoolNameEn) : T("Welcome", "مرحباً"))</h1>
+        <p class="text-muted mb-0">
+            @if (Model.HasSchool)
+            {
+                <span class="badge rounded-pill text-bg-light border me-1">@T("School status", "حالة المدرسة"): <strong>@Model.SchoolStatus</strong></span>
+                if (Model.ActiveYearLabelEn != null)
+                {
+                    <span class="badge rounded-pill text-bg-light border">@T("Academic year", "العام الدراسي"): <strong>@(isRtl ? Model.ActiveYearLabelAr : Model.ActiveYearLabelEn)</strong> · @Model.ActiveYearStatus</span>
+                }
+            }
+            else
+            {
+                @T("No school is defined yet — run the setup wizard (Module 01) or the demo seeder.", "لم يتم تعريف مدرسة بعد — شغّل معالج الإعداد (الوحدة 01) أو بيانات العرض التجريبي.")
+            }
+        </p>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    @{
+        var tiles = new (string Icon, string En, string Ar, int Value, string Code)[]
+        {
+            ("bi-mortarboard", "Students", "الطلاب", Model.Students, "STU"),
+            ("bi-people", "Parents", "أولياء الأمور", Model.Parents, "PAR"),
+            ("bi-person-badge", "Employees", "الموظفون", Model.Employees, "EMP"),
+            ("bi-grid-3x3-gap", "Sections", "الشعب", Model.Sections, "SEC"),
+            ("bi-clipboard-data", "Audit entries", "سجلات التدقيق", Model.AuditEntries, "AUD"),
+        };
+    }
+    @foreach (var t in tiles)
+    {
+        <div class="col-6 col-md-4 col-xl">
+            <a class="sms-tile" asp-controller="Modules" asp-action="Index" asp-route-code="@t.Code">
+                <span class="sms-tile__icon"><i class="bi @t.Icon"></i></span>
+                <span class="sms-tile__value">@t.Value.ToString("N0", CultureInfo.InvariantCulture)</span>
+                <span class="sms-tile__label">@T(t.En, t.Ar)</span>
+            </a>
+        </div>
+    }
+</div>
+
+<h2 class="sms-section-title">@T("Modules", "الوحدات")</h2>
+<div class="row g-3">
+    @foreach (var m in ModuleCatalog.Modules)
+    {
+        <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+            <a class="sms-card sms-module-card" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">
+                <span class="sms-module-card__icon"><i class="bi @m.Icon"></i></span>
+                <span class="sms-module-card__body">
+                    <span class="sms-module-card__num">@m.Number</span>
+                    <span class="sms-module-card__title">@(isRtl ? m.TitleAr : m.TitleEn)</span>
+                </span>
+                <i class="bi bi-chevron-right sms-module-card__chevron"></i>
+            </a>
+        </div>
+    }
 </div>

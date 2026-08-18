@@ -1,47 +1,92 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+@using System.Globalization
+@using Sms.Web.Navigation
+@{
+    var culture = CultureInfo.CurrentUICulture;
+    var isRtl = culture.TextInfo.IsRightToLeft;
+    var lang = culture.TwoLetterISOLanguageName;
+    var dir = isRtl ? "rtl" : "ltr";
+    var bootstrapCss = isRtl ? "~/lib/bootstrap/css/bootstrap.rtl.min.css" : "~/lib/bootstrap/css/bootstrap.min.css";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var productName = isRtl ? "نظام إدارة المدارس" : "School Management System";
+    var sidebar = ModuleCatalog.BuildSidebar();
+}
+<!DOCTYPE html>
+<html lang="@lang" dir="@dir">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Sms.Web</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" />
+    <title>@ViewData["Title"] - SMS</title>
+    <link rel="stylesheet" href="@bootstrapCss" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/fonts/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Sms.Web</a>
-                <button class="navbar-toggler" type="button" data-toggle="collapse" data-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex flex-sm-row-reverse">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
+    <a class="sms-skip-link" href="#sms-main">@(isRtl ? "تخطي إلى المحتوى" : "Skip to content")</a>
+    <div class="sms-shell" id="sms-shell">
+        <script>
+            (function () {
+                // doc/DesignSystem/15: collapse state persists per device; applied pre-paint on desktop only.
+                try {
+                    if (localStorage.getItem('sms-sidebar-collapsed') === '1' && !window.matchMedia('(max-width: 991.98px)').matches) {
+                        document.currentScript.parentElement.classList.add('is-collapsed');
+                    }
+                } catch (e) { }
+            })();
+        </script>
+
+        <aside class="sms-sidebar" id="sms-sidebar">
+            <div class="sms-sidebar__brand">
+                <a asp-controller="Home" asp-action="Index" class="sms-brand">
+                    <span class="sms-brand__mark"><i class="bi bi-mortarboard-fill"></i></span>
+                    <span class="sms-brand__text">
+                        <span class="sms-brand__name">SMS</span>
+                        <span class="sms-brand__sub">@productName</span>
+                    </span>
+                </a>
             </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+            <partial name="_Sidebar" model="sidebar" />
+            <div class="sms-sidebar__foot">
+                <button type="button" class="sms-nav-link sms-collapse-btn" id="sms-collapse-btn" aria-label="@(isRtl ? "طيّ القائمة" : "Collapse menu")">
+                    <i class="sms-nav-icon bi bi-chevron-double-left"></i>
+                    <span class="sms-nav-label">@(isRtl ? "طيّ القائمة" : "Collapse")</span>
+                </button>
+            </div>
+        </aside>
+        <div class="sms-sidebar__backdrop" id="sms-backdrop"></div>
+
+        <div class="sms-content">
+            <header class="sms-topbar">
+                <button type="button" class="btn sms-icon-btn d-lg-none" id="sms-menu-btn" aria-label="Menu"><i class="bi bi-list"></i></button>
+                <div class="sms-topbar__title">
+                    @if (ViewData["Breadcrumb"] is string crumb)
+                    {
+                        <span class="text-muted">@crumb</span>
+                    }
+                </div>
+                <div class="sms-topbar__actions">
+                    <form asp-controller="Home" asp-action="SetLanguage" method="post" class="d-inline">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <input type="hidden" name="culture" value="@(isRtl ? "en" : "ar")" />
+                        <button type="submit" class="btn btn-sm btn-outline-secondary sms-lang-btn" title="@(isRtl ? "English" : "العربية")">
+                            <i class="bi bi-translate"></i> <span>@(isRtl ? "English" : "العربية")</span>
+                        </button>
+                    </form>
+                    <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="Jobs"><i class="bi bi-activity"></i></a>
+                    <span class="sms-user"><i class="bi bi-person-circle"></i> <span class="d-none d-md-inline">@(isRtl ? "مسؤول النظام" : "System Administrator")</span></span>
+                </div>
+            </header>
+            <main id="sms-main" class="sms-main" role="main">
+                @RenderBody()
+            </main>
+            <footer class="sms-footer text-muted">
+                &copy; 2026 SMS &middot; <a asp-controller="Home" asp-action="Privacy">@(isRtl ? "الخصوصية" : "Privacy")</a>
+            </footer>
+        </div>
     </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - Sms.Web - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
 </body>

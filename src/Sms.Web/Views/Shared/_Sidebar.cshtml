@@ -1,0 +1,61 @@
+@using System.Globalization
+@using Sms.Web.Navigation
+@model IReadOnlyList<NavItem>
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var routeController = (ViewContext.RouteData.Values["controller"] as string) ?? string.Empty;
+    var routeAction = (ViewContext.RouteData.Values["action"] as string) ?? string.Empty;
+    var routeCode = (ViewContext.RouteData.Values["code"] as string) ?? string.Empty;
+
+    bool IsActive(NavItem item)
+    {
+        if (item.Controller == null || !string.Equals(item.Controller, routeController, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(item.Action, routeAction, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        var code = item.RouteValues?.GetType().GetProperty("code")?.GetValue(item.RouteValues) as string;
+        return code == null || string.Equals(code, routeCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    string Href(NavItem item) => Url.Action(item.Action, item.Controller, item.RouteValues) ?? "#";
+}
+
+<nav class="sms-sidebar__nav" aria-label="@(isRtl ? "التنقل الرئيسي" : "Primary navigation")">
+    @foreach (var nav in Model)
+    {
+        if (!nav.HasChildren)
+        {
+            var active = IsActive(nav);
+            <a class="sms-nav-link @(active ? "active" : "")" href="@Href(nav)" title="@nav.Title(isRtl)">
+                <i class="sms-nav-icon bi @nav.Icon"></i>
+                <span class="sms-nav-label">@nav.Title(isRtl)</span>
+            </a>
+        }
+        else
+        {
+            var groupActive = nav.Items.Any(IsActive);
+            var collapseId = $"nav-{nav.Key}";
+            <div class="sms-nav-group @(groupActive ? "is-active" : "")">
+                <button class="sms-nav-link" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#@collapseId" aria-expanded="@(groupActive ? "true" : "false")" aria-controls="@collapseId" title="@nav.Title(isRtl)">
+                    <i class="sms-nav-icon bi @nav.Icon"></i>
+                    <span class="sms-nav-label">@nav.Title(isRtl)</span>
+                    <i class="sms-nav-caret bi bi-chevron-down"></i>
+                </button>
+                <div class="collapse @(groupActive ? "show" : "")" id="@collapseId">
+                    <div class="sms-nav-group__items">
+                        @foreach (var item in nav.Items)
+                        {
+                            var active = IsActive(item);
+                            <a class="sms-nav-link @(active ? "active" : "")" href="@Href(item)" title="@item.Title(isRtl)">
+                                <i class="sms-nav-icon bi @item.Icon"></i>
+                                <span class="sms-nav-label">@item.Title(isRtl)</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</nav>

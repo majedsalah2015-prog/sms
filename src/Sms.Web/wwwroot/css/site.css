@@ -1,71 +1,173 @@
-﻿/* Please see documentation at https://docs.microsoft.com/aspnet/core/client-side/bundling-and-minification
-for details on configuring this project to bundle and minify static web assets. */
+/* SMS shell — tokens per docs/DesignSystem/05 (geometry) and 06 (palette).
+   Same design language as the ERP shell (sidebar 264/76, topbar 60), written
+   with plain CSS so Sms.Web stays free of a front-end build step. */
 
-a.navbar-brand {
-  white-space: normal;
-  text-align: center;
-  word-break: break-all;
-}
-
-/* Provide sufficient contrast against white background */
-a {
-  color: #0366d6;
-}
-
-.btn-primary {
-  color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
-}
-
-.nav-pills .nav-link.active, .nav-pills .show > .nav-link {
-  color: #fff;
-  background-color: #1b6ec2;
-  border-color: #1861ac;
-}
-
-/* Sticky footer styles
--------------------------------------------------- */
-html {
-  font-size: 14px;
-}
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+:root {
+  --sms-primary: #2563eb;
+  --sms-primary-hover: #1d4ed8;
+  --sms-primary-rgb: 37, 99, 235;
+  --sms-body-bg: #f4f6fb;
+  --sms-surface: #ffffff;
+  --sms-sidebar-bg: #ffffff;
+  --sms-sidebar-border: #e6e9f2;
+  --sms-topbar-bg: rgba(255, 255, 255, 0.88);
+  --sms-muted: #6b7280;
+  --sms-text: #111827;
+  --sms-nav-hover-bg: #eef2ff;
+  --sms-nav-active-color: #1d4ed8;
+  --sms-sidebar-width: 264px;
+  --sms-sidebar-width-collapsed: 76px;
+  --sms-topbar-height: 60px;
+  --sms-radius: 0.625rem;
+  --sms-radius-sm: 0.375rem;
+  --sms-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
+  --sms-font-latin: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sms-font-arabic: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
 }
 
-.border-top {
-  border-top: 1px solid #e5e5e5;
-}
-.border-bottom {
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.box-shadow {
-  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
-}
-
-button.accept-policy {
-  font-size: 1rem;
-  line-height: inherit;
-}
-
-/* Sticky footer styles
--------------------------------------------------- */
-html {
-  position: relative;
-  min-height: 100%;
-}
+html { font-size: 14px; }
+@media (min-width: 768px) { html { font-size: 15px; } }
 
 body {
-  /* Margin bottom by footer height */
-  margin-bottom: 60px;
+  margin: 0;
+  background: var(--sms-body-bg);
+  color: var(--sms-text);
+  font-family: var(--sms-font-latin);
 }
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  white-space: nowrap;
-  line-height: 60px; /* Vertically center the text there */
+[dir="rtl"] body { font-family: var(--sms-font-arabic); }
+
+a { color: var(--sms-primary); text-decoration: none; }
+a:hover { color: var(--sms-primary-hover); }
+.btn-primary { background-color: var(--sms-primary); border-color: var(--sms-primary); }
+.btn-primary:hover { background-color: var(--sms-primary-hover); border-color: var(--sms-primary-hover); }
+
+.sms-skip-link {
+  position: absolute; inset-inline-start: -999px; top: 0; z-index: 2000;
+  padding: .5rem .75rem; background: var(--sms-primary); color: #fff; border-radius: 0 0 var(--sms-radius-sm) 0;
+}
+.sms-skip-link:focus { inset-inline-start: 0; color: #fff; }
+
+/* ---- Shell grid ---- */
+.sms-shell { display: flex; min-height: 100vh; }
+
+.sms-sidebar {
+  position: fixed; top: 0; bottom: 0; inset-inline-start: 0;
+  width: var(--sms-sidebar-width);
+  background: var(--sms-sidebar-bg);
+  border-inline-end: 1px solid var(--sms-sidebar-border);
+  display: flex; flex-direction: column;
+  z-index: 1040;
+  transition: width .18s ease, transform .2s ease;
+}
+.sms-content {
+  flex: 1 1 auto; min-width: 0;
+  margin-inline-start: var(--sms-sidebar-width);
+  display: flex; flex-direction: column; min-height: 100vh;
+  transition: margin .18s ease;
+}
+.sms-shell.is-collapsed .sms-sidebar { width: var(--sms-sidebar-width-collapsed); }
+.sms-shell.is-collapsed .sms-content { margin-inline-start: var(--sms-sidebar-width-collapsed); }
+
+/* ---- Brand ---- */
+.sms-sidebar__brand { height: var(--sms-topbar-height); display: flex; align-items: center; padding: 0 .9rem; border-bottom: 1px solid var(--sms-sidebar-border); }
+.sms-brand { display: flex; align-items: center; gap: .65rem; color: inherit; overflow: hidden; }
+.sms-brand__mark { width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--sms-radius-sm); background: var(--sms-primary); color: #fff; display: grid; place-items: center; font-size: 1.25rem; }
+.sms-brand__text { display: flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
+.sms-brand__name { font-weight: 700; letter-spacing: .04em; }
+.sms-brand__sub { font-size: .72rem; color: var(--sms-muted); }
+.sms-shell.is-collapsed .sms-brand__text { display: none; }
+
+/* ---- Nav ---- */
+.sms-sidebar__nav { flex: 1 1 auto; overflow-y: auto; padding: .6rem .6rem; }
+.sms-sidebar__foot { border-top: 1px solid var(--sms-sidebar-border); padding: .5rem .6rem; }
+
+.sms-nav-link {
+  display: flex; align-items: center; gap: .7rem; width: 100%;
+  padding: .55rem .7rem; margin-bottom: 2px;
+  border: 0; border-radius: var(--sms-radius-sm); background: transparent;
+  color: var(--sms-text); font-size: .93rem; text-align: start; white-space: nowrap;
+  position: relative; cursor: pointer;
+}
+.sms-nav-link:hover { background: var(--sms-nav-hover-bg); color: var(--sms-text); }
+.sms-nav-link.active { background: var(--sms-nav-hover-bg); color: var(--sms-nav-active-color); font-weight: 600; }
+.sms-nav-link.active::before {
+  content: ""; position: absolute; inset-inline-start: -0.6rem; top: 20%; height: 60%; width: 3px;
+  background: var(--sms-primary); border-radius: 0 3px 3px 0;
+}
+[dir="rtl"] .sms-nav-link.active::before { border-radius: 3px 0 0 3px; }
+.sms-nav-icon { font-size: 1.15rem; width: 1.5rem; text-align: center; flex: 0 0 1.5rem; color: var(--sms-muted); }
+.sms-nav-link.active .sms-nav-icon, .sms-nav-link:hover .sms-nav-icon { color: var(--sms-nav-active-color); }
+.sms-nav-label { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.sms-nav-caret { font-size: .8rem; color: var(--sms-muted); transition: transform .15s ease; }
+.sms-nav-link[aria-expanded="true"] .sms-nav-caret { transform: rotate(180deg); }
+.sms-nav-group__items { padding-inline-start: .35rem; margin-bottom: .35rem; }
+.sms-nav-group__items .sms-nav-link { padding-block: .45rem; font-size: .9rem; }
+.sms-nav-group.is-active > .sms-nav-link { color: var(--sms-nav-active-color); }
+
+.sms-shell.is-collapsed .sms-nav-label,
+.sms-shell.is-collapsed .sms-nav-caret { display: none; }
+.sms-shell.is-collapsed .sms-nav-link { justify-content: center; padding-inline: 0; }
+.sms-shell.is-collapsed .sms-nav-group .collapse { display: none !important; }
+.sms-shell.is-collapsed .sms-collapse-btn .sms-nav-icon { transform: rotate(180deg); }
+[dir="rtl"] .sms-collapse-btn .sms-nav-icon { transform: rotate(180deg); }
+[dir="rtl"] .sms-shell.is-collapsed .sms-collapse-btn .sms-nav-icon { transform: none; }
+
+/* ---- Topbar ---- */
+.sms-topbar {
+  position: sticky; top: 0; z-index: 1020;
+  height: var(--sms-topbar-height);
+  display: flex; align-items: center; gap: .75rem;
+  padding: 0 1.25rem;
+  background: var(--sms-topbar-bg); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--sms-sidebar-border);
+}
+.sms-topbar__title { flex: 1 1 auto; font-size: .9rem; }
+.sms-topbar__actions { display: flex; align-items: center; gap: .5rem; }
+.sms-icon-btn { color: var(--sms-muted); font-size: 1.2rem; line-height: 1; padding: .3rem .5rem; }
+.sms-icon-btn:hover { color: var(--sms-primary); background: var(--sms-nav-hover-bg); }
+.sms-lang-btn { border-radius: 999px; }
+.sms-user { color: var(--sms-muted); font-size: .9rem; display: inline-flex; align-items: center; gap: .35rem; }
+.sms-user .bi { font-size: 1.35rem; }
+
+/* ---- Main / footer ---- */
+.sms-main { flex: 1 1 auto; padding: 1.5rem 1.25rem; }
+@media (min-width: 992px) { .sms-main { padding: 1.75rem 2rem; } }
+.sms-footer { padding: .9rem 1.25rem; border-top: 1px solid var(--sms-sidebar-border); font-size: .82rem; }
+
+.sms-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.sms-page-title { font-size: 1.45rem; font-weight: 700; margin: 0 0 .25rem; }
+.sms-section-title { font-size: 1rem; font-weight: 600; color: var(--sms-muted); text-transform: uppercase; letter-spacing: .06em; margin: .5rem 0 .75rem; }
+
+.sms-card { display: block; background: var(--sms-surface); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius); box-shadow: var(--sms-shadow); color: inherit; }
+a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inherit; }
+
+.sms-tile { display: flex; flex-direction: column; gap: .15rem; padding: 1rem 1.1rem; background: var(--sms-surface); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius); box-shadow: var(--sms-shadow); color: inherit; height: 100%; }
+.sms-tile:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inherit; }
+.sms-tile__icon { color: var(--sms-primary); font-size: 1.3rem; }
+.sms-tile__value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.sms-tile__label { color: var(--sms-muted); font-size: .85rem; }
+
+.sms-module-card { display: flex; align-items: center; gap: .85rem; padding: .85rem 1rem; }
+.sms-module-card__icon { width: 40px; height: 40px; flex: 0 0 40px; border-radius: var(--sms-radius-sm); background: var(--sms-nav-hover-bg); color: var(--sms-primary); display: grid; place-items: center; font-size: 1.2rem; }
+.sms-module-card__body { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.sms-module-card__num { font-size: .72rem; color: var(--sms-muted); }
+.sms-module-card__title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sms-module-card__chevron { color: var(--sms-muted); }
+[dir="rtl"] .sms-module-card__chevron { transform: scaleX(-1); }
+.sms-module-hero__icon { width: 56px; height: 56px; border-radius: var(--sms-radius); background: var(--sms-nav-hover-bg); color: var(--sms-primary); display: grid; place-items: center; font-size: 1.7rem; }
+.sms-inline-link { color: var(--sms-text); padding: .3rem .4rem; border-radius: var(--sms-radius-sm); }
+.sms-inline-link:hover { background: var(--sms-nav-hover-bg); color: var(--sms-nav-active-color); }
+
+/* ---- Mobile: off-canvas drawer (doc 15 §2) ---- */
+.sms-sidebar__backdrop { display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, .45); z-index: 1035; }
+@media (max-width: 991.98px) {
+  .sms-sidebar { transform: translateX(-100%); width: var(--sms-sidebar-width) !important; }
+  [dir="rtl"] .sms-sidebar { transform: translateX(100%); }
+  .sms-shell.is-mobile-open .sms-sidebar { transform: none; }
+  .sms-shell.is-mobile-open .sms-sidebar__backdrop { display: block; }
+  .sms-content { margin-inline-start: 0 !important; }
+  .sms-shell.is-collapsed .sms-nav-label, .sms-shell.is-collapsed .sms-nav-caret, .sms-shell.is-collapsed .sms-brand__text { display: initial; }
+  .sms-shell.is-collapsed .sms-nav-link { justify-content: flex-start; padding-inline: .7rem; }
+  .sms-shell.is-collapsed .sms-nav-group .collapse.show { display: block !important; }
+  .sms-sidebar__foot { display: none; }
 }

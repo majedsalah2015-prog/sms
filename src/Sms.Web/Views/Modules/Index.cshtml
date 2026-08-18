@@ -1,0 +1,51 @@
+@using System.Globalization
+@using Sms.Web.Navigation
+@model ModuleCatalog.ModuleInfo
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var title = isRtl ? Model.TitleAr : Model.TitleEn;
+    ViewData["Title"] = title;
+    ViewData["Breadcrumb"] = (isRtl ? "الوحدات" : "Modules") + " / " + title;
+    string T(string en, string ar) => isRtl ? ar : en;
+}
+
+<div class="sms-page-head">
+    <div class="d-flex align-items-center gap-3">
+        <span class="sms-module-hero__icon"><i class="bi @Model.Icon"></i></span>
+        <div>
+            <div class="text-muted small">@T("Module", "الوحدة") @Model.Number</div>
+            <h1 class="sms-page-title mb-0">@title</h1>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card p-4">
+            <h2 class="h5">@T("Screens pending", "الشاشات قيد الإنجاز")</h2>
+            <p class="text-muted">
+                @T($"The {Model.TitleEn} engine — domain model, business rules and admin services — was built in epic {Model.Epic} and is covered by the automated test suite. Its user screens are the next slice; this page stands in for them so the menu entry stays navigable.",
+                   $"تم بناء محرك وحدة {Model.TitleAr} — نموذج البيانات وقواعد العمل وخدمات الإدارة — ضمن الحزمة {Model.Epic} وهو مغطى بالاختبارات الآلية. شاشات المستخدم هي المرحلة التالية؛ هذه الصفحة تنوب عنها مؤقتاً حتى تبقى القائمة قابلة للتصفح.")
+            </p>
+            <dl class="row mb-0 small">
+                <dt class="col-sm-4">@T("Requirements", "المتطلبات")</dt>
+                <dd class="col-sm-8"><code>docs/Modules/@Model.DocPath</code></dd>
+                <dt class="col-sm-4">@T("Build epic", "حزمة البناء")</dt>
+                <dd class="col-sm-8"><code>@Model.Epic</code></dd>
+                <dt class="col-sm-4">@T("Rule prefix", "بادئة القواعد")</dt>
+                <dd class="col-sm-8"><code>BR-@Model.Code</code></dd>
+            </dl>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-4">
+            <h2 class="h6 text-muted">@T("Other modules", "وحدات أخرى")</h2>
+            <div class="d-flex flex-column gap-1">
+                @foreach (var m in ModuleCatalog.Modules.Where(x => x.Group == Model.Group && x.Code != Model.Code))
+                {
+                    <a class="sms-inline-link" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code"><i class="bi @m.Icon me-2"></i>@(isRtl ? m.TitleAr : m.TitleEn)</a>
+                }
+            </div>
+        </div>
+    </div>
+</div>

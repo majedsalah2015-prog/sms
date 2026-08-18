@@ -570,6 +570,13 @@ namespace Sms.Web
 
             app.UseRouting();
 
+            // doc/DesignSystem/01: default en-US, Arabic (ar-SA) via the shell's
+            // language toggle (culture cookie); one set of views flips direction.
+            app.UseRequestLocalization(new RequestLocalizationOptions()
+                .SetDefaultCulture("en-US")
+                .AddSupportedCultures("en-US", "ar-SA")
+                .AddSupportedUICultures("en-US", "ar-SA"));
+
             // Stamp per-request audit metadata (doc 07 §4). IP capture for
             // portal users pends the country-pack privacy check (doc 07 Q2).
             app.Use(async (context, next) =>
