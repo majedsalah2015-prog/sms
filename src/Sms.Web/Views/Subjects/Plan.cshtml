@@ -1,0 +1,65 @@
+@using System.Globalization
+@model CurriculumPlanViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Curriculum plan", "الخطة الدراسية");
+    ViewData["Breadcrumb"] = T("Subjects / Curriculum plan", "المواد الدراسية / الخطة الدراسية");
+    var yid = Model.Year?.Id; var pid = Model.Profile?.ProfileId;
+    var over = Model.TotalPeriods > Model.AvailableSlots;
+    var pct = Model.AvailableSlots == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Model.TotalPeriods / Model.AvailableSlots));
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade-year: subject, periods/week, assessable, GPA weight, elective group; the period total must fit the timetable's available slots (BR-SUB-005). Offerings are end-dated, never removed (BR-SUB-004).", "لكل صف سنوي: المادة، الحصص أسبوعياً، قابلة للتقييم، وزن المعدل، مجموعة اختيارية؛ يجب أن يتسع مجموع الحصص في الجدول (BR-SUB-005). المواد تُنهى بتاريخ ولا تُحذف (BR-SUB-004).")</p></div>
+    <form method="get" class="d-flex gap-2 align-items-center">
+        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+        <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
+        <label class="small text-muted text-nowrap">@T("slots/wk", "حصص/أسبوع")</label><input name="slots" type="number" class="form-control form-control-sm" style="width:5rem" value="@Model.AvailableSlots" onchange="this.form.submit()" />
+    </form></div>
+<partial name="_SubjectsNav" />
+
+@if (Model.Profile == null)
+{
+    <div class="alert alert-info">@T("Define a grade-year profile for this year first (Grades → Profile).", "عرّف ملف الصف السنوي لهذا العام أولاً (الصفوف → الملف).")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card">
+                <div class="p-3 border-bottom d-flex align-items-center gap-3">
+                    <h2 class="h6 mb-0">@Model.Profile.Grade.Code @(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) · @(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)</h2>
+                    <div class="ms-auto d-flex align-items-center gap-2 small"><span class="@(over ? "text-danger fw-semibold" : "")">@Model.TotalPeriods / @Model.AvailableSlots @T("periods/week", "حصة/أسبوع")</span><div class="sms-progress" style="width:8rem"><span style="width:@(pct)%;@(over ? "background:#dc2626" : "")"></span></div>@if (over) { <span class="badge text-bg-danger">@T("over capacity (BR-SUB-005)", "يتجاوز السعة (BR-SUB-005)")</span> }</div>
+                </div>
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <thead><tr><th>@T("Subject", "المادة")</th><th>@T("Periods/wk", "حصص/أسبوع")</th><th>@T("Assessable", "تقييم")</th><th>@T("GPA weight", "وزن المعدل")</th><th>@T("Elective", "اختيارية")</th><th>@T("Effective", "السريان")</th><th></th></tr></thead>
+                    <tbody>@foreach (var r in Model.Offerings)
+                    {
+                        var ended = r.Offering.EffectiveToUtc != null;
+                        <tr class="@(ended ? "text-muted" : "")"><td><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td>@r.Offering.WeeklyPeriods</td><td>@(r.Offering.IsAssessable ? "✓" : "—")</td><td>@r.Offering.GpaWeight</td><td>@(r.Offering.IsElective ? (r.Offering.ElectiveGroupTag ?? "✓") : "—")</td><td class="small">@r.Offering.EffectiveFromUtc.ToString("yyyy-MM-dd")@(ended ? " → " + r.Offering.EffectiveToUtc!.Value.ToString("yyyy-MM-dd") : "")</td>
+                            <td class="text-end">@if (!ended) { <form method="post" asp-action="EndOffering" asp-route-id="@r.Offering.Id" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots" class="d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" style="width:9.5rem" /><button class="btn btn-sm btn-outline-secondary" type="submit" title="@T("End-date", "إنهاء بتاريخ")"><i class="bi bi-calendar-x"></i></button></form> }</td></tr>
+                    }
+                    @if (Model.Offerings.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No offerings yet.", "لا مواد في الخطة بعد.")</td></tr> }</tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-3 mb-3"><h2 class="h6">@T("Add offering", "إضافة مادة")</h2>
+                <form method="post" asp-action="AddOffering" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots">
+                    <div class="mb-2"><select asp-for="SubjectId" class="form-select form-select-sm"><option value="">@T("— subject —", "— المادة —")</option>@foreach (var s in Model.Subjects) { <option value="@s.Id">@s.Code · @(isRtl ? s.Name.NameAr : s.Name.NameEn)</option> }</select></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small">@T("Periods/wk", "حصص/أسبوع")</label><input asp-for="WeeklyPeriods" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-6"><label class="form-label small">@T("GPA weight", "وزن المعدل")</label><input asp-for="GpaWeight" class="form-control form-control-sm" type="number" step="0.5" min="0" /></div></div>
+                    <div class="form-check"><input asp-for="IsAssessable" class="form-check-input" /><label asp-for="IsAssessable" class="form-check-label small">@T("Assessable (weight must be > 0)", "قابلة للتقييم (الوزن > 0)")</label></div>
+                    <div class="form-check mb-2"><input asp-for="IsElective" class="form-check-input" /><label asp-for="IsElective" class="form-check-label small">@T("Elective", "اختيارية")</label></div>
+                    <div class="mb-2"><input asp-for="ElectiveGroupTag" class="form-control form-control-sm" placeholder="@T("elective group tag (optional)", "وسم المجموعة الاختيارية (اختياري)")" /></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Add", "إضافة")</button>
+                </form></div>
+            @if (Model.PreviousYearProfileId != null)
+            {
+                <div class="sms-card p-3"><h2 class="h6">@T("Copy from previous year", "نسخ من العام السابق")</h2>
+                    <form method="post" asp-action="CopyPlan" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots"><input type="hidden" name="sourceProfile" value="@Model.PreviousYearProfileId" />
+                        <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi bi-files me-1"></i>@T("Copy", "نسخ") @Model.PreviousYearLabel → @(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)</button>
+                        <div class="form-text">@T("Copies active offerings of the same grade; subjects already in this plan are skipped.", "ينسخ مواد الصف نفسه النشطة؛ ويتخطى الموجود.")</div></form></div>
+            }
+        </div>
+    </div>
+}

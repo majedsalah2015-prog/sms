@@ -34,8 +34,8 @@ namespace Sms.Web.Navigation
             M("CAL", "04", "Academic Calendar", "التقويم الدراسي", "bi-calendar-event", "structure", "E-103", "04-Academic-Calendar.md", "Calendar", "Index"),
             M("GRD", "05", "Grades", "الصفوف", "bi-layers", "structure", "E-103", "05-Grades.md", "Grades", "Index"),
             M("SEC", "06", "Sections", "الشعب", "bi-grid-3x3-gap", "structure", "E-103", "06-Sections.md", "Sections", "Index"),
-            M("SUB", "07", "Subjects", "المواد الدراسية", "bi-journal-bookmark", "structure", "E-104", "07-Subjects.md"),
-            M("CLS", "08", "Classrooms", "القاعات الدراسية", "bi-door-open", "structure", "E-104", "08-Classrooms.md"),
+            M("SUB", "07", "Subjects", "المواد الدراسية", "bi-journal-bookmark", "structure", "E-104", "07-Subjects.md", "Subjects", "Index"),
+            M("CLS", "08", "Classrooms", "القاعات الدراسية", "bi-door-open", "structure", "E-104", "08-Classrooms.md", "Rooms", "Index"),
 
             // S2 — People
             M("ADM", "09", "Admissions", "القبول والتسجيل", "bi-person-plus", "people", "E-201", "09-Admissions.md"),

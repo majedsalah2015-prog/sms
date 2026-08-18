@@ -1,0 +1,50 @@
+@using System.Globalization
+@using Sms.Domain.Grades
+@model RoomCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Classrooms", "القاعات الدراسية");
+    ViewData["Breadcrumb"] = T("Classrooms / Catalog", "القاعات / الدليل");
+    string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys wing", "جناح بنين"), GenderPolicy.Girls => T("Girls wing", "جناح بنات"), _ => T("Mixed", "مشترك") };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Building → floor → room tree with standard/exam capacity, wing tag and feature tags (BR-ROM-001/002/003).", "شجرة مبنى → طابق → قاعة مع السعة العادية/الاختبارية ووسم الجناح والتجهيزات (BR-ROM-001/002/003).") · @Model.TotalRooms @T("rooms", "قاعة") · @Model.TotalSeats @T("seats", "مقعد")</p></div></div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        @foreach (var b in Model.Buildings)
+        {
+            <div class="sms-card mb-3">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-building me-1"></i>@(isRtl ? b.Building.Name.NameAr : b.Building.Name.NameEn)</h2></div>
+                @foreach (var f in b.Floors)
+                {
+                    <div class="px-3 pt-2 small fw-semibold text-muted"><i class="bi bi-layers me-1"></i>@(isRtl ? f.Floor.Name.NameAr : f.Floor.Name.NameEn)</div>
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-2">
+                        <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Room", "القاعة")</th><th>@T("Type", "النوع")</th><th>@T("Std / exam", "عادية / اختبار")</th><th>@T("Wing", "الجناح")</th><th>@T("Features", "التجهيزات")</th><th>@T("Sections", "الشعب")</th><th></th></tr></thead>
+                        <tbody>@foreach (var r in f.Rooms) { <tr class="@(r.Room.IsActive ? "" : "text-muted")"><td><code>@r.Room.Code</code></td><td><a asp-action="Details" asp-route-id="@r.Room.Id" class="fw-semibold">@(isRtl ? r.Room.Name.NameAr : r.Room.Name.NameEn)</a>@if (r.UnavailableNow) { <span class="badge text-bg-warning ms-1">@T("unavailable today", "غير متاحة اليوم")</span> }</td><td>@r.TypeName</td><td>@r.Room.StandardCapacity / @r.Room.ExamCapacity</td><td>@Gender(r.Room.WingTag)</td><td>@foreach (var ft in r.Features) { <span class="badge text-bg-light border me-1">@ft</span> }</td><td>@(r.SectionsUsing?.ToString() ?? "—")</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Room.Id">@T("Open", "فتح")</a></td></tr> }
+                        @if (f.Rooms.Count == 0) { <tr><td colspan="8" class="small text-muted text-center py-2">@T("No rooms on this floor.", "لا قاعات في هذا الطابق.")</td></tr> }</tbody>
+                    </table></div>
+                }
+                @if (b.Floors.Count == 0) { <div class="p-3 small text-muted">@T("No floors yet.", "لا طوابق بعد.")</div> }
+            </div>
+        }
+        @if (Model.Buildings.Count == 0) { <div class="sms-card p-4 text-center text-muted">@T("No buildings yet — create the first one.", "لا مبانٍ بعد — أنشئ الأول.")</div> }
+    </div>
+    <div class="col-xl-4">
+        <div class="sms-card p-3 mb-3"><h2 class="h6">@T("New building", "مبنى جديد")</h2>
+            <form method="post" asp-action="DefineBuilding"><div class="row g-2 mb-2"><div class="col-6"><input asp-for="BuildingNameAr" class="form-control form-control-sm" dir="rtl" placeholder="المبنى الرئيسي" /></div><div class="col-6"><input asp-for="BuildingNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Main building" /></div></div><button class="btn btn-sm btn-outline-primary w-100" type="submit">@T("Create building", "إنشاء مبنى")</button></form></div>
+        <div class="sms-card p-3 mb-3"><h2 class="h6">@T("New floor", "طابق جديد")</h2>
+            <form method="post" asp-action="DefineFloor"><div class="mb-2"><select asp-for="FloorBuildingId" class="form-select form-select-sm"><option value="">@T("— building —", "— المبنى —")</option>@foreach (var b in Model.Buildings) { <option value="@b.Building.Id">@(isRtl ? b.Building.Name.NameAr : b.Building.Name.NameEn)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-5"><input asp-for="FloorNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الطابق الأول" /></div><div class="col-5"><input asp-for="FloorNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Floor 1" /></div><div class="col-2"><input asp-for="FloorOrder" class="form-control form-control-sm" type="number" min="0" /></div></div><button class="btn btn-sm btn-outline-primary w-100" type="submit">@T("Create floor", "إنشاء طابق")</button></form></div>
+        <div class="sms-card p-3"><h2 class="h6">@T("New room", "قاعة جديدة")</h2>
+            <form method="post" asp-action="DefineRoom">
+                <div class="mb-2"><select asp-for="RoomFloorId" class="form-select form-select-sm"><option value="">@T("— floor —", "— الطابق —")</option>@foreach (var f in Model.Floors) { <option value="@f.Id">@(isRtl ? f.BuildingAr : f.BuildingEn) / @(isRtl ? f.Ar : f.En)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-4"><input asp-for="RoomCode" class="form-control form-control-sm" dir="ltr" placeholder="A-101" /></div><div class="col-8"><select asp-for="RoomTypeId" class="form-select form-select-sm"><option value="">@T("— type —", "— النوع —")</option>@foreach (var t in Model.RoomTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }</select></div></div>
+                <div class="row g-2 mb-2"><div class="col-6"><input asp-for="RoomNameAr" class="form-control form-control-sm" dir="rtl" placeholder="قاعة 101" /></div><div class="col-6"><input asp-for="RoomNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Room 101" /></div></div>
+                <div class="row g-2 mb-2"><div class="col-4"><label class="form-label small">@T("Std cap.", "سعة")</label><input asp-for="StandardCapacity" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-4"><label class="form-label small">@T("Exam cap.", "اختبار")</label><input asp-for="ExamCapacity" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-4"><label class="form-label small">@T("Wing", "الجناح")</label><select asp-for="WingTag" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div></div>
+                <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create room", "إنشاء قاعة")</button>
+                <div class="form-text">@T("Exam capacity ≤ standard capacity (BR-ROM-002).", "سعة الاختبار ≤ السعة العادية (BR-ROM-002).")</div>
+            </form></div>
+    </div>
+</div>

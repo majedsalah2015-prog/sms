@@ -55,6 +55,19 @@ namespace Sms.Infrastructure.Seeding
                 ("EGP", "جنيه مصري", "Egyptian Pound"), ("JOD", "دينار أردني", "Jordanian Dinar"), ("USD", "دولار أمريكي", "US Dollar"),
                 ("EUR", "يورو", "Euro"), ("GBP", "جنيه إسترليني", "Pound Sterling"));
 
+            // E-104 screens: room catalog (doc/Modules/08) picks type/features from these product lists.
+            await _lookups.DefineCategoryAsync("RoomType", LookupCategoryTier.ProductSeeded, "نوع القاعة", "Room Type", cancellationToken);
+            await SeedValues("RoomType", cancellationToken,
+                ("Classroom", "فصل دراسي", "Classroom"), ("Lab", "مختبر", "Laboratory"), ("ComputerLab", "معمل حاسب", "Computer Lab"),
+                ("Library", "مكتبة", "Library"), ("Gym", "صالة رياضية", "Gymnasium"), ("Hall", "قاعة كبرى", "Hall"), ("Office", "مكتب", "Office"));
+            await _lookups.DefineCategoryAsync("RoomFeature", LookupCategoryTier.ProductSeeded, "تجهيزات القاعة", "Room Feature", cancellationToken);
+            await SeedValues("RoomFeature", cancellationToken,
+                ("Projector", "جهاز عرض", "Projector"), ("SmartBoard", "سبورة ذكية", "Smart board"), ("AirConditioning", "تكييف", "Air conditioning"),
+                ("LabBenches", "طاولات مختبر", "Lab benches"), ("Wheelchair", "مدخل كراسي متحركة", "Wheelchair access"), ("Computers", "أجهزة حاسب", "Computers"));
+            await _lookups.DefineCategoryAsync("Curriculum", LookupCategoryTier.ProductSeeded, "المنهج", "Curriculum", cancellationToken);
+            await SeedValues("Curriculum", cancellationToken,
+                ("National", "المنهج الوطني", "National curriculum"), ("International", "منهج دولي", "International"), ("Bilingual", "ثنائي اللغة", "Bilingual"));
+
             await _lookups.DefineCategoryAsync("JobTitle", LookupCategoryTier.ProductSeeded, "المسمى الوظيفي", "Job Title", cancellationToken);
             await SeedValues("JobTitle", cancellationToken,
                 ("Teacher", "معلم", "Teacher"), ("Administrator", "إداري", "Administrator"), ("Accountant", "محاسب", "Accountant"),

@@ -1,0 +1,96 @@
+@using System.Globalization
+@using Sms.Domain.Subjects
+@model SubjectCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Subjects", "المواد الدراسية");
+    ViewData["Breadcrumb"] = T("Subjects", "المواد الدراسية");
+    ViewData["SubjectsTab"] = Model.ActiveTab;
+    string TeacherName(int userId) => Model.Teachers.FirstOrDefault(t => t.UserAccountId == userId) is { } t ? (isRtl ? t.NameAr : t.NameEn) : $"#{userId}";
+    var subjectsAll = Model.Subjects.Select(r => r.Subject).ToList();
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Catalog, departments and teacher qualifications (BR-SUB-001/002/006); the per-grade plan lives under Curriculum plan.", "الدليل والأقسام وتأهيل المعلمين (BR-SUB-001/002/006)؛ الخطة لكل صف تحت الخطة الدراسية.")</p></div></div>
+<partial name="_SubjectsNav" />
+
+@if (Model.ActiveTab == "catalog")
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card">
+                <div class="p-2 border-bottom d-flex gap-2 align-items-center">
+                    <form method="get" class="d-flex gap-2 align-items-center"><input type="hidden" name="tab" value="catalog" /><select name="department" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">@T("All departments", "كل الأقسام")</option>@foreach (var d in Model.Departments) { <option value="@d.Id" selected="@(d.Id == Model.DepartmentFilter)">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</option> }</select></form>
+                    <span class="small text-muted ms-auto">@Model.Subjects.Count @T("subjects", "مادة")</span>
+                </div>
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Subject", "المادة")</th><th>@T("Category", "الفئة")</th><th>@T("Department", "القسم")</th><th>@T("Offerings", "في الخطط")</th><th>@T("Qualified teachers", "المعلمون المؤهلون")</th></tr></thead>
+                    <tbody>@foreach (var r in Model.Subjects) { <tr><td><code>@r.Subject.Code</code></td><td class="fw-semibold">@(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td>@r.Subject.Category</td><td>@(r.Department == null ? "—" : (isRtl ? r.Department.Name.NameAr : r.Department.Name.NameEn))</td><td><span class="badge text-bg-light border">@r.Offerings</span></td><td>@if (r.QualifiedTeachers == 0) { <span class="badge text-bg-warning">0 · @T("gap", "فجوة")</span> } else { <span class="badge text-bg-light border">@r.QualifiedTeachers</span> }</td></tr> }
+                    @if (Model.Subjects.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No subjects yet.", "لا مواد بعد.")</td></tr> }</tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-3">
+                <h2 class="h6">@T("New subject", "مادة جديدة")</h2>
+                <form method="post" asp-action="DefineSubject">
+                    <div class="row g-2 mb-2"><div class="col-4"><input asp-for="Code" class="form-control form-control-sm" dir="ltr" placeholder="MATH" /></div><div class="col-8"><input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" placeholder="Mathematics" /></div></div>
+                    <div class="mb-2"><input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" placeholder="رياضيات" /></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><select asp-for="Category" class="form-select form-select-sm">@foreach (var c in SubjectCatalogViewModel.Categories) { <option value="@c">@c</option> }</select></div><div class="col-6"><select asp-for="DepartmentId" class="form-select form-select-sm"><option value="">@T("— department —", "— القسم —")</option>@foreach (var d in Model.Departments) { <option value="@d.Id">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</option> }</select></div></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create subject", "إنشاء مادة")</button>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+else if (Model.ActiveTab == "departments")
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            @foreach (var d in Model.Departments)
+            {
+                <div class="sms-card mb-3"><div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</h2><span class="small text-muted">@T("Head:", "الرئيس:") @(d.HeadTeacherUserId == null ? "—" : TeacherName(d.HeadTeacherUserId.Value))</span></div>
+                    <div class="p-3 d-flex flex-wrap gap-2">@foreach (var s in subjectsAll.Where(s => s.DepartmentId == d.Id)) { <span class="badge text-bg-light border">@s.Code · @(isRtl ? s.Name.NameAr : s.Name.NameEn)</span> }@if (!subjectsAll.Any(s => s.DepartmentId == d.Id)) { <span class="small text-muted">@T("No subjects assigned.", "لا مواد مسندة.")</span> }</div></div>
+            }
+            @if (Model.Departments.Count == 0) { <div class="sms-card p-4 text-center text-muted">@T("No departments yet.", "لا أقسام بعد.")</div> }
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-3"><h2 class="h6">@T("New department", "قسم جديد")</h2>
+                <form method="post" asp-action="DefineDepartment">
+                    <div class="mb-2"><input asp-for="DeptNameAr" class="form-control form-control-sm" dir="rtl" placeholder="قسم العلوم" /></div>
+                    <div class="mb-2"><input asp-for="DeptNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Science" /></div>
+                    <div class="mb-2"><select asp-for="HeadTeacherUserId" class="form-select form-select-sm"><option value="">@T("— head of department —", "— رئيس القسم —")</option>@foreach (var t in Model.Teachers) { <option value="@t.UserAccountId" disabled="@(t.UserAccountId == null)">@(isRtl ? t.NameAr : t.NameEn)@(t.UserAccountId == null ? " (" + T("no user account", "بلا حساب") + ")" : "")</option> }</select></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create department", "إنشاء قسم")</button>
+                </form></div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Teacher × subject", "معلم × مادة")</h2><div class="small text-muted">@T("Cells list stage restrictions; empty = not qualified. Columns with no qualified teacher are gaps.", "الخلايا تعرض قيود المرحلة؛ الفارغة = غير مؤهل. الأعمدة بلا معلم مؤهل فجوات.")</div></div>
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+                    <thead><tr><th>@T("Teacher", "المعلم")</th>@foreach (var s in subjectsAll) { var gap = !Model.Matrix.Values.Any(m => m.ContainsKey(s.Id)); <th class="@(gap ? "text-warning-emphasis" : "")" title="@(isRtl ? s.Name.NameAr : s.Name.NameEn)">@s.Code@if (gap) { <i class="bi bi-exclamation-triangle ms-1"></i> }</th> }</tr></thead>
+                    <tbody>@foreach (var t in Model.Teachers.Where(t => t.UserAccountId != null))
+                    {
+                        Model.Matrix.TryGetValue(t.UserAccountId!.Value, out var row);
+                        <tr><td class="fw-semibold">@(isRtl ? t.NameAr : t.NameEn)</td>@foreach (var s in subjectsAll) { <td>@if (row != null && row.TryGetValue(s.Id, out var stages)) { <span class="badge text-bg-success" title="@string.Join(", ", stages)">✓ <span class="fw-normal">@string.Join(", ", stages)</span></span> }</td> }</tr>
+                    }
+                    @if (!Model.Teachers.Any(t => t.UserAccountId != null)) { <tr><td colspan="@(subjectsAll.Count + 1)" class="text-center text-muted py-3">@T("No teachers with user accounts yet.", "لا معلمون بحسابات مستخدم بعد.")</td></tr> }</tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-3"><h2 class="h6">@T("Record qualification", "تسجيل تأهيل")</h2>
+                <form method="post" asp-action="DefineQualification">
+                    <div class="mb-2"><select asp-for="QTeacherUserId" class="form-select form-select-sm"><option value="">@T("— teacher —", "— المعلم —")</option>@foreach (var t in Model.Teachers) { <option value="@t.UserAccountId" disabled="@(t.UserAccountId == null)">@(isRtl ? t.NameAr : t.NameEn)@(t.UserAccountId == null ? " (" + T("no user account", "بلا حساب") + ")" : "")</option> }</select></div>
+                    <div class="mb-2"><select asp-for="QSubjectId" class="form-select form-select-sm"><option value="">@T("— subject —", "— المادة —")</option>@foreach (var s in subjectsAll) { <option value="@s.Id">@s.Code · @(isRtl ? s.Name.NameAr : s.Name.NameEn)</option> }</select></div>
+                    <div class="row g-2 mb-2"><div class="col-7"><select asp-for="QStageId" class="form-select form-select-sm"><option value="">@T("all stages", "كل المراحل")</option>@foreach (var s in Model.Stages) { <option value="@s.Id">@(isRtl ? s.Name.NameAr : s.Name.NameEn)</option> }</select></div><div class="col-5"><select asp-for="QSource" class="form-select form-select-sm"><option value="Qualification">@T("Qualification", "مؤهل")</option><option value="Approval">@T("Approval", "اعتماد")</option></select></div></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Record", "تسجيل")</button>
+                    <div class="form-text">@T("BR-SUB-006: assignments outside the matrix are blocked (or need an approval-sourced entry).", "BR-SUB-006: الإسناد خارج المصفوفة محجوب (أو يحتاج تأهيلاً باعتماد).")</div>
+                </form></div>
+        </div>
+    </div>
+}
