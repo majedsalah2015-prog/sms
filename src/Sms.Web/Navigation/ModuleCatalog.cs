@@ -21,12 +21,14 @@ namespace Sms.Web.Navigation
             string Icon,
             string Group,
             string Epic,
-            string DocPath);
+            string DocPath,
+            string? ScreenController = null,
+            string? ScreenAction = null);
 
         private static readonly ModuleInfo[] All =
         {
             // S1 — Structure
-            M("SET", "01", "System Setup", "إعداد النظام", "bi-sliders", "structure", "E-101", "01-System-Setup.md"),
+            M("SET", "01", "System Setup", "إعداد النظام", "bi-sliders", "structure", "E-101", "01-System-Setup.md", "Setup", "Index"),
             M("SCH", "02", "Schools", "المدارس", "bi-building", "structure", "E-102", "02-Schools.md"),
             M("AYR", "03", "Academic Years", "الأعوام الدراسية", "bi-calendar3", "structure", "E-102", "03-Academic-Years.md"),
             M("CAL", "04", "Academic Calendar", "التقويم الدراسي", "bi-calendar-event", "structure", "E-103", "04-Academic-Calendar.md"),
@@ -102,7 +104,9 @@ namespace Sms.Web.Navigation
                 var group = new NavItem(key, titleEn, titleAr, icon);
                 foreach (var m in All.Where(x => x.Group == key && (isVisible == null || isVisible(x))))
                 {
-                    group.Items.Add(new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, "Modules", "Index", new { code = m.Code }));
+                    group.Items.Add(m.ScreenController == null
+                        ? new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, "Modules", "Index", new { code = m.Code })
+                        : new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, m.ScreenController, m.ScreenAction));
                 }
 
                 items.Add(group);
@@ -111,7 +115,7 @@ namespace Sms.Web.Navigation
             return items;
         }
 
-        private static ModuleInfo M(string code, string number, string en, string ar, string icon, string group, string epic, string doc) =>
-            new(code, number, en, ar, icon, group, epic, doc);
+        private static ModuleInfo M(string code, string number, string en, string ar, string icon, string group, string epic, string doc, string? screenController = null, string? screenAction = null) =>
+            new(code, number, en, ar, icon, group, epic, doc, screenController, screenAction);
     }
 }

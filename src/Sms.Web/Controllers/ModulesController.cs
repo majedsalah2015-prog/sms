@@ -20,6 +20,11 @@ namespace Sms.Web.Controllers
                 return NotFound();
             }
 
+            if (module.ScreenController != null)
+            {
+                return RedirectToAction(module.ScreenAction, module.ScreenController);
+            }
+
             return View(module);
         }
     }

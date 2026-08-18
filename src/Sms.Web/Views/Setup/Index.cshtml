@@ -1,0 +1,78 @@
+@using System.Globalization
+@using Sms.Domain.Setup
+@model SetupWizardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Setup wizard", "معالج الإعداد");
+    ViewData["Breadcrumb"] = T("System Setup / Setup wizard", "إعداد النظام / معالج الإعداد");
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@T("System Setup", "إعداد النظام")</h1>
+        <p class="text-muted mb-0">@T("Module 01 — every school completes the wizard before its first academic year can be activated (BR-SET-003).", "الوحدة 01 — تُكمل كل مدرسة المعالج قبل تفعيل أول عام دراسي (BR-SET-003).")</p>
+    </div>
+</div>
+
+<partial name="_SetupNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="p-3 border-bottom d-flex align-items-center gap-3">
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">@T("Completion", "نسبة الإنجاز")</span>
+                        <span>@Model.CompletionPercent%</span>
+                    </div>
+                    <div class="sms-progress"><span style="width:@(Model.CompletionPercent)%"></span></div>
+                </div>
+                @if (Model.IsComplete)
+                {
+                    <span class="badge text-bg-success"><i class="bi bi-check2-circle me-1"></i>@T("Setup complete", "الإعداد مكتمل") · @Model.CompletedAtUtc?.ToString("yyyy-MM-dd")</span>
+                }
+                else
+                {
+                    <form asp-action="Complete" method="post">
+                        <button type="submit" class="btn btn-primary" @(Model.CanDeclareComplete ? "" : "disabled")>
+                            <i class="bi bi-flag-fill me-1"></i>@T("Declare setup complete", "إعلان اكتمال الإعداد")
+                        </button>
+                    </form>
+                }
+            </div>
+            <ol class="sms-stepper">
+                @foreach (var s in Model.Steps)
+                {
+                    var done = s.Status == SetupStepStatus.Completed;
+                    <li>
+                        <a class="sms-stepper__item @(done ? "is-done" : s.IsReady ? "is-ready" : "")" asp-action="Step" asp-route-code="@s.Step.Code">
+                            <span class="sms-stepper__num">@(done ? "✓" : s.Step.Order.ToString())</span>
+                            <span class="flex-grow-1">
+                                <span class="sms-stepper__title d-block">@(isRtl ? s.Step.TitleAr : s.Step.TitleEn)</span>
+                                <span class="sms-stepper__meta">
+                                    @if (done) { @T("Completed", "مكتملة") }
+                                    else if (s.IsReady) { @T("Data in place — mark as complete", "البيانات جاهزة — علّم كمكتملة") }
+                                    else { @T("Pending", "قيد الانتظار") }
+                                    @if (!s.Step.IsMandatory) { <text> · @T("optional", "اختيارية")</text> }
+                                </span>
+                            </span>
+                            <i class="bi bi-chevron-right text-muted @(isRtl ? "sms-flip" : "")"></i>
+                        </a>
+                    </li>
+                }
+            </ol>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-4">
+            <h2 class="h6 text-muted">@T("How it works", "كيف يعمل")</h2>
+            <p class="small mb-2">@T("Each step validates on save (server-side). Steps can be revisited until \"Setup Complete\" is declared; that needs every mandatory step green.", "تُتحقق كل خطوة عند الحفظ (من الخادم). يمكن إعادة زيارة الخطوات حتى إعلان \"اكتمال الإعداد\"، والذي يتطلب اكتمال كل الخطوات الإلزامية.")</p>
+            <p class="small mb-0">@T("After go-live, settings change through the hub (audited); the country pack change is support-gated (BR-SET-004).", "بعد التشغيل تُعدَّل الإعدادات من المركز (مع تدقيق)؛ وتغيير حزمة الدولة يتطلب صلاحية الدعم (BR-SET-004).")</p>
+            @if (!Model.HasSchool)
+            {
+                <div class="alert alert-warning small mt-3 mb-0">@T("No school profile yet — start with step 1.", "لا يوجد ملف مدرسة بعد — ابدأ بالخطوة 1.")</div>
+            }
+        </div>
+    </div>
+</div>

@@ -1,0 +1,219 @@
+@using System.Globalization
+@using Sms.Application.Setup
+@using Sms.Domain.Setup
+@model SetupStepViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var step = Model.State!.Step;
+    var title = isRtl ? step.TitleAr : step.TitleEn;
+    ViewData["Title"] = title;
+    ViewData["Breadcrumb"] = T("System Setup / Setup wizard / ", "إعداد النظام / معالج الإعداد / ") + title;
+    var done = Model.State.Status == SetupStepStatus.Completed;
+    var days = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
+    string DayName(DayOfWeek d) => isRtl ? CultureInfo.GetCultureInfo("ar-SA").DateTimeFormat.GetDayName(d) : d.ToString();
+}
+
+<div class="sms-page-head">
+    <div>
+        <div class="text-muted small">@T("Step", "الخطوة") @step.Order @T("of", "من") @SetupWizardSteps.All.Count</div>
+        <h1 class="sms-page-title">@title</h1>
+    </div>
+    <div>
+        @if (done) { <span class="badge text-bg-success"><i class="bi bi-check2 me-1"></i>@T("Completed", "مكتملة")</span> }
+        else if (Model.State.IsReady) { <span class="badge text-bg-primary">@T("Ready", "جاهزة")</span> }
+        else { <span class="badge text-bg-secondary">@T("Pending", "قيد الانتظار")</span> }
+    </div>
+</div>
+
+<partial name="_SetupNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card p-4">
+            <form method="post" asp-action="Step" asp-route-code="@step.Code" novalidate>
+                <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+
+                @switch (step.Code)
+                {
+                    case SetupWizardSteps.Profile:
+                        <p class="text-muted small">@T("Identity fields appear on official documents; later edits require an audit reason (BR-SCH-002).", "حقول الهوية تظهر في المستندات الرسمية؛ التعديلات اللاحقة تتطلب سبباً للتدقيق (BR-SCH-002).")</p>
+                        <input type="hidden" asp-for="SchoolId" />
+                        <div class="sms-bilingual mb-3">
+                            <div><label class="form-label">@T("School name (Arabic)", "اسم المدرسة (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                            <div><label class="form-label">@T("School name (English)", "اسم المدرسة (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><label class="form-label">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" class="form-control" type="date" /></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><label class="form-label">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
+                            <div class="col-md-8"><label class="form-label">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4"><label class="form-label">@T("Contact email", "البريد الإلكتروني")</label><input asp-for="ContactEmail" class="form-control" dir="ltr" type="email" /></div>
+                            <div class="col-md-4"><label class="form-label">@T("Contact phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.CountryPack:
+                        <p class="text-muted small">@T("The pack binds VAT default, ID-type requirements, Hijri display and retention defaults (BR-SET-004). Changing it after go-live needs product-support permission.", "تربط الحزمة افتراضيات الضريبة ومتطلبات الهوية وعرض الهجري والاحتفاظ (BR-SET-004). تغييرها بعد التشغيل يتطلب صلاحية دعم المنتج.")</p>
+                        @foreach (var p in Model.Packs)
+                        {
+                            <label class="sms-card p-3 d-flex align-items-start gap-3 mb-2 @(Model.PackCode == p.Code ? "border-primary" : "")">
+                                <input class="form-check-input mt-1" type="radio" asp-for="PackCode" value="@p.Code" />
+                                <span>
+                                    <span class="fw-semibold d-block">@(isRtl ? p.Name.NameAr : p.Name.NameEn) <span class="text-muted small">(@p.Code v@(p.Version))</span></span>
+                                    <span class="small text-muted">@p.CountryIsoCode · @p.DefaultCurrencyCode · @T("VAT", "ض.ق.م") @((p.DefaultVatRate * 100).ToString("0.#"))% · @T("Hijri", "هجري"): @(p.HijriDisplayDefault ? T("on", "مفعّل") : T("off", "معطّل")) · @T("IDs", "الهويات"): @p.RequiredIdTypeCodes</span>
+                                </span>
+                            </label>
+                        }
+                        if (Model.Packs.Count == 0) { <div class="alert alert-warning small">@T("No country packs are defined — run the product seeder.", "لا توجد حزم دول معرّفة — شغّل بيانات المنتج.")</div> }
+                        break;
+
+                    case SetupWizardSteps.Currency:
+                        <p class="text-muted small">@T("Picked from the ISO currency list (BR-GLB-112).", "تُختار من قائمة عملات ISO (BR-GLB-112).")</p>
+                        <div class="mb-3" style="max-width:420px">
+                            <label class="form-label">@T("Currency", "العملة")</label>
+                            <select asp-for="CurrencyCode" class="form-select">
+                                @foreach (var c in Model.Currencies) { <option value="@c.Code">@c.Code — @(isRtl ? c.Name.NameAr : c.Name.NameEn)</option> }
+                            </select>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.TimeZone:
+                        <div class="mb-3" style="max-width:520px">
+                            <label class="form-label">@T("Time zone", "المنطقة الزمنية")</label>
+                            <select asp-for="TimeZoneId" class="form-select">
+                                @foreach (var tz in Model.TimeZones) { <option value="@tz.Id">@tz.DisplayName</option> }
+                            </select>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.WorkingWeek:
+                        <p class="text-muted small">@T("At least 4 working days. The rest are the weekend for the calendar and timetable.", "أربعة أيام عمل على الأقل. البقية عطلة نهاية الأسبوع للتقويم والجدول.")</p>
+                        <div class="d-flex flex-wrap gap-3 mb-3">
+                            @foreach (var d in days)
+                            {
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="WorkingDays" value="@d" id="wd-@d" @(Model.WorkingDays.Contains(d) ? "checked" : "") />
+                                    <label class="form-check-label" for="wd-@d">@DayName(d)</label>
+                                </div>
+                            }
+                        </div>
+                        <div class="mb-3" style="max-width:320px">
+                            <label class="form-label">@T("First day of week", "أول أيام الأسبوع")</label>
+                            <select asp-for="FirstDayOfWeek" class="form-select">
+                                @foreach (var d in days) { <option value="@d">@DayName(d)</option> }
+                            </select>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.Languages:
+                        <div class="mb-3">
+                            <label class="form-label d-block">@T("Enabled languages", "اللغات المفعّلة")</label>
+                            @foreach (var l in SettingKeys.SupportedLanguages)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="EnabledLanguages" value="@l" id="lang-@l" @(Model.EnabledLanguages.Contains(l) ? "checked" : "") />
+                                    <label class="form-check-label" for="lang-@l">@(l == "ar" ? "العربية" : "English")</label>
+                                </div>
+                            }
+                        </div>
+                        <div class="mb-3" style="max-width:320px">
+                            <label class="form-label">@T("Default language", "اللغة الافتراضية")</label>
+                            <select asp-for="DefaultLanguage" class="form-select"><option value="ar">العربية</option><option value="en">English</option></select>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.CalendarType:
+                        <div class="mb-3">
+                            <label class="form-label d-block">@T("Calendar type", "نوع التقويم")</label>
+                            @foreach (var c in SettingKeys.CalendarTypes)
+                            {
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" asp-for="CalendarType" value="@c" id="cal-@c" />
+                                    <label class="form-check-label" for="cal-@c">@(c == "Gregorian" ? T("Gregorian", "ميلادي") : c == "Hijri" ? T("Hijri", "هجري") : T("Both (dual display)", "كلاهما (عرض مزدوج)"))</label>
+                                </div>
+                            }
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" asp-for="HijriDisplay" />
+                            <label class="form-check-label" asp-for="HijriDisplay">@T("Show Hijri dates alongside Gregorian", "عرض التاريخ الهجري بجانب الميلادي")</label>
+                        </div>
+                        break;
+
+                    case SetupWizardSteps.NumberingSeries:
+                        <p class="text-muted small">@T("The doc 08 catalog ships with the product; confirm the series below exist for this school (E-006 registry manages formats and cutovers).", "كتالوج الوثيقة 08 يأتي مع المنتج؛ تأكد من وجود السلاسل أدناه لهذه المدرسة (سجل E-006 يدير الصيغ والتحويل).")</p>
+                        @if (Model.NumberingSeriesCount == 0)
+                        {
+                            <div class="alert alert-warning small">@T("No numbering series exist yet — run the product seeder (doc 08 §4 catalog).", "لا توجد سلاسل ترقيم بعد — شغّل بيانات المنتج (كتالوج الوثيقة 08 §4).")</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive"><table class="table table-sm sms-table mb-3">
+                                <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Entity", "الكيان")</th><th>@T("Format", "الصيغة")</th></tr></thead>
+                                <tbody>@foreach (var s in Model.NumberingSeries) { <tr><td><code>@s.Code</code></td><td>@s.Entity</td><td dir="ltr"><code>@s.Format</code></td></tr> }</tbody>
+                            </table></div>
+                        }
+                        break;
+
+                    case SetupWizardSteps.StageStructure:
+                        <p class="text-muted small">@T("Define at least one stage and one grade. The full ladder (promotion targets, grade-year profiles) is Module 05.", "عرّف مرحلة واحدة وصفاً واحداً على الأقل. السلم الكامل (أهداف الترفيع، ملفات الصف السنوية) في الوحدة 05.")</p>
+                        @if (Model.Stages.Count > 0)
+                        {
+                            <div class="table-responsive mb-3"><table class="table table-sm sms-table">
+                                <thead><tr><th>#</th><th>@T("Stage", "المرحلة")</th><th>@T("Grades", "الصفوف")</th></tr></thead>
+                                <tbody>@foreach (var s in Model.Stages) { <tr><td>@s.Order</td><td>@(isRtl ? s.StageAr : s.StageEn)</td><td>@string.Join(" · ", s.Grades.Select(g => $"{g.Code} {(isRtl ? g.Ar : g.En)}"))</td></tr> }</tbody>
+                            </table></div>
+                        }
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 small text-muted">@T("New stage (optional)", "مرحلة جديدة (اختياري)")</legend>
+                            <div class="row g-3">
+                                <div class="col-md-5"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="StageNameAr" class="form-control" dir="rtl" /></div>
+                                <div class="col-md-5"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="StageNameEn" class="form-control" dir="ltr" /></div>
+                                <div class="col-md-2"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="StageOrder" class="form-control" type="number" min="1" /></div>
+                            </div>
+                        </fieldset>
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 small text-muted">@T("New grade (optional)", "صف جديد (اختياري)")</legend>
+                            <div class="row g-3">
+                                <div class="col-md-3"><label class="form-label">@T("Stage", "المرحلة")</label>
+                                    <select asp-for="ExistingStageId" class="form-select"><option value="">@T("— the new stage above —", "— المرحلة الجديدة أعلاه —")</option>@foreach (var s in Model.StageOptions) { <option value="@s.Id">@(isRtl ? s.Ar : s.En)</option> }</select></div>
+                                <div class="col-md-2"><label class="form-label">@T("Code", "الرمز")</label><input asp-for="GradeCode" class="form-control" dir="ltr" placeholder="G1" /></div>
+                                <div class="col-md-2"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="GradeNameAr" class="form-control" dir="rtl" /></div>
+                                <div class="col-md-3"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="GradeNameEn" class="form-control" dir="ltr" /></div>
+                                <div class="col-md-2"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="GradeOrder" class="form-control" type="number" min="1" /></div>
+                            </div>
+                        </fieldset>
+                        break;
+                }
+
+                <div class="mb-3">
+                    <label class="form-label">@T("Note (optional)", "ملاحظة (اختياري)")</label>
+                    <input asp-for="Notes" class="form-control" maxlength="500" />
+                </div>
+
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>@(done ? T("Save & keep completed", "حفظ والإبقاء مكتملة") : T("Save & complete step", "حفظ وإكمال الخطوة"))</button>
+                    <a class="btn btn-outline-secondary" asp-action="Index">@T("Back to wizard", "العودة للمعالج")</a>
+                    @if (Model.NextStepCode != null) { <a class="ms-auto small" asp-action="Step" asp-route-code="@Model.NextStepCode">@T("Skip to next step", "التخطي للخطوة التالية") →</a> }
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-4">
+            <h2 class="h6 text-muted">@T("Steps", "الخطوات")</h2>
+            <ol class="small ps-3 mb-0">
+                @foreach (var s in SetupWizardSteps.All)
+                {
+                    <li class="@(s.Code == step.Code ? "fw-semibold" : "")"><a asp-action="Step" asp-route-code="@s.Code" class="sms-inline-link p-0">@(isRtl ? s.TitleAr : s.TitleEn)</a></li>
+                }
+            </ol>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,20 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Index", "Setup wizard", "معالج الإعداد", "bi-list-check"),
+        ("Settings", "Settings hub", "مركز الإعدادات", "bi-sliders"),
+        ("Features", "Feature toggles", "الميزات", "bi-toggles"),
+        ("Pack", "Country pack", "حزمة الدولة", "bi-globe2"),
+        ("Lookups", "Lookup lists", "القوائم المرجعية", "bi-card-list"),
+    };
+    bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || (a == "Index" && action == "Step");
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item"><a class="nav-link @(Active(t.Action) ? "active" : "")" asp-controller="Setup" asp-action="@t.Action"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

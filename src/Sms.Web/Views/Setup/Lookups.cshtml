@@ -1,0 +1,85 @@
+@using System.Globalization
+@using Sms.Domain.Lookups
+@model LookupsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Lookup lists", "القوائم المرجعية");
+    ViewData["Breadcrumb"] = T("System Setup / Lookup lists", "إعداد النظام / القوائم المرجعية");
+    var readOnly = Model.Selected?.Tier == LookupCategoryTier.ProductSeeded;
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Two tiers (BR-SET-001): product-seeded lists are read-only for schools; school-managed lists are yours. Values are deactivated, never deleted (BR-SET-002).", "مستويان (BR-SET-001): القوائم المزوَّدة من المنتج للقراءة فقط؛ وقوائم المدرسة تخصكم. القيم تُعطَّل ولا تُحذف (BR-SET-002).")</p></div></div>
+<partial name="_SetupNav" />
+
+<div class="row g-3">
+    <div class="col-lg-3">
+        <div class="sms-card">
+            <div class="p-2 border-bottom small text-muted fw-semibold">@T("Categories", "الفئات")</div>
+            <div class="list-group list-group-flush">
+                @foreach (var c in Model.Categories)
+                {
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(c.Id == Model.Selected?.Id ? "active" : "")" asp-action="Lookups" asp-route-category="@c.Code">
+                        <span>@(isRtl ? c.Name.NameAr : c.Name.NameEn)<br /><code class="small">@c.Code</code></span>
+                        <span class="badge rounded-pill @(c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-light border" : "text-bg-primary")" title="@c.Tier">@(c.Tier == LookupCategoryTier.ProductSeeded ? T("product", "منتج") : T("school", "مدرسة"))</span>
+                    </a>
+                }
+            </div>
+            <form method="post" asp-action="DefineLookupCategory" class="p-3 border-top">
+                <div class="small fw-semibold mb-2">@T("New school-managed category", "فئة جديدة تديرها المدرسة")</div>
+                <input name="NewCategoryCode" class="form-control form-control-sm mb-1" placeholder="Code" dir="ltr" />
+                <input name="NewCategoryAr" class="form-control form-control-sm mb-1" placeholder="الاسم بالعربية" dir="rtl" />
+                <input name="NewCategoryEn" class="form-control form-control-sm mb-2" placeholder="English name" dir="ltr" />
+                <button class="btn btn-sm btn-outline-primary w-100" type="submit">@T("Create", "إنشاء")</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        @if (Model.Selected != null)
+        {
+            <div class="sms-card">
+                <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h2 class="h6 mb-0">@(isRtl ? Model.Selected.Name.NameAr : Model.Selected.Name.NameEn) <code class="small text-muted">@Model.Selected.Code</code></h2>
+                    @if (readOnly) { <span class="badge text-bg-light border"><i class="bi bi-lock me-1"></i>@T("Product-seeded — read only", "مزوَّدة من المنتج — للقراءة فقط")</span> }
+                </div>
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <thead><tr><th>#</th><th>@T("Code", "الرمز")</th><th>@T("Arabic", "عربي")</th><th>@T("English", "إنجليزي")</th><th>@T("Active", "فعّال")</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var v in Model.Values)
+                    {
+                        <tr class="@(v.IsActive ? "" : "text-muted")">
+                            <td>@v.SortOrder</td><td><code>@v.Code</code></td><td dir="rtl">@v.Name.NameAr</td><td dir="ltr">@v.Name.NameEn</td>
+                            <td>@(v.IsActive ? "✓" : "—")</td>
+                            <td class="text-end">
+                                @if (!readOnly && v.IsActive)
+                                {
+                                    <form method="post" asp-action="DeactivateLookupValue" class="d-inline" onsubmit="return confirm('@T("Deactivate this value? It stays visible in historical records (BR-GLB-006).", "إلغاء تفعيل هذه القيمة؟ ستبقى ظاهرة في السجلات التاريخية (BR-GLB-006).")');">
+                                        <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="category" value="@Model.Selected.Code" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">@T("Deactivate", "إلغاء التفعيل")</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+                @if (!readOnly)
+                {
+                    <form method="post" asp-action="DefineLookupValue" asp-route-category="@Model.Selected.Code" class="p-3 border-top">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-2"><label class="form-label small">@T("Code", "الرمز")</label><input name="Code" class="form-control form-control-sm" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label small">@T("Arabic name", "الاسم بالعربية")</label><input name="NameAr" class="form-control form-control-sm" dir="rtl" /></div>
+                            <div class="col-md-3"><label class="form-label small">@T("English name", "الاسم بالإنجليزية")</label><input name="NameEn" class="form-control form-control-sm" dir="ltr" /></div>
+                            <div class="col-md-1"><label class="form-label small">#</label><input name="SortOrder" class="form-control form-control-sm" type="number" value="@Model.SortOrder" /></div>
+                            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button></div>
+                        </div>
+                    </form>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">@T("No lookup categories yet.", "لا توجد فئات بعد.")</div>
+        }
+    </div>
+</div>

@@ -1,0 +1,64 @@
+@using System.Globalization
+@using Sms.Application.Setup
+@model SettingsHubViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Settings hub", "مركز الإعدادات");
+    ViewData["Breadcrumb"] = T("System Setup / Settings hub", "إعداد النظام / مركز الإعدادات");
+    var groups = new (string Key, string En, string Ar)[] { ("Regional", "Regional", "إقليمي"), ("Financial", "Financial", "مالي"), ("Languages", "Languages", "اللغات"), ("Portal", "Portal", "البوابة") };
+    string YearLabel(int? id) => id == null ? T("School default", "افتراضي المدرسة") : (Model.Years.FirstOrDefault(y => y.Id == id) is { } y ? (isRtl ? y.LabelAr : y.LabelEn) : id.ToString()!);
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Year-versionable keys keep history per academic year (BR-SET-005); every change is T1-audited and edits need a reason (BR-SET-007).", "المفاتيح القابلة للإصدار السنوي تحفظ تاريخاً لكل عام دراسي (BR-SET-005)؛ كل تغيير مدقَّق T1 والتعديلات تتطلب سبباً (BR-SET-007).")</p></div></div>
+<partial name="_SetupNav" />
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var g in groups) { <li class="nav-item"><a class="nav-link @(Model.ActiveGroup == g.Key ? "active" : "")" asp-action="Settings" asp-route-group="@g.Key">@(isRtl ? g.Ar : g.En)</a></li> }
+    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="NTF">@T("Notifications defaults", "افتراضيات الإشعارات") <i class="bi bi-box-arrow-up-right small"></i></a></li>
+    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="SYS">@T("Numbering", "الترقيم") <i class="bi bi-box-arrow-up-right small"></i></a></li>
+</ul>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <thead><tr><th>@T("Setting", "الإعداد")</th><th>@T("Value", "القيمة")</th><th>@T("Scope", "النطاق")</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup))
+                {
+                    var rows = Model.Rows.Where(r => r.Key == d.Key).OrderBy(r => r.AcademicYearId.HasValue).ThenBy(r => r.AcademicYearId).ToList();
+                    if (rows.Count == 0)
+                    {
+                        <tr><td><code>@d.Key</code>@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</td><td class="text-muted">—</td><td class="text-muted small">@T("not set", "غير محدد")</td><td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-fragment="edit" asp-route-key="@d.Key">@T("Set", "تحديد")</a></td></tr>
+                    }
+                    else
+                    {
+                        foreach (var r in rows)
+                        {
+                            <tr><td><code>@d.Key</code>@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</td><td dir="ltr">@r.Value</td><td class="small">@YearLabel(r.AcademicYearId)</td><td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-route-key="@d.Key" asp-route-year="@r.AcademicYearId" asp-fragment="edit">@T("Edit", "تعديل")</a></td></tr>
+                        }
+                    }
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-4" id="edit">
+            <h2 class="h6">@T("Set a value", "تحديد قيمة")</h2>
+            <form method="post" asp-action="Settings">
+                <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+                <div class="mb-2"><label class="form-label">@T("Key", "المفتاح")</label>
+                    <select name="Key" class="form-select">
+                        @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup)) { <option value="@d.Key" selected="@(d.Key == (Model.Key ?? Context.Request.Query["key"].ToString()))">@d.Key</option> }
+                    </select></div>
+                <div class="mb-2"><label class="form-label">@T("Value", "القيمة")</label><input name="Value" class="form-control" dir="ltr" value="@Model.Value" /></div>
+                <div class="mb-2"><label class="form-label">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
+                    <select name="AcademicYearId" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></div>
+                <div class="mb-3"><label class="form-label">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" class="form-control" value="@Model.Reason" /></div>
+                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
+            </form>
+        </div>
+    </div>
+</div>

@@ -187,3 +187,26 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
 .sms-auth__submit { padding-block: .6rem; font-weight: 600; }
 .sms-auth__foot { margin-top: 1.25rem; font-size: .8rem; color: var(--sms-muted); display: flex; gap: 1rem; }
 .sms-user.dropdown-toggle::after { margin-inline-start: .35rem; }
+
+/* ---- Setup module (doc/Modules/01 §8) ---- */
+.sms-subnav .nav-link { color: var(--sms-muted); border-radius: 999px; padding: .4rem .9rem; }
+.sms-subnav .nav-link.active { background: var(--sms-primary); color: #fff; }
+.sms-stepper { list-style: none; margin: 0; padding: 0; }
+.sms-stepper__item { display: flex; align-items: center; gap: .9rem; padding: .8rem 1rem; border-bottom: 1px solid var(--sms-sidebar-border); color: inherit; }
+.sms-stepper__item:last-child { border-bottom: 0; }
+.sms-stepper__item:hover { background: var(--sms-nav-hover-bg); color: inherit; }
+.sms-stepper__num { width: 32px; height: 32px; flex: 0 0 32px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; font-size: .85rem; background: var(--sms-body-bg); color: var(--sms-muted); border: 1px solid var(--sms-sidebar-border); }
+.sms-stepper__item.is-done .sms-stepper__num { background: #16a34a; color: #fff; border-color: #16a34a; }
+.sms-stepper__item.is-ready .sms-stepper__num { border-color: var(--sms-primary); color: var(--sms-primary); }
+.sms-stepper__title { font-weight: 600; }
+.sms-stepper__meta { font-size: .8rem; color: var(--sms-muted); }
+.sms-progress { height: 8px; border-radius: 999px; background: var(--sms-body-bg); overflow: hidden; }
+.sms-progress > span { display: block; height: 100%; background: var(--sms-primary); }
+.sms-bilingual { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 767.98px) { .sms-bilingual { grid-template-columns: 1fr; } }
+.sms-kv dt { color: var(--sms-muted); font-weight: 500; }
+.sms-table td, .sms-table th { vertical-align: middle; }
+.form-check-input:checked { background-color: var(--sms-primary); border-color: var(--sms-primary); }
+.sms-flip { transform: scaleX(-1); }
+.validation-summary-valid { display: none; }
+input[type=number].form-control { min-width: 4.5rem; }

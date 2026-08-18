@@ -1,0 +1,44 @@
+@using System.Globalization
+@using Sms.Application.Setup
+@model FeaturesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Feature toggles", "الميزات");
+    ViewData["Breadcrumb"] = T("System Setup / Feature toggles", "إعداد النظام / الميزات");
+    string Title(string code) => FeatureCatalog.TryGet(code, out var f) ? (isRtl ? f.TitleAr : f.TitleEn) : code;
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Off hides the module from menus and permissions; it never deletes data (BR-SET-006). Dependencies are enforced — e.g. Transport fees require Transport.", "التعطيل يخفي الوحدة من القوائم والصلاحيات ولا يحذف بيانات (BR-SET-006). التبعيات مُلزِمة — مثل: رسوم النقل تتطلب النقل.")</p></div></div>
+<partial name="_SetupNav" />
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <thead><tr><th>@T("Feature", "الميزة")</th><th>@T("Code", "الرمز")</th><th>@T("Depends on", "يعتمد على")</th><th>@T("Module", "الوحدة")</th><th class="text-center">@T("State", "الحالة")</th><th></th></tr></thead>
+        <tbody>
+        @foreach (var f in FeatureCatalog.Features)
+        {
+            var on = Model.States.TryGetValue(f.Code, out var s) && s;
+            var blockers = FeatureDependencyEvaluator.Blockers(f.Code, !on, Model.States);
+            <tr>
+                <td class="fw-semibold">@(isRtl ? f.TitleAr : f.TitleEn)</td>
+                <td><code>@f.Code</code></td>
+                <td class="small">@(f.DependsOn.Count == 0 ? "—" : string.Join(", ", f.DependsOn.Select(Title)))</td>
+                <td class="small">@(f.ModuleCode == null ? "—" : f.ModuleCode)</td>
+                <td class="text-center">@if (on) { <span class="badge text-bg-success">@T("On", "مفعّل")</span> } else { <span class="badge text-bg-secondary">@T("Off", "معطّل")</span> }</td>
+                <td class="text-end">
+                    <form method="post" asp-action="Toggle" class="d-inline-flex gap-1 align-items-center">
+                        <input type="hidden" name="code" value="@f.Code" />
+                        <input type="hidden" name="enabled" value="@(!on)" />
+                        <input name="reason" class="form-control form-control-sm" style="width:12rem" placeholder="@T("reason", "السبب")" />
+                        <button type="submit" class="btn btn-sm @(on ? "btn-outline-danger" : "btn-outline-success")" @(blockers.Count > 0 ? "disabled" : "") title="@(blockers.Count > 0 ? T("Blocked by: ", "محجوب بسبب: ") + string.Join(", ", blockers.Select(Title)) : "")">
+                            @(on ? T("Disable", "تعطيل") : T("Enable", "تفعيل"))
+                        </button>
+                    </form>
+                    @if (blockers.Count > 0) { <div class="small text-warning-emphasis mt-1"><i class="bi bi-exclamation-triangle me-1"></i>@T("Blocked by", "محجوب بسبب") @string.Join(", ", blockers.Select(Title))</div> }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>

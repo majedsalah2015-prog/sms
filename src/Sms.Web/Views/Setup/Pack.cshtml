@@ -1,0 +1,48 @@
+@using System.Globalization
+@using Sms.Domain.Setup
+@model CountryPack
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Country pack", "حزمة الدولة");
+    ViewData["Breadcrumb"] = T("System Setup / Country pack", "إعداد النظام / حزمة الدولة");
+    var all = ViewData["AllPacks"] as IReadOnlyList<CountryPack> ?? Array.Empty<CountryPack>();
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only contents of the active pack (BR-SET-004). Change it from the wizard's Country pack step.", "محتويات الحزمة الفعّالة للقراءة فقط (BR-SET-004). يمكن تغييرها من خطوة حزمة الدولة في المعالج.")</p></div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-pencil me-1"></i>@T("Change", "تغيير")</a></div>
+<partial name="_SetupNav" />
+
+@if (Model == null)
+{
+    <div class="alert alert-warning">@T("No country pack is bound yet.", "لم تُربط حزمة دولة بعد.")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="sms-card p-4">
+                <h2 class="h5 mb-3">@(isRtl ? Model.Name.NameAr : Model.Name.NameEn) <span class="text-muted small">@Model.Code · v@(Model.Version)</span></h2>
+                <dl class="row sms-kv mb-0">
+                    <dt class="col-sm-5">@T("Country", "الدولة")</dt><dd class="col-sm-7">@Model.CountryIsoCode</dd>
+                    <dt class="col-sm-5">@T("Default currency", "العملة الافتراضية")</dt><dd class="col-sm-7">@Model.DefaultCurrencyCode</dd>
+                    <dt class="col-sm-5">@T("Default time zone", "المنطقة الزمنية الافتراضية")</dt><dd class="col-sm-7">@Model.DefaultTimeZoneId</dd>
+                    <dt class="col-sm-5">@T("Standard VAT rate", "نسبة الضريبة القياسية")</dt><dd class="col-sm-7">@((Model.DefaultVatRate * 100).ToString("0.##"))%</dd>
+                    <dt class="col-sm-5">@T("Hijri display default", "عرض الهجري افتراضياً")</dt><dd class="col-sm-7">@(Model.HijriDisplayDefault ? T("On", "مفعّل") : T("Off", "معطّل"))</dd>
+                    <dt class="col-sm-5">@T("Accepted ID types (BR-GLB-003)", "أنواع الهوية المقبولة (BR-GLB-003)")</dt><dd class="col-sm-7">@Model.RequiredIdTypeCodes</dd>
+                    <dt class="col-sm-5">@T("Audit retention floor (BR-AUD-006)", "الحد الأدنى للاحتفاظ بالتدقيق (BR-AUD-006)")</dt><dd class="col-sm-7">@Model.AuditRetentionYearsMinimum @T("years", "سنوات")</dd>
+                    <dt class="col-sm-5">@T("Default working days", "أيام العمل الافتراضية")</dt><dd class="col-sm-7">@Model.DefaultWorkingDays</dd>
+                    <dt class="col-sm-5">@T("Statutory report set", "التقارير النظامية")</dt><dd class="col-sm-7">@Model.StatutoryReportCodes</dd>
+                </dl>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="sms-card p-4">
+                <h2 class="h6 text-muted">@T("All product packs", "كل حزم المنتج")</h2>
+                <ul class="list-unstyled small mb-0">
+                    @foreach (var p in all) { <li class="py-1 @(p.Id == Model.Id ? "fw-semibold" : "")">@p.Code v@(p.Version) — @(isRtl ? p.Name.NameAr : p.Name.NameEn) @(p.IsActive ? "" : "· " + T("retired", "متقاعدة"))</li> }
+                </ul>
+            </div>
+        </div>
+    </div>
+}

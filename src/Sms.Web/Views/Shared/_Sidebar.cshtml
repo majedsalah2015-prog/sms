@@ -9,8 +9,15 @@
 
     bool IsActive(NavItem item)
     {
-        if (item.Controller == null || !string.Equals(item.Controller, routeController, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(item.Action, routeAction, StringComparison.OrdinalIgnoreCase))
+        if (item.Controller == null || !string.Equals(item.Controller, routeController, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        if (item.RouteValues == null && !string.Equals(item.Controller, "Home", StringComparison.OrdinalIgnoreCase))
+        {
+            return true; // a module with its own controller (e.g. Setup): any of its actions counts
+        }
+        if (!string.Equals(item.Action, routeAction, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
