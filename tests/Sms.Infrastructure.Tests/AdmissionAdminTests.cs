@@ -174,15 +174,20 @@ namespace Sms.Infrastructure.Tests
 
         [Fact]
         [BusinessRule("BR-ADM-002")]
-        public async Task A_second_live_application_for_the_same_parent_in_the_same_campaign_is_blocked()
+        public async Task A_second_live_application_for_the_same_child_is_blocked_but_a_sibling_is_not()
         {
             using var db = CreateContext();
             var admin = CreateAdmin(db);
 
             await Submit(admin, new DateTime(2021, 1, 1), parentId: _parentId, suffix: "1");
 
+            // Same parent, same first name, same DOB = the same applicant twice.
             await Assert.ThrowsAsync<DuplicateLiveApplicationException>(() =>
-                Submit(admin, new DateTime(2021, 2, 1), parentId: _parentId, suffix: "2"));
+                Submit(admin, new DateTime(2021, 1, 1), parentId: _parentId, suffix: "1"));
+
+            // Same parent, different child (name + DOB) = a sibling/twin — allowed.
+            var sibling = await Submit(admin, new DateTime(2021, 2, 1), parentId: _parentId, suffix: "2");
+            Assert.NotEqual(0, sibling.Id);
         }
 
         [Fact]
@@ -239,6 +244,43 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(1, firstEntry.OrderRank);
             Assert.Equal(2, secondEntry.OrderRank);
+        }
+
+        [Fact]
+        [BusinessRule("BR-ADM-006")]
+        public async Task Seat_offer_accepted_approves_and_declined_lapses_the_application()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var a1 = await Submit(admin, new DateTime(2021, 1, 1), suffix: "1");
+            var a2 = await Submit(admin, new DateTime(2021, 2, 1), suffix: "2");
+            foreach (var a in new[] { a1, a2 })
+            {
+                await admin.ChangeStatusAsync(a.Id, ApplicationStatus.Submitted);
+                await admin.ChangeStatusAsync(a.Id, ApplicationStatus.UnderReview);
+                await admin.ChangeStatusAsync(a.Id, ApplicationStatus.Recommended);
+                await admin.ChangeStatusAsync(a.Id, ApplicationStatus.Waitlisted);
+            }
+
+            var e1 = await admin.AddToWaitingListAsync(a1.Id, _profileId);
+            var e2 = await admin.AddToWaitingListAsync(a2.Id, _profileId);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => admin.RespondToOfferAsync(e1.Id, true)); // nothing offered yet
+
+            var expires = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
+            await admin.OfferSeatAsync(e1.Id, expires);
+            await admin.RespondToOfferAsync(e1.Id, accepted: true);
+            var approved = db.Applications.Single(a => a.Id == a1.Id);
+            Assert.Equal(ApplicationStatus.Approved, approved.Status);
+            Assert.Equal(expires, approved.RegistrationDeadlineUtc);
+            Assert.True(db.WaitingListEntries.Single(w => w.Id == e1.Id).IsOfferAccepted);
+
+            await admin.OfferSeatAsync(e2.Id, expires);
+            await admin.RespondToOfferAsync(e2.Id, accepted: false);
+            Assert.Equal(ApplicationStatus.Lapsed, db.Applications.Single(a => a.Id == a2.Id).Status);
+
+            // A non-waitlisted application can't be offered a seat.
+            await Assert.ThrowsAsync<InvalidApplicationStatusTransitionException>(() => admin.OfferSeatAsync(e1.Id, expires));
         }
 
         // --- BR-ADM-007 registration (one transaction) ---------------------------

@@ -38,7 +38,7 @@ namespace Sms.Web.Navigation
             M("CLS", "08", "Classrooms", "القاعات الدراسية", "bi-door-open", "structure", "E-104", "08-Classrooms.md", "Rooms", "Index"),
 
             // S2 — People
-            M("ADM", "09", "Admissions", "القبول والتسجيل", "bi-person-plus", "people", "E-201", "09-Admissions.md"),
+            M("ADM", "09", "Admissions", "القبول والتسجيل", "bi-person-plus", "people", "E-201", "09-Admissions.md", "Admissions", "Index"),
             M("STU", "10", "Students", "الطلاب", "bi-mortarboard", "people", "E-202", "10-Student-Management.md"),
             M("PAR", "11", "Parents", "أولياء الأمور", "bi-people", "people", "E-202", "11-Parent-Management.md"),
             M("EMP", "12", "Employees", "الموظفون", "bi-person-badge", "people", "E-203", "12-Employees.md"),

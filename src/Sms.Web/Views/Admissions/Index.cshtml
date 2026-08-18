@@ -1,0 +1,60 @@
+@using System.Globalization
+@model CampaignListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Admissions", "القبول والتسجيل");
+    ViewData["Breadcrumb"] = T("Admissions / Campaigns", "القبول / الحملات");
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "adm-help", Title = T("Admissions — help", "القبول والتسجيل — مساعدة"),
+        Intro = T("Admissions runs per campaign (one grade, one academic year, an open/close window). Applications move through the pipeline: Draft → Submitted → Under review → Recommended → Approve / Reject / Waitlist → Registered (WF-01, BR-ADM-005).", "يعمل القبول لكل حملة (صف واحد، عام دراسي واحد، نافذة فتح/إغلاق). تمر الطلبات عبر المسار: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (WF-01، BR-ADM-005)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Campaigns", "الحملات"), T("Create one per grade-year from the side card: window, whether an assessment is required, application fee. ✎ edits window/assessment/fee; 🗑 deactivates a campaign that has no open applications (decided ones stay as history).", "أنشئ واحدة لكل صف سنوي من البطاقة الجانبية: النافذة، متطلب التقييم، رسم الطلب. ✎ يعدّل النافذة/التقييم/الرسم؛ 🗑 يلغي تفعيل حملة بلا طلبات مفتوحة (تبقى المقررة كسجل).")),
+            new HelpPanelViewModel.Item(T("New application", "طلب جديد"), T("Counter capture: bilingual quad name, DOB, gender, nationality and the parent (pick an existing one, or type a mobile — an existing parent with that mobile is linked, otherwise one is created: BR-GLB-003/004). Duplicate live applications and age ineligibility are refused (BR-ADM-002, BR-GRD-005).", "إدخال من الشباك: الاسم الرباعي بلغتين، الميلاد، الجنس، الجنسية وولي الأمر (اختر موجوداً أو اكتب جوالاً — يُربط ولي أمر بنفس الجوال أو يُنشأ: BR-GLB-003/004). تُرفض الطلبات المكررة وغير المستوفية للعمر (BR-ADM-002، BR-GRD-005).")),
+            new HelpPanelViewModel.Item(T("Pipeline board", "لوحة الطلبات"), T("Kanban by status with days-in-status, SLA flag (review > 5 working days), assessment score and missing-parent marker. The arrow button moves a card to the next step; open the card for decisions.", "كانبان حسب الحالة مع أيام البقاء وعلامة المهلة (مراجعة > 5 أيام) ودرجة التقييم ومؤشر غياب ولي الأمر. زر السهم ينقل البطاقة للخطوة التالية؛ افتحها للقرارات.")),
+            new HelpPanelViewModel.Item(T("Application page", "صفحة الطلب"), T("Tabs: applicant (✎ edit before a decision), family link, assessment (0–100), history. Decision buttons only offer legal moves; Approved unlocks the registration wizard: pick a section with a seat, enrollment date, guardian relationship → one transaction creates the student, enrollment, section membership and parent link (BR-ADM-007).", "التبويبات: المتقدم (✎ تعديل قبل القرار)، الأسرة، التقييم (0–100)، السجل. أزرار القرار تعرض الانتقالات المشروعة فقط؛ الاعتماد يفتح معالج التسجيل: شعبة بها مقعد وتاريخ التسجيل وصلة القرابة → معاملة واحدة تنشئ الطالب والتسجيل وعضوية الشعبة وربط ولي الأمر (BR-ADM-007).")),
+            new HelpPanelViewModel.Item(T("Waiting list", "قائمة الانتظار"), T("Ranked by submission order per grade. Offer a seat with an expiry, then record accepted (→ Approved) or declined (→ Lapsed) (BR-ADM-006).", "مرتبة حسب التقديم لكل صف. اعرض مقعداً بمهلة ثم سجّل القبول (→ معتمد) أو الرفض (→ ساقط) (BR-ADM-006).")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@T("Admission campaigns", "حملات القبول")</h1><p class="text-muted mb-0">@T("One campaign per grade-year: window, assessment requirement, application fee (BR-ADM-001). Applications flow through the pipeline board.", "حملة لكل صف سنوي: النافذة ومتطلب التقييم ورسم الطلب (BR-ADM-001). تمر الطلبات عبر لوحة الطلبات.")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2 align-items-center"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_AdmissionsNav" />
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+            <thead><tr><th>@T("Grade", "الصف")</th><th>@T("Window", "النافذة")</th><th>@T("Assessment", "تقييم")</th><th>@T("Fee", "الرسم")</th><th>@T("Applications", "الطلبات")</th><th>@T("Approved / Registered / Waitlisted", "معتمد / مسجّل / انتظار")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in Model.Rows) { <tr><td class="fw-semibold">@r.Grade.Code @(isRtl ? r.Grade.Name.NameAr : r.Grade.Name.NameEn)</td><td class="small">@r.Campaign.OpenDate.ToString("yyyy-MM-dd") → @r.Campaign.CloseDate.ToString("yyyy-MM-dd") @if (r.IsOpen) { <span class="badge text-bg-success ms-1">@T("open", "مفتوحة")</span> } else { <span class="badge text-bg-secondary ms-1">@T("closed", "مغلقة")</span> }</td><td>@(r.Campaign.RequiresAssessment ? "✓" : "—")</td><td>@(r.Campaign.ApplicationFeeAmount?.ToString("N2") ?? "—")</td><td><span class="badge text-bg-light border">@r.Applications</span></td><td>@r.Approved / @r.Registered / @r.Waitlisted</td>
+                <td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" asp-action="Board" asp-route-campaign="@r.Campaign.Id"><i class="bi bi-kanban"></i> @T("Board", "اللوحة")</a> <a class="btn btn-sm btn-primary" asp-action="Apply" asp-route-campaign="@r.Campaign.Id"><i class="bi bi-person-plus"></i> @T("New application", "طلب جديد")</a>
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-@r.Campaign.Id" title="@T("Edit campaign", "تعديل الحملة")"><i class="bi bi-pencil"></i></button>
+                    <form method="post" asp-action="DeleteCampaign" asp-route-id="@r.Campaign.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this campaign?", "حذف هذه الحملة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@(r.Applications - r.Registered > 0 ? T("Open applications exist — decide them first", "توجد طلبات مفتوحة — قرر فيها أولاً") : T("Remove campaign", "حذف الحملة"))"><i class="bi bi-trash"></i></button></form></td></tr>
+                <tr class="collapse" id="edit-@r.Campaign.Id"><td colspan="7" class="bg-light">
+                    <form method="post" asp-action="EditCampaign" asp-route-id="@r.Campaign.Id" asp-route-year="@yid" class="d-flex flex-wrap gap-2 align-items-end">
+                        <div><label class="form-label small">@T("Opens", "تفتح")</label><input name="openDate" type="date" class="form-control form-control-sm" value="@r.Campaign.OpenDate.ToString("yyyy-MM-dd")" /></div>
+                        <div><label class="form-label small">@T("Closes", "تغلق")</label><input name="closeDate" type="date" class="form-control form-control-sm" value="@r.Campaign.CloseDate.ToString("yyyy-MM-dd")" /></div>
+                        <div><label class="form-label small">@T("Fee", "الرسم")</label><input name="applicationFeeAmount" type="number" step="0.01" min="0" class="form-control form-control-sm" value="@r.Campaign.ApplicationFeeAmount" style="width:7rem" /></div>
+                        <div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="requiresAssessment" value="true" id="ra-@r.Campaign.Id" @(r.Campaign.RequiresAssessment ? "checked" : "") /><label class="form-check-label small" for="ra-@r.Campaign.Id">@T("Requires assessment", "يتطلب تقييماً")</label></div>
+                        <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
+                    </form></td></tr> }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No campaigns for this year yet.", "لا حملات لهذا العام بعد.")</td></tr> }</tbody></table></div></div>
+    </div>
+    <div class="col-xl-4">
+        <div class="sms-card p-3"><h2 class="h6">@T("New campaign", "حملة جديدة")</h2>
+            @if (Model.Profiles.Count == 0) { <div class="small text-muted">@T("Define grade-year profiles for this year first (Grades).", "عرّف ملفات الصفوف لهذا العام أولاً (الصفوف).")</div> }
+            else
+            {
+                <form method="post" asp-action="DefineCampaign" asp-route-year="@yid">
+                    <div class="mb-2"><select asp-for="GradeYearProfileId" class="form-select form-select-sm"><option value="">@T("— grade —", "— الصف —")</option>@foreach (var p in Model.Profiles) { <option value="@p.ProfileId">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small">@T("Opens", "تفتح")</label><input asp-for="OpenDate" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control form-control-sm" /></div><div class="col-6"><label class="form-label small">@T("Closes", "تغلق")</label><input asp-for="CloseDate" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control form-control-sm" /></div></div>
+                    <div class="row g-2 mb-2 align-items-end"><div class="col-6"><label class="form-label small">@T("Application fee", "رسم الطلب")</label><input asp-for="ApplicationFeeAmount" class="form-control form-control-sm" type="number" step="0.01" min="0" /></div><div class="col-6 form-check ms-2"><input asp-for="RequiresAssessment" class="form-check-input" /><label asp-for="RequiresAssessment" class="form-check-label small">@T("Requires assessment", "يتطلب تقييماً")</label></div></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create campaign", "إنشاء حملة")</button>
+                </form>
+            }
+        </div>
+    </div>
+</div>

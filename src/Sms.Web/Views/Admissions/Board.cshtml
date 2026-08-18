@@ -1,0 +1,55 @@
+@using System.Globalization
+@using Sms.Domain.Admissions
+@model PipelineBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Pipeline board", "لوحة الطلبات");
+    ViewData["Breadcrumb"] = T("Admissions / Pipeline board", "القبول / لوحة الطلبات");
+    string Name(ApplicationStatus s) => s switch { ApplicationStatus.Draft => T("Draft", "مسودة"), ApplicationStatus.Submitted => T("Submitted", "مقدَّم"), ApplicationStatus.UnderReview => T("Under review", "قيد المراجعة"), ApplicationStatus.Recommended => T("Recommended", "موصى به"), ApplicationStatus.Approved => T("Approved", "معتمد"), ApplicationStatus.Waitlisted => T("Waitlisted", "قائمة الانتظار"), ApplicationStatus.Registered => T("Registered", "مسجَّل"), ApplicationStatus.Rejected => T("Rejected", "مرفوض"), ApplicationStatus.Lapsed => T("Lapsed", "ساقط"), _ => s.ToString() };
+    string Head(ApplicationStatus s) => s switch { ApplicationStatus.Approved or ApplicationStatus.Registered => "sms-kanban__col--ok", ApplicationStatus.Rejected or ApplicationStatus.Lapsed => "sms-kanban__col--off", ApplicationStatus.Waitlisted => "sms-kanban__col--wait", _ => "" };
+    ApplicationStatus? Next(ApplicationStatus s) => s switch { ApplicationStatus.Draft => ApplicationStatus.Submitted, ApplicationStatus.Submitted => ApplicationStatus.UnderReview, ApplicationStatus.UnderReview => ApplicationStatus.Recommended, ApplicationStatus.Recommended => ApplicationStatus.Approved, _ => null };
+}
+
+<div class="sms-page-head">
+    <div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Grade.Code @(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) · @T("WF-01: Draft → Submitted → Review → Recommended → Approve / Reject / Waitlist → Registered (BR-ADM-005). Review SLA", "WF-01: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (BR-ADM-005). مهلة المراجعة") @Model.ReviewSlaDays @T("working days.", "أيام عمل.")</p></div>
+    <div class="d-flex gap-2"><form method="get"><select name="campaign" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var c in Model.Campaigns) { <option value="@c.Id" selected="@(c.Id == Model.Campaign.Id)">@Model.CampaignLabels[c.Id]</option> }</select></form>
+        <a class="btn btn-sm btn-primary text-nowrap" asp-action="Apply" asp-route-campaign="@Model.Campaign.Id"><i class="bi bi-person-plus me-1"></i>@T("New application", "طلب جديد")</a></div>
+</div>
+<partial name="_AdmissionsNav" />
+@{ var quickHelp = new HelpPanelViewModel { Id = "adm-quick-help", Title = T("Admissions — help", "القبول والتسجيل — مساعدة"), Intro = T("Pipeline: Draft → Submitted → Under review → Recommended → Approve / Reject / Waitlist → Registered (WF-01). Full guidance is on the Campaigns page help.", "المسار: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (WF-01). الإرشاد الكامل في مساعدة صفحة الحملات."), Items = new[] { new HelpPanelViewModel.Item(T("Decisions", "القرارات"), T("Only legal moves are offered; Approved unlocks registration (needs a linked parent and a section with a seat).", "تُعرض الانتقالات المشروعة فقط؛ الاعتماد يفتح التسجيل (يحتاج ولي أمر مرتبطاً وشعبة بها مقعد).")), new HelpPanelViewModel.Item(T("Waiting list", "قائمة الانتظار"), T("Offer a seat with an expiry, then record accepted / declined (BR-ADM-006).", "اعرض مقعداً بمهلة ثم سجّل القبول/الرفض (BR-ADM-006).")) } }; }
+<div class="mb-3 text-end"><partial name="_HelpModal" model="quickHelp" /></div>
+
+<div class="sms-kanban">
+    @foreach (var col in Model.Columns)
+    {
+        <div class="sms-kanban__col @Head(col.Status)">
+            <div class="sms-kanban__head">@Name(col.Status) <span class="badge rounded-pill text-bg-light border">@col.Cards.Count</span></div>
+            @foreach (var c in col.Cards)
+            {
+                var a = c.Application;
+                <div class="sms-kanban__card @(c.SlaBreached ? "is-late" : "")">
+                    <div class="d-flex align-items-start gap-1">
+                        <a asp-action="Details" asp-route-id="@a.Id" class="fw-semibold d-block flex-grow-1">@(isRtl ? $"{a.FirstNameAr} {a.FamilyNameAr}" : $"{a.FirstNameEn} {a.FamilyNameEn}")</a>
+                        <a asp-action="Details" asp-route-id="@a.Id" class="btn btn-sm btn-link p-0 text-secondary" title="@T("Open / edit", "فتح / تعديل")"><i class="bi bi-pencil"></i></a>
+                        @if (a.Status is ApplicationStatus.Draft or ApplicationStatus.Submitted)
+                        {
+                            <form method="post" asp-action="DeleteApplication" asp-route-id="@a.Id" class="d-inline" onsubmit="return confirm('@T("Delete this application permanently?", "حذف هذا الطلب نهائياً؟")');"><button class="btn btn-sm btn-link p-0 text-danger" type="submit" title="@T("Delete application", "حذف الطلب")"><i class="bi bi-trash"></i></button></form>
+                        }
+                    </div>
+                    <div class="small text-muted"><code>@a.ApplicationNo</code> · @a.DateOfBirth.ToString("yyyy-MM-dd") · @(a.Gender == Sms.Domain.Common.Gender.Male ? T("M", "ذ") : T("F", "أ"))</div>
+                    <div class="d-flex flex-wrap gap-1 mt-1 small">
+                        <span class="badge text-bg-light border" title="@T("days in this status", "أيام في هذه الحالة")"><i class="bi bi-clock me-1"></i>@c.AgeDays d</span>
+                        @if (c.SlaBreached) { <span class="badge text-bg-danger">@T("SLA", "المهلة")</span> }
+                        @if (c.Score != null) { <span class="badge text-bg-info">@c.Score</span> }
+                        @if (!c.HasParent) { <span class="badge text-bg-warning" title="@T("no parent linked (BR-GLB-004)", "بلا ولي أمر (BR-GLB-004)")"><i class="bi bi-people"></i></span> }
+                    </div>
+                    @if (Next(col.Status) is { } nx)
+                    {
+                        <form method="post" asp-action="ChangeStatus" asp-route-id="@a.Id" class="mt-2"><input type="hidden" name="target" value="@nx" /><input type="hidden" name="returnTo" value="board" /><button class="btn btn-sm btn-outline-primary w-100" type="submit">→ @Name(nx)</button></form>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>

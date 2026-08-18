@@ -1,0 +1,48 @@
+@using System.Globalization
+@model WaitingListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Waiting list", "قائمة الانتظار");
+    ViewData["Breadcrumb"] = T("Admissions / Waiting list", "القبول / قائمة الانتظار");
+    var free = Math.Max(0, Model.PlannedSeats - Model.Enrolled);
+    var next7 = DateTime.UtcNow.Date.AddDays(7).ToString("yyyy-MM-dd");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Ordered per grade by submission rank; offer a seat with an expiry, then record the family's answer (BR-ADM-006).", "مرتبة لكل صف حسب ترتيب التقديم؛ اعرض مقعداً بمهلة ثم سجّل رد الأسرة (BR-ADM-006).")</p></div>
+    <form method="get"><select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == Model.ProfileId)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn) · @(isRtl ? p.Year.LabelAr : p.Year.LabelEn)</option> }</select></form></div>
+<partial name="_AdmissionsNav" />
+@{ var quickHelp = new HelpPanelViewModel { Id = "adm-quick-help", Title = T("Admissions — help", "القبول والتسجيل — مساعدة"), Intro = T("Pipeline: Draft → Submitted → Under review → Recommended → Approve / Reject / Waitlist → Registered (WF-01). Full guidance is on the Campaigns page help.", "المسار: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (WF-01). الإرشاد الكامل في مساعدة صفحة الحملات."), Items = new[] { new HelpPanelViewModel.Item(T("Decisions", "القرارات"), T("Only legal moves are offered; Approved unlocks registration (needs a linked parent and a section with a seat).", "تُعرض الانتقالات المشروعة فقط؛ الاعتماد يفتح التسجيل (يحتاج ولي أمر مرتبطاً وشعبة بها مقعد).")), new HelpPanelViewModel.Item(T("Waiting list", "قائمة الانتظار"), T("Offer a seat with an expiry, then record accepted / declined (BR-ADM-006).", "اعرض مقعداً بمهلة ثم سجّل القبول/الرفض (BR-ADM-006).")) } }; }
+<div class="mb-3 text-end"><partial name="_HelpModal" model="quickHelp" /></div>
+
+@if (Model.Profiles.Count == 0) { <div class="sms-card p-4 text-center text-muted">@T("No one is waiting.", "لا أحد في الانتظار.")</div> }
+else
+{
+    <div class="sms-card">
+        <div class="p-3 border-bottom small text-muted">@T("Planned seats", "المقاعد المخططة") <strong>@Model.PlannedSeats</strong> · @T("enrolled", "مسجَّل") <strong>@Model.Enrolled</strong> · @T("free", "متاح") <strong class="@(free > 0 ? "text-success" : "text-danger")">@free</strong></div>
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <thead><tr><th>#</th><th>@T("Applicant", "المتقدم")</th><th>@T("Status", "الحالة")</th><th>@T("Offer", "العرض")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in Model.Rows)
+            {
+                var a = r.Application;
+                <tr class="@(a.Status != Sms.Domain.Admissions.ApplicationStatus.Waitlisted ? "text-muted" : "")">
+                    <td class="fw-semibold">@r.Entry.OrderRank</td>
+                    <td><a asp-action="Details" asp-route-id="@a.Id">@(isRtl ? $"{a.FirstNameAr} {a.FamilyNameAr}" : $"{a.FirstNameEn} {a.FamilyNameEn}")</a> <code class="small">@a.ApplicationNo</code></td>
+                    <td>@a.Status</td>
+                    <td class="small">@if (r.Entry.OfferedAtUtc == null) { <span class="text-muted">—</span> } else { <text>@T("offered", "عُرض") @r.Entry.OfferedAtUtc?.ToString("yyyy-MM-dd") → @r.Entry.OfferExpiresAtUtc?.ToString("yyyy-MM-dd") @(r.Entry.IsOfferAccepted == true ? "· " + T("accepted", "مقبول") : r.Entry.IsOfferAccepted == false ? "· " + T("declined", "مرفوض") : r.OfferExpired ? "· " + T("expired", "منتهٍ") : "· " + T("pending", "معلّق"))</text> }</td>
+                    <td class="text-end text-nowrap">
+                        @if (a.Status == Sms.Domain.Admissions.ApplicationStatus.Waitlisted && (r.Entry.OfferedAtUtc == null || r.OfferExpired))
+                        {
+                            <form method="post" asp-action="Offer" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline-flex gap-1"><input name="expires" type="date" class="form-control form-control-sm" value="@next7" style="width:9.5rem" /><button class="btn btn-sm btn-primary" type="submit" @(free == 0 ? "disabled" : "") title="@(free == 0 ? T("no free seat", "لا مقعد متاحاً") : "")"><i class="bi bi-envelope-paper me-1"></i>@T("Offer seat", "عرض مقعد")</button></form>
+                        }
+                        else if (a.Status == Sms.Domain.Admissions.ApplicationStatus.Waitlisted && r.Entry.IsOfferAccepted == null)
+                        {
+                            <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="true" /><button class="btn btn-sm btn-success" type="submit">@T("Accepted", "قَبِل")</button></form>
+                            <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="false" /><button class="btn btn-sm btn-outline-danger" type="submit">@T("Declined", "رفض")</button></form>
+                        }
+                    </td>
+                </tr>
+            }</tbody>
+        </table></div>
+    </div>
+}

@@ -1,0 +1,55 @@
+@using System.Globalization
+@model ApplicationFormViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("New application", "طلب قبول جديد");
+    ViewData["Breadcrumb"] = T("Admissions / New application", "القبول / طلب جديد");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.CampaignLabel · @T("Counter capture: bilingual quad name, DOB, gender, nationality; parent linked or created with a mobile-based dedup step (BR-GLB-003/004); duplicates and age eligibility are checked by the engine (BR-ADM-002, BR-GRD-005).", "إدخال من الشباك: الاسم الرباعي بالعربية والإنجليزية، الميلاد، الجنس، الجنسية؛ يُربط ولي الأمر أو يُنشأ مع فحص التكرار بالجوال (BR-GLB-003/004)؛ يفحص المحرك التكرار وأهلية العمر (BR-ADM-002، BR-GRD-005).")</p></div></div>
+<partial name="_AdmissionsNav" />
+@{ var quickHelp = new HelpPanelViewModel { Id = "adm-quick-help", Title = T("Admissions — help", "القبول والتسجيل — مساعدة"), Intro = T("Pipeline: Draft → Submitted → Under review → Recommended → Approve / Reject / Waitlist → Registered (WF-01). Full guidance is on the Campaigns page help.", "المسار: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (WF-01). الإرشاد الكامل في مساعدة صفحة الحملات."), Items = new[] { new HelpPanelViewModel.Item(T("Decisions", "القرارات"), T("Only legal moves are offered; Approved unlocks registration (needs a linked parent and a section with a seat).", "تُعرض الانتقالات المشروعة فقط؛ الاعتماد يفتح التسجيل (يحتاج ولي أمر مرتبطاً وشعبة بها مقعد).")), new HelpPanelViewModel.Item(T("Waiting list", "قائمة الانتظار"), T("Offer a seat with an expiry, then record accepted / declined (BR-ADM-006).", "اعرض مقعداً بمهلة ثم سجّل القبول/الرفض (BR-ADM-006).")) } }; }
+<div class="mb-3 text-end"><partial name="_HelpModal" model="quickHelp" /></div>
+
+<form method="post" asp-action="Apply" novalidate>
+    <input type="hidden" asp-for="CampaignId" />
+    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card p-4 mb-3">
+                <h2 class="h6 mb-3">@T("Applicant", "المتقدم")</h2>
+                <div class="sms-bilingual mb-3">
+                    <div><label class="form-label small">@T("Name (Arabic): first / father / grandfather / family", "الاسم بالعربية: الأول / الأب / الجد / العائلة")</label>
+                        <div class="row g-1"><div class="col-3"><input asp-for="FirstNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الأول" /></div><div class="col-3"><input asp-for="FatherNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الأب" /></div><div class="col-3"><input asp-for="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الجد" /></div><div class="col-3"><input asp-for="FamilyNameAr" class="form-control form-control-sm" dir="rtl" placeholder="العائلة" /></div></div></div>
+                    <div><label class="form-label small">@T("Name (English): first / father / grandfather / family", "الاسم بالإنجليزية: الأول / الأب / الجد / العائلة")</label>
+                        <div class="row g-1"><div class="col-3"><input asp-for="FirstNameEn" class="form-control form-control-sm" dir="ltr" placeholder="First" /></div><div class="col-3"><input asp-for="FatherNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Father" /></div><div class="col-3"><input asp-for="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Grandfather" /></div><div class="col-3"><input asp-for="FamilyNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Family" /></div></div></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3"><label class="form-label small">@T("Gender", "الجنس")</label><select asp-for="Gender" class="form-select form-select-sm"><option value="Male">@T("Male", "ذكر")</option><option value="Female">@T("Female", "أنثى")</option></select></div>
+                    <div class="col-md-3"><label class="form-label small">@T("Date of birth", "تاريخ الميلاد")</label><input asp-for="DateOfBirth" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control form-control-sm" /></div>
+                    <div class="col-md-6"><label class="form-label small">@T("Nationality", "الجنسية")</label><select asp-for="NationalityLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var n in Model.Nationalities) { <option value="@n.Id">@(isRtl ? n.Ar : n.En)</option> }</select></div>
+                </div>
+            </div>
+            <div class="sms-card p-4">
+                <h2 class="h6 mb-3">@T("Family (BR-GLB-004)", "الأسرة (BR-GLB-004)")</h2>
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label small">@T("Existing parent", "ولي أمر موجود")</label><select asp-for="ParentId" class="form-select form-select-sm"><option value="">@T("— none / create below —", "— لا شيء / أنشئ أدناه —")</option>@foreach (var p in Model.Parents) { <option value="@p.Id">@p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile</option> }</select></div>
+                    <div class="col-md-6"><label class="form-label small">@T("…or new parent — mobile (dedup key)", "…أو ولي أمر جديد — الجوال (مفتاح التكرار)")</label><input asp-for="NewParentMobile" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" /></div>
+                    <div class="col-md-4"><input asp-for="NewParentNameAr" class="form-control form-control-sm" dir="rtl" placeholder="اسم ولي الأمر (عربي)" /></div>
+                    <div class="col-md-4"><input asp-for="NewParentNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Parent name (English)" /></div>
+                    <div class="col-md-4"><input asp-for="NewParentEmail" class="form-control form-control-sm" dir="ltr" placeholder="email (optional)" /></div>
+                </div>
+                <div class="form-text">@T("If the mobile already belongs to a parent, the application links to that parent instead of creating a duplicate.", "إذا كان الجوال لولي أمر موجود يُربط الطلب به بدلاً من إنشاء نسخة مكررة.")</div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-4">
+                <div class="form-check mb-3"><input asp-for="SubmitImmediately" class="form-check-input" /><label asp-for="SubmitImmediately" class="form-check-label">@T("Submit immediately (else keep as Draft)", "تقديم فوري (وإلا يبقى مسودة)")</label></div>
+                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-send me-1"></i>@T("Capture application", "تسجيل الطلب")</button>
+                <a class="btn btn-outline-secondary w-100 mt-2" asp-action="Board" asp-route-campaign="@Model.CampaignId">@T("Cancel", "إلغاء")</a>
+                <div class="form-text mt-3">@T("Documents checklist and application-fee payment (Modules 10 §BR-ATT-006 / 19) are gated at approval, not capture — those screens follow.", "قائمة المستندات ورسم الطلب (الوحدتان 10/19) تُفحص عند الاعتماد لا الإدخال — شاشاتها لاحقاً.")</div>
+            </div>
+        </div>
+    </div>
+</form>

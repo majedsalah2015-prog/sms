@@ -122,6 +122,44 @@ namespace Sms.Infrastructure.Tests
             Assert.NotNull(db.NumberingSeries.SingleOrDefault(s => s.Id == v1.Id));
         }
 
+        [Fact]
+        [BusinessRule("BR-NUM-005")]
+        public async Task Redefining_a_locked_series_with_the_same_definition_is_a_no_op()
+        {
+            using var db = CreateContext();
+            var admin = Admin(db);
+            var v1 = await admin.DefineSeriesAsync("PAR", "Parent", "PAR-{SEQ:6}", ResetPolicy.Never, GapPolicy.Normal, _clock.UtcNow);
+            await Issuer(db, _tenant, _clock).IssueAsync("PAR");
+            await db.SaveChangesAsync();
+
+            // An idempotent seed re-run must not open a new version (that restarted numbering in production).
+            var again = await admin.DefineSeriesAsync("PAR", "Parent", "PAR-{SEQ:6}", ResetPolicy.Never, GapPolicy.Normal, _clock.UtcNow.AddDays(3));
+            Assert.Equal(v1.Id, again.Id);
+            Assert.Equal(1, db.NumberingSeries.Count(s => s.Code == "PAR"));
+        }
+
+        [Fact]
+        [BusinessRule("BR-NUM-002")]
+        public async Task A_new_version_continues_the_previous_counter_instead_of_reissuing_numbers()
+        {
+            using var db = CreateContext();
+            var admin = Admin(db);
+            var issuer = Issuer(db, _tenant, _clock);
+            await admin.DefineSeriesAsync("EMP", "Employee", "EMP-{SEQ:5}", ResetPolicy.Never, GapPolicy.Normal, _clock.UtcNow);
+            var n1 = await issuer.IssueAsync("EMP");
+            var n2 = await issuer.IssueAsync("EMP");
+            await db.SaveChangesAsync();
+            Assert.Equal("EMP-00002", n2);
+
+            _audit.Reason = "new format";
+            await admin.DefineSeriesAsync("EMP", "Employee", "E-{SEQ:5}", ResetPolicy.Never, GapPolicy.Normal, _clock.UtcNow.AddDays(1));
+            var n3 = await issuer.IssueAsync("EMP");
+            await db.SaveChangesAsync();
+
+            Assert.Equal("E-00003", n3);
+            Assert.NotEqual(n1, n3);
+        }
+
         // --- INumberIssuer: rendering + locking (BR-NUM-001, BR-NUM-007) -----
 
         [Fact]

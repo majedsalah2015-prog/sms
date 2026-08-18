@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,8 +47,11 @@ namespace Sms.Infrastructure.Numbering
             var gregorianYear = _clock.UtcNow.Year;
             var resetKey = ResetKeyResolver.Resolve(series.ResetPolicy, academicYearLabel, gregorianYear);
 
-            var state = await _db.SeriesStates.SingleOrDefaultAsync(
-                s => s.NumberingSeriesId == series.Id && s.ResetKey == resetKey, cancellationToken);
+            // A second issue in the same unit of work must reuse the state added
+            // by the first (bulk registration issues several numbers before saving).
+            var state = _db.SeriesStates.Local.FirstOrDefault(s => s.NumberingSeriesId == series.Id && s.ResetKey == resetKey)
+                ?? await _db.SeriesStates.SingleOrDefaultAsync(
+                    s => s.NumberingSeriesId == series.Id && s.ResetKey == resetKey, cancellationToken);
             if (state == null)
             {
                 state = new SeriesState { NumberingSeriesId = series.Id, ResetKey = resetKey, LastIssuedSequence = 0 };

@@ -1,0 +1,114 @@
+@using System.Globalization
+@using Sms.Domain.Admissions
+@model ApplicationDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var a = Model.Application;
+    var name = isRtl ? $"{a.FirstNameAr} {a.FatherNameAr} {a.GrandfatherNameAr} {a.FamilyNameAr}" : $"{a.FirstNameEn} {a.FatherNameEn} {a.GrandfatherNameEn} {a.FamilyNameEn}";
+    ViewData["Title"] = a.ApplicationNo;
+    ViewData["Breadcrumb"] = T("Admissions / ", "القبول / ") + a.ApplicationNo;
+    string Name(ApplicationStatus s) => s switch { ApplicationStatus.Draft => T("Draft", "مسودة"), ApplicationStatus.Submitted => T("Submitted", "مقدَّم"), ApplicationStatus.UnderReview => T("Under review", "قيد المراجعة"), ApplicationStatus.Recommended => T("Recommended", "موصى به"), ApplicationStatus.Approved => T("Approved", "معتمد"), ApplicationStatus.Waitlisted => T("Waitlisted", "قائمة الانتظار"), ApplicationStatus.Registered => T("Registered", "مسجَّل"), ApplicationStatus.Rejected => T("Rejected", "مرفوض"), ApplicationStatus.Lapsed => T("Lapsed", "ساقط"), _ => s.ToString() };
+    string Btn(ApplicationStatus s) => s switch { ApplicationStatus.Approved => "btn-success", ApplicationStatus.Rejected => "btn-outline-danger", ApplicationStatus.Waitlisted => "btn-outline-warning", ApplicationStatus.Lapsed => "btn-outline-secondary", _ => "btn-outline-primary" };
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@a.ApplicationNo</code> · @Model.Grade.Code @(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
+        <h1 class="sms-page-title">@name <span class="badge fs-6 @(a.Status == ApplicationStatus.Approved || a.Status == ApplicationStatus.Registered ? "text-bg-success" : a.Status == ApplicationStatus.Rejected || a.Status == ApplicationStatus.Lapsed ? "text-bg-secondary" : "text-bg-primary")">@Name(a.Status)</span></h1></div>
+    <a class="btn btn-outline-secondary" asp-action="Board" asp-route-campaign="@a.CampaignId"><i class="bi bi-kanban me-1"></i>@T("Board", "اللوحة")</a>
+</div>
+<partial name="_AdmissionsNav" />
+@{ var quickHelp = new HelpPanelViewModel { Id = "adm-quick-help", Title = T("Admissions — help", "القبول والتسجيل — مساعدة"), Intro = T("Pipeline: Draft → Submitted → Under review → Recommended → Approve / Reject / Waitlist → Registered (WF-01). Full guidance is on the Campaigns page help.", "المسار: مسودة → مقدَّم → مراجعة → موصى به → اعتماد / رفض / انتظار → مسجَّل (WF-01). الإرشاد الكامل في مساعدة صفحة الحملات."), Items = new[] { new HelpPanelViewModel.Item(T("Decisions", "القرارات"), T("Only legal moves are offered; Approved unlocks registration (needs a linked parent and a section with a seat).", "تُعرض الانتقالات المشروعة فقط؛ الاعتماد يفتح التسجيل (يحتاج ولي أمر مرتبطاً وشعبة بها مقعد).")), new HelpPanelViewModel.Item(T("Waiting list", "قائمة الانتظار"), T("Offer a seat with an expiry, then record accepted / declined (BR-ADM-006).", "اعرض مقعداً بمهلة ثم سجّل القبول/الرفض (BR-ADM-006).")) } }; }
+<div class="mb-3 text-end"><partial name="_HelpModal" model="quickHelp" /></div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card mb-3">
+            <ul class="nav nav-tabs px-3 pt-2"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-app" type="button">@T("Applicant", "المتقدم")</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-fam" type="button">@T("Family", "الأسرة")</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-ass" type="button">@T("Assessment", "التقييم")</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-hist" type="button">@T("History", "السجل")</button></li></ul>
+            <div class="tab-content p-4">
+                <div class="tab-pane fade show active" id="t-app">
+                    <dl class="row sms-kv small mb-0">
+                        <dt class="col-sm-3">@T("Name (Arabic)", "الاسم (عربي)")</dt><dd class="col-sm-9" dir="rtl">@a.FirstNameAr @a.FatherNameAr @a.GrandfatherNameAr @a.FamilyNameAr</dd>
+                        <dt class="col-sm-3">@T("Name (English)", "الاسم (إنجليزي)")</dt><dd class="col-sm-9" dir="ltr">@a.FirstNameEn @a.FatherNameEn @a.GrandfatherNameEn @a.FamilyNameEn</dd>
+                        <dt class="col-sm-3">@T("Gender / DOB", "الجنس / الميلاد")</dt><dd class="col-sm-9">@(a.Gender == Sms.Domain.Common.Gender.Male ? T("Male", "ذكر") : T("Female", "أنثى")) · @a.DateOfBirth.ToString("yyyy-MM-dd")</dd>
+                        <dt class="col-sm-3">@T("Nationality", "الجنسية")</dt><dd class="col-sm-9">@Model.NationalityName</dd>
+                        <dt class="col-sm-3">@T("Campaign", "الحملة")</dt><dd class="col-sm-9">@Model.Campaign.OpenDate.ToString("yyyy-MM-dd") → @Model.Campaign.CloseDate.ToString("yyyy-MM-dd") · @(Model.Campaign.RequiresAssessment ? T("assessment required", "يتطلب تقييماً") : T("no assessment", "بلا تقييم")) @(Model.Campaign.ApplicationFeeAmount == null ? "" : "· " + T("fee", "رسم") + " " + Model.Campaign.ApplicationFeeAmount.Value.ToString("N2"))</dd>
+                        @if (a.RegistrationDeadlineUtc != null) { <dt class="col-sm-3">@T("Registration deadline", "مهلة التسجيل")</dt><dd class="col-sm-9">@a.RegistrationDeadlineUtc?.ToString("yyyy-MM-dd")</dd> }
+                        @if (a.RegisteredStudentId != null) { <dt class="col-sm-3">@T("Student", "الطالب")</dt><dd class="col-sm-9"><span class="badge text-bg-success">@T("registered — student #", "مسجَّل — طالب #")@a.RegisteredStudentId</span></dd> }
+                    </dl>
+                    <div class="form-text mt-2">@T("Document checklist (BR-ATT-006) appears here once attachment screens exist.", "قائمة المستندات (BR-ATT-006) ستظهر هنا مع شاشات المرفقات.")</div>
+                    @if (Model.CanEdit)
+                    {
+                        <button class="btn btn-sm btn-outline-primary mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#edit-app"><i class="bi bi-pencil me-1"></i>@T("Edit applicant", "تعديل بيانات المتقدم")</button>
+                        @if (a.Status is ApplicationStatus.Draft or ApplicationStatus.Submitted)
+                        {
+                            <form method="post" asp-action="DeleteApplication" asp-route-id="@a.Id" class="d-inline" onsubmit="return confirm('@T("Delete this application permanently? Only undecided applications can be deleted.", "حذف هذا الطلب نهائياً؟ يمكن حذف الطلبات غير المبتوت فيها فقط.")');"><button class="btn btn-sm btn-outline-danger mt-3" type="submit"><i class="bi bi-trash me-1"></i>@T("Delete application", "حذف الطلب")</button></form>
+                        }
+                        <div class="collapse mt-3" id="edit-app"><form method="post" asp-action="EditApplication" asp-route-id="@a.Id">
+                            <div class="sms-bilingual mb-2">
+                                <div><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FirstNameAr" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FatherNameAr" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@a.GrandfatherNameAr" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FamilyNameAr" /></div></div></div>
+                                <div><label class="form-label small">@T("Name (English)", "الاسم (إنجليزي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@a.FirstNameEn" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@a.FatherNameEn" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@a.GrandfatherNameEn" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@a.FamilyNameEn" /></div></div></div>
+                            </div>
+                            <div class="row g-2 mb-2"><div class="col-md-3"><select name="Gender" class="form-select form-select-sm"><option value="Male" selected="@(a.Gender == Sms.Domain.Common.Gender.Male)">@T("Male", "ذكر")</option><option value="Female" selected="@(a.Gender == Sms.Domain.Common.Gender.Female)">@T("Female", "أنثى")</option></select></div><div class="col-md-3"><input name="DateOfBirth" type="date" class="form-control form-control-sm" value="@a.DateOfBirth.ToString("yyyy-MM-dd")" /></div><div class="col-md-6"><select name="NationalityLookupId" class="form-select form-select-sm">@foreach (var n in Model.Nationalities) { <option value="@n.Id" selected="@(n.Id == a.NationalityLookupId)">@(isRtl ? n.Ar : n.En)</option> }</select></div></div>
+                            <input type="hidden" name="ParentId" value="@a.ParentId" />
+                            <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+                        </form></div>
+                    }
+                </div>
+                <div class="tab-pane fade" id="t-fam">
+                    @if (Model.Parent != null) { <div class="mb-3"><span class="badge text-bg-success me-1">@T("linked", "مرتبط")</span> <code>@Model.Parent.ParentFileNo</code> @(isRtl ? Model.Parent.NameAr : Model.Parent.NameEn) · <span dir="ltr">@Model.Parent.PrimaryMobile</span> @(Model.Parent.Email == null ? "" : "· " + Model.Parent.Email)</div> } else { <div class="alert alert-warning small">@T("No parent linked — registration requires one (BR-GLB-004).", "لا ولي أمر مرتبط — التسجيل يتطلب واحداً (BR-GLB-004).")</div> }
+                    @if (a.Status != ApplicationStatus.Registered)
+                    {
+                        <form method="post" asp-action="LinkParent" asp-route-id="@a.Id" class="d-flex gap-2"><select name="parentId" class="form-select form-select-sm"><option value="">@T("— unlink —", "— فك الربط —")</option>@foreach (var p in Model.Parents) { <option value="@p.Id" selected="@(p.Id == a.ParentId)">@p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile</option> }</select><button class="btn btn-sm btn-outline-primary" type="submit">@T("Link", "ربط")</button></form>
+                    }
+                </div>
+                <div class="tab-pane fade" id="t-ass">
+                    @if (Model.Assessments.Count == 0) { <div class="small text-muted mb-2">@(Model.Campaign.RequiresAssessment ? T("Assessment required by the campaign — none recorded yet.", "الحملة تتطلب تقييماً — لم يُسجَّل بعد.") : T("No assessment recorded.", "لا تقييم مسجَّل."))</div> }
+                    else { <table class="table table-sm sms-table mb-3"><thead><tr><th>@T("Score", "الدرجة")</th><th>@T("Notes", "ملاحظات")</th><th>@T("By / at", "بواسطة / في")</th></tr></thead><tbody>@foreach (var s in Model.Assessments) { <tr><td class="fw-semibold">@s.Score</td><td>@s.Notes</td><td class="small">#@s.AssessedByUserId · @s.AssessedAtUtc.ToString("yyyy-MM-dd HH:mm")</td></tr> }</tbody></table> }
+                    @if (a.Status is ApplicationStatus.Submitted or ApplicationStatus.UnderReview or ApplicationStatus.Recommended)
+                    {
+                        <form method="post" asp-action="Assess" asp-route-id="@a.Id" class="row g-2 align-items-end"><div class="col-3"><label class="form-label small">@T("Score (0–100)", "الدرجة (0–100)")</label><input name="score" type="number" step="0.5" min="0" max="100" class="form-control form-control-sm" /></div><div class="col-7"><label class="form-label small">@T("Notes", "ملاحظات")</label><input name="notes" class="form-control form-control-sm" /></div><div class="col-2"><button class="btn btn-sm btn-primary w-100" type="submit">@T("Record", "تسجيل")</button></div></form>
+                    }
+                </div>
+                <div class="tab-pane fade" id="t-hist">
+                    <table class="table table-sm sms-table mb-0 small"><thead><tr><th>@T("When", "متى")</th><th>@T("Action", "الإجراء")</th><th>@T("Field", "الحقل")</th><th>@T("Value", "القيمة")</th><th>@T("Actor", "المنفذ")</th></tr></thead>
+                        <tbody>@foreach (var h in Model.History) { <tr><td>@h.At.ToString("yyyy-MM-dd HH:mm")</td><td>@h.Action</td><td>@h.Field</td><td>@h.NewValue</td><td>#@h.Actor</td></tr> }@if (Model.History.Count == 0) { <tr><td colspan="5" class="text-muted text-center py-3">—</td></tr> }</tbody></table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6">@T("Decision", "القرار")</h2>
+            @if (Model.AllowedTransitions.Count == 0) { <div class="small text-muted">@T("Terminal status.", "حالة نهائية.")</div> }
+            <div class="d-grid gap-2">
+                @foreach (var s in Model.AllowedTransitions)
+                {
+                    if (s == ApplicationStatus.Waitlisted)
+                    {
+                        <form method="post" asp-action="Waitlist" asp-route-id="@a.Id"><button class="btn btn-sm w-100 @Btn(s)" type="submit"><i class="bi bi-hourglass-split me-1"></i>@T("Waitlist (rank by order)", "قائمة الانتظار (حسب الترتيب)")</button></form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="ChangeStatus" asp-route-id="@a.Id"><input type="hidden" name="target" value="@s" /><button class="btn btn-sm w-100 @Btn(s)" type="submit">→ @Name(s)</button></form>
+                    }
+                }
+            </div>
+            @if (Model.WaitingListEntry != null) { <div class="small text-muted mt-2">@T("Waiting-list rank", "ترتيب الانتظار") <strong>@Model.WaitingListEntry.OrderRank</strong>@if (Model.WaitingListEntry.OfferedAtUtc != null) { <text> · @T("offered until", "معروض حتى") @Model.WaitingListEntry.OfferExpiresAtUtc?.ToString("yyyy-MM-dd")</text> } · <a asp-action="WaitingList" asp-route-profile="@Model.WaitingListEntry.GradeYearProfileId">@T("manage", "إدارة")</a></div> }
+        </div>
+        @if (Model.CanRegister)
+        {
+            <div class="sms-card p-3 border-success">
+                <h2 class="h6"><i class="bi bi-check2-circle me-1 text-success"></i>@T("Registration wizard", "معالج التسجيل")</h2>
+                <ol class="small text-muted ps-3 mb-2"><li>@T("Approved ✓", "معتمد ✓")</li><li>@(Model.Parent != null ? T("Parent linked ✓", "ولي الأمر مرتبط ✓") : T("Parent link missing ✗", "ولي الأمر غير مرتبط ✗"))</li><li>@T("Documents verified — pending attachment screens", "المستندات — بانتظار شاشات المرفقات")</li><li>@T("Pick a section with a seat", "اختر شعبة بها مقعد")</li></ol>
+                <form method="post" asp-action="Register" asp-route-id="@a.Id">
+                    <div class="mb-2"><select name="sectionId" class="form-select form-select-sm"><option value="">@T("— section —", "— الشعبة —")</option>@foreach (var s in Model.Sections) { var n = Model.SectionMembers.TryGetValue(s.Id, out var m) ? m : 0; <option value="@s.Id" disabled="@(n >= s.Capacity)">@(isRtl ? s.NameAr : s.NameEn) · @n/@s.Capacity@(n >= s.Capacity ? " (" + T("full", "ممتلئة") + ")" : "")</option> }</select></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><input name="enrollmentDate" type="date" class="form-control form-control-sm" value="@today" /></div><div class="col-6"><select name="relationshipId" class="form-select form-select-sm"><option value="">@T("relationship", "صلة القرابة")</option>@foreach (var r in Model.Relationships) { <option value="@r.Id">@(isRtl ? r.Ar : r.En)</option> }</select></div></div>
+                    <button class="btn btn-success w-100" type="submit" @(Model.Parent == null || Model.Sections.Count == 0 ? "disabled" : "")><i class="bi bi-person-check me-1"></i>@T("Register as student (one transaction)", "تسجيل كطالب (معاملة واحدة)")</button>
+                    <div class="form-text">@T("Fee preview (pro-ration, sibling discount) arrives with Module 19 screens.", "معاينة الرسوم (التناسب، خصم الإخوة) مع شاشات الوحدة 19.")</div>
+                </form>
+            </div>
+        }
+    </div>
+</div>

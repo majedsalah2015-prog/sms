@@ -15,6 +15,24 @@ namespace Sms.Application.Admissions
             int gradeYearProfileId, DateTime openDate, DateTime closeDate, bool requiresAssessment,
             decimal? applicationFeeAmount, CancellationToken cancellationToken = default);
 
+        /// <summary>Edits window / assessment / fee of a campaign; the grade-year cannot change once applications exist.</summary>
+        Task<AdmissionCampaign> UpdateCampaignAsync(int campaignId, DateTime openDate, DateTime closeDate, bool requiresAssessment, decimal? applicationFeeAmount, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-removes a campaign (IsActive = false); refused while any non-terminal application exists on it.</summary>
+        Task DeactivateCampaignAsync(int campaignId, CancellationToken cancellationToken = default);
+
+        /// <summary>Hard-deletes an application together with its assessments/waiting-list rows; refused once it is Registered (linked to a student record).</summary>
+        Task DeleteApplicationAsync(int applicationId, CancellationToken cancellationToken = default);
+
+        /// <summary>Removes a waiting-list entry; an application still Waitlisted moves to Lapsed (it is no longer queued for a seat).</summary>
+        Task RemoveFromWaitingListAsync(int waitingListEntryId, CancellationToken cancellationToken = default);
+
+        /// <summary>Corrects applicant identity fields before a decision (Draft/Submitted/UnderReview/Recommended); re-checks age eligibility.</summary>
+        Task<AdmissionApplication> UpdateApplicationAsync(
+            int applicationId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
+            string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
+            Gender gender, DateTime dateOfBirth, int nationalityLookupId, int? parentId, CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.DuplicateLiveApplicationException"/> or <see cref="Common.Exceptions.AgeIneligibleException"/>.</summary>
         Task<AdmissionApplication> SubmitApplicationAsync(
             int campaignId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
@@ -28,6 +46,12 @@ namespace Sms.Application.Admissions
             int applicationId, decimal score, int assessedByUserId, string? notes = null, CancellationToken cancellationToken = default);
 
         Task<WaitingListEntry> AddToWaitingListAsync(int applicationId, int gradeYearProfileId, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-ADM-006 waitlist path: offers the seat to a Waitlisted entry with an expiry; throws <see cref="Common.Exceptions.InvalidApplicationStatusTransitionException"/> if the application is not Waitlisted.</summary>
+        Task OfferSeatAsync(int waitingListEntryId, DateTime offerExpiresAtUtc, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-ADM-006: records the family's answer — accepted moves the application to Approved (registration deadline = offer expiry), declined/expired moves it to Lapsed.</summary>
+        Task RespondToOfferAsync(int waitingListEntryId, bool accepted, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// BR-ADM-007: one transaction — creates the Student (via

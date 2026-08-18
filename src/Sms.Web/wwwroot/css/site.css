@@ -238,3 +238,11 @@ input[type=number].form-control { min-width: 4.5rem; }
 .sms-cal-day__prov { position: absolute; top: 1px; inset-inline-end: 3px; font-size: .6rem; }
 .sms-cal-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-inline-end: .35rem; vertical-align: -1px; border: 1px solid var(--sms-sidebar-border); }
 .sms-cal-swatch.is-working { background: #fff; } .sms-cal-swatch.is-weekend { background: #f1f5f9; } .sms-cal-swatch.is-holiday { background: #fee2e2; } .sms-cal-swatch.is-partial { background: #fef3c7; } .sms-cal-swatch.is-exam { background: #ede9fe; } .sms-cal-swatch.is-event { background: var(--sms-primary); }
+
+/* ---- Admissions pipeline board (doc/Modules/09 §8.4) ---- */
+.sms-kanban { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .5rem; }
+.sms-kanban__col { flex: 0 0 230px; background: var(--sms-body-bg); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius); padding: .5rem; min-height: 200px; }
+.sms-kanban__head { font-weight: 600; font-size: .85rem; display: flex; justify-content: space-between; align-items: center; padding: .25rem .35rem .5rem; }
+.sms-kanban__col--ok .sms-kanban__head { color: #15803d; } .sms-kanban__col--off .sms-kanban__head { color: var(--sms-muted); } .sms-kanban__col--wait .sms-kanban__head { color: #b45309; }
+.sms-kanban__card { background: var(--sms-surface); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius-sm); padding: .55rem .65rem; margin-bottom: .5rem; box-shadow: var(--sms-shadow); }
+.sms-kanban__card.is-late { border-inline-start: 3px solid #dc2626; }

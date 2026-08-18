@@ -1,0 +1,29 @@
+@using System.Globalization
+@model HelpPanelViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var label = Model.ButtonLabel ?? (isRtl ? "مساعدة" : "Help");
+    var close = isRtl ? "إغلاق" : "Close";
+}
+<button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#@Model.Id" title="@label"><i class="bi bi-question-circle me-1"></i>@label</button>
+<div class="modal fade" id="@Model.Id" tabindex="-1" aria-labelledby="@(Model.Id)-title" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="@(Model.Id)-title"><i class="bi bi-question-circle me-2"></i>@Model.Title</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@close"></button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrWhiteSpace(Model.Intro)) { <p class="text-muted">@Model.Intro</p> }
+                <dl class="mb-0">
+                    @foreach (var item in Model.Items)
+                    {
+                        <dt class="fw-semibold">@item.Heading</dt>
+                        <dd class="text-muted small mb-3">@item.Body</dd>
+                    }
+                </dl>
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">@close</button></div>
+        </div>
+    </div>
+</div>
