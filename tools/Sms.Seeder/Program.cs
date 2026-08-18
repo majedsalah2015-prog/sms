@@ -15,6 +15,7 @@ using Sms.Application.Numbering;
 using Sms.Application.Parents;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
+using Sms.Application.Security;
 using Sms.Application.Seeding;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
@@ -31,6 +32,7 @@ using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
+using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Seeding;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Students;
@@ -71,6 +73,8 @@ namespace Sms.Seeder
             services.AddScoped<IAuditContext, AuditContext>();
             services.AddScoped<SmsDbContext>(sp => sp.GetRequiredService<AppDbContext>());
             services.AddScoped<IAuditEventWriter, AuditEventWriter>();
+            services.AddSingleton<IPasswordHasher, PasswordHasher>();
+            services.AddScoped<IAuthenticationService, AuthenticationService>();
 
             services.AddScoped<INumberingSeriesAdmin, NumberingSeriesAdmin>();
             services.AddScoped<ILookupAdmin, LookupAdmin>();
@@ -92,6 +96,7 @@ namespace Sms.Seeder
 
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
             services.AddScoped<ISeedContributor, RoleTemplateSeedContributor>();
+            services.AddScoped<ISeedContributor, SysAdminAccountSeedContributor>();
             services.AddScoped<ISeedContributor, Ksa01ContentPackSeedContributor>();
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();

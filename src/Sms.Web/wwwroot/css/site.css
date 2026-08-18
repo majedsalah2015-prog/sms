@@ -171,3 +171,19 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
   .sms-shell.is-collapsed .sms-nav-group .collapse.show { display: block !important; }
   .sms-sidebar__foot { display: none; }
 }
+
+/* ---- Auth screens (doc/DesignSystem/10): centred card outside the shell ---- */
+.sms-auth { min-height: 100vh; background: var(--sms-body-bg); position: relative; }
+.sms-auth__bg { position: fixed; inset: 0; background: radial-gradient(1200px 600px at 50% -10%, rgba(var(--sms-primary-rgb), .12), transparent 60%); pointer-events: none; }
+.sms-auth__wrap { position: relative; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem 1rem; }
+.sms-auth__top { position: absolute; top: 1rem; inset-inline-end: 1rem; }
+.sms-auth__lang { border-radius: 999px; color: var(--sms-muted); border: 1px solid var(--sms-sidebar-border); background: var(--sms-surface); }
+.sms-auth__card { width: 100%; max-width: 420px; background: var(--sms-surface); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius); box-shadow: 0 10px 30px rgba(16, 24, 40, .08); padding: 2rem 1.75rem 1.75rem; }
+.sms-auth__brand { text-align: center; margin-bottom: 1.5rem; }
+.sms-auth__mark { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: var(--sms-radius); background: linear-gradient(135deg, var(--sms-primary), var(--sms-primary-hover)); color: #fff; font-size: 1.6rem; margin-bottom: .6rem; }
+.sms-auth__name { font-size: 1.35rem; font-weight: 700; margin: 0; letter-spacing: .04em; }
+.sms-auth__sub { color: var(--sms-muted); margin: 0; font-size: .9rem; }
+.sms-auth__title { font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem; }
+.sms-auth__submit { padding-block: .6rem; font-weight: 600; }
+.sms-auth__foot { margin-top: 1.25rem; font-size: .8rem; color: var(--sms-muted); display: flex; gap: 1rem; }
+.sms-user.dropdown-toggle::after { margin-inline-start: .35rem; }

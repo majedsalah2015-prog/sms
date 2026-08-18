@@ -1,0 +1,58 @@
+@using System.Globalization
+@{
+    var culture = CultureInfo.CurrentUICulture;
+    var isRtl = culture.TextInfo.IsRightToLeft;
+    var lang = culture.TwoLetterISOLanguageName;
+    var bootstrapCss = isRtl ? "~/lib/bootstrap/css/bootstrap.rtl.min.css" : "~/lib/bootstrap/css/bootstrap.min.css";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var version = typeof(Sms.Web.Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+}
+<!DOCTYPE html>
+<html lang="@lang" dir="@(isRtl ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SMS</title>
+    <link rel="stylesheet" href="@bootstrapCss" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/fonts/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="sms-auth">
+    <div class="sms-auth__bg" aria-hidden="true"></div>
+    <div class="sms-auth__wrap">
+        <div class="sms-auth__top">
+            <form asp-controller="Home" asp-action="SetLanguage" method="post" class="d-inline">
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <input type="hidden" name="culture" value="@(isRtl ? "en" : "ar")" />
+                <button type="submit" class="btn btn-sm sms-auth__lang"><i class="bi bi-translate"></i> @(isRtl ? "English" : "العربية")</button>
+            </form>
+        </div>
+        <main class="sms-auth__card">
+            <div class="sms-auth__brand">
+                <span class="sms-auth__mark"><i class="bi bi-mortarboard-fill"></i></span>
+                <h1 class="sms-auth__name">SMS</h1>
+                <p class="sms-auth__sub">@(isRtl ? "نظام إدارة المدارس" : "School Management System")</p>
+            </div>
+            @RenderBody()
+        </main>
+        <footer class="sms-auth__foot">
+            <span>&copy; 2026 SMS &middot; @(isRtl ? "جميع الحقوق محفوظة" : "All rights reserved")</span>
+            <span class="sms-auth__version">v@(version)</span>
+        </footer>
+    </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var input = document.getElementById(btn.getAttribute('data-password-toggle'));
+                var show = input.type === 'password';
+                input.type = show ? 'text' : 'password';
+                btn.querySelector('i').className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+            });
+        });
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

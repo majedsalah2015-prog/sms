@@ -1,4 +1,8 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Sms.Web.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -116,7 +120,42 @@ namespace Sms.Web
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllersWithViews();
+            services.AddControllersWithViews(options =>
+            {
+                // BR-SEC-005: forced password change gates every other action.
+                options.Filters.Add<RequirePasswordChangeFilter>();
+            });
+
+            // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,
+            // re-validated per request by SessionCookieEvents; a second, 5-minute
+            // scheme carries the password-verified-awaiting-TOTP state.
+            services.AddHttpContextAccessor();
+            services.AddScoped<SessionCookieEvents>();
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+                {
+                    options.Cookie.Name = "Sms.Auth";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                    options.LoginPath = "/Account/Login";
+                    options.LogoutPath = "/Account/Logout";
+                    options.AccessDeniedPath = "/Account/AccessDenied";
+                    options.SlidingExpiration = true;
+                    options.EventsType = typeof(SessionCookieEvents);
+                })
+                .AddCookie("Sms.TwoFactor", options =>
+                {
+                    options.Cookie.Name = "Sms.TwoFactor";
+                    options.Cookie.HttpOnly = true;
+                    options.ExpireTimeSpan = System.TimeSpan.FromMinutes(5);
+                });
+
+            // Deny-by-default (doc 06 §1): every endpoint needs an authenticated
+            // user unless explicitly [AllowAnonymous] (login, static assets).
+            services.AddAuthorization(options =>
+            {
+                options.FallbackPolicy = new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build();
+            });
 
             // E-002 tenancy + working-year context (ADR-2/3). Static single-tenant
             // wiring until M02/M03 provide school resolution and the year switcher.
@@ -126,7 +165,8 @@ namespace Sms.Web
             services.AddSingleton<ITenantContext>(tenant);
             services.AddSingleton<IWorkingYearContext>(tenant);
             services.AddSingleton<IClock, SystemClock>();
-            services.AddSingleton<ICurrentUser, SystemUser>();
+            // ICurrentUser now resolves from the cookie principal (0 = system actor outside a request).
+            services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
 
             // E-003 authorization core: deny-by-default policy engine (doc 06).
             services.AddDbContext<AppDbContext>(options =>
@@ -587,6 +627,7 @@ namespace Sms.Web
                 await next();
             });
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.UseEndpoints(endpoints =>

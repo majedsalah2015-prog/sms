@@ -73,10 +73,27 @@
                         </button>
                     </form>
                     <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="Jobs"><i class="bi bi-activity"></i></a>
-                    <span class="sms-user"><i class="bi bi-person-circle"></i> <span class="d-none d-md-inline">@(isRtl ? "مسؤول النظام" : "System Administrator")</span></span>
+                    <div class="dropdown">
+                        <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key me-2"></i>@(isRtl ? "تغيير كلمة المرور" : "Change password")</a></li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                <form asp-controller="Account" asp-action="Logout" method="post">
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>@(isRtl ? "تسجيل الخروج" : "Sign out")</button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </header>
             <main id="sms-main" class="sms-main" role="main">
+                @if (TempData["Flash"] is string flash)
+                {
+                    <div class="alert alert-success py-2" role="alert"><i class="bi bi-check-circle me-1"></i>@flash</div>
+                }
                 @RenderBody()
             </main>
             <footer class="sms-footer text-muted">

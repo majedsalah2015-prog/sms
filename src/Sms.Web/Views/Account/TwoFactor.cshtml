@@ -1,0 +1,27 @@
+@using System.Globalization
+@model TwoFactorViewModel
+@{
+    Layout = "_LoginLayout";
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Verification", "التحقق");
+}
+
+<h2 class="sms-auth__title">@T("Two-factor verification", "التحقق بخطوتين")</h2>
+<p class="text-muted small">@T("Enter the 6-digit code from your authenticator app.", "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة.")</p>
+
+<form asp-action="TwoFactor" method="post" novalidate>
+    <input type="hidden" asp-for="ReturnUrl" />
+    <div asp-validation-summary="ModelOnly" class="alert alert-danger py-2 small" role="alert"></div>
+    <div class="mb-3">
+        <label asp-for="Code" class="form-label">@T("Code", "الرمز")</label>
+        <input asp-for="Code" class="form-control form-control-lg text-center" inputmode="numeric" autocomplete="one-time-code" autofocus dir="ltr" maxlength="8" />
+        <span asp-validation-for="Code" class="text-danger small"></span>
+    </div>
+    <button type="submit" class="btn btn-primary w-100 sms-auth__submit"><i class="bi bi-shield-check"></i> @T("Verify", "تحقق")</button>
+</form>
+<div class="text-center mt-3"><a asp-action="Login" class="small">@T("Back to sign in", "العودة لتسجيل الدخول")</a></div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
