@@ -9,6 +9,10 @@
     <!-- E-011 background jobs (doc 02 T-6, IP-02 §2 toolchain decision). -->
     <PackageReference Include="Hangfire.AspNetCore" Version="1.7.34" />
     <PackageReference Include="Hangfire.SqlServer" Version="1.7.34" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="5.0.17">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <PropertyGroup>
