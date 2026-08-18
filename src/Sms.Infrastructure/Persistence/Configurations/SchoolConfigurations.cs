@@ -31,6 +31,7 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.TimeZoneId).HasMaxLength(100).IsRequired();
             builder.Property(x => x.CurrencyCode).HasMaxLength(3).IsRequired();
             builder.HasOne<SchoolGroup>().WithMany().HasForeignKey(x => x.SchoolGroupId);
+            builder.HasOne<Sms.Domain.Setup.CountryPack>().WithMany().HasForeignKey(x => x.CountryPackId);
         }
     }
 

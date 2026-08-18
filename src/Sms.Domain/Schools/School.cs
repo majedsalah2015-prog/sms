@@ -55,5 +55,17 @@ namespace Sms.Domain.Schools
         /// <summary>Active↔Suspended and reactivation require a reason (doc/Modules/02 §4); enforced here, not by convention.</summary>
         [RequiresAuditReason]
         public SchoolStatus Status { get; set; } = SchoolStatus.Setup;
+
+        /// <summary>
+        /// E-101 / BR-SET-004: the bound product country pack. Null until the
+        /// wizard's CountryPack step. Changing it after go-live is a
+        /// support-gated, reason-bearing change — SystemSetupAdmin enforces the
+        /// reason once the school has left Setup status (the attribute alone
+        /// can't express "only after go-live").
+        /// </summary>
+        public int? CountryPackId { get; set; }
+
+        /// <summary>E-101 / BR-SET-003: stamped by "Setup Complete"; the first academic-year activation is gated on it.</summary>
+        public DateTime? SetupCompletedAtUtc { get; set; }
     }
 }

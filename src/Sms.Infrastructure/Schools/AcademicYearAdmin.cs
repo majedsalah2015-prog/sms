@@ -60,6 +60,30 @@ namespace Sms.Infrastructure.Schools
             var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
             RequireTransition(year.Status, AcademicYearStatus.Active);
 
+            // E-101 / BR-SET-003: the school's FIRST activation is gated on the
+            // Setup Wizard being declared complete. "First" = no year of this
+            // school has ever left Preparation. Later activations (rollover)
+            // aren't re-gated. Evaluated against the tenant's School row; if the
+            // row is absent (only possible in fixtures — a real tenant always
+            // has one) there is no wizard to gate on.
+            var everActivated = await _db.AcademicYears.AnyAsync(y => y.Status != AcademicYearStatus.Preparation, cancellationToken);
+            if (!everActivated)
+            {
+                var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == year.SchoolId, cancellationToken);
+                if (school != null && school.SetupCompletedAtUtc == null)
+                {
+                    var completed = await _db.SetupChecklists.AsNoTracking()
+                        .Where(c => c.Status == Sms.Domain.Setup.SetupStepStatus.Completed)
+                        .Select(c => c.StepCode)
+                        .ToListAsync(cancellationToken);
+                    var pending = Sms.Application.Setup.SetupWizardSteps.All
+                        .Where(s => s.IsMandatory && !completed.Contains(s.Code))
+                        .Select(s => s.Code)
+                        .ToList();
+                    throw new SetupIncompleteException(pending);
+                }
+            }
+
             // BR-AYR-004: activating the new year moves the prior Active to Closing.
             var currentActive = await _db.AcademicYears.SingleOrDefaultAsync(y => y.Status == AcademicYearStatus.Active, cancellationToken);
             if (currentActive != null)

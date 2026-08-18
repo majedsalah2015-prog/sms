@@ -16,7 +16,9 @@ using Sms.Application.Parents;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
+using Sms.Application.Notifications;
 using Sms.Application.Seeding;
+using Sms.Application.Setup;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
 using Sms.Application.Teachers;
@@ -33,7 +35,9 @@ using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Seeding;
+using Sms.Infrastructure.Setup;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
@@ -82,6 +86,8 @@ namespace Sms.Seeder
 
             // S3/E-305 demo tenant - every admin service DemoSeedContributor composes.
             services.AddScoped<ISchoolAdmin, SchoolAdmin>();
+            services.AddScoped<INotificationPublisher, NotificationPublisher>();
+            services.AddScoped<ISystemSetupAdmin, SystemSetupAdmin>();
             services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
             services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
             services.AddScoped<ISectionAdmin, SectionAdmin>();

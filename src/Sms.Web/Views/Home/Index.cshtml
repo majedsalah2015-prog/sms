@@ -1,7 +1,10 @@
 @using System.Globalization
 @using Sms.Web.Navigation
+@using Sms.Application.Setup
+@inject ISystemSetupAdmin SetupAdmin
 @model Sms.Web.Models.HomeDashboardViewModel
 @{
+    var featureStates = await SetupAdmin.GetFeatureStatesAsync();
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
     ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
@@ -53,7 +56,7 @@
 
 <h2 class="sms-section-title">@T("Modules", "الوحدات")</h2>
 <div class="row g-3">
-    @foreach (var m in ModuleCatalog.Modules)
+    @foreach (var m in ModuleCatalog.Modules.Where(x => FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]))
     {
         <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
             <a class="sms-card sms-module-card" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">

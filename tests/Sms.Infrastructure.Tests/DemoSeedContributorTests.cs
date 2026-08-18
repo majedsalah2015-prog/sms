@@ -14,11 +14,14 @@ using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Grades;
+using Sms.Infrastructure.Lookups;
+using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
+using Sms.Infrastructure.Setup;
 using Sms.Infrastructure.Seeding;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
@@ -81,9 +84,19 @@ namespace Sms.Infrastructure.Tests
             }
 
             db.SaveChanges();
+
+            // E-101: the demo tenant now walks the Setup Wizard, which needs the
+            // product Currency lookup (BR-GLB-112) and the KSA-01 country pack.
+            var lookups = new LookupAdmin(db);
+            lookups.DefineCategoryAsync("Currency", Sms.Domain.Lookups.LookupCategoryTier.ProductSeeded, "العملة", "Currency").GetAwaiter().GetResult();
+            lookups.DefineValueAsync("Currency", "SAR", "ريال سعودي", "Saudi Riyal", sortOrder: 1).GetAwaiter().GetResult();
+            new Ksa01ContentPackSeedContributor(lookups, CreateSetupAdmin(db, new AuditContext())).SeedAsync().GetAwaiter().GetResult();
         }
 
         public void Dispose() => _connection.Dispose();
+
+        private SystemSetupAdmin CreateSetupAdmin(AppDbContext db, AuditContext audit) =>
+            new(db, _tenant, _clock, _user, audit, new NotificationPublisher(db));
 
         private AppDbContext CreateContext(AuditContext audit)
         {
@@ -99,7 +112,7 @@ namespace Sms.Infrastructure.Tests
                 new SectionAdmin(db), new SubjectAdmin(db), new CalendarAdmin(db, _clock),
                 new EmployeeAdmin(db, numberIssuer), new TeacherAdmin(db, _clock),
                 new ParentAdmin(db, numberIssuer), new StudentAdmin(db, numberIssuer),
-                new AttendanceAdmin(db), new FeeAdmin(db, numberIssuer, _clock));
+                new AttendanceAdmin(db), new FeeAdmin(db, numberIssuer, _clock), CreateSetupAdmin(db, audit));
         }
 
         [Fact]

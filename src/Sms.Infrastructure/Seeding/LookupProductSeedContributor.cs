@@ -46,6 +46,15 @@ namespace Sms.Infrastructure.Seeding
                 ("Father", "الأب", "Father"), ("Mother", "الأم", "Mother"), ("Guardian", "ولي أمر", "Guardian"),
                 ("Grandfather", "الجد", "Grandfather"), ("Grandmother", "الجدة", "Grandmother"), ("Other", "أخرى", "Other"));
 
+            // E-101 / BR-SET-001 "ISO currencies" + BR-GLB-112: the wizard's currency
+            // step and School.CurrencyCode validate against this product list.
+            await _lookups.DefineCategoryAsync("Currency", LookupCategoryTier.ProductSeeded, "العملة", "Currency", cancellationToken);
+            await SeedValues("Currency", cancellationToken,
+                ("SAR", "ريال سعودي", "Saudi Riyal"), ("AED", "درهم إماراتي", "UAE Dirham"), ("KWD", "دينار كويتي", "Kuwaiti Dinar"),
+                ("BHD", "دينار بحريني", "Bahraini Dinar"), ("QAR", "ريال قطري", "Qatari Riyal"), ("OMR", "ريال عماني", "Omani Rial"),
+                ("EGP", "جنيه مصري", "Egyptian Pound"), ("JOD", "دينار أردني", "Jordanian Dinar"), ("USD", "دولار أمريكي", "US Dollar"),
+                ("EUR", "يورو", "Euro"), ("GBP", "جنيه إسترليني", "Pound Sterling"));
+
             await _lookups.DefineCategoryAsync("JobTitle", LookupCategoryTier.ProductSeeded, "المسمى الوظيفي", "Job Title", cancellationToken);
             await SeedValues("JobTitle", cancellationToken,
                 ("Teacher", "معلم", "Teacher"), ("Administrator", "إداري", "Administrator"), ("Accountant", "محاسب", "Accountant"),

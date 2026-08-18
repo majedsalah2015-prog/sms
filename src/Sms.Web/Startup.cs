@@ -14,6 +14,7 @@ using Sms.Application.Activities;
 using Sms.Application.Admissions;
 using Sms.Application.Attachments;
 using Sms.Application.Attendance;
+using Sms.Application.Setup;
 using Sms.Application.Audit;
 using Sms.Application.Backup;
 using Sms.Application.Cafeteria;
@@ -62,6 +63,7 @@ using Sms.Infrastructure.Activities;
 using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Attendance;
+using Sms.Infrastructure.Setup;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Backup;
 using Sms.Infrastructure.Cafeteria;
@@ -248,6 +250,13 @@ namespace Sms.Web
             // E-002) — wiring them to real School/AcademicYear rows (multi-school
             // resolution, per-session year switching) is follow-up work.
             services.AddScoped<ISchoolAdmin, SchoolAdmin>();
+
+            // E-101 System Setup (doc/Modules/01): country packs, effective-dated
+            // settings, feature toggles, setup wizard. IFeatureGate is the same
+            // instance — the shell sidebar reads it (BR-SET-006).
+            services.AddScoped<SystemSetupAdmin>();
+            services.AddScoped<ISystemSetupAdmin>(sp => sp.GetRequiredService<SystemSetupAdmin>());
+            services.AddScoped<IFeatureGate>(sp => sp.GetRequiredService<SystemSetupAdmin>());
             services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
 
             // E-103 (slice: Calendar, doc/Modules/04, BR-CAL-001..008). Impact

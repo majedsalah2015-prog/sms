@@ -1,44 +1,41 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Sms.Application.Fees;
 using Sms.Application.Lookups;
 using Sms.Application.Seeding;
+using Sms.Application.Setup;
 using Sms.Domain.Lookups;
 
 namespace Sms.Infrastructure.Seeding
 {
     /// <summary>
-    /// S3/E-305 KSA-01 content pack v1 (BR-SET-004). A real `CountryPack`
-    /// entity that binds VAT defaults/ID-type requirements/Hijri
-    /// default/statutory report set doesn't exist yet — E-101 (System
-    /// Setup + wizard) was never started — so this seeds the concrete
-    /// reference data a KSA pilot school needs today: a "HolidayType"
-    /// lookup (product-tier content, same shape as E-010's
-    /// RelationshipType/JobTitle) and the standard VAT rate (as
-    /// <see cref="Sms.Application.Fees.KsaVatRates"/>, a plain constant
-    /// rather than a database row — there's no live-configurable VAT
-    /// setting to seed into yet). BR-GLB-003's KSA ID-type requirement
-    /// (National ID / Iqama / Passport) is already satisfied by E-010's
-    /// "IdType" lookup — not re-seeded here.
+    /// KSA-01 content pack v1 (BR-SET-004). Since E-101 the pack is a real
+    /// <see cref="Sms.Domain.Setup.CountryPack"/> row (product tier) that
+    /// binds VAT default, ID-type requirements (BR-GLB-003 — the E-010
+    /// "IdType" codes), Hijri display default, audit-retention floor
+    /// (BR-AUD-006) and the statutory report set; schools bind to it in the
+    /// wizard's COUNTRY_PACK step. The "HolidayType" lookup below is the
+    /// pack's reference-content half (S3/E-305).
     ///
     /// Only the two Gregorian-fixed KSA national holidays are named as
     /// content (National Day = Sep 23, Founding Day = Feb 22) — the
-    /// religious holidays (Eid al-Fitr/Eid al-Adha) are Hijri-moving and
-    /// this codebase's own documented Hijri-accuracy gap
-    /// (UmmAlQuraCalendar unavailable in net5.0, ±1 day risk with the
-    /// tabular HijriCalendar fallback) means seeding their dates here
-    /// would be guessing, not content — deferred, needs a per-year
-    /// ministry calendar confirmation instead. Actual CalendarEvent rows
-    /// for a specific academic year are a school/year-instance concern
-    /// (see DemoSeedContributor), not product-tier content — this
-    /// contributor only seeds the holiday *type* catalog.
+    /// religious holidays are Hijri-moving and this codebase's documented
+    /// Hijri-accuracy gap (UmmAlQuraCalendar unavailable in net5.0) means
+    /// seeding their dates would be guessing; the types exist, the dated
+    /// instances are a per-year school concern (DemoSeedContributor).
     /// </summary>
     public class Ksa01ContentPackSeedContributor : ISeedContributor
     {
-        private readonly ILookupAdmin _lookups;
+        public const string PackCode = "KSA-01";
 
-        public Ksa01ContentPackSeedContributor(ILookupAdmin lookups)
+        private readonly ILookupAdmin _lookups;
+        private readonly ISystemSetupAdmin _setup;
+
+        public Ksa01ContentPackSeedContributor(ILookupAdmin lookups, ISystemSetupAdmin setup)
         {
             _lookups = lookups;
+            _setup = setup;
         }
 
         public string Name => "KSA-01 content pack v1 (BR-SET-004)";
@@ -47,6 +44,22 @@ namespace Sms.Infrastructure.Seeding
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)
         {
+            await _setup.DefineCountryPackAsync(new CountryPackDefinition(
+                Code: PackCode,
+                NameAr: "المملكة العربية السعودية — الحزمة 01",
+                NameEn: "Saudi Arabia — pack 01",
+                CountryIsoCode: "SA",
+                DefaultCurrencyCode: "SAR",
+                DefaultTimeZoneId: "Arab Standard Time",
+                DefaultVatRate: KsaVatRates.Standard,
+                HijriDisplayDefault: true,
+                RequiredIdTypeCodes: new[] { "NationalId", "Iqama", "Passport" },
+                AuditRetentionYearsMinimum: 10,
+                // doc/Modules/30 statutory set for KSA — codes as the report registry names them.
+                StatutoryReportCodes: new[] { "RPT-STU-001", "RPT-ATT-001", "RPT-FEE-004", "RPT-VAT-001" },
+                DefaultWorkingDays: new[] { DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday }),
+                cancellationToken);
+
             await _lookups.DefineCategoryAsync("HolidayType", LookupCategoryTier.ProductSeeded, "نوع العطلة", "Holiday Type", cancellationToken);
             await SeedValues(cancellationToken,
                 ("NationalDay", "اليوم الوطني", "National Day"),

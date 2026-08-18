@@ -6,8 +6,10 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Lookups;
+using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Seeding;
+using Sms.Infrastructure.Setup;
 using Sms.TestSupport;
 using Xunit;
 
@@ -60,7 +62,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Seeding_creates_the_HolidayType_category_and_its_values()
         {
             using var db = CreateContext();
-            var contributor = new Ksa01ContentPackSeedContributor(new LookupAdmin(db));
+            var contributor = new Ksa01ContentPackSeedContributor(new LookupAdmin(db), new SystemSetupAdmin(db, _tenant, _clock, _user, _audit, new NotificationPublisher(db)));
 
             await contributor.SeedAsync();
 
@@ -76,7 +78,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Re_running_is_idempotent()
         {
             using var db = CreateContext();
-            var contributor = new Ksa01ContentPackSeedContributor(new LookupAdmin(db));
+            var contributor = new Ksa01ContentPackSeedContributor(new LookupAdmin(db), new SystemSetupAdmin(db, _tenant, _clock, _user, _audit, new NotificationPublisher(db)));
 
             await contributor.SeedAsync();
             await contributor.SeedAsync();

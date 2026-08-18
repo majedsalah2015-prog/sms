@@ -13,6 +13,7 @@ using Sms.Application.Grades;
 using Sms.Application.Parents;
 using Sms.Application.Schools;
 using Sms.Application.Seeding;
+using Sms.Application.Setup;
 using Sms.Application.Sections;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
@@ -64,13 +65,15 @@ namespace Sms.Infrastructure.Seeding
         private readonly IStudentAdmin _studentAdmin;
         private readonly IAttendanceAdmin _attendanceAdmin;
         private readonly IFeeAdmin _feeAdmin;
+        private readonly ISystemSetupAdmin _setupAdmin;
 
         public DemoSeedContributor(
             AppDbContext db, IAuditContext audit, IClock clock, ISchoolAdmin schoolAdmin, IAcademicYearAdmin yearAdmin, IGradeStructureAdmin gradeAdmin,
             ISectionAdmin sectionAdmin, ISubjectAdmin subjectAdmin, ICalendarAdmin calendarAdmin, IEmployeeAdmin employeeAdmin,
             ITeacherAdmin teacherAdmin, IParentAdmin parentAdmin, IStudentAdmin studentAdmin, IAttendanceAdmin attendanceAdmin,
-            IFeeAdmin feeAdmin)
+            IFeeAdmin feeAdmin, ISystemSetupAdmin setupAdmin)
         {
+            _setupAdmin = setupAdmin;
             _db = db;
             _audit = audit;
             _clock = clock;
@@ -104,16 +107,28 @@ namespace Sms.Infrastructure.Seeding
             var school = await _schoolAdmin.DefineSchoolAsync(
                 null, "مدرسة الأندلس النموذجية", "Al-Andalus Demo School", "LIC-DEMO-0001", "MIN-DEMO-0001",
                 "Arab Standard Time", "SAR", city: "Riyadh", cancellationToken: cancellationToken);
+            // E-101 / BR-SET-003: the Setup Wizard must be complete before the first
+            // year activates — the demo school walks every mandatory step for real.
+            var stage = await _gradeAdmin.DefineStageAsync("الابتدائية", "Elementary", sequenceOrder: 1, GenderPolicy.Mixed, cancellationToken);
+            var grade = await _gradeAdmin.DefineGradeLevelAsync(
+                stage.Id, "G3", "الصف الثالث", "Grade 3", sequenceOrder: 3, promotionTargetGradeLevelId: null, isGraduating: false, cancellationToken);
+            await _setupAdmin.BindCountryPackAsync(Ksa01ContentPackSeedContributor.PackCode, cancellationToken: cancellationToken);
+            await _setupAdmin.SetSettingAsync(SettingKeys.EnabledLanguages, "ar,en", cancellationToken: cancellationToken);
+            await _setupAdmin.SetSettingAsync(SettingKeys.DefaultLanguage, "ar", cancellationToken: cancellationToken);
+            await _setupAdmin.SetSettingAsync(SettingKeys.CalendarType, "Both", cancellationToken: cancellationToken);
+            await _setupAdmin.SetSettingAsync(SettingKeys.FirstDayOfWeek, "Sunday", cancellationToken: cancellationToken);
+            foreach (var step in SetupWizardSteps.All)
+            {
+                await _setupAdmin.CompleteStepAsync(step.Code, "Demo tenant seed", cancellationToken);
+            }
+
+            await _setupAdmin.DeclareSetupCompleteAsync(cancellationToken);
             await _schoolAdmin.ChangeStatusAsync(school.Id, SchoolStatus.Active, cancellationToken);
 
             var yearStart = new DateTime(2027, 9, 1);
             var yearEnd = new DateTime(2028, 6, 30);
             var year = await _yearAdmin.DefineYearAsync("٢٠٢٧-٢٠٢٨", "2027-2028", "١٤٤٩هـ", yearStart, yearEnd, cancellationToken);
             await _yearAdmin.ActivateAsync(year.Id, cancellationToken);
-
-            var stage = await _gradeAdmin.DefineStageAsync("الابتدائية", "Elementary", sequenceOrder: 1, GenderPolicy.Mixed, cancellationToken);
-            var grade = await _gradeAdmin.DefineGradeLevelAsync(
-                stage.Id, "G3", "الصف الثالث", "Grade 3", sequenceOrder: 3, promotionTargetGradeLevelId: null, isGraduating: false, cancellationToken);
             var profile = await _gradeAdmin.DefineGradeYearProfileAsync(
                 grade.Id, year.Id, GenderPolicy.Mixed, targetSections: 1, targetSectionSize: 25, cancellationToken: cancellationToken);
 

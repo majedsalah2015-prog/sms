@@ -1,5 +1,7 @@
 @using System.Globalization
 @using Sms.Web.Navigation
+@using Sms.Application.Setup
+@inject ISystemSetupAdmin SetupAdmin
 @{
     var culture = CultureInfo.CurrentUICulture;
     var isRtl = culture.TextInfo.IsRightToLeft;
@@ -8,7 +10,9 @@
     var bootstrapCss = isRtl ? "~/lib/bootstrap/css/bootstrap.rtl.min.css" : "~/lib/bootstrap/css/bootstrap.min.css";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var productName = isRtl ? "نظام إدارة المدارس" : "School Management System";
-    var sidebar = ModuleCatalog.BuildSidebar();
+    // BR-SET-006: modules whose feature toggle is off vanish from the menu.
+    var featureStates = await SetupAdmin.GetFeatureStatesAsync();
+    var sidebar = ModuleCatalog.BuildSidebar(m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code]);
 }
 <!DOCTYPE html>
 <html lang="@lang" dir="@dir">

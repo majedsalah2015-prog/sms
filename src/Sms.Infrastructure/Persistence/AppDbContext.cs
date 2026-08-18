@@ -37,6 +37,7 @@ using Sms.Domain.Reports;
 using Sms.Domain.Rollover;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
+using Sms.Domain.Setup;
 using Sms.Domain.Security;
 using Sms.Domain.Store;
 using Sms.Domain.SysAdmin;
@@ -125,6 +126,15 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<School> Schools => Set<School>();
 
         public DbSet<Signatory> Signatories => Set<Signatory>();
+
+        // E-101 System Setup (doc/Modules/01 §7)
+        public DbSet<CountryPack> CountryPacks => Set<CountryPack>();
+
+        public DbSet<SchoolSetting> SchoolSettings => Set<SchoolSetting>();
+
+        public DbSet<FeatureToggle> FeatureToggles => Set<FeatureToggle>();
+
+        public DbSet<SetupChecklist> SetupChecklists => Set<SetupChecklist>();
 
         public DbSet<AcademicYear> AcademicYears => Set<AcademicYear>();
 

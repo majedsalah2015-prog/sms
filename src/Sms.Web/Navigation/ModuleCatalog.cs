@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -88,8 +89,8 @@ namespace Sms.Web.Navigation
         public static ModuleInfo? Find(string code) =>
             All.FirstOrDefault(m => string.Equals(m.Code, code, System.StringComparison.OrdinalIgnoreCase));
 
-        /// <summary>Sidebar tree: Home leaf, then one collapsible group per stage.</summary>
-        public static IReadOnlyList<NavItem> BuildSidebar()
+        /// <summary>Sidebar tree: Home leaf, then one collapsible group per stage. <paramref name="isVisible"/> lets the caller drop modules whose feature toggle is off (BR-SET-006).</summary>
+        public static IReadOnlyList<NavItem> BuildSidebar(Func<ModuleInfo, bool>? isVisible = null)
         {
             var items = new List<NavItem>
             {
@@ -99,7 +100,7 @@ namespace Sms.Web.Navigation
             foreach (var (key, titleEn, titleAr, icon) in Groups)
             {
                 var group = new NavItem(key, titleEn, titleAr, icon);
-                foreach (var m in All.Where(x => x.Group == key))
+                foreach (var m in All.Where(x => x.Group == key && (isVisible == null || isVisible(x))))
                 {
                     group.Items.Add(new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, "Modules", "Index", new { code = m.Code }));
                 }
