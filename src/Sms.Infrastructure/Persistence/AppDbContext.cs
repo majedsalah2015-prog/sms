@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
@@ -563,6 +564,22 @@ namespace Sms.Infrastructure.Persistence
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+
+            // Deletes are soft (Status/IsActive, E-002), so no relationship
+            // should cascade physically. EF's default is Cascade for required
+            // FKs, and SQL Server rejects the resulting multiple-cascade-path
+            // graphs (error 1785, first surfaced by RolloverBatch's two
+            // AcademicYear FKs on the first real SQL Server run) — Sqlite tests
+            // never see it. Downgrade every cascade to Restrict model-wide,
+            // except owned types (LocalizedName etc.), which must follow their
+            // owner.
+            foreach (var fk in modelBuilder.Model.GetEntityTypes().SelectMany(e => e.GetForeignKeys()))
+            {
+                if (fk.DeleteBehavior == DeleteBehavior.Cascade && !fk.IsOwnership)
+                {
+                    fk.DeleteBehavior = DeleteBehavior.Restrict;
+                }
+            }
 
             // Base runs last so tenant/soft-active filters cover every entity
             // the configurations added.
