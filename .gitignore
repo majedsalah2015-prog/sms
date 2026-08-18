@@ -245,6 +245,13 @@ Generated_Code/
 # because we have git ;-)
 _UpgradeReport_Files/
 Backup*/
+# Backup*/ above is VS-upgrade boilerplate; it also matches this solution's
+# own Sms.*.Backup module (M35) folders, so explicitly un-ignore those.
+!src/Sms.Domain/Backup/
+!src/Sms.Application/Backup/
+!src/Sms.Infrastructure/Backup/
+!tests/Sms.Application.Tests/Backup/
+!tests/Sms.Infrastructure.Tests/Backup/
 UpgradeLog*.XML
 UpgradeLog*.htm
 ServiceFabricBackup/

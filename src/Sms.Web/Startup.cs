@@ -11,6 +11,7 @@ using Sms.Application.Admissions;
 using Sms.Application.Attachments;
 using Sms.Application.Attendance;
 using Sms.Application.Audit;
+using Sms.Application.Backup;
 using Sms.Application.Cafeteria;
 using Sms.Application.Calendar;
 using Sms.Application.Certificates;
@@ -45,6 +46,7 @@ using Sms.Application.Statements;
 using Sms.Application.Store;
 using Sms.Application.Students;
 using Sms.Application.Subjects;
+using Sms.Application.SysAdmin;
 using Sms.Application.Teachers;
 using Sms.Application.Timetable;
 using Sms.Application.Transport;
@@ -56,6 +58,7 @@ using Sms.Infrastructure.Admissions;
 using Sms.Infrastructure.Attachments;
 using Sms.Infrastructure.Attendance;
 using Sms.Infrastructure.Audit;
+using Sms.Infrastructure.Backup;
 using Sms.Infrastructure.Cafeteria;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Certificates;
@@ -91,6 +94,7 @@ using Sms.Infrastructure.Statements;
 using Sms.Infrastructure.Store;
 using Sms.Infrastructure.Students;
 using Sms.Infrastructure.Subjects;
+using Sms.Infrastructure.SysAdmin;
 using Sms.Infrastructure.Teachers;
 using Sms.Infrastructure.Timetable;
 using Sms.Infrastructure.Transport;
@@ -506,6 +510,30 @@ namespace Sms.Web
             // notifications, WF-03 hand-off for "Not Re-registering",
             // FeeStructureLine lock at activation, waiting-list seat release.
             services.AddScoped<IRolloverAdmin, RolloverAdmin>();
+
+            // S7/E-704 — Audit admin (M34) + Backup (M35) + SysAdmin (M36),
+            // closing S7. Audit admin wraps IntegrityCheckpointService with
+            // persisted verification runs and an Auditor disposition queue
+            // over anomaly hits; a failed unresolved run freezes audit-data
+            // purge (BR-AUM-001). Backup admin models the policy/run/
+            // verification/snapshot/restore-case rules doc §3 defines —
+            // actual backup artifact creation is infra tooling, out of
+            // scope; TakeSnapshotAsync is the real cross-module hook
+            // (BR-BAK-004) that SysAdminService calls before every import
+            // commit and purge execution. SysAdminService (not "SysAdmin" —
+            // avoids colliding with the Sms.Domain.SysAdmin/
+            // Sms.Application.SysAdmin namespace leaf segment, same
+            // discipline as E-201's AdmissionApplication) hosts a single
+            // generic PurgeExecution reused for both BR-SYS-005 and
+            // BR-AUM-005 rather than a parallel purge entity per data
+            // class. License tiers (O5) land here: Essentials/Professional/
+            // Enterprise aligned to this build's own S0-S3/S4-S6/S7 stage
+            // boundaries (Sms.Domain.SysAdmin.LicenseTier) — enforcement
+            // middleware per module is a deferred wiring point, same
+            // "engine built, not wired" precedent as PromotionPathValidator.
+            services.AddScoped<IAuditAdmin, AuditAdmin>();
+            services.AddScoped<IBackupAdmin, BackupAdmin>();
+            services.AddScoped<ISysAdmin, SysAdminService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

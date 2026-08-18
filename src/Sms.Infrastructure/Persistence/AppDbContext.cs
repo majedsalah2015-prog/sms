@@ -5,6 +5,7 @@ using Sms.Domain.Activities;
 using Sms.Domain.Admissions;
 using Sms.Domain.Attachments;
 using Sms.Domain.Attendance;
+using Sms.Domain.Audit;
 using Sms.Domain.Cafeteria;
 using Sms.Domain.Calendar;
 using Sms.Domain.Certificates;
@@ -29,12 +30,14 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
+using Sms.Domain.Backup;
 using Sms.Domain.Reports;
 using Sms.Domain.Rollover;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
 using Sms.Domain.Store;
+using Sms.Domain.SysAdmin;
 using Sms.Domain.Students;
 using Sms.Domain.Subjects;
 using Sms.Domain.Teachers;
@@ -517,6 +520,37 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<RolloverBatch> RolloverBatches => Set<RolloverBatch>();
 
         public DbSet<RolloverStudentState> RolloverStudentStates => Set<RolloverStudentState>();
+
+        // S7/E-704 — Audit admin (doc/Modules/34, BR-AUM-001/002)
+        public DbSet<AnomalyRule> AnomalyRules => Set<AnomalyRule>();
+
+        public DbSet<AnomalyHit> AnomalyHits => Set<AnomalyHit>();
+
+        public DbSet<IntegrityVerificationRun> IntegrityVerificationRuns => Set<IntegrityVerificationRun>();
+
+        // S7/E-704 — Backup (doc/Modules/35, BR-BAK-001..006)
+        public DbSet<BackupPolicy> BackupPolicies => Set<BackupPolicy>();
+
+        public DbSet<BackupRun> BackupRuns => Set<BackupRun>();
+
+        public DbSet<BackupVerificationRun> BackupVerificationRuns => Set<BackupVerificationRun>();
+
+        public DbSet<SnapshotEvent> SnapshotEvents => Set<SnapshotEvent>();
+
+        public DbSet<RestoreCase> RestoreCases => Set<RestoreCase>();
+
+        // S7/E-704 — SysAdmin (doc/Modules/36, BR-SYS-003/005/006/007/008)
+        public DbSet<LicenseState> LicenseStates => Set<LicenseState>();
+
+        public DbSet<MaintenanceWindow> MaintenanceWindows => Set<MaintenanceWindow>();
+
+        public DbSet<ImportBatch> ImportBatches => Set<ImportBatch>();
+
+        public DbSet<PurgeExecution> PurgeExecutions => Set<PurgeExecution>();
+
+        public DbSet<LegalHold> LegalHolds => Set<LegalHold>();
+
+        public DbSet<DiagnosticsBundle> DiagnosticsBundles => Set<DiagnosticsBundle>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
