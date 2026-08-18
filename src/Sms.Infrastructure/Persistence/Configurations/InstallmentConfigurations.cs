@@ -55,6 +55,11 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<Pdc>().WithMany().HasForeignKey(x => x.CoveringPdcId);
             builder.HasMany(x => x.ChargeLines).WithOne().HasForeignKey(x => x.InstallmentId);
             builder.HasIndex(x => new { x.PlanAssignmentId, x.DueDate });
+            // DB/04 §1 (S8/E-802): dunning + collection calendar. The doc's "(PayerId, DueDate, Status) / WHERE unpaid" can't be
+            // written literally — Installment has no PayerId (it's on PlanAssignment) and no stored status (BR-INS-007 derives it) —
+            // so the closest honest form is school + due date over the rows that can still be owed.
+            builder.HasIndex(x => new { x.SchoolId, x.DueDate }, "IX_Installment_School_DueDate_Open")
+                .HasFilter("[IsSuperseded] = 0 AND [IsWrittenOff] = 0");
         }
     }
 

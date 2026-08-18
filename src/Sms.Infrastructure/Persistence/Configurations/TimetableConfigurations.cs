@@ -53,6 +53,10 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<Room>().WithMany().HasForeignKey(x => x.OverrideRoomId);
             builder.Property(x => x.ChangeReason).HasMaxLength(500);
             builder.HasIndex(x => new { x.PlacementId, x.Date }).IsUnique();
+            // DB/04 §1 (S8/E-802): daily ops / cover console. Doc names the columns SessionDate + ActualTeacherId/ActualRoomId; here the
+            // date is `Date`, the room override is `OverrideRoomId` and the actual teacher lives on Substitution — the INCLUDE list is a
+            // SQL Server-only covering detail added at implementation with the workload (doc rule 4), not modeled here.
+            builder.HasIndex(x => new { x.SchoolId, x.Date }, "IX_Session_School_Date");
         }
     }
 

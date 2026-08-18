@@ -36,6 +36,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<DocumentType>().WithMany().HasForeignKey(x => x.DocumentTypeId);
             builder.HasMany(x => x.Versions).WithOne().HasForeignKey(v => v.AttachmentId);
             builder.HasIndex(x => new { x.OwningEntityType, x.OwningEntityId, x.DocumentTypeId });
+            // DB/04 §1 (S8/E-802): expiry console — only expiry-tracked documents carry a date (doc's "WHERE tracked").
+            builder.HasIndex(x => new { x.DocumentTypeId, x.ExpiryDateUtc }, "IX_Attachment_DocumentType_Expiry")
+                .HasFilter("[ExpiryDateUtc] IS NOT NULL");
         }
     }
 

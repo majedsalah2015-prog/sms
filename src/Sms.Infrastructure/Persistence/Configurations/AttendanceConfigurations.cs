@@ -15,6 +15,8 @@ namespace Sms.Infrastructure.Persistence.Configurations
 
             // BR-ATD-003: one record per enrollment per day.
             builder.HasIndex(x => new { x.EnrollmentId, x.Date }, "IX_AttendanceDay_Enrollment_Date").IsUnique();
+            // DB/04 §1 (S8/E-802): daily absence report (RPT-ATD-001) + snap_DailyAttendanceSummary refresh.
+            builder.HasIndex(x => new { x.SchoolId, x.Date, x.Status }, "IX_AttendanceDay_School_Date_Status");
         }
     }
 

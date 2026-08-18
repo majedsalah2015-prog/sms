@@ -37,6 +37,7 @@ using Sms.Application.Numbering;
 using Sms.Application.Parents;
 using Sms.Application.Payments;
 using Sms.Application.Portal;
+using Sms.Application.ReadModels;
 using Sms.Application.Reports;
 using Sms.Application.Rollover;
 using Sms.Application.Schools;
@@ -85,6 +86,7 @@ using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Portal;
+using Sms.Infrastructure.ReadModels;
 using Sms.Infrastructure.Reports;
 using Sms.Infrastructure.Rollover;
 using Sms.Infrastructure.Schools;
@@ -511,6 +513,20 @@ namespace Sms.Web
             // FeeStructureLine lock at activation, waiting-list seat release.
             services.AddScoped<IRolloverAdmin, RolloverAdmin>();
 
+            // S8/E-802 — DB/04 §4 read models: the "views" (IReadModelQuery,
+            // each reusing the owning module's calculator — one computation
+            // source) and the snapshot tables (rpt schema, AsOfUtc on every row)
+            // refreshed by IJobHandlers on the ops.JobDefinition schedule. Heavy
+            // reports/dashboard widgets read these, never the hot tables (NF-P5).
+            // DB/04 §1 index prescriptions applied in the EF configurations;
+            // §6 P95 gates live in Sms.Infrastructure.Tests/PerfGateTests
+            // (indicative on Sqlite — re-measured on SQL Server at pilot, P4).
+            services.AddScoped<IReadModelQuery, ReadModelQuery>();
+            services.AddScoped<ISnapshotRefreshService, SnapshotRefreshService>();
+            services.AddScoped<IJobHandler, AgedReceivablesSnapshotJobHandler>();
+            services.AddScoped<IJobHandler, DailyAttendanceSummarySnapshotJobHandler>();
+            services.AddScoped<IJobHandler, CollectionCalendarSnapshotJobHandler>();
+
             // S7/E-704 — Audit admin (M34) + Backup (M35) + SysAdmin (M36),
             // closing S7. Audit admin wraps IntegrityCheckpointService with
             // persisted verification runs and an Auditor disposition queue
@@ -591,6 +607,20 @@ namespace Sms.Web
                 "NotificationDispatch",
                 runner => runner.RunAsync("NotificationDispatch", JobTriggerType.Scheduled, default),
                 "*/5 * * * *"); // every 5 minutes
+
+            // S8/E-802 — DB/04 §4 snapshot refreshes ("Snapshots refresh via ops.JobDefinition schedules").
+            RecurringJob.AddOrUpdate<IJobRunner>(
+                SnapshotJobCodes.AgedReceivables,
+                runner => runner.RunAsync(SnapshotJobCodes.AgedReceivables, JobTriggerType.Scheduled, default),
+                "30 2 * * *"); // daily 02:30 UTC — D refresh class (RPT-FEE-004, finance donut)
+            RecurringJob.AddOrUpdate<IJobRunner>(
+                SnapshotJobCodes.DailyAttendanceSummary,
+                runner => runner.RunAsync(SnapshotJobCodes.DailyAttendanceSummary, JobTriggerType.Scheduled, default),
+                "*/15 4-12 * * *"); // C15 refresh class during the KSA school day (UTC)
+            RecurringJob.AddOrUpdate<IJobRunner>(
+                SnapshotJobCodes.CollectionCalendar,
+                runner => runner.RunAsync(SnapshotJobCodes.CollectionCalendar, JobTriggerType.Scheduled, default),
+                "45 2 * * *"); // daily 02:45 UTC — RPT-INS-001 cashflow forecast
         }
     }
 }

@@ -27,6 +27,8 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.ToTable("Receipt", "ppl");
             builder.Property(x => x.ReceiptNo).HasMaxLength(30).IsRequired();
             builder.HasIndex(x => new { x.SchoolId, x.ReceiptNo }).IsUnique();
+            // DB/04 §1 (S8/E-802): payer history / day close (doc's PostedAtUtc is IssuedAtUtc here). TillSessionId is FK-indexed by convention.
+            builder.HasIndex(x => new { x.PayerId, x.IssuedAtUtc }, "IX_Receipt_Payer_IssuedAt");
             builder.Property(x => x.MethodRefNo).HasMaxLength(60);
             builder.Property(x => x.Amount).HasColumnType("decimal(18,4)");
             builder.HasOne<Payer>().WithMany().HasForeignKey(x => x.PayerId);

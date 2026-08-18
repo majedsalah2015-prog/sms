@@ -48,6 +48,8 @@ namespace Sms.Infrastructure.Persistence.Configurations
                 .HasDatabaseName("IX_Enrollment_Student_Year_Active")
                 .IsUnique()
                 .HasFilter("[Status] = 1");
+            // DB/04 §1 (S8/E-802): tenant-first roster path — rosters, seat utilization, rollover state seeding.
+            builder.HasIndex(x => new { x.SchoolId, x.AcademicYearId, x.GradeYearProfileId }, "IX_Enrollment_School_Year_Profile");
         }
     }
 

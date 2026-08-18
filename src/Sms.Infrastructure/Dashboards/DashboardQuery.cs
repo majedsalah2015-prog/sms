@@ -49,9 +49,12 @@ namespace Sms.Infrastructure.Dashboards
             // (same fix as E-303/E-304's money aggregates).
             var totalCharges = (await _db.Charges.Where(c => c.Status == ChargeStatus.Posted).Select(c => c.GrossAmount).ToListAsync(cancellationToken)).Sum();
             var totalCreditNotes = (await _db.CreditNotes.Select(n => n.Amount).ToListAsync(cancellationToken)).Sum();
+            // S8/E-802 fix: discount documents (E-502) are a distinct document type every position reader must subtract —
+            // this widget over-stated receivables by the discounted total until now (see build conventions).
+            var totalDiscounts = (await _db.DiscountDocuments.Select(d => d.Amount).ToListAsync(cancellationToken)).Sum();
             var totalAllocated = (await _db.PaymentAllocations.Select(a => a.AllocatedAmount).ToListAsync(cancellationToken)).Sum();
 
-            return StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalAllocated);
+            return StudentFinancialPositionCalculator.Calculate(totalCharges, totalCreditNotes, totalDiscounts, totalAllocated);
         }
 
         public async Task<int> GetPendingCertificateRequestsCountAsync(CancellationToken cancellationToken = default)

@@ -72,6 +72,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.Score).HasColumnType("decimal(7,2)");
             builder.HasOne<Marksheet>().WithMany().HasForeignKey(x => x.MarksheetId);
             builder.HasIndex(x => new { x.MarksheetId, x.BlueprintComponentId, x.EnrollmentId }, "IX_MarkEntry_Marksheet_Component_Enrollment").IsUnique();
+            // DB/04 §1 (S8/E-802): student results path. (The doc's UQ (MarksheetId, EnrollmentId) predates the per-component row
+            // shape — the 3-column unique above is the correct form of that singleton.)
+            builder.HasIndex(x => x.EnrollmentId, "IX_MarkEntry_Enrollment");
         }
     }
 

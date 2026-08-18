@@ -57,6 +57,10 @@ namespace Sms.Infrastructure.Persistence.Configurations
                 .IsUnique()
                 .HasFilter("[EffectiveToUtc] IS NULL");
             builder.HasIndex(x => x.SectionId);
+            // DB/04 §1 (S8/E-802): membership-at-date resolution both ways (roster of a section as of a date; a student's
+            // section on a date — AttendanceAdmin.CaptureAsync's hot lookup).
+            builder.HasIndex(x => new { x.SectionId, x.EffectiveToUtc }, "IX_SectionMembership_Section_EffectiveTo");
+            builder.HasIndex(x => new { x.EnrollmentId, x.EffectiveFromUtc }, "IX_SectionMembership_Enrollment_EffectiveFrom");
         }
     }
 }

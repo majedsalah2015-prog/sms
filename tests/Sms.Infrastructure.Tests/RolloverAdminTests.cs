@@ -490,7 +490,7 @@ namespace Sms.Infrastructure.Tests
         /// cohorts (rehearsal) the pattern repeats mod 4. Student[0] of the whole set owes 1150 in the source year; student[1]
         /// has a fully credited charge (settled).
         /// </summary>
-        public static RolloverFixture Seed(AppDbContext db, DateTime now, int studentsPerGrade, bool chargeEveryStudent = false)
+        public static RolloverFixture Seed(AppDbContext db, DateTime now, int studentsPerGrade, bool chargeEveryStudent = false, int sourceSectionSize = int.MaxValue)
         {
             var fx = new RolloverFixture();
             foreach (var (code, entity, format) in new[] { ("INV", "Charge", "INV-{SEQ:6}"), ("CRN", "CreditNote", "CRN-{SEQ:6}") })
@@ -529,12 +529,18 @@ namespace Sms.Infrastructure.Tests
                 db.GradeYearProfiles.Add(profile);
                 db.SaveChanges();
                 fx.SourceProfileIds[code] = profile.Id;
-                var section = new Section { AcademicYearId = source.Id, GradeYearProfileId = profile.Id, NameAr = code + "-أ", NameEn = code + "-A", Capacity = studentsPerGrade + 5, GenderPolicy = GenderPolicy.Mixed };
-                db.Sections.Add(section);
-                db.SaveChanges();
-
+                Section section = null!;
                 for (var i = 0; i < studentsPerGrade; i++)
                 {
+                    if (i % sourceSectionSize == 0)
+                    {
+                        // one section per `sourceSectionSize` students (default: one big section per grade, as the E-801 tests expect)
+                        var ordinal = i / sourceSectionSize;
+                        section = new Section { AcademicYearId = source.Id, GradeYearProfileId = profile.Id, NameAr = code + "-" + ordinal, NameEn = code + "-" + (char)('A' + ordinal % 26) + (ordinal >= 26 ? ordinal.ToString() : string.Empty), Capacity = Math.Min(studentsPerGrade, sourceSectionSize) + 5, GenderPolicy = GenderPolicy.Mixed };
+                        db.Sections.Add(section);
+                        db.SaveChanges();
+                    }
+
                     var n = fx.StudentIds.Count + 1;
                     var student = new Student
                     {

@@ -60,6 +60,8 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<Wallet>().WithMany().HasForeignKey(x => x.WalletId);
             builder.HasOne<Receipt>().WithMany().HasForeignKey(x => x.ReceiptId);
             builder.HasOne<RefundVoucher>().WithMany().HasForeignKey(x => x.RefundVoucherId);
+            // DB/04 §1 (S8/E-802): balance derivation walks a wallet's ledger in insertion order (BR-CAF-007, ledger-derived balance).
+            builder.HasIndex(x => new { x.WalletId, x.Id }, "IX_WalletLedger_Wallet_Id");
         }
     }
 

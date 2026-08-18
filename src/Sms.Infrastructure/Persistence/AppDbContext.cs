@@ -31,6 +31,7 @@ using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
 using Sms.Domain.Backup;
+using Sms.Domain.ReadModels;
 using Sms.Domain.Reports;
 using Sms.Domain.Rollover;
 using Sms.Domain.Schools;
@@ -520,6 +521,13 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<RolloverBatch> RolloverBatches => Set<RolloverBatch>();
 
         public DbSet<RolloverStudentState> RolloverStudentStates => Set<RolloverStudentState>();
+
+        // S8/E-802 — DB/04 §4 snapshot read models (rpt schema)
+        public DbSet<AgedReceivablesSnapshot> AgedReceivablesSnapshots => Set<AgedReceivablesSnapshot>();
+
+        public DbSet<DailyAttendanceSummarySnapshot> DailyAttendanceSummarySnapshots => Set<DailyAttendanceSummarySnapshot>();
+
+        public DbSet<CollectionCalendarSnapshot> CollectionCalendarSnapshots => Set<CollectionCalendarSnapshot>();
 
         // S7/E-704 — Audit admin (doc/Modules/34, BR-AUM-001/002)
         public DbSet<AnomalyRule> AnomalyRules => Set<AnomalyRule>();

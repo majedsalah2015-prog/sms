@@ -67,6 +67,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.RecipientUserId);
             builder.HasIndex(x => new { x.RecipientUserId, x.Status });
             builder.HasIndex(x => x.Status);
+            // DB/04 §1 (S8/E-802): ops queue — pending/failed deliveries in queue order (doc's QueuedAtUtc is CreatedAtUtc here; Queued=1, Failed=4).
+            builder.HasIndex(x => new { x.SchoolId, x.Status, x.CreatedAtUtc }, "IX_Delivery_School_Status_Queued")
+                .HasFilter("[Status] IN (1, 4)");
         }
     }
 
