@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -60,6 +61,26 @@ namespace Sms.Infrastructure.Grades
 
             await _db.SaveChangesAsync(cancellationToken);
             return grade;
+        }
+
+        public async Task SetPromotionPathAsync(int gradeLevelId, int? promotionTargetGradeLevelId, bool isGraduating, CancellationToken cancellationToken = default)
+        {
+            var grade = await _db.GradeLevels.SingleAsync(g => g.Id == gradeLevelId, cancellationToken);
+            if (promotionTargetGradeLevelId == gradeLevelId)
+            {
+                throw new PromotionPathCycleException();
+            }
+
+            var all = await _db.GradeLevels.AsNoTracking().ToListAsync(cancellationToken);
+            var snapshot = all.Select(g => new GradeSnapshot(g.Id, g.Id == gradeLevelId ? promotionTargetGradeLevelId : g.PromotionTargetGradeLevelId, g.Id == gradeLevelId ? isGraduating : g.IsGraduating)).ToList();
+            if (PromotionPathValidator.HasCycle(snapshot))
+            {
+                throw new PromotionPathCycleException();
+            }
+
+            grade.PromotionTargetGradeLevelId = promotionTargetGradeLevelId;
+            grade.IsGraduating = isGraduating;
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         public async Task<GradeYearProfile> DefineGradeYearProfileAsync(

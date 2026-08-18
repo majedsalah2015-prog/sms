@@ -1,0 +1,56 @@
+@using System.Globalization
+@using Sms.Domain.Grades
+@model SectionListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Sections", "الشعب");
+    ViewData["Breadcrumb"] = T("Sections / List", "الشعب / القائمة");
+    string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
+    var yid = Model.Year?.Id;
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade and year: capacity meters, gender, homeroom, room, student counts (BR-SCN-001/002/004).", "لكل صف وعام: مقاييس السعة، الجنس، رائد الفصل، القاعة، عدد الطلاب (BR-SCN-001/002/004).")</p></div>
+    <form method="get" class="d-flex gap-2 align-items-center"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></form></div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <thead><tr><th>@T("Grade", "الصف")</th><th>@T("Section", "الشعبة")</th><th>@T("Gender", "الجنس")</th><th>@T("Homeroom", "رائد الفصل")</th><th>@T("Room", "القاعة")</th><th style="min-width:10rem">@T("Students / capacity", "الطلاب / السعة")</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var pct = r.Section.Capacity == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * r.Members / r.Section.Capacity));
+                    <tr class="@(r.Section.Status == Sms.Domain.Sections.SectionStatus.Closed ? "text-muted" : "")">
+                        <td>@r.Grade.Code @(isRtl ? r.Grade.Name.NameAr : r.Grade.Name.NameEn)</td>
+                        <td><a asp-action="Details" asp-route-id="@r.Section.Id" class="fw-semibold">@(isRtl ? r.Section.NameAr : r.Section.NameEn)</a>@if (r.Section.Status == Sms.Domain.Sections.SectionStatus.Closed) { <span class="badge text-bg-secondary ms-1">@T("closed", "مغلقة")</span> }</td>
+                        <td>@Gender(r.Section.GenderPolicy)</td>
+                        <td>@(r.HomeroomName ?? "—")</td>
+                        <td>@(r.RoomName ?? "—")</td>
+                        <td><div class="small">@r.Members / @r.Section.Capacity</div><div class="sms-progress"><span style="width:@(pct)%;@(pct >= 100 ? "background:#dc2626" : pct >= 90 ? "background:#f59e0b" : "")"></span></div></td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Section.Id">@T("Open", "فتح")</a></td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No sections for this year yet.", "لا شعب لهذا العام بعد.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="sms-card p-3">
+            <h2 class="h6">@T("New section", "شعبة جديدة")</h2>
+            @if (Model.Profiles.Count == 0) { <div class="small text-muted">@T("Define a grade-year profile for this year first (Grades → Profile).", "عرّف ملف الصف السنوي لهذا العام أولاً (الصفوف → الملف).")</div> }
+            else
+            {
+                <form method="post" asp-action="Define" asp-route-year="@yid">
+                    <div class="mb-2"><select asp-for="GradeYearProfileId" class="form-select form-select-sm"><option value="">@T("— grade —", "— الصف —")</option>@foreach (var p in Model.Profiles) { <option value="@p.ProfileId">@(isRtl ? p.GradeAr : p.GradeEn) (@p.TargetSections × @p.TargetSize)</option> }</select></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" placeholder="أول-أ" /></div><div class="col-6"><input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" placeholder="1-A" /></div></div>
+                    <div class="row g-2 mb-2"><div class="col-5"><label class="form-label small">@T("Capacity", "السعة")</label><input asp-for="Capacity" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-7"><label class="form-label small">@T("Gender", "الجنس")</label><select asp-for="GenderPolicy" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create section", "إنشاء شعبة")</button>
+                    <div class="form-text">@T("Sections × size can't exceed the grade-year plan (BR-SCN-001); gender may only narrow the grade's policy (BR-SCN-002).", "الشعب × الحجم لا تتجاوز خطة الصف السنوية (BR-SCN-001)؛ الجنس يضيّق سياسة الصف فقط (BR-SCN-002).")</div>
+                </form>
+            }
+        </div>
+    </div>
+</div>

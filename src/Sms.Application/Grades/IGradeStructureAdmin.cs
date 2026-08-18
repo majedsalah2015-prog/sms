@@ -16,6 +16,9 @@ namespace Sms.Application.Grades
             int stageId, string code, string nameAr, string nameEn, int sequenceOrder,
             int? promotionTargetGradeLevelId, bool isGraduating, CancellationToken cancellationToken = default);
 
+        /// <summary>Ladder builder: sets/clears a grade's promotion target and graduating flag; throws <see cref="Common.Exceptions.PromotionPathCycleException"/> if the path would loop (doc/Modules/05 §9 acyclic).</summary>
+        Task SetPromotionPathAsync(int gradeLevelId, int? promotionTargetGradeLevelId, bool isGraduating, CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.InvalidGenderPolicyNarrowingException"/> when the requested policy widens the grade's stage default.</summary>
         Task<GradeYearProfile> DefineGradeYearProfileAsync(
             int gradeLevelId, int academicYearId, GenderPolicy genderPolicy, int targetSections, int targetSectionSize,

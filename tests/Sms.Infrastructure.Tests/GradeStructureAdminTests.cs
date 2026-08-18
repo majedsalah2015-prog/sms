@@ -168,5 +168,25 @@ namespace Sms.Infrastructure.Tests
             db.GradeLevels.Remove(tracked);
             await Assert.ThrowsAsync<HardDeleteForbiddenException>(() => db.SaveChangesAsync());
         }
+
+        [Fact]
+        [BusinessRule("BR-GRD-002")]
+        public async Task Promotion_path_can_be_set_later_but_never_form_a_cycle()
+        {
+            using var db = CreateContext();
+            var admin = new GradeStructureAdmin(db);
+            var stage = await admin.DefineStageAsync("الابتدائية", "Elementary", 1, GenderPolicy.Mixed);
+            var g1 = await admin.DefineGradeLevelAsync(stage.Id, "G1", "أول", "Grade 1", 1, null, false);
+            var g2 = await admin.DefineGradeLevelAsync(stage.Id, "G2", "ثاني", "Grade 2", 2, null, false);
+
+            await admin.SetPromotionPathAsync(g1.Id, g2.Id, false);
+            Assert.Equal(g2.Id, db.GradeLevels.Single(g => g.Id == g1.Id).PromotionTargetGradeLevelId);
+
+            await Assert.ThrowsAsync<PromotionPathCycleException>(() => admin.SetPromotionPathAsync(g2.Id, g1.Id, false));
+            await Assert.ThrowsAsync<PromotionPathCycleException>(() => admin.SetPromotionPathAsync(g2.Id, g2.Id, false));
+
+            await admin.SetPromotionPathAsync(g2.Id, null, true);
+            Assert.True(db.GradeLevels.Single(g => g.Id == g2.Id).IsGraduating);
+        }
     }
 }

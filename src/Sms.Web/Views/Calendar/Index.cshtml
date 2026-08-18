@@ -1,0 +1,125 @@
+@using System.Globalization
+@using Sms.Domain.Calendar
+@model CalendarBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Academic calendar", "التقويم الدراسي");
+    ViewData["Breadcrumb"] = T("Academic Calendar / ", "التقويم الدراسي / ") + (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn);
+    var ci = isRtl ? CultureInfo.GetCultureInfo("ar-SA") : CultureInfo.InvariantCulture;
+    string DayName(DayOfWeek d) => ci.DateTimeFormat.GetAbbreviatedDayName(d);
+    string MonthName(int y, int m) => new DateTime(y, m, 1).ToString("MMMM yyyy", ci);
+    string Cls(DayType t) => t switch { DayType.Working => "is-working", DayType.Weekend => "is-weekend", DayType.Holiday => "is-holiday", DayType.Partial => "is-partial", DayType.ExamPeriodWorking => "is-exam", _ => "" };
+    string TypeName(DayType t) => t switch { DayType.Working => T("Working", "عمل"), DayType.Weekend => T("Weekend", "عطلة أسبوعية"), DayType.Holiday => T("Holiday", "إجازة"), DayType.Partial => T("Partial day", "يوم جزئي"), DayType.ExamPeriodWorking => T("Exam period", "فترة اختبارات"), _ => t.ToString() };
+    string CatName(CalendarEventCategory c) => c switch { CalendarEventCategory.National => T("National", "وطني"), CalendarEventCategory.Religious => T("Religious", "ديني"), CalendarEventCategory.SchoolEvent => T("School event", "حدث مدرسي"), CalendarEventCategory.ProfessionalDay => T("Professional day", "يوم مهني"), _ => c.ToString() };
+}
+
+<div class="sms-page-head">
+    <div><h1 class="sms-page-title">@ViewData["Title"] — @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) <span class="text-muted fs-6">@Model.Year.HijriLabel</span></h1>
+        <p class="text-muted mb-0">@T("Weekends come from the working-week setting; painted days override them (BR-CAL-001/002). Instructional days:", "عطلات نهاية الأسبوع من إعداد أسبوع العمل؛ الأيام المعيَّنة تتجاوزها (BR-CAL-001/002). الأيام الدراسية:") <strong>@Model.InstructionalDays</strong> · @Model.OverrideCount @T("overrides", "تجاوزات")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select>
+            <input type="hidden" name="hijri" value="@(!Model.HijriOverlay ? "true" : "false")" />
+            <button class="btn btn-sm @(Model.HijriOverlay ? "btn-primary" : "btn-outline-secondary")" type="submit" title="@T("Toggle Hijri overlay", "تبديل عرض الهجري")"><i class="bi bi-moon-stars"></i> @T("Hijri", "هجري")</button>
+        </form>
+        <form method="post" asp-action="Publish"><input type="hidden" name="academicYearId" value="@Model.Year.Id" />
+            <button class="btn btn-sm btn-success" type="submit" @(Model.HasUnpublishedEdits ? "" : "disabled") title="@T("BR-CAL-007: snapshots a new published version", "BR-CAL-007: يحفظ إصداراً منشوراً جديداً")"><i class="bi bi-megaphone me-1"></i>@T("Publish", "نشر") @(Model.Versions.Count > 0 ? $"v{Model.Versions[0].VersionNumber + 1}" : "v1")</button></form>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-9">
+        <div class="sms-card p-3 mb-3">
+            <div class="d-flex flex-wrap gap-3 small mb-2 sms-legend">
+                <span><i class="sms-cal-swatch is-working"></i>@TypeName(DayType.Working)</span><span><i class="sms-cal-swatch is-weekend"></i>@TypeName(DayType.Weekend)</span><span><i class="sms-cal-swatch is-holiday"></i>@TypeName(DayType.Holiday)</span><span><i class="sms-cal-swatch is-partial"></i>@TypeName(DayType.Partial)</span><span><i class="sms-cal-swatch is-exam"></i>@TypeName(DayType.ExamPeriodWorking)</span><span><i class="sms-cal-swatch is-event"></i>@T("Event", "حدث")</span><span class="text-muted">◔ @T("provisional (BR-CAL-005)", "مبدئي (BR-CAL-005)")</span>
+            </div>
+            <div class="sms-cal-months">
+                @foreach (var m in Model.Months)
+                {
+                    <div class="sms-cal-month">
+                        <div class="sms-cal-month__title">@MonthName(m.Year, m.Month)</div>
+                        <table class="sms-cal-grid">
+                            <thead><tr>@foreach (var d in Model.WeekOrder) { <th>@DayName(d)</th> }</tr></thead>
+                            <tbody>
+                            @foreach (var w in m.Weeks)
+                            {
+                                <tr>@foreach (var c in w)
+                                {
+                                    if (c == null) { <td></td>; continue; }
+                                    var title = $"{c.Date:yyyy-MM-dd} · {TypeName(c.Type)}" + (c.Events.Count > 0 ? " · " + string.Join(", ", c.Events.Select(e => isRtl ? e.NameAr : e.NameEn)) : "");
+                                    <td class="sms-cal-day @Cls(c.Type) @(c.InYear ? "" : "is-out") @(c.Events.Count > 0 ? "has-event" : "") @(c.IsOverride ? "is-override" : "")" title="@title" data-date="@c.Date.ToString("yyyy-MM-dd")">
+                                        <span class="sms-cal-day__num">@c.Date.Day</span>
+                                        @if (c.HijriDay != null) { <span class="sms-cal-day__hijri">@c.HijriDay</span> }
+                                        @if (c.IsProvisional) { <span class="sms-cal-day__prov">◔</span> }
+                                    </td>
+                                }</tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="sms-card">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Events", "الأحداث")</h2><span class="small text-muted">@Model.Events.Count</span></div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+                <thead><tr><th>@T("Event", "الحدث")</th><th>@T("Category", "الفئة")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th><th>@T("Audience", "الجمهور")</th><th>@T("Portal", "البوابة")</th></tr></thead>
+                <tbody>@foreach (var e in Model.Events) { <tr><td>@(isRtl ? e.NameAr : e.NameEn)</td><td>@CatName(e.Category)</td><td>@e.StartDate.ToString("yyyy-MM-dd")</td><td>@e.EndDate.ToString("yyyy-MM-dd")</td><td>@e.Audience</td><td>@(e.IsPortalVisible ? "✓" : "—")</td></tr> }
+                @if (Model.Events.Count == 0) { <tr><td colspan="6" class="text-muted text-center py-3">@T("No events yet.", "لا أحداث بعد.")</td></tr> }</tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6">@T("Paint days", "تعيين أيام")</h2>
+            <form method="post" asp-action="Day">
+                <input type="hidden" name="AcademicYearId" value="@Model.Year.Id" />
+                <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small">@T("From", "من")</label><input name="Date" id="paint-from" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div>
+                    <div class="col-6"><label class="form-label small">@T("To (optional)", "إلى (اختياري)")</label><input name="EndDate" id="paint-to" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div></div>
+                <div class="mb-2"><label class="form-label small">@T("Day type", "نوع اليوم")</label><select name="DayType" class="form-select form-select-sm">@foreach (DayType t in Enum.GetValues(typeof(DayType))) { <option value="@t" selected="@(t == DayType.Holiday)">@TypeName(t)</option> }</select></div>
+                <div class="mb-2"><label class="form-label small">@T("Audience", "الجمهور")</label><select name="Audience" class="form-select form-select-sm"><option value="All">@T("All", "الجميع")</option><option value="StudentsOnly">@T("Students only", "الطلاب فقط")</option><option value="StaffOnly">@T("Staff only", "الموظفون فقط")</option></select></div>
+                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="IsProvisional" value="true" id="prov" /><label class="form-check-label small" for="prov">@T("Provisional (Hijri, pending confirmation)", "مبدئي (هجري، بانتظار التأكيد)")</label></div>
+                <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-brush me-1"></i>@T("Paint", "تعيين")</button>
+                <div class="form-text">@T("Past dates are locked (BR-CAL-003). Click a day in the grid to pick it.", "التواريخ الماضية مقفلة (BR-CAL-003). انقر يوماً في الشبكة لاختياره.")</div>
+            </form>
+        </div>
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6">@T("Add event", "إضافة حدث")</h2>
+            <form method="post" asp-action="Event">
+                <input type="hidden" name="AcademicYearId" value="@Model.Year.Id" />
+                <div class="mb-2"><input name="NameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" /></div>
+                <div class="mb-2"><input name="NameEn" class="form-control form-control-sm" dir="ltr" placeholder="English name" /></div>
+                <div class="mb-2"><select name="Category" class="form-select form-select-sm">@foreach (CalendarEventCategory c in Enum.GetValues(typeof(CalendarEventCategory))) { <option value="@c">@CatName(c)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-6"><input name="StartDate" type="date" class="form-control form-control-sm" /></div><div class="col-6"><input name="EndDate" type="date" class="form-control form-control-sm" /></div></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="IsPortalVisible" value="true" id="pv" checked /><label class="form-check-label small" for="pv">@T("Visible on portal", "ظاهر في البوابة")</label></div>
+                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="MarkAsHoliday" value="true" id="mh" /><label class="form-check-label small" for="mh">@T("Also paint the range as holiday", "تعيين المدى كإجازة أيضاً")</label></div>
+                <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi bi-calendar-plus me-1"></i>@T("Add event", "إضافة حدث")</button>
+            </form>
+        </div>
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6">@T("Working-day counters", "عدّاد أيام العمل")</h2>
+            <table class="table table-sm mb-0 small"><tbody>@foreach (var c in Model.Counters) { <tr><td style="white-space:pre">@c.Label</td><td class="text-end fw-semibold">@c.WorkingDays</td><td class="text-muted text-end">/ @c.TotalDays</td></tr> }</tbody></table>
+            <div class="form-text">@T("BR-CAL-006 — instructional-day totals per semester/term.", "BR-CAL-006 — مجموع الأيام الدراسية لكل فصل/فترة.")</div>
+        </div>
+        <div class="sms-card p-3">
+            <h2 class="h6">@T("Published versions", "الإصدارات المنشورة")</h2>
+            @if (Model.Versions.Count == 0) { <div class="small text-muted">@T("Never published.", "لم يُنشر بعد.")</div> }
+            else { <ul class="list-unstyled small mb-0">@foreach (var v in Model.Versions) { <li>v@(v.VersionNumber) · @v.PublishedAtUtc.ToString("yyyy-MM-dd HH:mm") UTC</li> }</ul> }
+            @if (Model.HasUnpublishedEdits) { <div class="small text-warning-emphasis mt-2"><i class="bi bi-exclamation-circle me-1"></i>@T("Unpublished edits.", "توجد تعديلات غير منشورة.")</div> }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    document.querySelectorAll('.sms-cal-day[data-date]').forEach(function (td) {
+        td.addEventListener('click', function () {
+            var from = document.getElementById('paint-from'), to = document.getElementById('paint-to');
+            if (!from.value || (from.value && to.value)) { from.value = td.dataset.date; to.value = ''; }
+            else if (td.dataset.date >= from.value) { to.value = td.dataset.date; }
+            else { to.value = from.value; from.value = td.dataset.date; }
+        });
+    });
+</script>
+}

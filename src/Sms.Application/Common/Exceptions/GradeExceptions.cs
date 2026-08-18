@@ -21,3 +21,15 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 }
+
+namespace Sms.Application.Common.Exceptions
+{
+    /// <summary>doc/Modules/05 §9: the promotion path must be acyclic.</summary>
+    public class PromotionPathCycleException : System.InvalidOperationException
+    {
+        public PromotionPathCycleException()
+            : base("Promotion path would form a cycle (doc/Modules/05 §9).")
+        {
+        }
+    }
+}

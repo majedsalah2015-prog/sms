@@ -217,3 +217,24 @@ input[type=number].form-control { min-width: 4.5rem; }
 .sms-timeline__track--terms { height: 22px; }
 .sms-timeline__bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; color: #fff; font-size: .72rem; line-height: 22px; padding: 0 .4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sms-timeline__bar--term { background: rgba(var(--sms-primary-rgb), .18); color: var(--sms-nav-active-color); line-height: 16px; border: 1px solid rgba(var(--sms-primary-rgb), .35); }
+
+/* ---- Calendar board (doc/Modules/04 §8.1) ---- */
+.sms-cal-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.sms-cal-month__title { font-weight: 600; font-size: .9rem; margin-bottom: .35rem; }
+.sms-cal-grid { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
+.sms-cal-grid th { font-size: .65rem; color: var(--sms-muted); font-weight: 500; text-align: center; }
+.sms-cal-day { position: relative; height: 30px; text-align: center; font-size: .78rem; border-radius: 4px; cursor: pointer; background: var(--sms-body-bg); border: 1px solid transparent; }
+.sms-cal-day:hover { border-color: var(--sms-primary); }
+.sms-cal-day.is-working { background: #ffffff; border-color: var(--sms-sidebar-border); }
+.sms-cal-day.is-weekend { background: #f1f5f9; color: var(--sms-muted); }
+.sms-cal-day.is-holiday { background: #fee2e2; color: #991b1b; }
+.sms-cal-day.is-partial { background: #fef3c7; color: #92400e; }
+.sms-cal-day.is-exam { background: #ede9fe; color: #5b21b6; }
+.sms-cal-day.is-out { opacity: .35; pointer-events: none; }
+.sms-cal-day.has-event::after { content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--sms-primary); }
+.sms-cal-day.is-override { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.sms-cal-day__num { display: block; line-height: 1; padding-top: 4px; }
+.sms-cal-day__hijri { display: block; font-size: .58rem; color: var(--sms-muted); line-height: 1; }
+.sms-cal-day__prov { position: absolute; top: 1px; inset-inline-end: 3px; font-size: .6rem; }
+.sms-cal-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-inline-end: .35rem; vertical-align: -1px; border: 1px solid var(--sms-sidebar-border); }
+.sms-cal-swatch.is-working { background: #fff; } .sms-cal-swatch.is-weekend { background: #f1f5f9; } .sms-cal-swatch.is-holiday { background: #fee2e2; } .sms-cal-swatch.is-partial { background: #fef3c7; } .sms-cal-swatch.is-exam { background: #ede9fe; } .sms-cal-swatch.is-event { background: var(--sms-primary); }

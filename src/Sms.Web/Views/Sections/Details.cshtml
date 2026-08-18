@@ -1,0 +1,85 @@
+@using System.Globalization
+@using Sms.Domain.Sections
+@model SectionDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var name = isRtl ? Model.Section.NameAr : Model.Section.NameEn;
+    ViewData["Title"] = name;
+    ViewData["Breadcrumb"] = T("Sections / ", "الشعب / ") + name;
+    var closed = Model.Section.Status == SectionStatus.Closed;
+    var pct = Model.Section.Capacity == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Model.Members.Count / Model.Section.Capacity));
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small">@(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
+        <h1 class="sms-page-title">@name @if (closed) { <span class="badge text-bg-secondary fs-6">@T("Closed", "مغلقة")</span> }</h1>
+        <div class="d-flex align-items-center gap-3 small text-muted"><span>@Model.Members.Count / @Model.Section.Capacity @T("students", "طالب")</span><div class="sms-progress" style="width:10rem"><span style="width:@(pct)%"></span></div><span>@Model.Section.GenderPolicy</span>@if (Model.RoomName != null) { <span><i class="bi bi-door-open me-1"></i>@Model.RoomName</span> }</div></div>
+    <div class="d-flex gap-2"><a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("List", "القائمة")</a>
+        @if (!closed) { <form method="post" asp-action="Close" asp-route-id="@Model.Section.Id" onsubmit="return confirm('@T("Close this section? Only allowed with zero current students (BR-SCN-007).", "إغلاق الشعبة؟ مسموح فقط بدون طلاب حاليين (BR-SCN-007).")');"><button class="btn btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1"></i>@T("Close section", "إغلاق الشعبة")</button></form> }</div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex justify-content-between"><h2 class="h6 mb-0">@T("Roster", "الكشف")</h2><span class="small text-muted">@Model.Members.Count</span></div>
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <thead><tr><th>@T("Student no.", "رقم الطالب")</th><th>@T("Name", "الاسم")</th><th>@T("Since", "منذ")</th><th>@T("Transfer", "نقل")</th></tr></thead>
+                <tbody>
+                @foreach (var m in Model.Members)
+                {
+                    <tr><td><code>@m.StudentNo</code></td><td>@(isRtl ? m.NameAr : m.NameEn)</td><td>@m.Membership.EffectiveFromUtc.ToString("yyyy-MM-dd")</td>
+                        <td>@if (Model.SiblingSections.Count > 0) {
+                            <form method="post" asp-action="Transfer" asp-route-id="@Model.Section.Id" class="d-flex gap-1 align-items-center">
+                                <input type="hidden" name="enrollmentId" value="@m.EnrollmentId" />
+                                <select name="targetSectionId" class="form-select form-select-sm" style="width:8rem"><option value="">@T("to…", "إلى…")</option>@foreach (var s in Model.SiblingSections) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)</option> }</select>
+                                <select name="reasonCode" class="form-select form-select-sm" style="width:9rem"><option value="BALANCE">@T("Balancing", "موازنة")</option><option value="PARENT_REQUEST">@T("Parent request", "طلب ولي الأمر")</option><option value="DISCIPLINE">@T("Discipline", "سلوكي")</option><option value="ACADEMIC">@T("Academic", "أكاديمي")</option></select>
+                                <input name="effectiveDate" type="date" class="form-control form-control-sm" value="@today" style="width:9.5rem" />
+                                <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-arrow-left-right"></i></button>
+                            </form> } else { <span class="small text-muted">@T("no sibling section", "لا شعبة أخرى") </span> }</td></tr>
+                }
+                @if (Model.Members.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("No students assigned.", "لا طلاب مسندون.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+        @if (Model.PastMembers.Count > 0)
+        {
+            <div class="sms-card mb-3"><div class="p-3 border-bottom"><h2 class="h6 mb-0 text-muted">@T("Past memberships", "العضويات السابقة")</h2></div>
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 text-muted"><tbody>@foreach (var m in Model.PastMembers) { <tr><td><code>@m.StudentNo</code></td><td>@(isRtl ? m.NameAr : m.NameEn)</td><td>@m.Membership.EffectiveFromUtc.ToString("yyyy-MM-dd") → @m.Membership.EffectiveToUtc?.ToString("yyyy-MM-dd")</td><td>@m.Membership.TransferReasonCode</td></tr> }</tbody></table></div></div>
+        }
+        <div class="sms-card">
+            <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Homeroom history", "سجل رواد الفصل")</h2></div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><thead><tr><th>@T("Teacher", "المعلم")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th></tr></thead>
+                <tbody>@foreach (var h in Model.Homerooms) { <tr class="@(h.Assignment.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@h.TeacherName</td><td>@h.Assignment.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(h.Assignment.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? T("current", "حالي"))</td></tr> }
+                @if (Model.Homerooms.Count == 0) { <tr><td colspan="3" class="text-muted text-center py-3">@T("No homeroom teacher yet.", "لا رائد فصل بعد.")</td></tr> }</tbody></table></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        @if (!closed)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6">@T("Assign student", "إسناد طالب")</h2>
+                @if (Model.Unassigned.Count == 0) { <div class="small text-muted">@T("Every enrolled student of this grade already has a section.", "كل طلاب هذا الصف مسندون بالفعل.")</div> }
+                else
+                {
+                    <form method="post" asp-action="Assign" asp-route-id="@Model.Section.Id">
+                        <div class="mb-2"><select name="enrollmentId" class="form-select form-select-sm">@foreach (var u in Model.Unassigned) { <option value="@u.EnrollmentId">@u.StudentNo — @(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
+                        <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" /></div>
+                        <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-person-plus me-1"></i>@T("Assign", "إسناد")</button>
+                        <div class="form-text">@T("Capacity is enforced (BR-SCN-002).", "السعة مُلزِمة (BR-SCN-002).")</div>
+                    </form>
+                }
+            </div>
+            <div class="sms-card p-3">
+                <h2 class="h6">@T("Homeroom teacher", "رائد الفصل")</h2>
+                <form method="post" asp-action="Homeroom" asp-route-id="@Model.Section.Id">
+                    <div class="mb-2"><select name="teacherUserId" class="form-select form-select-sm"><option value="">@T("— teacher —", "— المعلم —")</option>@foreach (var t in Model.Teachers) { <option value="@t.UserAccountId" disabled="@(t.UserAccountId == null)">@(isRtl ? t.NameAr : t.NameEn)@(t.UserAccountId == null ? " (" + T("no user account", "بلا حساب مستخدم") + ")" : "")</option> }</select></div>
+                    <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" /></div>
+                    <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi bi-person-badge me-1"></i>@T("Assign homeroom", "تعيين رائد الفصل")</button>
+                    <div class="form-text">@T("Effective-dated; the previous assignment is closed out (BR-SCN-004). Teachers need a linked user account.", "بتاريخ سريان؛ يُغلق التعيين السابق (BR-SCN-004). يحتاج المعلم حساب مستخدم مرتبطاً.")</div>
+                </form>
+            </div>
+        }
+    </div>
+</div>
