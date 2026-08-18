@@ -172,5 +172,41 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(AcademicYearStatus.Archived, db.AcademicYears.Single(y => y.Id == year.Id).Status);
         }
+
+        // --- BR-AYR-007 semester/term builder -----------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-AYR-007")]
+        public async Task Semesters_and_terms_nest_inside_their_parent_and_never_overlap_siblings()
+        {
+            using var db = CreateContext();
+            var admin = new AcademicYearAdmin(db);
+            var year = await DefineYear(admin, new DateTime(2026, 9, 1), new DateTime(2027, 6, 30));
+
+            var s1 = await admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول", "Semester 1", new DateTime(2026, 9, 1), new DateTime(2027, 1, 31));
+            await admin.DefineSemesterAsync(year.Id, 2, "الفصل الثاني", "Semester 2", new DateTime(2027, 2, 1), new DateTime(2027, 6, 30));
+
+            // outside the year
+            await Assert.ThrowsAsync<InvalidPeriodDatesException>(() =>
+                admin.DefineSemesterAsync(year.Id, 3, "س", "S3", new DateTime(2027, 6, 1), new DateTime(2027, 8, 1)));
+            // overlapping a sibling
+            await Assert.ThrowsAsync<InvalidPeriodDatesException>(() =>
+                admin.DefineSemesterAsync(year.Id, 3, "س", "S3", new DateTime(2027, 1, 15), new DateTime(2027, 3, 1)));
+
+            var t1 = await admin.DefineTermAsync(s1.Id, 1, "الفترة الأولى", "Term 1", new DateTime(2026, 9, 1), new DateTime(2026, 11, 15));
+            await admin.DefineTermAsync(s1.Id, 2, "الفترة الثانية", "Term 2", new DateTime(2026, 11, 16), new DateTime(2027, 1, 31));
+            Assert.Equal(year.Id, db.Terms.Single(t => t.Id == t1.Id).AcademicYearId);
+
+            // term outside its semester
+            await Assert.ThrowsAsync<InvalidPeriodDatesException>(() =>
+                admin.DefineTermAsync(s1.Id, 3, "ف", "T3", new DateTime(2027, 1, 20), new DateTime(2027, 2, 20)));
+
+            // re-defining by sequence updates in place; shrinking below its terms is refused
+            await Assert.ThrowsAsync<InvalidPeriodDatesException>(() =>
+                admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول", "Semester 1", new DateTime(2026, 9, 1), new DateTime(2026, 12, 31)));
+            var updated = await admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول (محدث)", "Semester 1 (updated)", new DateTime(2026, 9, 1), new DateTime(2027, 1, 31));
+            Assert.Equal(s1.Id, updated.Id);
+            Assert.Equal(2, db.Semesters.Count(s => s.AcademicYearId == year.Id));
+        }
     }
 }

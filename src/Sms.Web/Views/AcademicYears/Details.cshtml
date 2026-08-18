@@ -1,0 +1,93 @@
+@using System.Globalization
+@model YearDefinitionViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var y = Model.Year!;
+    var label = isRtl ? y.LabelAr : y.LabelEn;
+    ViewData["Title"] = label;
+    ViewData["Breadcrumb"] = T("Academic Years / ", "الأعوام الدراسية / ") + label;
+    var total = Math.Max(1, (y.EndDate - y.StartDate).TotalDays);
+    string Left(DateTime d) => ((d - y.StartDate).TotalDays / total * 100).ToString("0.##", CultureInfo.InvariantCulture);
+    string Width(DateTime s, DateTime e) => (Math.Max(0.5, (e - s).TotalDays / total * 100)).ToString("0.##", CultureInfo.InvariantCulture);
+    var colors = new[] { "#2563eb", "#7c3aed", "#0ea5e9", "#16a34a" };
+}
+
+<div class="sms-page-head"><div><div class="text-muted small">@T("Academic year", "العام الدراسي") · @y.Status</div><h1 class="sms-page-title">@label <span class="text-muted fs-6">@y.HijriLabel</span></h1>
+    <p class="text-muted mb-0">@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd") · @T("Semester/term structure is per year (BR-AYR-007); terms nest in semesters, semesters in the year (§9).", "هيكل الفصول/الفترات لكل عام (BR-AYR-007)؛ الفترات داخل الفصول والفصول داخل العام (§9).")</p></div>
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Board", "اللوحة")</a></div>
+
+<div class="sms-card p-4 mb-3">
+    <h2 class="h6 text-muted">@T("Timeline", "الخط الزمني")</h2>
+    <div class="sms-timeline">
+        <div class="sms-timeline__year"><span>@y.StartDate.ToString("MMM yyyy", CultureInfo.InvariantCulture)</span><span>@y.EndDate.ToString("MMM yyyy", CultureInfo.InvariantCulture)</span></div>
+        <div class="sms-timeline__track">
+            @foreach (var (s, i) in Model.Semesters.Select((s, i) => (s, i)))
+            {
+                <div class="sms-timeline__bar" style="inset-inline-start:@(Left(s.StartDate))%;width:@(Width(s.StartDate, s.EndDate))%;background:@colors[i % colors.Length]" title="@(isRtl ? s.NameAr : s.NameEn): @s.StartDate.ToString("yyyy-MM-dd") → @s.EndDate.ToString("yyyy-MM-dd")">@(isRtl ? s.NameAr : s.NameEn)</div>
+            }
+        </div>
+        <div class="sms-timeline__track sms-timeline__track--terms">
+            @foreach (var t in Model.Terms)
+            {
+                <div class="sms-timeline__bar sms-timeline__bar--term" style="inset-inline-start:@(Left(t.StartDate))%;width:@(Width(t.StartDate, t.EndDate))%" title="@(isRtl ? t.NameAr : t.NameEn): @t.StartDate.ToString("yyyy-MM-dd") → @t.EndDate.ToString("yyyy-MM-dd")">@(isRtl ? t.NameAr : t.NameEn)</div>
+            }
+        </div>
+    </div>
+    @if (Model.Semesters.Count == 0) { <div class="text-muted small mt-2">@T("No semesters yet — add the first one below.", "لا فصول بعد — أضف الأول أدناه.")</div> }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Semesters & terms", "الفصول والفترات")</h2></div>
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <thead><tr><th>#</th><th>@T("Name", "الاسم")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th></tr></thead>
+                <tbody>
+                @foreach (var s in Model.Semesters)
+                {
+                    <tr class="table-light fw-semibold"><td>@s.SequenceNumber</td><td>@(isRtl ? s.NameAr : s.NameEn)</td><td>@s.StartDate.ToString("yyyy-MM-dd")</td><td>@s.EndDate.ToString("yyyy-MM-dd")</td></tr>
+                    foreach (var t in Model.Terms.Where(t => t.SemesterId == s.Id))
+                    {
+                        <tr><td class="ps-4 text-muted">@s.SequenceNumber.@t.SequenceNumber</td><td class="ps-4">@(isRtl ? t.NameAr : t.NameEn)</td><td>@t.StartDate.ToString("yyyy-MM-dd")</td><td>@t.EndDate.ToString("yyyy-MM-dd")</td></tr>
+                    }
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="sms-card p-4 mb-3">
+            <h2 class="h6">@T("Add / update semester", "إضافة أو تحديث فصل")</h2>
+            <form method="post" asp-action="DefineSemester" asp-route-id="@y.Id" novalidate>
+                <div class="row g-2 mb-2">
+                    <div class="col-3"><label class="form-label small">#</label><input asp-for="SemesterSequence" class="form-control form-control-sm" type="number" min="1" /></div>
+                    <div class="col-9"><label class="form-label small">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="SemesterNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Semester 1" /></div>
+                </div>
+                <div class="mb-2"><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="SemesterNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الفصل الأول" /></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="form-label small">@T("From", "من")</label><input asp-for="SemesterStart" asp-format="{0:yyyy-MM-dd}" class="form-control form-control-sm" type="date" /></div>
+                    <div class="col-6"><label class="form-label small">@T("To", "إلى")</label><input asp-for="SemesterEnd" asp-format="{0:yyyy-MM-dd}" class="form-control form-control-sm" type="date" /></div>
+                </div>
+                <button class="btn btn-sm btn-primary w-100" type="submit">@T("Save semester", "حفظ الفصل")</button>
+            </form>
+        </div>
+        <div class="sms-card p-4">
+            <h2 class="h6">@T("Add / update term", "إضافة أو تحديث فترة")</h2>
+            <form method="post" asp-action="DefineTerm" asp-route-id="@y.Id" novalidate>
+                <div class="mb-2"><label class="form-label small">@T("Semester", "الفصل")</label>
+                    <select asp-for="TermSemesterId" class="form-select form-select-sm">@foreach (var s in Model.Semesters) { <option value="@s.Id">@s.SequenceNumber — @(isRtl ? s.NameAr : s.NameEn)</option> }</select></div>
+                <div class="row g-2 mb-2">
+                    <div class="col-3"><label class="form-label small">#</label><input asp-for="TermSequence" class="form-control form-control-sm" type="number" min="1" /></div>
+                    <div class="col-9"><label class="form-label small">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="TermNameEn" class="form-control form-control-sm" dir="ltr" placeholder="Term 1" /></div>
+                </div>
+                <div class="mb-2"><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="TermNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الفترة الأولى" /></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6"><label class="form-label small">@T("From", "من")</label><input asp-for="TermStart" asp-format="{0:yyyy-MM-dd}" class="form-control form-control-sm" type="date" /></div>
+                    <div class="col-6"><label class="form-label small">@T("To", "إلى")</label><input asp-for="TermEnd" asp-format="{0:yyyy-MM-dd}" class="form-control form-control-sm" type="date" /></div>
+                </div>
+                <button class="btn btn-sm btn-primary w-100" type="submit" @(Model.Semesters.Count == 0 ? "disabled" : "")>@T("Save term", "حفظ الفترة")</button>
+            </form>
+        </div>
+    </div>
+</div>

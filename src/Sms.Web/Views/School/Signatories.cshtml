@@ -1,0 +1,46 @@
+@using System.Globalization
+@model SignatoriesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Signatories", "الموقّعون");
+    ViewData["Breadcrumb"] = T("Schools / Signatories", "المدارس / الموقّعون");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per document class, effective-dated: defining a new signatory closes out the current one; reissued documents show the signatory in force at issue (BR-SCH-004).", "لكل فئة مستند بتاريخ سريان: تعريف موقّع جديد يغلق الحالي؛ المستندات المعاد إصدارها تعرض الموقّع الساري وقت الإصدار (BR-SCH-004).")</p></div></div>
+<partial name="_SchoolNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        @foreach (var cls in SignatoriesViewModel.DocumentClasses)
+        {
+            var rows = Model.Signatories.Where(s => s.DocumentClassCode == cls.Code).ToList();
+            <div class="sms-card mb-3">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@(isRtl ? cls.Ar : cls.En) <code class="small text-muted">@cls.Code</code></h2>
+                    @if (rows.FirstOrDefault(r => r.EffectiveToUtc == null) is { } cur) { <span class="badge text-bg-success">@T("Current", "الحالي"): @(isRtl ? cur.NameAr : cur.NameEn)</span> } else { <span class="badge text-bg-warning">@T("None defined", "غير معرَّف")</span> }</div>
+                @if (rows.Count > 0)
+                {
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+                        <thead><tr><th>@T("Name", "الاسم")</th><th>@T("Title", "المسمى")</th><th>@T("Effective from", "ساري من")</th><th>@T("Effective to", "ساري إلى")</th></tr></thead>
+                        <tbody>@foreach (var s in rows) { <tr class="@(s.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@(isRtl ? s.NameAr : s.NameEn)</td><td>@(isRtl ? s.TitleAr : s.TitleEn)</td><td>@s.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(s.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? "—")</td></tr> }</tbody>
+                    </table></div>
+                }
+            </div>
+        }
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-4">
+            <h2 class="h6">@T("Define signatory", "تعريف موقّع")</h2>
+            <form method="post" asp-action="Signatories" novalidate>
+                <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+                <div class="mb-2"><label class="form-label">@T("Document class", "فئة المستند")</label><select asp-for="DocumentClassCode" class="form-select">@foreach (var c in SignatoriesViewModel.DocumentClasses) { <option value="@c.Code">@(isRtl ? c.Ar : c.En)</option> }</select></div>
+                <div class="mb-2"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                <div class="mb-2"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                <div class="mb-2"><label class="form-label">@T("Title (Arabic)", "المسمى (عربي)")</label><input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" /></div>
+                <div class="mb-2"><label class="form-label">@T("Title (English)", "المسمى (إنجليزي)")</label><input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" /></div>
+                <div class="mb-3"><label class="form-label">@T("Effective from", "ساري من")</label><input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-pen me-1"></i>@T("Save", "حفظ")</button>
+            </form>
+        </div>
+    </div>
+</div>

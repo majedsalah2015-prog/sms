@@ -46,7 +46,7 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-4"><label class="form-label">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
                             <div class="col-md-4"><label class="form-label">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
-                            <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" class="form-control" type="date" /></div>
+                            <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
                         </div>
                         <div class="row g-3 mb-3">
                             <div class="col-md-4"><label class="form-label">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>

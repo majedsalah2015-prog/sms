@@ -1,0 +1,57 @@
+@using System.Globalization
+@using Sms.Domain.Schools
+@model SchoolStatusViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("School status", "حالة المدرسة");
+    ViewData["Breadcrumb"] = T("Schools / School status", "المدارس / حالة المدرسة");
+    string Name(SchoolStatus s) => s switch { SchoolStatus.Setup => T("Setup", "إعداد"), SchoolStatus.Active => T("Active", "نشطة"), SchoolStatus.Suspended => T("Suspended", "موقوفة"), SchoolStatus.Closed => T("Closed", "مغلقة"), _ => s.ToString() };
+    string Badge(SchoolStatus s) => s switch { SchoolStatus.Active => "text-bg-success", SchoolStatus.Suspended => "text-bg-warning", SchoolStatus.Closed => "text-bg-dark", _ => "text-bg-secondary" };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Setup → Active → Suspended → Closed; Suspended blocks portal and transactions, Closed is terminal (BR-SCH-005). Every move is T1-audited with a reason.", "إعداد → نشطة → موقوفة → مغلقة؛ الموقوفة تحجب البوابة والمعاملات، والمغلقة نهائية (BR-SCH-005). كل انتقال مدقَّق T1 مع سبب.")</p></div></div>
+<partial name="_SchoolNav" />
+
+@if (Model.School == null)
+{
+    <div class="alert alert-warning">@T("No school profile yet.", "لا يوجد ملف مدرسة بعد.")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-5">
+            <div class="sms-card p-4">
+                <div class="text-muted small">@T("Current status", "الحالة الحالية")</div>
+                <div class="d-flex align-items-center gap-2 mb-3"><span class="badge fs-6 @Badge(Model.School.Status)">@Name(Model.School.Status)</span> <span class="text-muted small">@(isRtl ? Model.School.NameAr : Model.School.NameEn)</span></div>
+                <div class="d-flex flex-wrap gap-2 align-items-center small text-muted mb-3">
+                    @foreach (var s in new[] { SchoolStatus.Setup, SchoolStatus.Active, SchoolStatus.Suspended, SchoolStatus.Closed })
+                    {
+                        <span class="badge @(s == Model.School.Status ? Badge(s) : "text-bg-light border")">@Name(s)</span>@if (s != SchoolStatus.Closed) { <i class="bi bi-arrow-right @(isRtl ? "sms-flip" : "")"></i> }
+                    }
+                </div>
+                <form method="post" asp-action="Status" novalidate>
+                    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+                    <div class="mb-2"><label class="form-label">@T("Move to", "الانتقال إلى")</label>
+                        <select asp-for="Target" class="form-select">
+                            <option value="">—</option>
+                            @foreach (var t in Model.AllowedTargets) { <option value="@t">@Name(t)</option> }
+                        </select></div>
+                    <div class="mb-3"><label class="form-label">@T("Reason (mandatory)", "السبب (إلزامي)")</label><input asp-for="Reason" class="form-control" /></div>
+                    <button class="btn btn-primary" type="submit" @(Model.AllowedTargets.Count == 0 ? "disabled" : "")><i class="bi bi-arrow-repeat me-1"></i>@T("Change status", "تغيير الحالة")</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="sms-card p-4 sms-kv">
+                <h2 class="h6 text-muted">@T("Effects", "الآثار")</h2>
+                <dl class="row small mb-0">
+                    <dt class="col-sm-3">@Name(SchoolStatus.Setup)</dt><dd class="col-sm-9">@T("Wizard phase; the first academic year can't activate until Setup Complete (BR-SET-003).", "مرحلة المعالج؛ لا يُفعَّل أول عام دراسي قبل اكتمال الإعداد (BR-SET-003).")</dd>
+                    <dt class="col-sm-3">@Name(SchoolStatus.Active)</dt><dd class="col-sm-9">@T("Normal operation.", "التشغيل العادي.")</dd>
+                    <dt class="col-sm-3">@Name(SchoolStatus.Suspended)</dt><dd class="col-sm-9">@T("Portal and transactions blocked; staff read + finance collection stay available (configurable). Reactivation allowed.", "حجب البوابة والمعاملات؛ تبقى القراءة للموظفين والتحصيل المالي (قابل للضبط). يمكن إعادة التفعيل.")</dd>
+                    <dt class="col-sm-3">@Name(SchoolStatus.Closed)</dt><dd class="col-sm-9">@T("Terminal — read-only forever.", "نهائية — للقراءة فقط دائماً.")</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+}

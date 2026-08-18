@@ -1,0 +1,17 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Profile", "School profile", "ملف المدرسة", "bi-building"),
+        ("Signatories", "Signatories", "الموقّعون", "bi-pen"),
+        ("Status", "School status", "حالة المدرسة", "bi-toggle-on"),
+    };
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item"><a class="nav-link @(string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) ? "active" : "")" asp-controller="School" asp-action="@t.Action"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

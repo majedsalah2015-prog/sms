@@ -113,6 +113,84 @@ namespace Sms.Infrastructure.Schools
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task<Semester> DefineSemesterAsync(
+            int academicYearId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
+            RequireNested(startDate, endDate, year.StartDate, year.EndDate, "semester", "academic year");
+
+            var siblings = await _db.Semesters.Where(s => s.AcademicYearId == academicYearId && s.SequenceNumber != sequenceNumber).ToListAsync(cancellationToken);
+            RequireNoOverlap(startDate, endDate, siblings.Select(s => (s.StartDate, s.EndDate)), "semester");
+
+            var semester = await _db.Semesters.SingleOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.SequenceNumber == sequenceNumber, cancellationToken);
+            if (semester == null)
+            {
+                semester = new Semester { AcademicYearId = academicYearId, SequenceNumber = sequenceNumber };
+                _db.Semesters.Add(semester);
+            }
+            else
+            {
+                // Shrinking a semester must keep its terms nested.
+                var terms = await _db.Terms.Where(t => t.SemesterId == semester.Id).ToListAsync(cancellationToken);
+                foreach (var t in terms)
+                {
+                    RequireNested(t.StartDate, t.EndDate, startDate, endDate, $"term {t.SequenceNumber}", "semester");
+                }
+            }
+
+            semester.NameAr = nameAr;
+            semester.NameEn = nameEn;
+            semester.StartDate = startDate;
+            semester.EndDate = endDate;
+            await _db.SaveChangesAsync(cancellationToken);
+            return semester;
+        }
+
+        public async Task<Term> DefineTermAsync(
+            int semesterId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            var semester = await _db.Semesters.SingleAsync(s => s.Id == semesterId, cancellationToken);
+            RequireNested(startDate, endDate, semester.StartDate, semester.EndDate, "term", "semester");
+
+            var siblings = await _db.Terms.Where(t => t.SemesterId == semesterId && t.SequenceNumber != sequenceNumber).ToListAsync(cancellationToken);
+            RequireNoOverlap(startDate, endDate, siblings.Select(t => (t.StartDate, t.EndDate)), "term");
+
+            var term = await _db.Terms.SingleOrDefaultAsync(t => t.SemesterId == semesterId && t.SequenceNumber == sequenceNumber, cancellationToken);
+            if (term == null)
+            {
+                term = new Term { AcademicYearId = semester.AcademicYearId, SemesterId = semesterId, SequenceNumber = sequenceNumber };
+                _db.Terms.Add(term);
+            }
+
+            term.NameAr = nameAr;
+            term.NameEn = nameEn;
+            term.StartDate = startDate;
+            term.EndDate = endDate;
+            await _db.SaveChangesAsync(cancellationToken);
+            return term;
+        }
+
+        private static void RequireNested(DateTime start, DateTime end, DateTime outerStart, DateTime outerEnd, string inner, string outer)
+        {
+            if (end <= start)
+            {
+                throw new InvalidPeriodDatesException($"{inner} end date must be after its start date");
+            }
+
+            if (start < outerStart || end > outerEnd)
+            {
+                throw new InvalidPeriodDatesException($"{inner} ({start:yyyy-MM-dd}..{end:yyyy-MM-dd}) must lie within the {outer} ({outerStart:yyyy-MM-dd}..{outerEnd:yyyy-MM-dd})");
+            }
+        }
+
+        private static void RequireNoOverlap(DateTime start, DateTime end, System.Collections.Generic.IEnumerable<(DateTime Start, DateTime End)> siblings, string kind)
+        {
+            if (siblings.Any(s => AcademicYearValidation.Overlaps(start, end, s.Start, s.End)))
+            {
+                throw new InvalidPeriodDatesException($"{kind} overlaps a sibling {kind}");
+            }
+        }
+
         private static void RequireTransition(AcademicYearStatus from, AcademicYearStatus to)
         {
             if (!AcademicYearStatusTransitions.CanTransition(from, to))

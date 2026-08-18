@@ -39,3 +39,15 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 }
+
+namespace Sms.Application.Common.Exceptions
+{
+    /// <summary>BR-AYR-007 / doc/Modules/03 §9: term dates must nest within their semester, semesters within the year, and siblings must not overlap.</summary>
+    public class InvalidPeriodDatesException : System.InvalidOperationException
+    {
+        public InvalidPeriodDatesException(string reason)
+            : base($"Period dates are invalid: {reason} (BR-AYR-007).")
+        {
+        }
+    }
+}

@@ -1,0 +1,69 @@
+@using System.Globalization
+@using Sms.Domain.Schools
+@model YearBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Academic years", "الأعوام الدراسية");
+    ViewData["Breadcrumb"] = T("Academic Years / Status board", "الأعوام الدراسية / لوحة الحالة");
+    string Name(AcademicYearStatus s) => s switch { AcademicYearStatus.Preparation => T("Preparation", "إعداد"), AcademicYearStatus.Active => T("Active", "نشط"), AcademicYearStatus.Closing => T("Closing", "قيد الإغلاق"), AcademicYearStatus.Closed => T("Closed", "مغلق"), AcademicYearStatus.Archived => T("Archived", "مؤرشف"), _ => s.ToString() };
+    string Badge(AcademicYearStatus s) => s switch { AcademicYearStatus.Active => "text-bg-success", AcademicYearStatus.Preparation => "text-bg-primary", AcademicYearStatus.Closing => "text-bg-warning", AcademicYearStatus.Closed => "text-bg-secondary", _ => "text-bg-dark" };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Preparation → Active → Closing → Closed → Archived; exactly one Active, at most one in Preparation (BR-AYR-002).", "إعداد → نشط → قيد الإغلاق → مغلق → مؤرشف؛ عام نشط واحد فقط وعام إعداد واحد على الأكثر (BR-AYR-002).")</p></div>
+    <a class="btn btn-primary" asp-action="Define"><i class="bi bi-plus-lg me-1"></i>@T("New academic year", "عام دراسي جديد")</a></div>
+
+@if (Model.WorkingYear != null && Model.ActiveYear != null && Model.WorkingYear.Id != Model.ActiveYear.Id)
+{
+    <div class="alert alert-warning py-2"><i class="bi bi-exclamation-triangle me-1"></i>@T("Your working year", "عام العمل الحالي") <strong>@(isRtl ? Model.WorkingYear.LabelAr : Model.WorkingYear.LabelEn)</strong> @T("is not the Active year (BR-AYR-010).", "ليس العام النشط (BR-AYR-010).")</div>
+}
+@if (!Model.SetupComplete && Model.Rows.All(r => r.Year.Status == AcademicYearStatus.Preparation))
+{
+    <div class="alert alert-info py-2"><i class="bi bi-info-circle me-1"></i>@T("The first activation is gated on the Setup wizard (BR-SET-003).", "أول تفعيل مشروط باكتمال معالج الإعداد (BR-SET-003).") <a asp-controller="Setup" asp-action="Index">@T("Open wizard", "فتح المعالج")</a></div>
+}
+
+@if (Model.Rows.Count == 0)
+{
+    <div class="sms-card p-4 text-center text-muted">@T("No academic years yet.", "لا توجد أعوام دراسية بعد.")</div>
+}
+@foreach (var r in Model.Rows)
+{
+    var y = r.Year;
+    <div class="sms-card mb-3">
+        <div class="p-3 d-flex flex-wrap align-items-center gap-3">
+            <div class="flex-grow-1">
+                <a class="h5 mb-0 d-inline-block" asp-action="Details" asp-route-id="@y.Id">@(isRtl ? y.LabelAr : y.LabelEn)</a> <span class="text-muted">@y.HijriLabel</span>
+                <span class="badge @Badge(y.Status) ms-2">@Name(y.Status)</span>
+                @if (y.Id == Model.WorkingYearId) { <span class="badge text-bg-light border ms-1">@T("working year", "عام العمل")</span> }
+                <div class="small text-muted mt-1">@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd") · @r.Semesters @T("semesters", "فصول") · @r.Terms @T("terms", "فترات")@if (y.ClosingEndsOn != null) { <text> · @T("closing window ends", "تنتهي نافذة الإغلاق") @y.ClosingEndsOn?.ToString("yyyy-MM-dd")</text> }</div>
+            </div>
+            <div class="d-flex gap-2 align-items-center">
+                @if (y.Status == AcademicYearStatus.Preparation)
+                {
+                    <form method="post" asp-action="Activate" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-play-fill"></i> @T("Activate", "تفعيل")</button></form>
+                }
+                else if (y.Status == AcademicYearStatus.Closing)
+                {
+                    <form method="post" asp-action="Close" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-warning" type="submit"><i class="bi bi-lock"></i> @T("Close", "إغلاق")</button></form>
+                }
+                else if (y.Status == AcademicYearStatus.Closed)
+                {
+                    <form method="post" asp-action="Archive" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-outline-dark" type="submit"><i class="bi bi-archive"></i> @T("Archive", "أرشفة")</button></form>
+                }
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@y.Id"><i class="bi bi-calendar-range"></i> @T("Structure", "الهيكل")</a>
+            </div>
+        </div>
+        @if (r.OpeningChecklist.Count > 0 || r.ClosingChecklist.Count > 0)
+        {
+            var items = r.OpeningChecklist.Count > 0 ? r.OpeningChecklist : r.ClosingChecklist;
+            <div class="px-3 pb-3">
+                <div class="small fw-semibold text-muted mb-1">@(r.OpeningChecklist.Count > 0 ? T("Opening checklist (BR-AYR-004)", "قائمة الافتتاح (BR-AYR-004)") : T("Closing checklist (BR-AYR-005)", "قائمة الإغلاق (BR-AYR-005)"))</div>
+                <div class="d-flex flex-wrap gap-2">@foreach (var i in items) { <span class="badge @(i.IsSatisfied ? "text-bg-success" : "text-bg-danger")" title="@i.Detail">@(i.IsSatisfied ? "✓" : "✗") @i.Code</span> }</div>
+            </div>
+        }
+        else if (y.Status == AcademicYearStatus.Preparation && Model.Rows.Any(x => x.Year.Status == AcademicYearStatus.Active))
+        {
+            <div class="px-3 pb-3 small text-muted"><i class="bi bi-info-circle me-1"></i>@T("Opening checklist appears once a rollover batch is opened from the Active year (WF-02 cockpit — E-801 screens).", "تظهر قائمة الافتتاح بعد فتح دفعة ترحيل من العام النشط (WF-02 — شاشات E-801).")</div>
+        }
+    </div>
+}

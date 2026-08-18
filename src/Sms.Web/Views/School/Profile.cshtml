@@ -1,0 +1,71 @@
+@using System.Globalization
+@model SchoolProfileViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("School profile", "ملف المدرسة");
+    ViewData["Breadcrumb"] = T("Schools / School profile", "المدارس / ملف المدرسة");
+    var tabs = new (string Key, string En, string Ar)[] { ("identity", "Identity", "الهوية"), ("license", "License & Ministry", "الترخيص والوزارة"), ("contacts", "Contacts & Location", "التواصل والموقع"), ("branding", "Branding", "الهوية البصرية"), ("stages", "Stages offered", "المراحل المقدَّمة") };
+    string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@(Model.SchoolId == null ? T("New school", "مدرسة جديدة") : (isRtl ? Model.NameAr : Model.NameEn))</h1>
+    <p class="text-muted mb-0">@T("Module 02 — identity fields appear on official documents exactly as entered (BR-SCH-001) and later edits require a reason (BR-SCH-002).", "الوحدة 02 — حقول الهوية تظهر في المستندات الرسمية كما أُدخلت (BR-SCH-001) والتعديلات اللاحقة تتطلب سبباً (BR-SCH-002).")</p></div>
+    @if (Model.Status != null) { <span class="badge @(Model.Status == Sms.Domain.Schools.SchoolStatus.Active ? "text-bg-success" : "text-bg-secondary")">@Model.Status</span> }
+</div>
+<partial name="_SchoolNav" />
+
+<form method="post" asp-action="Profile" novalidate>
+    <input type="hidden" asp-for="SchoolId" /><input type="hidden" asp-for="TimeZoneId" /><input type="hidden" asp-for="CurrencyCode" /><input type="hidden" asp-for="ActiveTab" id="ActiveTab" />
+    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+    <div class="sms-card">
+        <ul class="nav nav-tabs px-3 pt-2" role="tablist">
+            @foreach (var t in tabs) { <li class="nav-item"><button class="nav-link @(Model.ActiveTab == t.Key ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button" onclick="document.getElementById('ActiveTab').value='@t.Key'">@(isRtl ? t.Ar : t.En)</button></li> }
+        </ul>
+        <div class="tab-content p-4">
+            <div class="tab-pane fade @Show("identity")" id="tab-identity">
+                <div class="sms-bilingual mb-3">
+                    <div><label class="form-label">@T("Official name (Arabic)", "الاسم الرسمي (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                    <div><label class="form-label">@T("Official name (English)", "الاسم الرسمي (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                </div>
+                <div class="row g-3"><div class="col-md-4"><label class="form-label">@T("Time zone", "المنطقة الزمنية")</label><input class="form-control" value="@Model.TimeZoneId" disabled /><div class="form-text">@T("Set in the Setup wizard.", "يُحدَّد في معالج الإعداد.")</div></div>
+                    <div class="col-md-4"><label class="form-label">@T("Currency", "العملة")</label><input class="form-control" value="@Model.CurrencyCode" disabled /></div></div>
+            </div>
+            <div class="tab-pane fade @Show("license")" id="tab-license">
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="form-label">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+                </div>
+            </div>
+            <div class="tab-pane fade @Show("contacts")" id="tab-contacts">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4"><label class="form-label">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
+                    <div class="col-md-8"><label class="form-label">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4"><label class="form-label">@T("Official email", "البريد الرسمي")</label><input asp-for="ContactEmail" class="form-control" type="email" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label">@T("Phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-3"><label class="form-label">@T("Latitude", "خط العرض")</label><input asp-for="Latitude" class="form-control" dir="ltr" disabled /></div>
+                    <div class="col-md-3"><label class="form-label">@T("Longitude", "خط الطول")</label><input asp-for="Longitude" class="form-control" dir="ltr" disabled /></div>
+                    <div class="col-md-6"><div class="form-text mt-4">@T("Map pin picker pending (BR-SCH-008 geo validation).", "منتقي الخريطة لاحقاً (BR-SCH-008).")</div></div>
+                </div>
+            </div>
+            <div class="tab-pane fade @Show("branding")" id="tab-branding">
+                <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-1"></i>@T("Logo/seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) lands with the attachment store screens (doc 10). Templates render current branding at issue time.", "رفع الشعار/الختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات المرفقات (الوثيقة 10).")</div>
+            </div>
+            <div class="tab-pane fade @Show("stages")" id="tab-stages">
+                @if (Model.StagesOffered.Count == 0) { <div class="alert alert-warning small">@T("No stages defined yet — see the Setup wizard's Stage structure step or Module 05.", "لا مراحل بعد — انظر خطوة الهيكل الدراسي في المعالج أو الوحدة 05.")</div> }
+                else { <ul class="list-group">@foreach (var s in Model.StagesOffered) { <li class="list-group-item d-flex justify-content-between"><span>@(isRtl ? s.Ar : s.En)</span><span class="badge text-bg-light border">@s.Grades @T("grades", "صفوف")</span></li> }</ul> }
+                <div class="form-text mt-2">@T("BR-SCH-003: grades outside offered stages cannot be created (the explicit declaration UI is a follow-up; today every defined stage counts as offered).", "BR-SCH-003: لا يمكن إنشاء صفوف خارج المراحل المقدَّمة.")</div>
+            </div>
+        </div>
+        <div class="p-3 border-top d-flex gap-2 align-items-end">
+            <div style="max-width:420px" class="flex-grow-1"><label class="form-label small">@T("Reason (required when changing identity fields)", "السبب (مطلوب عند تعديل حقول الهوية)")</label><input asp-for="Reason" class="form-control" /></div>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
+        </div>
+    </div>
+</form>

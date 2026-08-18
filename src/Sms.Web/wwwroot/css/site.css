@@ -210,3 +210,10 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
 .sms-flip { transform: scaleX(-1); }
 .validation-summary-valid { display: none; }
 input[type=number].form-control { min-width: 4.5rem; }
+
+/* ---- Academic year timeline (doc/Modules/03 §8.2) ---- */
+.sms-timeline__year { display: flex; justify-content: space-between; font-size: .75rem; color: var(--sms-muted); margin-bottom: .25rem; }
+.sms-timeline__track { position: relative; height: 28px; background: var(--sms-body-bg); border-radius: var(--sms-radius-sm); margin-bottom: .4rem; }
+.sms-timeline__track--terms { height: 22px; }
+.sms-timeline__bar { position: absolute; top: 3px; bottom: 3px; border-radius: 4px; color: #fff; font-size: .72rem; line-height: 22px; padding: 0 .4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sms-timeline__bar--term { background: rgba(var(--sms-primary-rgb), .18); color: var(--sms-nav-active-color); line-height: 16px; border: 1px solid rgba(var(--sms-primary-rgb), .35); }

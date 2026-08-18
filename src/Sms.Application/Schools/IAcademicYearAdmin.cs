@@ -26,5 +26,11 @@ namespace Sms.Application.Schools
 
         /// <summary>BR-AYR-006: Closed → Archived.</summary>
         Task ArchiveAsync(int academicYearId, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-AYR-007 structure builder: creates or updates (by sequence) a semester nested inside the year's dates; throws <see cref="Common.Exceptions.InvalidPeriodDatesException"/> on nesting/overlap violations (doc §9).</summary>
+        Task<Semester> DefineSemesterAsync(int academicYearId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-AYR-007: creates or updates (by sequence) a term nested inside its semester.</summary>
+        Task<Term> DefineTermAsync(int semesterId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
     }
 }
