@@ -106,9 +106,32 @@ namespace Sms.Infrastructure.Fees
             return await PostChargeInternalAsync(studentId, payerId, academicYearId, feeCategoryId, category.VatRate, amount, ChargeSourceType.Manual, cancellationToken);
         }
 
+        public async Task<Charge> PostOpeningBalanceAsync(
+            int studentId, int payerId, int targetAcademicYearId, int sourceAcademicYearId, int feeCategoryId, decimal amount,
+            CancellationToken cancellationToken = default)
+        {
+            if (amount <= 0m)
+            {
+                throw new ArgumentOutOfRangeException(nameof(amount), "An opening balance carries a positive receivable.");
+            }
+
+            // Ambient: no VAT, no save — the caller commits it with its carry-forward credit notes (BR-AYR-009 hard check).
+            return await BuildChargeAsync(studentId, payerId, targetAcademicYearId, feeCategoryId, vatRate: null, amount,
+                ChargeSourceType.OpeningBalance, sourceAcademicYearId, cancellationToken);
+        }
+
         private async Task<Charge> PostChargeInternalAsync(
             int studentId, int payerId, int academicYearId, int feeCategoryId, decimal? vatRate, decimal netAmount,
             ChargeSourceType sourceType, CancellationToken cancellationToken)
+        {
+            var charge = await BuildChargeAsync(studentId, payerId, academicYearId, feeCategoryId, vatRate, netAmount, sourceType, sourceAcademicYearId: null, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return charge;
+        }
+
+        private async Task<Charge> BuildChargeAsync(
+            int studentId, int payerId, int academicYearId, int feeCategoryId, decimal? vatRate, decimal netAmount,
+            ChargeSourceType sourceType, int? sourceAcademicYearId, CancellationToken cancellationToken)
         {
             var (vatAmount, grossAmount) = VatCalculator.Calculate(netAmount, vatRate);
             var chargeNo = await _numberIssuer.IssueAsync("INV", cancellationToken);
@@ -135,14 +158,30 @@ namespace Sms.Infrastructure.Fees
                 InvoiceUuid = invoiceUuid,
                 InvoiceHash = invoiceHash,
                 PreviousInvoiceHash = previousHash,
+                SourceAcademicYearId = sourceAcademicYearId,
             };
             _db.Charges.Add(charge);
-
-            await _db.SaveChangesAsync(cancellationToken);
             return charge;
         }
 
+        public async Task<CreditNote> IssueCarryForwardCreditNoteAsync(int chargeId, decimal amount, CancellationToken cancellationToken = default)
+        {
+            var note = await BuildCreditNoteAsync(chargeId, amount, CarryForwardReason, cancellationToken);
+            note.IsCarryForward = true;
+            return note;
+        }
+
+        /// <summary>Fixed reason text on every carry-forward note (BR-AYR-009) — the flag, not the text, is what readers key on.</summary>
+        public const string CarryForwardReason = "Carry-forward to next academic year (BR-AYR-009)";
+
         public async Task<CreditNote> IssueCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken = default)
+        {
+            var creditNote = await BuildCreditNoteAsync(chargeId, amount, reason, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return creditNote;
+        }
+
+        private async Task<CreditNote> BuildCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken)
         {
             var charge = await _db.Charges.SingleAsync(c => c.Id == chargeId, cancellationToken);
             if (charge.Status != ChargeStatus.Posted)
@@ -167,8 +206,6 @@ namespace Sms.Infrastructure.Fees
                 IssuedAtUtc = _clock.UtcNow,
             };
             _db.CreditNotes.Add(creditNote);
-
-            await _db.SaveChangesAsync(cancellationToken);
             return creditNote;
         }
 

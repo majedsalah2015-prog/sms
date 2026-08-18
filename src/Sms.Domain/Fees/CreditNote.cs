@@ -24,5 +24,16 @@ namespace Sms.Domain.Fees
         public string Reason { get; set; } = string.Empty;
 
         public DateTime IssuedAtUtc { get; set; }
+
+        /// <summary>
+        /// BR-AYR-009 (S8/E-801): true when this note closes a source-year
+        /// charge's remaining receivable so it can be re-posted as an
+        /// OpeningBalance charge in the next year. Position readers treat it
+        /// like any credit note (the money moves, it isn't forgiven); the GL
+        /// export skips carry-forward pairs entirely — receivable→receivable
+        /// is a nil journal, and treating it as a revenue/VAT reversal would
+        /// misstate both.
+        /// </summary>
+        public bool IsCarryForward { get; set; }
     }
 }

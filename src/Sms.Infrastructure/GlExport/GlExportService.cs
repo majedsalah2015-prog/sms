@@ -68,13 +68,16 @@ namespace Sms.Infrastructure.GlExport
             // which the mapping table can still name explicitly.
             var categories = await _db.FeeCategories.ToDictionaryAsync(c => c.Id, c => c.GlExportCode, cancellationToken);
 
+            // S8/E-801 BR-AYR-009: opening-balance charges and their carry-forward credit notes are a receivable→receivable
+            // transfer (Dr/Cr Receivables, nil) — journaling them as revenue + VAT would misstate both, so both halves are skipped.
             var charges = await _db.Charges
-                .Where(c => c.Status == ChargeStatus.Posted && c.PostedAtUtc >= periodFromUtc && c.PostedAtUtc <= periodToUtc)
+                .Where(c => c.Status == ChargeStatus.Posted && c.SourceType != ChargeSourceType.OpeningBalance
+                    && c.PostedAtUtc >= periodFromUtc && c.PostedAtUtc <= periodToUtc)
                 .Select(c => new { c.FeeCategoryId, c.NetAmount, c.VatAmount, c.GrossAmount }).ToListAsync(cancellationToken);
             var creditNotes = await (
                 from n in _db.CreditNotes
                 join c in _db.Charges on n.ChargeId equals c.Id
-                where n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc
+                where !n.IsCarryForward && n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc
                 select new { c.FeeCategoryId, n.Amount, VatRate = c.VatRateSnapshot ?? 0m }).ToListAsync(cancellationToken);
             var discounts = await _db.DiscountDocuments
                 .Where(d => d.IssuedAtUtc >= periodFromUtc && d.IssuedAtUtc <= periodToUtc)

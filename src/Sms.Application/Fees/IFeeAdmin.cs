@@ -33,8 +33,24 @@ namespace Sms.Application.Fees
         Task<Charge> PostManualChargeAsync(
             int studentId, int payerId, int feeCategoryId, decimal amount, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// BR-FEE-009 / BR-AYR-009 (S8/E-801): posts an OpeningBalance charge into <paramref name="targetAcademicYearId"/>
+        /// referencing <paramref name="sourceAcademicYearId"/>. No VAT — a receivable transfer is not a supply.
+        /// Ambient (does NOT save): the rollover commits it together with the carry-forward credit notes it mirrors,
+        /// so the pair is atomic (BR-AYR §9 reconciliation hard check).
+        /// </summary>
+        Task<Charge> PostOpeningBalanceAsync(
+            int studentId, int payerId, int targetAcademicYearId, int sourceAcademicYearId, int feeCategoryId, decimal amount,
+            CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.ChargeNotPostedException"/> or <see cref="Common.Exceptions.CreditNoteExceedsChargeException"/>.</summary>
         Task<CreditNote> IssueCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// BR-AYR-009 (S8/E-801): a carry-forward credit note closing a source-year charge's remainder. Same cap check as
+        /// <see cref="IssueCreditNoteAsync"/>; flagged <c>IsCarryForward</c> so the GL export skips it. Ambient (does NOT save).
+        /// </summary>
+        Task<CreditNote> IssueCarryForwardCreditNoteAsync(int chargeId, decimal amount, CancellationToken cancellationToken = default);
 
         /// <summary>BR-FEE-008: posted charges - credit notes - allocated payments, as of now.</summary>
         Task<decimal> ComputeStudentPositionAsync(int studentId, CancellationToken cancellationToken = default);

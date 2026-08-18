@@ -52,5 +52,12 @@ namespace Sms.Domain.Fees
         public string? InvoiceHash { get; set; }
 
         public string? PreviousInvoiceHash { get; set; }
+
+        /// <summary>
+        /// BR-FEE-009 / BR-AYR-009 (S8/E-801): set only on
+        /// <see cref="ChargeSourceType.OpeningBalance"/> charges — the closed
+        /// year whose receivable this charge carries forward. Null otherwise.
+        /// </summary>
+        public int? SourceAcademicYearId { get; set; }
     }
 }

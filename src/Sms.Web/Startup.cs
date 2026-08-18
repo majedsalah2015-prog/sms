@@ -37,6 +37,7 @@ using Sms.Application.Parents;
 using Sms.Application.Payments;
 using Sms.Application.Portal;
 using Sms.Application.Reports;
+using Sms.Application.Rollover;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
@@ -82,6 +83,7 @@ using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Portal;
 using Sms.Infrastructure.Reports;
+using Sms.Infrastructure.Rollover;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
@@ -492,6 +494,18 @@ namespace Sms.Web
             // DashboardAdmin, since PermissionService only checks the
             // ambient ICurrentUser.
             services.AddScoped<IReportAdmin, ReportAdmin>();
+
+            // S8/E-801 — Year-end rollover (doc/Modules/03 §4, WF-02 family,
+            // BR-AYR-008/009, BR-FEE-009). Composes Grades/Students/Sections/
+            // Fees/AcademicYear admins under per-student transactions so a
+            // killed activation or carry-forward run resumes without
+            // double-enrolling or double-posting. First real wiring of
+            // E-103's PromotionPathValidator, E-402's PromotionCriteria/
+            // YearResult, and BR-AYR-004/005's opening/closing checklists.
+            // Deferred: rollover cockpit + all doc §8 screens, doc §12
+            // notifications, WF-03 hand-off for "Not Re-registering",
+            // FeeStructureLine lock at activation, waiting-list seat release.
+            services.AddScoped<IRolloverAdmin, RolloverAdmin>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

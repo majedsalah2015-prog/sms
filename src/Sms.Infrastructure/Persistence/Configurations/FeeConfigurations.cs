@@ -56,6 +56,10 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<FeeCategory>().WithMany().HasForeignKey(x => x.FeeCategoryId);
             builder.HasOne<Payer>().WithMany().HasForeignKey(x => x.PayerId);
             builder.HasIndex(x => x.StudentId);
+            // S8/E-801 BR-FEE-009: opening-balance charges reference their source year; one per (student, payer, source year)
+            // is the carry-forward idempotency guarantee at the DB level.
+            builder.HasIndex(x => new { x.StudentId, x.PayerId, x.SourceAcademicYearId }, "IX_Charge_OpeningBalance_Unique")
+                .IsUnique().HasFilter("[SourceAcademicYearId] IS NOT NULL");
         }
     }
 

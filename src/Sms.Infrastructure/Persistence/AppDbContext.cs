@@ -30,6 +30,7 @@ using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
 using Sms.Domain.Reports;
+using Sms.Domain.Rollover;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
@@ -511,6 +512,11 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<ReportExecution> ReportExecutions => Set<ReportExecution>();
 
         public DbSet<ReportSubscription> ReportSubscriptions => Set<ReportSubscription>();
+
+        // S8/E-801 — year-end rollover (doc/Modules/03 §4/§7, BR-AYR-008/009)
+        public DbSet<RolloverBatch> RolloverBatches => Set<RolloverBatch>();
+
+        public DbSet<RolloverStudentState> RolloverStudentStates => Set<RolloverStudentState>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
