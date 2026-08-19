@@ -10,5 +10,8 @@ namespace Sms.Web.Security
 
         /// <summary>"1" while BR-SEC-005 demands a password change before any other action.</summary>
         public const string MustChangePassword = "sms:must-change-password";
+
+        /// <summary>BR-SEC-010: Staff / Parent / Student / System — lets the portal-area filter route portal accounts without a DB hit per request.</summary>
+        public const string AccountType = "sms:account-type";
     }
 }

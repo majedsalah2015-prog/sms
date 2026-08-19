@@ -1,0 +1,57 @@
+@using System.Globalization
+@{
+    var culture = CultureInfo.CurrentUICulture;
+    var isRtl = culture.TextInfo.IsRightToLeft;
+    var lang = culture.TwoLetterISOLanguageName;
+    var bootstrapCss = isRtl ? "~/lib/bootstrap/css/bootstrap.rtl.min.css" : "~/lib/bootstrap/css/bootstrap.min.css";
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var isPortalAccount = Sms.Web.Security.PortalAreaFilter.IsPortalAccount(User.FindFirst(Sms.Web.Security.SmsClaimTypes.AccountType)?.Value);
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Index", "My family", "عائلتي", "bi-people"),
+        ("Statement", "My statement", "كشف حسابي", "bi-receipt"),
+        ("Announcements", "Announcements", "الإعلانات", "bi-megaphone"),
+    };
+}
+<!DOCTYPE html>
+<html lang="@lang" dir="@(isRtl ? "rtl" : "ltr")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - @(isRtl ? "بوابة أولياء الأمور" : "Parent portal")</title>
+    <link rel="stylesheet" href="@bootstrapCss" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/lib/fonts/fonts.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <style>
+        body.sms-portal { background: var(--sms-body-bg); }
+        .sms-portal-bar { background: var(--sms-surface); border-bottom: 1px solid var(--sms-sidebar-border); }
+        .sms-portal-main { max-width: 1100px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+        .sms-portal-nav .nav-link { color: var(--sms-muted); border-radius: 999px; padding: .4rem .9rem; }
+        .sms-portal-nav .nav-link.active { background: var(--sms-primary); color: #fff; }
+    </style>
+</head>
+<body class="sms-portal">
+    <header class="sms-portal-bar">
+        <div class="d-flex align-items-center gap-3 px-3 py-2 flex-wrap" style="max-width:1100px;margin:0 auto">
+            <a asp-controller="Portal" asp-action="Index" class="sms-brand text-decoration-none d-flex align-items-center gap-2"><span class="sms-brand__mark"><i class="bi bi-mortarboard-fill"></i></span><span class="fw-semibold">@(isRtl ? "بوابة أولياء الأمور والطلاب" : "Parent & student portal")</span></a>
+            <ul class="nav sms-portal-nav ms-lg-3">@foreach (var t in tabs) { <li class="nav-item"><a class="nav-link @(string.Equals(action, t.Action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Index" && action == "Student") ? "active" : "")" asp-controller="Portal" asp-action="@t.Action"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li> }</ul>
+            <div class="ms-auto d-flex align-items-center gap-2">
+                @if (!isPortalAccount) { <a class="btn btn-sm btn-outline-secondary" asp-controller="Home" asp-action="Index" title="@(isRtl ? "شاشات الموظفين" : "Staff screens")"><i class="bi bi-arrow-left @(isRtl ? "sms-flip" : "")"></i> @(isRtl ? "الموظفون" : "Staff")</a> }
+                <form asp-controller="Home" asp-action="SetLanguage" method="post" class="d-inline"><input type="hidden" name="returnUrl" value="@returnUrl" /><input type="hidden" name="culture" value="@(isRtl ? "en" : "ar")" /><button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-translate"></i> @(isRtl ? "English" : "العربية")</button></form>
+                <div class="dropdown"><button class="btn btn-sm sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-person-circle"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span></button>
+                    <ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key me-2"></i>@(isRtl ? "تغيير كلمة المرور" : "Change password")</a></li><li><hr class="dropdown-divider" /></li><li><form asp-controller="Account" asp-action="Logout" method="post"><button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>@(isRtl ? "تسجيل الخروج" : "Sign out")</button></form></li></ul></div>
+            </div>
+        </div>
+    </header>
+    <main class="sms-portal-main" role="main">
+        @if (TempData["Flash"] is string flash) { <div class="alert alert-success py-2" role="alert"><i class="bi bi-check-circle me-1"></i>@flash</div> }
+        @if (TempData["Error"] is string error) { <div class="alert alert-danger py-2" role="alert"><i class="bi bi-exclamation-triangle me-1"></i>@error</div> }
+        @RenderBody()
+    </main>
+    <footer class="text-center text-muted small pb-4">&copy; 2026 SMS &middot; <a asp-controller="Home" asp-action="Privacy">@(isRtl ? "الخصوصية" : "Privacy")</a> &middot; @(isRtl ? "تُعرض البيانات المنشورة فقط (BR-SEC-012)" : "Published data only (BR-SEC-012)")</footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

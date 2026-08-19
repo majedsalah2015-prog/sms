@@ -218,6 +218,7 @@ namespace Sms.Web.Controllers
                 new(ClaimTypes.Name, account.UserName),
                 new(SmsClaimTypes.SessionToken, session.SessionToken),
                 new(SmsClaimTypes.SchoolId, account.SchoolId.ToString(CultureInfo.InvariantCulture)),
+                new(SmsClaimTypes.AccountType, account.AccountType.ToString()),
             };
             if (mustChangePassword)
             {

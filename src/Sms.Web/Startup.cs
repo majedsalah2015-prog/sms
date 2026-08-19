@@ -126,6 +126,8 @@ namespace Sms.Web
             {
                 // BR-SEC-005: forced password change gates every other action.
                 options.Filters.Add<RequirePasswordChangeFilter>();
+                // BR-SEC-010: portal accounts never see staff URLs (404, not 403).
+                options.Filters.Add<Sms.Web.Security.PortalAreaFilter>();
             });
 
             // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,

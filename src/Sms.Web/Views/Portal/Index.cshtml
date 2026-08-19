@@ -1,0 +1,47 @@
+@using System.Globalization
+@model PortalHomeViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My family", "عائلتي");
+    var who = isRtl ? Model.ParentNameAr : Model.ParentNameEn;
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@(string.IsNullOrEmpty(who) ? T("My family", "عائلتي") : T($"Welcome, {who}", $"مرحباً، {who}"))</h1><p class="text-muted mb-0">@(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)) · @T("Attendance, published results and posted fees for each child.", "الحضور والنتائج المنشورة والرسوم المرحّلة لكل ابن/ابنة.")</p></div></div>
+
+@if (Model.Children.Count == 0)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i>@T("No students are linked to this account yet.", "لا طلاب مرتبطون بهذا الحساب بعد.")
+        @if (!Model.IsPortalAccount) { <span class="text-muted">@T("(You are signed in with a staff account — the portal shows a parent's linked children or a student's own record; see BR-SEC-011.)", "(أنت مسجّل بحساب موظف — تعرض البوابة أبناء ولي الأمر المرتبطين أو سجل الطالب نفسه؛ انظر BR-SEC-011.)")</span> }
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        @foreach (var c in Model.Children)
+        {
+            var s = c.Student;
+            var name = isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
+            var att = c.Attendance?.ScheduledDays > 0 ? c.Attendance.AttendancePercent : (decimal?)null;
+            <div class="col-md-6 col-xl-4">
+                <a class="sms-card p-3 h-100 text-decoration-none" asp-action="Student" asp-route-id="@s.Id">
+                    <div class="d-flex align-items-center gap-3 mb-3"><span class="sms-brand__mark" style="width:48px;height:48px;font-size:1.4rem"><i class="bi bi-person"></i></span><div><div class="fw-semibold">@name @if (c.IsSelf) { <span class="badge text-bg-light border">@T("me", "أنا")</span> }</div><div class="small text-muted"><code>@s.StudentNo</code> · @(c.Grade == null ? T("not enrolled this year", "غير مقيّد هذا العام") : $"{c.Grade.Code} {(isRtl ? c.Grade.Name.NameAr : c.Grade.Name.NameEn)}{(c.Section == null ? "" : " / " + (isRtl ? c.Section.NameAr : c.Section.NameEn))}")</div></div></div>
+                    <div class="row g-2 text-center small">
+                        <div class="col-4"><div class="fw-semibold fs-5">@(att == null ? "—" : att.Value.ToString("0.#") + "%")</div><div class="text-muted">@T("attendance", "الحضور")</div></div>
+                        <div class="col-4"><div class="fw-semibold fs-5">@c.PublishedResults</div><div class="text-muted">@T("results", "نتائج")</div></div>
+                        <div class="col-4"><div class="fw-semibold fs-5 @(c.FeePosition > 0 ? "text-danger" : "text-success")">@(c.FeePosition?.ToString("N2") ?? "—")</div><div class="text-muted">@T("due", "مستحق")</div></div>
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+<div class="sms-card">
+    <div class="p-3 border-bottom d-flex align-items-center"><h2 class="h6 mb-0"><i class="bi bi-megaphone me-1"></i>@T("Announcements", "الإعلانات")</h2><a class="ms-auto small" asp-action="Announcements">@T("All →", "الكل ←")</a></div>
+    <div class="list-group list-group-flush">
+        @foreach (var a in Model.Announcements) { <div class="list-group-item"><div class="fw-semibold">@(isRtl ? a.TitleAr : a.TitleEn)</div><div class="small text-muted">@(a.SentAtUtc?.ToString("yyyy-MM-dd") ?? "")</div><div class="small mt-1">@(isRtl ? a.BodyAr : a.BodyEn)</div></div> }
+        @if (Model.Announcements.Count == 0) { <div class="list-group-item text-muted small">@T("No announcements yet.", "لا إعلانات بعد.")</div> }
+    </div>
+</div>

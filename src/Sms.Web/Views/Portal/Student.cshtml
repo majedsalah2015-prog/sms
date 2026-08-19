@@ -1,0 +1,75 @@
+@using System.Globalization
+@using Sms.Domain.Attendance
+@model PortalStudentViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var s = Model.Student;
+    var name = isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.GrandfatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.GrandfatherNameEn} {s.FamilyNameEn}";
+    ViewData["Title"] = name;
+    string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+    string Act(string k) => Model.ActiveTab == k ? "active" : "";
+    string DayLabel(AttendanceStatus st) => st switch
+    {
+        AttendanceStatus.Present => T("Present", "حاضر"), AttendanceStatus.Late => T("Late", "متأخر"), AttendanceStatus.AbsentExcused => T("Absent (excused)", "غائب بعذر"),
+        AttendanceStatus.AbsentUnexcused => T("Absent", "غائب"), AttendanceStatus.MedicalLeave => T("Medical leave", "إجازة مرضية"), AttendanceStatus.Permission => T("Permission", "استئذان"),
+        AttendanceStatus.EarlyLeave => T("Early leave", "انصراف مبكر"), AttendanceStatus.Exempted => T("Exempted", "معفى"), _ => st.ToString(),
+    };
+    string DayBadge(AttendanceStatus st) => st switch { AttendanceStatus.Present => "text-bg-success", AttendanceStatus.Late or AttendanceStatus.EarlyLeave or AttendanceStatus.Permission => "text-bg-warning", AttendanceStatus.Exempted => "text-bg-light border", _ => "text-bg-danger" };
+    var att = Model.Attendance;
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@s.StudentNo</code> · @(Model.Grade == null ? T("not enrolled this year", "غير مقيّد هذا العام") : $"{Model.Grade.Code} {(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn)}{(Model.Section == null ? "" : " / " + (isRtl ? Model.Section.NameAr : Model.Section.NameEn))}") · @(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn))</div>
+        <h1 class="sms-page-title">@name @if (Model.IsSelf) { <span class="badge fs-6 text-bg-light border">@T("me", "أنا")</span> }</h1></div>
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("My family", "عائلتي")</a>
+</div>
+
+<div class="sms-card">
+    <ul class="nav nav-tabs px-3 pt-2">
+        <li class="nav-item"><button class="nav-link @Act("attendance")" data-bs-toggle="tab" data-bs-target="#tab-attendance" type="button"><i class="bi bi-check2-square me-1"></i>@T("Attendance", "الحضور")</button></li>
+        <li class="nav-item"><button class="nav-link @Act("results")" data-bs-toggle="tab" data-bs-target="#tab-results" type="button"><i class="bi bi-bar-chart-line me-1"></i>@T("Results", "النتائج") <span class="badge rounded-pill text-bg-light border ms-1">@Model.Results.Count</span></button></li>
+        <li class="nav-item"><button class="nav-link @Act("fees")" data-bs-toggle="tab" data-bs-target="#tab-fees" type="button"><i class="bi bi-receipt me-1"></i>@T("Fees", "الرسوم")</button></li>
+    </ul>
+    <div class="tab-content p-4">
+        <div class="tab-pane fade @Show("attendance")" id="tab-attendance">
+            @if (att.ScheduledDays == 0) { <p class="text-muted mb-0">@T("No attendance recorded this year yet.", "لم يُسجَّل حضور هذا العام بعد.")</p> }
+            else
+            {
+                <div class="row g-3 text-center mb-3">
+                    <div class="col-6 col-md-3"><div class="sms-card p-3"><div class="fs-3 fw-bold @(att.AttendancePercent >= 90 ? "text-success" : att.AttendancePercent >= 75 ? "text-warning" : "text-danger")">@att.AttendancePercent.ToString("0.#")%</div><div class="small text-muted">@T("attendance (BR-ATD-009)", "نسبة الحضور (BR-ATD-009)")</div></div></div>
+                    <div class="col-6 col-md-3"><div class="sms-card p-3"><div class="fs-3 fw-bold">@att.ScheduledDays</div><div class="small text-muted">@T("scheduled days", "أيام مجدولة")</div></div></div>
+                    <div class="col-6 col-md-3"><div class="sms-card p-3"><div class="fs-3 fw-bold text-danger">@att.AbsentDays</div><div class="small text-muted">@T("absent days", "أيام غياب")</div></div></div>
+                    <div class="col-6 col-md-3"><div class="sms-card p-3"><div class="fs-3 fw-bold">@att.ExemptedDays</div><div class="small text-muted">@T("exempted", "معفاة")</div></div></div>
+                </div>
+                <h3 class="h6">@T("Recent days", "الأيام الأخيرة")</h3>
+                <div class="d-flex flex-wrap gap-1">@foreach (var d in Model.RecentDays) { <span class="badge @DayBadge(d.Status)" title="@DayLabel(d.Status)">@d.Date.ToString("MM-dd") · @DayLabel(d.Status)</span> }</div>
+            }
+        </div>
+        <div class="tab-pane fade @Show("results")" id="tab-results">
+            @if (Model.ResultsHidden) { <div class="alert alert-warning mb-0">@T("Results are not visible while the student is suspended (BR-STU-002).", "النتائج غير ظاهرة أثناء إيقاف الطالب (BR-STU-002).")</div> }
+            else if (Model.Results.Count == 0) { <p class="text-muted mb-0">@T("No published results yet — results appear here once the school publishes a term's marksheets (BR-SEC-012).", "لا نتائج منشورة بعد — تظهر هنا بعد نشر المدرسة لكشوف الفترة (BR-SEC-012).")</p> }
+            else
+            {
+                foreach (var tg in Model.Results.GroupBy(r => r.Term.Id))
+                {
+                    var term = tg.First().Term;
+                    <h3 class="h6 mt-2">@(isRtl ? term.NameAr : term.NameEn)</h3>
+                    <table class="table table-sm sms-table mb-3"><thead><tr><th>@T("Subject", "المادة")</th><th class="text-center">%</th><th class="text-center">@T("Band", "التقدير")</th><th class="text-end">@T("Published", "النشر")</th></tr></thead>
+                        <tbody>@foreach (var r in tg) { <tr><td><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td class="text-center fw-semibold">@r.Result.ScorePercent.ToString("0.00")</td><td class="text-center">@(r.Result.BandCode ?? "—")</td><td class="text-end small text-muted">@r.Result.PublishedAtUtc.ToString("yyyy-MM-dd")</td></tr> }</tbody></table>
+                }
+                <div class="form-text">@T("Report-card download and appeal requests arrive with the report-card center (O6 PDF engine).", "تنزيل بطاقة التقرير وطلبات التظلم تأتي مع مركز بطاقات التقرير (محرك O6).")</div>
+            }
+        </div>
+        <div class="tab-pane fade @Show("fees")" id="tab-fees">
+            <div class="row g-3 text-center mb-3">
+                <div class="col-4"><div class="sms-card p-3"><div class="fs-4 fw-bold">@Model.Fees.GrossCharges.ToString("N2")</div><div class="small text-muted">@T("posted charges", "رسوم مرحّلة")</div></div></div>
+                <div class="col-4"><div class="sms-card p-3"><div class="fs-4 fw-bold text-success">@Model.Fees.Discounts.ToString("N2")</div><div class="small text-muted">@T("discounts (BR-DIS-010)", "خصومات (BR-DIS-010)")</div></div></div>
+                <div class="col-4"><div class="sms-card p-3"><div class="fs-4 fw-bold @(Model.Fees.Position > 0 ? "text-danger" : "text-success")">@Model.Fees.Position.ToString("N2")</div><div class="small text-muted">@T("balance due", "الرصيد المستحق")</div></div></div>
+            </div>
+            <table class="table table-sm sms-table mb-2"><thead><tr><th>@T("Invoice", "الفاتورة")</th><th>@T("Posted", "التاريخ")</th><th class="text-end">@T("Amount", "المبلغ")</th></tr></thead>
+                <tbody>@foreach (var c in Model.Fees.Charges.OrderByDescending(c => c.PostedAtUtc)) { <tr><td><code>@c.ChargeNo</code></td><td>@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@c.GrossAmount.ToString("N2")</td></tr> }@if (Model.Fees.Charges.Count == 0) { <tr><td colspan="3" class="text-center text-muted py-3">@T("No posted invoices.", "لا فواتير مرحّلة.")</td></tr> }</tbody></table>
+            <div class="form-text">@T("Posted invoices only (BR-SEC-012). Online payment (BR-PAY-007) is not enabled; pay at the school cashier.", "الفواتير المرحّلة فقط (BR-SEC-012). الدفع الإلكتروني (BR-PAY-007) غير مفعّل؛ السداد لدى أمين الصندوق.") <a asp-action="Statement">@T("Family statement →", "كشف حساب العائلة ←")</a></div>
+        </div>
+    </div>
+</div>
