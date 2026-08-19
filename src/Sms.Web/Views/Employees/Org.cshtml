@@ -1,0 +1,56 @@
+@using System.Globalization
+@model OrgChartViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Org chart", "الهيكل التنظيمي");
+    ViewData["Breadcrumb"] = T("Employees / Org chart", "الموظفون / الهيكل التنظيمي");
+    var help = new HelpPanelViewModel
+    {
+        Id = "org-help", Title = T("Org chart — help", "الهيكل التنظيمي — مساعدة"),
+        Intro = T("The administrative tree (BR-EMP-002) — distinct from the academic departments in Subjects. Every employee's current position points at a unit here.", "الشجرة الإدارية (BR-EMP-002) — مستقلة عن الأقسام الأكاديمية في المواد. منصب كل موظف الحالي يشير إلى وحدة هنا."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Add / edit ✎", "إضافة / تعديل ✎"), T("Bilingual name + optional parent. Re-parenting is refused when it would create a cycle.", "اسم بلغتين + وحدة أم اختيارية. يُرفض النقل إذا أنشأ حلقة.")),
+            new HelpPanelViewModel.Item(T("Delete 🗑", "حذف 🗑"), T("Only a unit with no child units and no assignment history (past or present) can be deleted — the button is disabled otherwise.", "لا تُحذف إلا وحدة بلا وحدات فرعية وبلا سجل إسناد (سابق أو حالي) — الزر معطل خلاف ذلك.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.All.Count @T("units", "وحدة") · @Model.Unassigned @T("active employees without a position", "موظفاً نشطاً بلا منصب")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_StaffNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+                <thead><tr><th>@T("Unit", "الوحدة")</th><th>@T("Parent", "الوحدة الأم")</th><th>@T("Head-count", "العدد")</th><th>@T("Current staff", "الكادر الحالي")</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var n in Model.Nodes)
+                {
+                    var fid = $"ou{n.Unit.Id}";
+                    var deletable = n.ChildCount == 0 && n.HeadCount == 0;
+                    <tr>
+                        <td style="padding-@(isRtl ? "right" : "left"):@(1 + n.Depth * 1.5)rem"><div class="d-flex gap-1"><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@n.Unit.NameAr" style="width:10rem" /><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@n.Unit.NameEn" style="width:10rem" /></div></td>
+                        <td><select form="@fid" name="parentId" class="form-select form-select-sm" style="width:12rem"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All.Where(u => u.Id != n.Unit.Id)) { <option value="@u.Id" selected="@(u.Id == n.Unit.ParentOrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></td>
+                        <td>@n.HeadCount</td>
+                        <td class="small">@string.Join(" · ", n.Current.Take(6).Select(c => $"{(isRtl ? $"{c.Employee.FirstNameAr} {c.Employee.FamilyNameAr}" : $"{c.Employee.FirstNameEn} {c.Employee.FamilyNameEn}")}{(c.Position == null ? "" : $" ({c.Position})")}"))@(n.Current.Count > 6 ? $" +{n.Current.Count - 6}" : "")</td>
+                        <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")"><i class="bi bi-check-lg"></i></button></form> <form method="post" asp-action="DeleteOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline" onsubmit="return confirm('@T("Delete this unit?", "حذف هذه الوحدة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" @(deletable ? "" : "disabled") title="@(deletable ? T("Delete", "حذف") : T("Has child units or assignment history", "لها وحدات فرعية أو سجل إسناد"))"><i class="bi bi-trash"></i></button></form></td>
+                    </tr>
+                }
+                @if (Model.Nodes.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-4">@T("No org units yet — add the first root unit on the right.", "لا وحدات بعد — أضف الوحدة الجذرية الأولى من اليمين.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("New unit", "وحدة جديدة")</h2>
+            <form method="post" asp-action="CreateOrgUnit" class="d-grid gap-2">
+                <input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الشؤون الأكاديمية" required /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Academic Affairs" required />
+                <select name="parentId" class="form-select form-select-sm"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All) { <option value="@u.Id">@(isRtl ? u.NameAr : u.NameEn)</option> }</select>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button>
+            </form>
+        </div>
+    </div>
+</div>

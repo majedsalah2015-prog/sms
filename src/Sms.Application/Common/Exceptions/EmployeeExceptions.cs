@@ -29,4 +29,22 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>Only Draft contracts may be edited — active/terminated contracts are immutable documents (BR-EMP-003).</summary>
+    public class ContractNotEditableException : InvalidOperationException
+    {
+        public ContractNotEditableException(int contractId, ContractStatus status)
+            : base($"Contract {contractId} is '{status}' and can no longer be edited (BR-EMP-003).")
+        {
+        }
+    }
+
+    /// <summary>BR-EMP-002: an org unit can only be deleted/re-parented while its tree and assignment history allow it.</summary>
+    public class OrgUnitInUseException : InvalidOperationException
+    {
+        public OrgUnitInUseException(int orgUnitId, string reason)
+            : base($"Org unit {orgUnitId} is in use: {reason}.")
+        {
+        }
+    }
 }

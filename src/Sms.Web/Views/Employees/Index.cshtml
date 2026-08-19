@@ -1,0 +1,39 @@
+@using System.Globalization
+@using Sms.Domain.Employees
+@model EmployeeListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Employees", "الموظفون");
+    ViewData["Breadcrumb"] = T("Employees / Directory", "الموظفون / الدليل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "emp-help", Title = T("Employees — help", "الموظفون — مساعدة"),
+        Intro = T("One permanent employee record and number (EMP series) across contract renewals and rehires (BR-EMP-001). The directory is the basic contact card for all staff; the Employee file holds the HR tabs.", "سجل موظف واحد دائم ورقم (سلسلة EMP) عبر تجديد العقود وإعادة التعيين (BR-EMP-001). الدليل بطاقة تواصل أساسية لكل الكادر؛ ملف الموظف يحوي تبويبات الموارد البشرية."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Register", "تسجيل"), T("Names in both languages are mandatory (BR-GLB-001). A first position (org unit + job title) can be set at registration; contracts and qualifications are added from the file.", "الاسمان بلغتين إلزاميان (BR-GLB-001). يمكن تحديد منصب أول (وحدة + مسمى) عند التسجيل؛ العقود والمؤهلات تُضاف من الملف.")),
+            new HelpPanelViewModel.Item(T("Employee file", "ملف الموظف"), T("Personal (✎ identity edits need a reason, T1), Position & org (effective-dated history, BR-EMP-002), Contracts 🔒 (Draft → Active → Terminated, no overlaps, BR-EMP-003), Qualifications (BR-EMP-004), Teaching (designation + load, Module 13), Status, Audit.", "الشخصية (✎ تعديل الهوية بسبب، T1)، المنصب والهيكل (سجل بتواريخ سريان، BR-EMP-002)، العقود 🔒 (مسودة → ساري → منتهٍ، بلا تداخل، BR-EMP-003)، المؤهلات (BR-EMP-004)، التدريس (التعيين والنصاب، الوحدة 13)، الحالة، التدقيق.")),
+            new HelpPanelViewModel.Item(T("Salary 🔒", "الراتب 🔒"), T("Salary fields are restricted to HR + Principal (BR-GLB-072). The permission gate and Always-Encrypted storage (O10) are pending — the values are visible to every staff login in this build.", "حقول الراتب مقصورة على الموارد البشرية والمدير (BR-GLB-072). بوابة الصلاحية والتشفير (O10) معلّقان — القيم ظاهرة لكل موظف في هذا الإصدار.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Total @T("employees", "موظفاً")</p></div>
+    <div class="d-flex gap-2"><a class="btn btn-primary" asp-action="Register"><i class="bi bi-person-plus me-1"></i>@T("Register employee", "تسجيل موظف")</a><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_StaffNav" />
+
+<div class="sms-card">
+    <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+        <input name="q" class="form-control form-control-sm" style="max-width:18rem" value="@Model.Query" placeholder="@T("number, name, ID…", "الرقم، الاسم، الهوية…")" />
+        <select name="status" class="form-select form-select-sm" style="max-width:11rem" onchange="this.form.submit()"><option value="">@T("Any status", "كل الحالات")</option>@foreach (EmployeeStatus s in Enum.GetValues(typeof(EmployeeStatus))) { <option value="@s" selected="@(s == Model.Status)">@StaffLabels.EmployeeStatus(s, isRtl)</option> }</select>
+        <select name="org" class="form-select form-select-sm" style="max-width:14rem" onchange="this.form.submit()"><option value="">@T("Any org unit", "كل الوحدات")</option>@foreach (var u in Model.OrgUnits) { <option value="@u.Id" selected="@(u.Id == Model.OrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select>
+        <label class="small d-flex align-items-center gap-1"><input type="checkbox" name="teachers" value="true" class="form-check-input" checked="@(Model.TeachersOnly == true)" onchange="this.form.submit()" /> @T("teachers only", "المعلمون فقط")</label>
+        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+    </form>
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <thead><tr><th>@T("Employee no.", "رقم الموظف")</th><th>@T("Name", "الاسم")</th><th>@T("Position", "المسمى")</th><th>@T("Org unit", "الوحدة")</th><th>@T("Contract", "العقد")</th><th>@T("Nationality", "الجنسية")</th><th>@T("Status", "الحالة")</th></tr></thead>
+        <tbody>@foreach (var r in Model.Rows) { var e = r.Employee; <tr><td><a asp-action="File" asp-route-id="@e.Id"><code>@e.EmployeeNo</code></a></td><td class="fw-semibold"><a asp-action="File" asp-route-id="@e.Id">@(isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}")</a> @if (r.IsTeacher) { <span class="badge text-bg-info">@T("teacher", "معلم")</span> }</td><td>@(r.Position ?? "—")</td><td>@(r.OrgUnit ?? "—")</td><td>@if (r.CurrentContract != null) { <span class="small">@StaffLabels.ContractType(r.CurrentContract.Type, isRtl) · → @r.CurrentContract.EndDate.ToString("yyyy-MM-dd")</span> } else { <span class="text-warning-emphasis small">@T("no active contract", "لا عقد ساري")</span> }</td><td>@r.NationalityName</td><td><span class="badge @StaffLabels.EmployeeBadge(e.Status)">@StaffLabels.EmployeeStatus(e.Status, isRtl)</span></td></tr> }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No employees match.", "لا موظفون مطابقون.")</td></tr> }</tbody>
+    </table></div>
+</div>

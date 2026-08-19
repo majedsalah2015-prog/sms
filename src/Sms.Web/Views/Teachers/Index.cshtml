@@ -1,0 +1,54 @@
+@using System.Globalization
+@model TeacherDirectoryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Teachers", "المعلمون");
+    ViewData["Breadcrumb"] = T("Teachers / Directory", "المعلمون / الدليل");
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "tch-help", Title = T("Teachers — help", "المعلمون — مساعدة"),
+        Intro = T("A teacher is an employee with a teacher profile (BR-TCH-001) — designation needs an active contract. The academic view shows subjects taught, load vs max (BR-TCH-004) and homeroom for the selected year.", "المعلم موظف له ملف تدريسي (BR-TCH-001) — التعيين يحتاج عقداً سارياً. العرض الأكاديمي يُظهر المواد والنصاب مقابل الحد (BR-TCH-004) ومربي الصف للعام المختار."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Designate", "تعيين"), T("Pick an active employee and a weekly maximum. Adjust the maximum later from the Employee file → Teaching.", "اختر موظفاً نشطاً وحداً أسبوعياً. عدّل الحد لاحقاً من ملف الموظف → التدريس.")),
+            new HelpPanelViewModel.Item(T("Assign", "إسناد"), T("Offerings × sections are assigned on the Assignment matrix; the Load board compares all teachers.", "تُسند المواد × الشعب من مصفوفة الإسناد؛ لوحة النصاب تقارن كل المعلمين.")),
+            new HelpPanelViewModel.Item(T("Homeroom", "مربي الصف"), T("Read through Sections' homeroom assignment, which is keyed by user account — shows only when the employee's user account id is set (identity bridge, see notes).", "يُقرأ من إسناد مربي الصف في الشعب، المرتبط بحساب المستخدم — يظهر فقط إذا حُدد معرّف حساب الموظف (جسر الهوية).")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Rows.Count @T("teachers", "معلماً")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_StaffNav" />
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+                <thead><tr><th>@T("Teacher", "المعلم")</th><th>@T("Subjects", "المواد")</th><th>@T("Sections", "الشعب")</th><th>@T("Load", "النصاب")</th><th>@T("Homeroom", "مربي")</th><th>@T("Contract", "العقد")</th></tr></thead>
+                <tbody>@foreach (var r in Model.Rows)
+                {
+                    var e = r.Employee; var max = r.Profile.MaxWeeklyPeriods; var pct = max == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * r.Load / max));
+                    <tr><td class="fw-semibold"><a asp-controller="Employees" asp-action="File" asp-route-id="@e.Id" asp-route-tab="teaching"><code>@e.EmployeeNo</code> @(isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}")</a></td>
+                        <td class="small">@(r.Subjects.Count == 0 ? "—" : string.Join(" · ", r.Subjects))</td><td>@r.SectionCount</td>
+                        <td><div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(pct)%;@(r.Load > max ? "background:#dc2626" : r.Load < max / 2 ? "background:#f59e0b" : "")"></span></div><span class="small @(r.Load > max ? "text-danger fw-semibold" : "")">@r.Load/@max</span></div></td>
+                        <td>@(r.Homeroom ?? "—")</td><td>@if (r.HasActiveContract) { <span class="badge text-bg-success">@T("active", "ساري")</span> } else { <span class="badge text-bg-warning">@T("none", "لا عقد")</span> }</td></tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No teachers designated yet.", "لم يُعيَّن معلمون بعد.")</td></tr> }</tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-xl-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3"><i class="bi bi-person-workspace me-1"></i>@T("Designate a teacher", "تعيين معلم")</h2>
+            <form method="post" asp-action="Designate" asp-route-year="@yid" class="d-grid gap-2">
+                <select name="employeeId" class="form-select form-select-sm" required><option value="">@T("Employee…", "الموظف…")</option>@foreach (var e in Model.Designatable) { <option value="@e.Id">@e.EmployeeNo · @(isRtl ? $"{e.FirstNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FamilyNameEn}")</option> }</select>
+                <div class="d-flex gap-2 align-items-center"><label class="small text-nowrap">@T("Max periods/week", "الحد/أسبوع")</label><input name="maxWeeklyPeriods" type="number" min="1" class="form-control form-control-sm" value="24" /></div>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Designate", "تعيين")</button>
+                <div class="form-text">@T("Requires an active contract (BR-TCH-001).", "يتطلب عقداً سارياً (BR-TCH-001).")</div>
+            </form>
+        </div>
+    </div>
+</div>

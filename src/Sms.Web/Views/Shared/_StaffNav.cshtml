@@ -1,0 +1,22 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Controller, string Action, string En, string Ar, string Icon)[]
+    {
+        ("Employees", "Index", "Employee directory", "دليل الموظفين", "bi-person-badge"),
+        ("Employees", "Org", "Org chart", "الهيكل التنظيمي", "bi-diagram-3"),
+        ("Employees", "Contracts", "Contract manager 🔒", "إدارة العقود 🔒", "bi-file-earmark-text"),
+        ("Teachers", "Index", "Teacher directory", "دليل المعلمين", "bi-person-workspace"),
+        ("Teachers", "Matrix", "Assignment matrix", "مصفوفة الإسناد", "bi-grid-3x3"),
+        ("Teachers", "Load", "Load board", "لوحة النصاب", "bi-speedometer2"),
+    };
+    bool Active((string Controller, string Action, string En, string Ar, string Icon) t) => string.Equals(t.Controller, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Index" && (action == "File" || action == "Register")));
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item"><a class="nav-link @(Active(t) ? "active" : "")" asp-controller="@t.Controller" asp-action="@t.Action"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

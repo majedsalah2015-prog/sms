@@ -243,5 +243,45 @@ namespace Sms.Infrastructure.Tests
 
             Assert.NotNull(assignment);
         }
+
+        // --- E-203 screen support: reassignment + load edit ---------------------
+
+        [Fact]
+        [BusinessRule("BR-TCH-007")]
+        public async Task Ending_an_assignment_keeps_history_and_frees_the_primary_slot_for_another_teacher()
+        {
+            using var db = CreateContext();
+            var first = await RegisterEmployeeWithActiveContract(db, "1");
+            var second = await RegisterEmployeeWithActiveContract(db, "2");
+            var teacherAdmin = new TeacherAdmin(db, _clock);
+            var firstProfile = await teacherAdmin.DesignateTeacherAsync(first.Id, maxWeeklyPeriods: 24);
+            var secondProfile = await teacherAdmin.DesignateTeacherAsync(second.Id, maxWeeklyPeriods: 24);
+            var a1 = await teacherAdmin.AssignAsync(firstProfile.Id, _offeringId, _sectionId, TeacherRole.Primary, new DateTime(2026, 9, 1));
+
+            await teacherAdmin.EndAssignmentAsync(a1.Id, new DateTime(2026, 12, 1));
+            await teacherAdmin.EndAssignmentAsync(a1.Id, new DateTime(2027, 1, 1)); // idempotent — first close stands
+            Assert.Equal(new DateTime(2026, 12, 1), db.TeacherAssignments.Single(a => a.Id == a1.Id).EffectiveToUtc);
+
+            var a2 = await teacherAdmin.AssignAsync(secondProfile.Id, _offeringId, _sectionId, TeacherRole.Primary, new DateTime(2026, 12, 1));
+            Assert.Null(db.TeacherAssignments.Single(a => a.Id == a2.Id).EffectiveToUtc);
+            Assert.Equal(2, db.TeacherAssignments.Count(a => a.CurriculumOfferingId == _offeringId && a.SectionId == _sectionId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-TCH-004")]
+        public async Task Raising_max_load_lets_a_previously_rejected_assignment_through()
+        {
+            using var db = CreateContext();
+            var employee = await RegisterEmployeeWithActiveContract(db);
+            var teacherAdmin = new TeacherAdmin(db, _clock);
+            var profile = await teacherAdmin.DesignateTeacherAsync(employee.Id, maxWeeklyPeriods: 1);
+
+            await Assert.ThrowsAsync<LoadExceededException>(() =>
+                teacherAdmin.AssignAsync(profile.Id, _offeringId, _sectionId, TeacherRole.Primary, new DateTime(2026, 9, 1)));
+
+            await teacherAdmin.UpdateMaxLoadAsync(profile.Id, 24);
+            var assignment = await teacherAdmin.AssignAsync(profile.Id, _offeringId, _sectionId, TeacherRole.Primary, new DateTime(2026, 9, 1));
+            Assert.NotNull(assignment);
+        }
     }
 }

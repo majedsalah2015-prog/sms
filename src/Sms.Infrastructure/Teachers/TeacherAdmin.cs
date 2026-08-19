@@ -101,5 +101,25 @@ namespace Sms.Infrastructure.Teachers
             await _db.SaveChangesAsync(cancellationToken);
             return assignment;
         }
+
+        public async Task<TeacherProfile> UpdateMaxLoadAsync(int teacherProfileId, int maxWeeklyPeriods, CancellationToken cancellationToken = default)
+        {
+            var profile = await _db.TeacherProfiles.SingleAsync(p => p.Id == teacherProfileId, cancellationToken);
+            profile.MaxWeeklyPeriods = maxWeeklyPeriods;
+            await _db.SaveChangesAsync(cancellationToken);
+            return profile;
+        }
+
+        public async Task EndAssignmentAsync(int teacherAssignmentId, DateTime effectiveToUtc, CancellationToken cancellationToken = default)
+        {
+            var assignment = await _db.TeacherAssignments.SingleAsync(a => a.Id == teacherAssignmentId, cancellationToken);
+            if (assignment.EffectiveToUtc != null)
+            {
+                return;
+            }
+
+            assignment.EffectiveToUtc = effectiveToUtc;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
     }
 }

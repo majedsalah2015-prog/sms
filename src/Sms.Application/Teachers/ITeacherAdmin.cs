@@ -18,5 +18,11 @@ namespace Sms.Application.Teachers
         Task<TeacherAssignment> AssignAsync(
             int teacherProfileId, int curriculumOfferingId, int sectionId, TeacherRole role, DateTime effectiveFromUtc,
             bool overrideLoad = false, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-TCH-004: adjusts the school-configured weekly maximum for one teacher.</summary>
+        Task<TeacherProfile> UpdateMaxLoadAsync(int teacherProfileId, int maxWeeklyPeriods, CancellationToken cancellationToken = default);
+
+        /// <summary>BR-TCH-007: closes a current assignment (history kept) so the offering×section can be re-pointed to another teacher. Idempotent on an already-closed row.</summary>
+        Task EndAssignmentAsync(int teacherAssignmentId, DateTime effectiveToUtc, CancellationToken cancellationToken = default);
     }
 }

@@ -1,0 +1,144 @@
+@using System.Globalization
+@using Sms.Domain.Employees
+@using Sms.Domain.Teachers
+@model EmployeeFileViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var e = Model.Employee;
+    var name = isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.GrandfatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.GrandfatherNameEn} {e.FamilyNameEn}";
+    ViewData["Title"] = e.EmployeeNo;
+    ViewData["Breadcrumb"] = T("Employees / ", "الموظفون / ") + e.EmployeeNo;
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+    var current = Model.Assignments.FirstOrDefault(a => a.Assignment.EffectiveToUtc == null);
+    var tabs = new (string Key, string En, string Ar, string? Count)[]
+    {
+        ("personal", "Personal", "الشخصية", null), ("position", "Position & org", "المنصب والهيكل", Model.Assignments.Count.ToString()), ("contracts", "Contracts 🔒", "العقود 🔒", Model.Contracts.Count.ToString()),
+        ("qualifications", "Qualifications", "المؤهلات", Model.Qualifications.Count.ToString()), ("teaching", "Teaching", "التدريس", Model.TeacherProfile == null ? null : Model.Teaching.Count(t => t.Assignment.EffectiveToUtc == null).ToString()),
+        ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()), ("more", "More…", "المزيد…", null),
+    };
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@e.EmployeeNo</code> · @Model.NationalityName · @(e.Gender == Sms.Domain.Common.Gender.Male ? T("Male", "ذكر") : T("Female", "أنثى")) · @e.DateOfBirth.ToString("yyyy-MM-dd")@(current == null ? "" : $" · {current.Position ?? "?"} · {(current.OrgUnit == null ? "?" : (isRtl ? current.OrgUnit.NameAr : current.OrgUnit.NameEn))}")</div>
+        <h1 class="sms-page-title">@name <span class="badge fs-6 @StaffLabels.EmployeeBadge(e.Status)">@StaffLabels.EmployeeStatus(e.Status, isRtl)</span> @if (Model.TeacherProfile != null) { <span class="badge fs-6 text-bg-info">@T("teacher", "معلم")</span> }</h1></div>
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Directory", "الدليل")</a>
+</div>
+<partial name="_StaffNav" />
+
+<div class="sms-card">
+    <ul class="nav nav-tabs px-3 pt-2 flex-nowrap overflow-auto">@foreach (var t in tabs) { <li class="nav-item"><button class="nav-link text-nowrap @(Model.ActiveTab == t.Key ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button">@(isRtl ? t.Ar : t.En)@if (t.Count != null) { <span class="badge rounded-pill text-bg-light border ms-1">@t.Count</span> }</button></li> }</ul>
+    <div class="tab-content p-4">
+        <div class="tab-pane fade @Show("personal")" id="tab-personal">
+            <form method="post" asp-action="Edit" asp-route-id="@e.Id">
+                <div class="sms-bilingual mb-3">
+                    <div><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FirstNameAr" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FatherNameAr" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.GrandfatherNameAr" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FamilyNameAr" /></div></div></div>
+                    <div><label class="form-label small">@T("Name (English)", "الاسم (إنجليزي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FirstNameEn" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FatherNameEn" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.GrandfatherNameEn" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FamilyNameEn" /></div></div></div>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-2"><label class="form-label small">@T("Gender", "الجنس")</label><select name="Gender" class="form-select form-select-sm"><option value="Male" selected="@(e.Gender == Sms.Domain.Common.Gender.Male)">@T("Male", "ذكر")</option><option value="Female" selected="@(e.Gender == Sms.Domain.Common.Gender.Female)">@T("Female", "أنثى")</option></select></div>
+                    <div class="col-md-2"><label class="form-label small">@T("Date of birth", "الميلاد")</label><input name="DateOfBirth" type="date" class="form-control form-control-sm" value="@e.DateOfBirth.ToString("yyyy-MM-dd")" /></div>
+                    <div class="col-md-3"><label class="form-label small">@T("Nationality", "الجنسية")</label><select name="NationalityLookupId" class="form-select form-select-sm">@foreach (var n in Model.Nationalities) { <option value="@n.Id" selected="@(n.Id == e.NationalityLookupId)">@(isRtl ? n.Ar : n.En)</option> }</select></div>
+                    <div class="col-md-2"><label class="form-label small">@T("ID type", "نوع الهوية")</label><select name="PrimaryIdTypeLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(t.Id == e.PrimaryIdTypeLookupId)">@(isRtl ? t.Ar : t.En)</option> }</select></div>
+                    <div class="col-md-2"><label class="form-label small">@T("ID number", "رقم الهوية")</label><input name="PrimaryIdNo" class="form-control form-control-sm" dir="ltr" value="@e.PrimaryIdNo" /></div>
+                    <div class="col-md-1"><label class="form-label small">@T("Expiry", "الانتهاء")</label><input name="PrimaryIdExpiry" type="date" class="form-control form-control-sm" value="@e.PrimaryIdExpiry?.ToString("yyyy-MM-dd")" /></div>
+                    <div class="col-md-2"><label class="form-label small">@T("User account id", "معرّف حساب المستخدم")</label><input name="UserAccountId" type="number" class="form-control form-control-sm" dir="ltr" value="@e.UserAccountId" /><div class="form-text">@T("Bridge to sec.UserAccount (BR-EMP-001); provisioning lands with Module 36.", "ربط بـ sec.UserAccount (BR-EMP-001)؛ الإنشاء مع الوحدة 36.")</div></div>
+                </div>
+                <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small">@T("Reason (required when name fields change — BR-EMP-001, T1)", "السبب (مطلوب عند تغيير حقول الاسم — BR-EMP-001)")</label><input name="Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button></div>
+            </form>
+        </div>
+
+        <div class="tab-pane fade @Show("position")" id="tab-position">
+            <table class="table table-sm sms-table mb-3"><thead><tr><th>@T("Org unit", "الوحدة")</th><th>@T("Position", "المسمى")</th><th>@T("Reports to", "يرفع إلى")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th></tr></thead>
+                <tbody>@foreach (var a in Model.Assignments) { <tr class="@(a.Assignment.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@(a.OrgUnit == null ? "?" : (isRtl ? a.OrgUnit.NameAr : a.OrgUnit.NameEn))</td><td>@(a.Position ?? "?")</td><td>@(a.Manager == null ? "—" : $"{a.Manager.EmployeeNo} · {(isRtl ? $"{a.Manager.FirstNameAr} {a.Manager.FamilyNameAr}" : $"{a.Manager.FirstNameEn} {a.Manager.FamilyNameEn}")}")</td><td>@a.Assignment.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(a.Assignment.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? T("current", "حالي"))</td></tr> }
+                @if (Model.Assignments.Count == 0) { <tr><td colspan="5" class="text-center text-warning-emphasis py-3">@T("No position yet — every employee needs a position + org unit (BR-EMP-002).", "لا منصب بعد — كل موظف يحتاج منصباً ووحدة (BR-EMP-002).")</td></tr> }</tbody></table>
+            <form method="post" asp-action="AssignPosition" asp-route-id="@e.Id" class="row g-2 align-items-end">
+                <div class="col-md-3"><label class="form-label small">@T("Org unit", "الوحدة")</label><select name="orgUnitId" class="form-select form-select-sm"><option value="">—</option>@foreach (var u in Model.OrgUnits) { <option value="@u.Id" selected="@(u.Id == current?.Assignment.OrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
+                <div class="col-md-3"><label class="form-label small">@T("Job title", "المسمى")</label><select name="positionLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Positions) { <option value="@p.Id" selected="@(p.Id == current?.Assignment.PositionLookupId)">@(isRtl ? p.Ar : p.En)</option> }</select></div>
+                <div class="col-md-3"><label class="form-label small">@T("Reports to", "يرفع إلى")</label><select name="managerEmployeeId" class="form-select form-select-sm"><option value="">—</option>@foreach (var m in Model.Managers) { <option value="@m.Id" selected="@(m.Id == current?.Assignment.ManagerEmployeeId)">@m.EmployeeNo · @(isRtl ? $"{m.FirstNameAr} {m.FamilyNameAr}" : $"{m.FirstNameEn} {m.FamilyNameEn}")</option> }</select></div>
+                <div class="col-md-2"><label class="form-label small">@T("Effective from", "سريان من")</label><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" /></div>
+                <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit" title="@T("Assign (closes the current one)", "إسناد (يغلق الحالي)")"><i class="bi bi-arrow-right-circle"></i></button></div>
+            </form>
+            <div class="form-text">@T("Reassignment closes the current row as of the new effective date — history is kept. Reporting line drives WF-10 leave approvals (deferred).", "إعادة الإسناد تغلق الصف الحالي بتاريخ السريان الجديد مع حفظ السجل. خط الرفع يقود اعتمادات الإجازات WF-10 (مؤجل).")</div>
+        </div>
+
+        <div class="tab-pane fade @Show("contracts")" id="tab-contracts">
+            <div class="alert alert-light border small py-2"><i class="bi bi-lock me-1"></i>@T("Salary is restricted to HR + Principal (BR-GLB-072) and changes need a reason (T1). The permission gate and Always-Encrypted storage (O10) are pending in this build.", "الراتب مقصور على الموارد البشرية والمدير (BR-GLB-072) وتغييره يحتاج سبباً (T1). بوابة الصلاحية والتشفير (O10) معلّقان في هذا الإصدار.")</div>
+            <table class="table table-sm sms-table mb-3 align-middle"><thead><tr><th>@T("Type", "النوع")</th><th>@T("Start", "البداية")</th><th>@T("End", "النهاية")</th><th>@T("Basic 🔒", "الأساسي 🔒")</th><th>@T("Allowances 🔒", "البدلات 🔒")</th><th>@T("Status", "الحالة")</th><th></th></tr></thead>
+                <tbody>@foreach (var c in Model.Contracts)
+                {
+                    var expired = c.Status == ContractStatus.Active && c.EndDate < DateTime.UtcNow.Date;
+                    <tr>
+                        @if (c.Status == ContractStatus.Draft)
+                        {
+                            var fid = $"ct{c.Id}";
+                            <td><select form="@fid" name="type" class="form-select form-select-sm">@foreach (ContractType ct in Enum.GetValues(typeof(ContractType))) { <option value="@ct" selected="@(ct == c.Type)">@StaffLabels.ContractType(ct, isRtl)</option> }</select></td>
+                            <td><input form="@fid" name="startDate" type="date" class="form-control form-control-sm" value="@c.StartDate.ToString("yyyy-MM-dd")" /></td>
+                            <td><input form="@fid" name="endDate" type="date" class="form-control form-control-sm" value="@c.EndDate.ToString("yyyy-MM-dd")" /></td>
+                            <td><input form="@fid" name="salaryBasic" type="number" step="0.01" class="form-control form-control-sm" style="width:7rem" value="@c.SalaryBasic.ToString(CultureInfo.InvariantCulture)" /></td>
+                            <td><input form="@fid" name="salaryAllowances" type="number" step="0.01" class="form-control form-control-sm" style="width:7rem" value="@(c.SalaryAllowances?.ToString(CultureInfo.InvariantCulture))" /></td>
+                            <td><span class="badge text-bg-secondary">@StaffLabels.ContractStatus(c.Status, isRtl)</span></td>
+                            <td class="text-end text-nowrap">
+                                <form id="@fid" method="post" asp-action="EditContract" asp-route-id="@e.Id" asp-route-contractId="@c.Id" class="d-inline-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:8rem" /><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")"><i class="bi bi-check-lg"></i></button></form>
+                                <form method="post" asp-action="ContractStatusChange" asp-route-id="@e.Id" asp-route-contractId="@c.Id" class="d-inline"><input type="hidden" name="target" value="Active" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>@T("Activate", "تفعيل")</button></form>
+                            </td>
+                        }
+                        else
+                        {
+                            <td>@StaffLabels.ContractType(c.Type, isRtl)</td><td>@c.StartDate.ToString("yyyy-MM-dd")</td><td>@c.EndDate.ToString("yyyy-MM-dd")</td><td>@c.SalaryBasic.ToString("N2")</td><td>@(c.SalaryAllowances?.ToString("N2") ?? "—")</td>
+                            <td><span class="badge @(c.Status == ContractStatus.Active ? (expired ? "text-bg-warning" : "text-bg-success") : "text-bg-dark")">@StaffLabels.ContractStatus(c.Status, isRtl)@(expired ? " · " + T("expired", "منتهي المدة") : "")</span></td>
+                            <td class="text-end">@if (c.Status == ContractStatus.Active) { <form method="post" asp-action="ContractStatusChange" asp-route-id="@e.Id" asp-route-contractId="@c.Id" class="d-inline-flex gap-1" onsubmit="return confirm('@T("Terminate this contract early?", "إنهاء هذا العقد مبكراً؟")');"><input type="hidden" name="target" value="Terminated" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:8rem" /><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1"></i>@T("Terminate", "إنهاء")</button></form> }</td>
+                        }
+                    </tr>
+                }
+                @if (Model.Contracts.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-3">@T("No contracts.", "لا عقود.")</td></tr> }</tbody></table>
+            <form method="post" asp-action="DefineContract" asp-route-id="@e.Id" class="row g-2 align-items-end">
+                <div class="col-md-2"><label class="form-label small">@T("Type", "النوع")</label><select name="type" class="form-select form-select-sm">@foreach (ContractType ct in Enum.GetValues(typeof(ContractType))) { <option value="@ct">@StaffLabels.ContractType(ct, isRtl)</option> }</select></div>
+                <div class="col-md-2"><label class="form-label small">@T("Start", "البداية")</label><input name="startDate" type="date" class="form-control form-control-sm" /></div>
+                <div class="col-md-2"><label class="form-label small">@T("End", "النهاية")</label><input name="endDate" type="date" class="form-control form-control-sm" /></div>
+                <div class="col-md-2"><label class="form-label small">@T("Basic salary 🔒", "الراتب الأساسي 🔒")</label><input name="salaryBasic" type="number" step="0.01" class="form-control form-control-sm" /></div>
+                <div class="col-md-2"><label class="form-label small">@T("Allowances 🔒", "البدلات 🔒")</label><input name="salaryAllowances" type="number" step="0.01" class="form-control form-control-sm" /></div>
+                <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Draft contract", "مسودة عقد")</button></div>
+            </form>
+            <div class="form-text">@T("Dates must not overlap another non-terminated contract (BR-EMP-003). Draft → Active (Principal approval, P2 not enforced) → Terminated; natural expiry is derived from the end date.", "لا تتداخل التواريخ مع عقد آخر غير منتهٍ (BR-EMP-003). مسودة → ساري (اعتماد المدير، P2 غير مفعّل) → منتهٍ؛ انتهاء المدة يُستنتج من تاريخ النهاية.")</div>
+        </div>
+
+        <div class="tab-pane fade @Show("qualifications")" id="tab-qualifications">
+            <table class="table table-sm sms-table mb-3"><thead><tr><th>@T("Title", "المؤهل")</th><th>@T("Institution", "الجهة")</th><th>@T("Awarded", "تاريخ المنح")</th><th>@T("Teaching-relevant", "يخص التدريس")</th></tr></thead>
+                <tbody>@foreach (var q in Model.Qualifications) { <tr><td>@(isRtl ? q.TitleAr : q.TitleEn)</td><td>@(q.InstitutionName ?? "—")</td><td>@q.DateAwarded.ToString("yyyy-MM-dd")</td><td>@(q.IsTeachingRelevant ? "✓" : "—")</td></tr> }@if (Model.Qualifications.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("No qualifications recorded.", "لا مؤهلات مسجلة.")</td></tr> }</tbody></table>
+            <form method="post" asp-action="AddQualification" asp-route-id="@e.Id" class="row g-2 align-items-end">
+                <div class="col-md-3"><input name="titleAr" class="form-control form-control-sm" dir="rtl" placeholder="بكالوريوس رياضيات" /></div><div class="col-md-3"><input name="titleEn" class="form-control form-control-sm" dir="ltr" placeholder="BSc Mathematics" /></div><div class="col-md-2"><input name="institution" class="form-control form-control-sm" placeholder="@T("institution", "الجهة")" /></div><div class="col-md-2"><input name="dateAwarded" type="date" class="form-control form-control-sm" /></div><div class="col-md-1 small"><label><input type="checkbox" name="isTeachingRelevant" value="true" class="form-check-input" checked /> @T("teaching", "تدريس")</label></div><div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg"></i></button></div>
+            </form>
+            <div class="form-text">@T("Teaching-relevant entries are meant to feed the BR-SUB-006 qualification matrix (Subjects → matrix) — the auto-feed and document upload are deferred.", "المدخلات الخاصة بالتدريس تغذي مصفوفة التأهيل BR-SUB-006 (المواد → المصفوفة) — التغذية التلقائية ورفع المستندات مؤجلان.")</div>
+        </div>
+
+        <div class="tab-pane fade @Show("teaching")" id="tab-teaching">
+            @if (Model.TeacherProfile == null)
+            {
+                <p class="text-muted">@T("Not designated as a teacher. Designation needs an active contract (BR-TCH-001) and a weekly maximum (BR-TCH-004).", "غير معيَّن معلماً. التعيين يحتاج عقداً سارياً (BR-TCH-001) وحداً أسبوعياً (BR-TCH-004).")</p>
+                <form method="post" asp-action="Designate" asp-route-id="@e.Id" class="d-flex gap-2 align-items-end"><div><label class="form-label small">@T("Max weekly periods", "الحد الأقصى للحصص/أسبوع")</label><input name="maxWeeklyPeriods" type="number" min="1" class="form-control form-control-sm" style="width:8rem" value="24" /></div><button class="btn btn-sm btn-primary" type="submit" @(Model.HasActiveContract ? "" : "disabled") title="@(Model.HasActiveContract ? "" : T("Needs an active contract", "يحتاج عقداً سارياً"))"><i class="bi bi-person-workspace me-1"></i>@T("Designate as teacher", "تعيين معلماً")</button></form>
+            }
+            else
+            {
+                var pct = Model.TeacherProfile.MaxWeeklyPeriods == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Model.CurrentLoad / Model.TeacherProfile.MaxWeeklyPeriods));
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+                    <div class="small">@T("Load", "النصاب"): <strong>@Model.CurrentLoad / @Model.TeacherProfile.MaxWeeklyPeriods</strong> @T("periods/week", "حصة/أسبوع")</div><div class="sms-progress" style="width:10rem"><span style="width:@(pct)%;@(Model.CurrentLoad > Model.TeacherProfile.MaxWeeklyPeriods ? "background:#dc2626" : "")"></span></div>
+                    <form method="post" asp-action="MaxLoad" asp-route-id="@e.Id" class="d-inline-flex gap-1 align-items-center ms-auto"><input type="hidden" name="profileId" value="@Model.TeacherProfile.Id" /><label class="small">@T("max", "الحد")</label><input name="maxWeeklyPeriods" type="number" min="1" class="form-control form-control-sm" style="width:5rem" value="@Model.TeacherProfile.MaxWeeklyPeriods" /><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-check-lg"></i></button></form>
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Teachers" asp-action="Matrix"><i class="bi bi-grid-3x3 me-1"></i>@T("Assignment matrix", "مصفوفة الإسناد")</a>
+                </div>
+                <table class="table table-sm sms-table mb-0"><thead><tr><th>@T("Subject", "المادة")</th><th>@T("Section", "الشعبة")</th><th>@T("Role", "الدور")</th><th>@T("Periods/wk", "حصص")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th></tr></thead>
+                    <tbody>@foreach (var t in Model.Teaching) { <tr class="@(t.Assignment.EffectiveToUtc == null ? "" : "text-muted")"><td>@(t.Subject == null ? "?" : (isRtl ? t.Subject.Name.NameAr : t.Subject.Name.NameEn))</td><td>@(t.Section == null ? "?" : (isRtl ? t.Section.NameAr : t.Section.NameEn))</td><td>@StaffLabels.TeacherRole(t.Assignment.Role, isRtl)</td><td>@(t.Offering?.WeeklyPeriods)</td><td>@t.Assignment.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(t.Assignment.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? T("current", "حالي"))</td></tr> }@if (Model.Teaching.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-3">@T("No assignments yet — use the assignment matrix.", "لا إسنادات بعد — استخدم مصفوفة الإسناد.")</td></tr> }</tbody></table>
+                @if (!Model.HasActiveContract) { <div class="alert alert-warning small mt-3 mb-0">@T("No active contract — new assignments are blocked until a contract is active (BR-TCH-001).", "لا عقد ساري — الإسنادات الجديدة محجوبة حتى يسري عقد (BR-TCH-001).")</div> }
+            }
+        </div>
+
+        <div class="tab-pane fade @Show("status")" id="tab-status">
+            <div class="d-flex flex-wrap gap-2 mb-3">@foreach (var st in Model.AllowedTransitions) { <form method="post" asp-action="Status" asp-route-id="@e.Id" class="d-inline-flex gap-1" onsubmit="return @(st == EmployeeStatus.Terminated ? "confirm('" + T("Terminate employment? This is final (BR-EMP-008).", "إنهاء الخدمة؟ هذا نهائي (BR-EMP-008).") + "')" : "true");"><input type="hidden" name="target" value="@st" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm @(st == EmployeeStatus.Terminated ? "btn-outline-danger" : "btn-outline-primary")" type="submit">→ @StaffLabels.EmployeeStatus(st, isRtl)</button></form> }@if (Model.AllowedTransitions.Count == 0) { <span class="text-muted small">@T("Terminal status.", "حالة نهائية.")</span> }</div>
+            <div class="form-text">@T("Offboarding clearance (handover, assets, final settlement, account deactivation — BR-EMP-008) arrives as a wizard; today Terminated is a plain transition.", "معالج إخلاء الطرف (التسليم، العهد، التسوية النهائية، تعطيل الحساب — BR-EMP-008) يأتي لاحقاً؛ حالياً الإنهاء انتقال بسيط.")</div>
+        </div>
+
+        <div class="tab-pane fade @Show("audit")" id="tab-audit"><table class="table table-sm sms-table mb-0 small"><thead><tr><th>@T("When", "متى")</th><th>@T("Action", "الإجراء")</th><th>@T("Field", "الحقل")</th><th>@T("Old", "قبل")</th><th>@T("New", "بعد")</th><th>@T("Reason", "السبب")</th><th>@T("Actor", "المنفذ")</th></tr></thead><tbody>@foreach (var a in Model.Audit) { <tr><td>@a.At.ToString("yyyy-MM-dd HH:mm")</td><td>@a.Action</td><td>@a.Field</td><td>@a.Old</td><td>@a.New</td><td>@a.Reason</td><td>#@a.Actor</td></tr> }</tbody></table></div>
+        <div class="tab-pane fade @Show("more")" id="tab-more"><ul class="small text-muted mb-0"><li>@T("Training (PD hours), Attendance (staff console), Leave (WF-10 balances + requests), Documents (attachments), Payroll-prep, Offboarding — open as their engines/screens land.", "التدريب (ساعات التطوير)، الحضور (كونسول الموظفين)، الإجازات (WF-10)، المستندات، تجهيز الرواتب، إنهاء الخدمة — تُفعَّل مع محركاتها/شاشاتها.")</li></ul></div>
+    </div>
+</div>

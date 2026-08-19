@@ -1,0 +1,45 @@
+@using System.Globalization
+@using Sms.Domain.Employees
+@model ContractManagerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Contract manager 🔒", "إدارة العقود 🔒");
+    ViewData["Breadcrumb"] = T("Employees / Contracts", "الموظفون / العقود");
+    string Name(Employee e) => isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}";
+    var help = new HelpPanelViewModel
+    {
+        Id = "ct-help", Title = T("Contract manager — help", "إدارة العقود — مساعدة"),
+        Intro = T("Renewals pipeline and expiry console (BR-EMP-003). Natural expiry is derived from the end date — no job flips a status; the console makes it visible instead.", "مسار التجديد وكونسول الانتهاء (BR-EMP-003). انتهاء المدة يُستنتج من تاريخ النهاية — لا مهمة تغيّر الحالة؛ الكونسول يُظهره."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Expiring", "قيد الانتهاء"), T("Active contracts ending within the window (default 90 days) without a later contract already drafted/active — draft the renewal from the Employee file.", "عقود سارية تنتهي ضمن النافذة (90 يوماً افتراضياً) بلا عقد لاحق — أنشئ مسودة التجديد من ملف الموظف.")),
+            new HelpPanelViewModel.Item(T("Expired", "منتهية المدة"), T("Active contracts whose end date has passed: terminate them, or leave them if the renewal is pending.", "عقود سارية تجاوز تاريخ نهايتها: أنهِها أو اتركها إن كان التجديد معلّقاً.")),
+            new HelpPanelViewModel.Item(T("Drafts", "المسودات"), T("Activate once approved (Principal, P2 not enforced here).", "فعّلها بعد الاعتماد (المدير، P2 غير مفعّل هنا).")),
+        },
+    };
+    async Task Table(IReadOnlyList<ContractManagerViewModel.Row> rows, string empty)
+    {
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle"><thead><tr><th>@T("Employee", "الموظف")</th><th>@T("Type", "النوع")</th><th>@T("Start", "البداية")</th><th>@T("End", "النهاية")</th><th>@T("Days", "الأيام")</th><th>@T("Basic 🔒", "الأساسي 🔒")</th><th>@T("Renewal", "التجديد")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in rows)
+            {
+                var c = r.Contract;
+                <tr><td><a asp-action="File" asp-route-id="@r.Employee.Id" asp-route-tab="contracts"><code>@r.Employee.EmployeeNo</code> @Name(r.Employee)</a></td><td>@StaffLabels.ContractType(c.Type, isRtl)</td><td>@c.StartDate.ToString("yyyy-MM-dd")</td><td>@c.EndDate.ToString("yyyy-MM-dd")</td><td class="@(r.IsExpired ? "text-danger fw-semibold" : r.DaysToEnd <= 30 ? "text-warning-emphasis fw-semibold" : "")">@(r.IsExpired ? T($"{-r.DaysToEnd} ago", $"منذ {-r.DaysToEnd}") : r.DaysToEnd.ToString())</td><td>@c.SalaryBasic.ToString("N2")</td><td>@(r.HasSuccessor ? "✓ " + T("drafted", "موجود") : "—")</td>
+                    <td class="text-end text-nowrap">
+                        @if (c.Status == ContractStatus.Draft) { <form method="post" asp-action="ContractStatusChange" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="d-inline"><input type="hidden" name="target" value="Active" /><input type="hidden" name="returnTo" value="manager" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-circle me-1"></i>@T("Activate", "تفعيل")</button></form> }
+                        else if (c.Status == ContractStatus.Active) { <form method="post" asp-action="ContractStatusChange" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="d-inline-flex gap-1" onsubmit="return confirm('@T("Terminate this contract?", "إنهاء هذا العقد؟")');"><input type="hidden" name="target" value="Terminated" /><input type="hidden" name="returnTo" value="manager" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:8rem" /><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle"></i></button></form> }
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="File" asp-route-id="@r.Employee.Id" asp-route-tab="contracts" title="@T("Open file", "فتح الملف")"><i class="bi bi-box-arrow-up-right"></i></a>
+                    </td></tr>
+            }
+            @if (rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-3">@empty</td></tr> }</tbody></table></div>
+    }
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Renewals pipeline · expiry console · drafts awaiting activation.", "مسار التجديد · كونسول الانتهاء · مسودات بانتظار التفعيل.")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-1 align-items-center small"><label>@T("window (days)", "النافذة (أيام)")</label><input name="window" type="number" class="form-control form-control-sm" style="width:5rem" value="@Model.WindowDays" onchange="this.form.submit()" /></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_StaffNav" />
+
+<div class="sms-card mb-3"><div class="p-3 border-bottom"><h2 class="h6 mb-0 text-warning-emphasis"><i class="bi bi-hourglass-split me-1"></i>@T("Expiring within", "تنتهي خلال") @Model.WindowDays @T("days", "يوماً") <span class="badge text-bg-warning">@Model.Expiring.Count</span></h2></div>@{ await Table(Model.Expiring, T("Nothing expiring in the window.", "لا شيء ينتهي ضمن النافذة.")); }</div>
+<div class="sms-card mb-3"><div class="p-3 border-bottom"><h2 class="h6 mb-0 text-danger"><i class="bi bi-exclamation-octagon me-1"></i>@T("Expired, still Active", "منتهية المدة وما زالت سارية") <span class="badge text-bg-danger">@Model.Expired.Count</span></h2></div>@{ await Table(Model.Expired, T("None.", "لا شيء.")); }</div>
+<div class="sms-card mb-3"><div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-pencil me-1"></i>@T("Drafts awaiting activation", "مسودات بانتظار التفعيل") <span class="badge text-bg-secondary">@Model.Drafts.Count</span></h2></div>@{ await Table(Model.Drafts, T("No drafts.", "لا مسودات.")); }</div>
+<div class="sms-card"><div class="p-3 border-bottom"><h2 class="h6 mb-0 text-success"><i class="bi bi-check2-circle me-1"></i>@T("Active beyond the window", "سارية بعد النافذة") <span class="badge text-bg-success">@Model.Active.Count</span></h2></div>@{ await Table(Model.Active, T("None.", "لا شيء.")); }</div>

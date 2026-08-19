@@ -41,8 +41,8 @@ namespace Sms.Web.Navigation
             M("ADM", "09", "Admissions", "القبول والتسجيل", "bi-person-plus", "people", "E-201", "09-Admissions.md", "Admissions", "Index"),
             M("STU", "10", "Students", "الطلاب", "bi-mortarboard", "people", "E-202", "10-Student-Management.md"),
             M("PAR", "11", "Parents", "أولياء الأمور", "bi-people", "people", "E-202", "11-Parent-Management.md"),
-            M("EMP", "12", "Employees", "الموظفون", "bi-person-badge", "people", "E-203", "12-Employees.md"),
-            M("TCH", "13", "Teachers", "المعلمون", "bi-person-workspace", "people", "E-203", "13-Teachers.md"),
+            M("EMP", "12", "Employees", "الموظفون", "bi-person-badge", "people", "E-203", "12-Employees.md", "Employees", "Index"),
+            M("TCH", "13", "Teachers", "المعلمون", "bi-person-workspace", "people", "E-203", "13-Teachers.md", "Teachers", "Index"),
 
             // S3 — Academic operations
             M("ATT", "14", "Attendance", "الحضور والغياب", "bi-check2-square", "academics", "E-301", "14-Attendance.md"),

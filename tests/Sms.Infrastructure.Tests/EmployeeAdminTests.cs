@@ -200,5 +200,70 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(employee.Id, db.Qualifications.Single(q => q.Id == qualification.Id).EmployeeId);
         }
+
+        // --- E-203 screen support: identity edit, draft-contract edit, org tree ---
+
+        [Fact]
+        [BusinessRule("BR-EMP-001")]
+        public async Task Renaming_an_employee_requires_an_audit_reason_because_identity_is_T1()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            _audit.Reason = null;
+            await Assert.ThrowsAsync<MissingAuditReasonException>(() => admin.UpdateEmployeeAsync(
+                employee.Id, "جديد", "أب", "جد", "عائلة", "Renamed", "Father", "Grandfather", "Family", Gender.Male, new DateTime(1990, 1, 1), 1));
+
+            _audit.Reason = "ID card correction";
+            var updated = await admin.UpdateEmployeeAsync(
+                employee.Id, "جديد", "أب", "جد", "عائلة", "Renamed", "Father", "Grandfather", "Family", Gender.Male, new DateTime(1990, 1, 1), 1);
+            Assert.Equal("Renamed", updated.FirstNameEn);
+            _audit.Reason = null;
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-003")]
+        public async Task Only_a_draft_contract_can_be_edited_and_edits_still_respect_overlap()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var first = await admin.DefineContractAsync(employee.Id, ContractType.FullTime, new DateTime(2026, 1, 1), new DateTime(2026, 6, 30), 8000m);
+            var second = await admin.DefineContractAsync(employee.Id, ContractType.FullTime, new DateTime(2026, 7, 1), new DateTime(2026, 12, 31), 8000m);
+
+            _audit.Reason = "negotiated";
+            await admin.UpdateContractAsync(second.Id, ContractType.PartTime, new DateTime(2026, 8, 1), new DateTime(2026, 12, 31), 5000m);
+            Assert.Equal(ContractType.PartTime, db.Contracts.Single(c => c.Id == second.Id).Type);
+
+            await Assert.ThrowsAsync<OverlappingContractException>(() =>
+                admin.UpdateContractAsync(second.Id, ContractType.PartTime, new DateTime(2026, 6, 1), new DateTime(2026, 12, 31), 5000m));
+
+            await admin.ChangeContractStatusAsync(first.Id, ContractStatus.Active);
+            await Assert.ThrowsAsync<ContractNotEditableException>(() =>
+                admin.UpdateContractAsync(first.Id, ContractType.FullTime, new DateTime(2026, 1, 1), new DateTime(2026, 6, 30), 9000m));
+            _audit.Reason = null;
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Org_units_form_an_acyclic_tree_and_cannot_be_deleted_while_in_use()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var root = await admin.DefineOrgUnitAsync("الشؤون الأكاديمية", "Academic Affairs");
+            var child = await admin.DefineOrgUnitAsync("قسم العلوم", "Science Dept", root.Id);
+
+            await Assert.ThrowsAsync<OrgUnitInUseException>(() => admin.UpdateOrgUnitAsync(root.Id, "x", "x", child.Id));
+            await Assert.ThrowsAsync<OrgUnitInUseException>(() => admin.DeleteOrgUnitAsync(root.Id));
+
+            var employee = await Register(admin);
+            await admin.AssignPositionAsync(employee.Id, child.Id, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+            await Assert.ThrowsAsync<OrgUnitInUseException>(() => admin.DeleteOrgUnitAsync(child.Id));
+
+            var leaf = await admin.DefineOrgUnitAsync("مؤقت", "Temp", root.Id);
+            await admin.DeleteOrgUnitAsync(leaf.Id);
+            Assert.Empty(db.OrgUnits.Where(u => u.Id == leaf.Id));
+        }
     }
 }
