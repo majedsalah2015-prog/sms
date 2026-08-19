@@ -1,0 +1,63 @@
+@using System.Globalization
+@model ResultsExplorerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Results explorer", "مستكشف النتائج");
+    ViewData["Breadcrumb"] = T("Grading / Results", "الدرجات / النتائج");
+    ViewData["GradingYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id; var sid = Model.Section?.Id; var tid = Model.Term?.Id;
+    string Name(Sms.Domain.Students.Student st) => isRtl ? $"{st.FirstNameAr} {st.FatherNameAr} {st.FamilyNameAr}" : $"{st.FirstNameEn} {st.FatherNameEn} {st.FamilyNameEn}";
+    var help = new HelpPanelViewModel
+    {
+        Id = "rs-help", Title = T("Results — help", "النتائج — مساعدة"),
+        Intro = T("Internal view of published term results per section: one column per assessable offering, the GPA-weighted average, section rank (standard competition ties, BR-GRA-007) and failure count. Empty cells = not yet published.", "عرض داخلي لنتائج الفترة المنشورة لكل شعبة: عمود لكل مادة مقيَّمة، المتوسط الموزون بأوزان المعدل، الترتيب في الشعبة (تعادل بالنمط التنافسي، BR-GRA-007) وعدد الراسبة. الخلايا الفارغة = لم تُنشر بعد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Year result", "نتيجة العام"), T("“Compute year” aggregates the latest published result per offering into a GPA and a promote/conditional/retain outcome using the grade's criteria (BR-GRA-006). Recompute after any correction.", "«حساب العام» يجمع آخر نتيجة منشورة لكل مادة في معدل ونتيجة انتقال (ينتقل/مشروط/يُعيد) وفق معايير الصف (BR-GRA-006). أعد الحساب بعد أي تصحيح.")),
+            new HelpPanelViewModel.Item(T("Report card", "بطاقة التقرير"), T("Opens the bilingual, print-styled card for the student and term. The immutable PDF (BR-GRA-008) is pending the O6 engine decision.", "يفتح البطاقة ثنائية اللغة بتنسيق طباعة للطالب والفترة. ملف PDF الثابت (BR-GRA-008) بانتظار قرار محرك O6.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Student / section result views, rank tables and failure lists.", "عروض نتائج الطلاب/الشعب وجداول الترتيب وقوائم الرسوب.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="section" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var s in Model.Sections) { <option value="@s.Section.Id" selected="@(s.Section.Id == sid)">@s.Grade.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }</select>
+            <select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == tid)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select>
+        </form>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_GradingNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else if (Model.Section == null || Model.Term == null) { <div class="alert alert-info">@T("This year needs at least one section and one term.", "يحتاج هذا العام شعبة وفترة على الأقل.")</div> }
+else
+{
+    <div class="sms-card">
+        <div class="p-3 border-bottom d-flex flex-wrap align-items-center gap-3">
+            <h2 class="h6 mb-0">@Model.Grade?.Code · @(isRtl ? Model.Section.NameAr : Model.Section.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn)</h2>
+            <span class="small text-muted">@Model.Students.Count @T("students", "طالباً") · @Model.Students.Count(s => s.Average != null) @T("with results", "لهم نتائج") · @Model.Students.Count(s => s.FailedCount > 0) @T("with a failed subject", "لديهم مادة راسبة")</span>
+            <form method="post" asp-action="ComputeYear" asp-route-year="@yid" asp-route-section="@sid" asp-route-term="@tid" class="ms-auto"><button class="btn btn-sm btn-outline-primary" type="submit" @(Model.HasCriteria ? "" : "disabled") title="@(Model.HasCriteria ? "" : T("Define pass criteria for this grade first.", "عرّف معايير النجاح لهذا الصف أولاً."))"><i class="bi bi-calculator me-1"></i>@T("Compute year for section", "حساب العام للشعبة")</button></form>
+        </div>
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+            <thead><tr><th>#</th><th style="min-width:14rem">@T("Student", "الطالب")</th>@foreach (var o in Model.Offerings) { <th class="text-center" title="@(isRtl ? o.Subject.Name.NameAr : o.Subject.Name.NameEn)">@o.Subject.Code<div class="small text-muted fw-normal">×@o.Offering.GpaWeight</div></th> }<th class="text-center">@T("Avg %", "المتوسط %")</th><th class="text-center">@T("Failed", "راسب")</th><th class="text-center">@T("Year", "العام")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in Model.Students)
+            {
+                <tr class="@(r.FailedCount > 0 ? "table-warning" : "")">
+                    <td class="text-muted">@(r.Rank?.ToString() ?? "—")</td>
+                    <td><div class="fw-semibold"><a asp-controller="Students" asp-action="File" asp-route-id="@r.Student.Id">@Name(r.Student)</a></div><div class="small text-muted"><code>@r.Student.StudentNo</code></div></td>
+                    @foreach (var o in Model.Offerings)
+                    {
+                        <td class="text-center">@if (r.ByOffering.TryGetValue(o.Offering.Id, out var v)) { <span class="fw-semibold">@v.Result.ScorePercent.ToString("0.##")</span> @if (v.Band != null) { <span class="badge @(v.Band.IsPassing ? "text-bg-success" : "text-bg-danger")">@v.Band.BandCode</span> } } else { <span class="text-muted">—</span> }</td>
+                    }
+                    <td class="text-center fw-semibold">@(r.Average?.ToString("0.00") ?? "—")</td>
+                    <td class="text-center">@(r.FailedCount == 0 ? "—" : r.FailedCount.ToString())</td>
+                    <td class="text-center small">@if (r.YearResult != null) { <span class="badge @(r.YearResult.PromotionOutcome == Sms.Domain.Grading.PromotionOutcome.Promote ? "text-bg-success" : r.YearResult.PromotionOutcome == Sms.Domain.Grading.PromotionOutcome.Conditional ? "text-bg-warning" : "text-bg-danger")">@GradingLabels.PromotionOutcome(r.YearResult.PromotionOutcome, isRtl)</span><div class="text-muted">GPA @r.YearResult.Gpa.ToString("0.00")</div> } else { <span class="text-muted">—</span> }</td>
+                    <td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" asp-action="ReportCard" asp-route-enrollmentId="@r.Enrollment.Id" asp-route-term="@tid" target="_blank" title="@T("Report card", "بطاقة التقرير")"><i class="bi bi-file-earmark-text"></i></a> <form method="post" asp-action="ComputeYear" asp-route-year="@yid" asp-route-section="@sid" asp-route-term="@tid" class="d-inline"><input type="hidden" name="enrollmentId" value="@r.Enrollment.Id" /><button class="btn btn-sm btn-outline-secondary" type="submit" @(Model.HasCriteria ? "" : "disabled") title="@T("Compute year result", "حساب نتيجة العام")"><i class="bi bi-calculator"></i></button></form></td>
+                </tr>
+            }
+            @if (Model.Students.Count == 0) { <tr><td colspan="@(Model.Offerings.Count + 6)" class="text-center text-muted py-4">@T("No current members in this section.", "لا طلاب حاليين في هذه الشعبة.")</td></tr> }</tbody>
+        </table></div>
+    </div>
+}

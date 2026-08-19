@@ -1,0 +1,134 @@
+@using System.Globalization
+@model ScaleDesignerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Scale designer", "مصمم سلالم التقدير");
+    ViewData["Breadcrumb"] = T("Grading / Scales", "الدرجات / سلالم التقدير");
+    ViewData["GradingYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var sel = Model.Selected;
+    var help = new HelpPanelViewModel
+    {
+        Id = "sc-help", Title = T("Grading scales — help", "سلالم التقدير — مساعدة"),
+        Intro = T("A scale is a band table (min–max % → band code, bilingual label, GPA points, pass flag) per stage and optionally per curriculum, versioned per academic year (BR-GRA-001).", "السلم جدول نطاقات (من–إلى % → رمز، تسمية بلغتين، نقاط معدل، علم نجاح) لكل مرحلة واختيارياً لكل منهج، بإصدار لكل عام دراسي (BR-GRA-001)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Design", "التصميم"), T("Add bands until 0–100 is covered without gaps or overlaps and at least one band passes and one fails; the preview bar and warnings update on every save.", "أضف نطاقات حتى تُغطى 0–100 دون فجوات أو تداخل مع نطاق ناجح وآخر راسب على الأقل؛ يتحدث شريط المعاينة والتنبيهات مع كل حفظ.")),
+            new HelpPanelViewModel.Item(T("Lock", "القفل"), T("Locking freezes the bands (blueprints then reference the scale). A locked scale can no longer be edited or deleted — define a new scale for the next year instead.", "القفل يجمّد النطاقات (تشير إليها المخططات بعدها). لا يُعدَّل السلم المقفل ولا يُحذف — عرّف سلماً جديداً للعام التالي.")),
+            new HelpPanelViewModel.Item(T("Edit ✎ / Delete 🗑", "تعديل ✎ / حذف 🗑"), T("Renaming needs a reason (T1). Delete removes an unlocked, unreferenced scale with its bands.", "إعادة التسمية تتطلب سبباً (T1). الحذف يزيل سلماً غير مقفل وغير مُشار إليه مع نطاقاته.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Band tables per stage/curriculum, year-versioned; locked once results reference them.", "جداول نطاقات لكل مرحلة/منهج بإصدار سنوي؛ تُقفل حين تشير إليها النتائج.")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_GradingNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="sms-card mb-3">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Scales", "السلالم") · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</h2></div>
+                <div class="list-group list-group-flush">
+                    @foreach (var r in Model.Scales)
+                    {
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(sel?.Id == r.Scale.Id ? "active" : "")" asp-action="Scales" asp-route-year="@yid" asp-route-id="@r.Scale.Id">
+                            <span><span class="fw-semibold">@(isRtl ? r.Scale.NameAr : r.Scale.NameEn)</span><br /><span class="small opacity-75">@(isRtl ? r.Stage.Name.NameAr : r.Stage.Name.NameEn) · @r.BandCount @T("bands", "نطاقات") · @r.BlueprintCount @T("blueprints", "مخططات")</span></span>
+                            @if (r.Scale.IsLocked) { <i class="bi bi-lock-fill" title="@T("Locked", "مقفل")"></i> }
+                        </a>
+                    }
+                    @if (Model.Scales.Count == 0) { <div class="list-group-item text-muted small">@T("No scales for this year yet.", "لا سلالم لهذا العام بعد.")</div> }
+                </div>
+            </div>
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("New scale", "سلم جديد")</h2>
+                <form method="post" asp-action="CreateScale" asp-route-year="@yid" class="d-grid gap-2">
+                    <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required /></div>
+                    <select name="stageId" class="form-select form-select-sm" required><option value="">@T("Stage", "المرحلة")</option>@foreach (var st in Model.Stages) { <option value="@st.Id">@(isRtl ? st.Name.NameAr : st.Name.NameEn)</option> }</select>
+                    <select name="curriculumId" class="form-select form-select-sm"><option value="">@T("Any curriculum", "أي منهج")</option>@foreach (var c in Model.Curricula) { <option value="@c.Id">@(isRtl ? c.Ar : c.En)</option> }</select>
+                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create", "إنشاء")</button>
+                </form>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            @if (sel == null) { <div class="alert alert-light border">@T("Select a scale on the left, or create one.", "اختر سلماً من القائمة أو أنشئ واحداً.")</div> }
+            else
+            {
+                var locked = sel.IsLocked;
+                <div class="sms-card mb-3">
+                    <div class="p-3 border-bottom d-flex flex-wrap align-items-center gap-2">
+                        <form method="post" asp-action="EditScale" asp-route-id="@sel.Id" asp-route-year="@yid" class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
+                            <input name="nameAr" class="form-control form-control-sm" dir="rtl" value="@sel.NameAr" style="width:12rem" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" value="@sel.NameEn" style="width:12rem" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason (T1)", "السبب (T1)")" style="width:11rem" /><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Rename", "إعادة تسمية")"><i class="bi bi-pencil"></i></button>
+                        </form>
+                        <span class="badge text-bg-light border">@(Model.SelectedStage == null ? "?" : (isRtl ? Model.SelectedStage.Name.NameAr : Model.SelectedStage.Name.NameEn))</span>
+                        @if (locked) { <span class="badge text-bg-dark"><i class="bi bi-lock-fill me-1"></i>@T("Locked", "مقفل")</span> }
+                        else
+                        {
+                            <form method="post" asp-action="LockScale" asp-route-id="@sel.Id" asp-route-year="@yid" onsubmit="return confirm('@T("Lock this scale? Bands become permanent.", "قفل هذا السلم؟ تصبح النطاقات دائمة.")');"><button class="btn btn-sm btn-outline-dark" type="submit" @(Model.Warnings.Count > 0 ? "disabled" : "") title="@(Model.Warnings.Count > 0 ? T("Fix warnings first", "عالج التنبيهات أولاً") : "")"><i class="bi bi-lock me-1"></i>@T("Lock", "قفل")</button></form>
+                            <form method="post" asp-action="DeleteScale" asp-route-id="@sel.Id" asp-route-year="@yid" onsubmit="return confirm('@T("Delete this scale and its bands?", "حذف هذا السلم ونطاقاته؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" @(Model.SelectedBlueprintCount > 0 ? "disabled" : "") title="@(Model.SelectedBlueprintCount > 0 ? T("Referenced by blueprints", "تشير إليه مخططات") : "")"><i class="bi bi-trash"></i></button></form>
+                        }
+                    </div>
+                    <div class="p-3 border-bottom">
+                        <div class="small text-muted mb-1">@T("Preview 0 → 100 %", "معاينة 0 ← 100 %")</div>
+                        <div class="d-flex rounded overflow-hidden border" style="height:28px" dir="ltr">
+                            @foreach (var b in Model.Bands.OrderBy(b => b.MinPercent))
+                            {
+                                var w = Math.Max(0m, b.MaxPercent - b.MinPercent + (b.MaxPercent >= 100 || b.MinPercent == 0 ? 0.01m : 0m));
+                                <div class="d-flex align-items-center justify-content-center small text-white fw-semibold" style="width:@(w.ToString("0.##", CultureInfo.InvariantCulture))%;background:@(b.IsPassing ? "#16a34a" : "#dc2626");opacity:@((0.55 + 0.45 * (double)(b.MinPercent / 100m)).ToString("0.00", CultureInfo.InvariantCulture))" title="@b.BandCode @b.MinPercent–@b.MaxPercent">@b.BandCode</div>
+                            }
+                        </div>
+                        @if (Model.Warnings.Count > 0) { <ul class="small text-warning-emphasis mt-2 mb-0 ps-3">@foreach (var w in Model.Warnings) { <li>@w</li> }</ul> } else { <div class="small text-success mt-2"><i class="bi bi-check-circle me-1"></i>@T("Bands cover 0–100 with no gaps or overlaps.", "النطاقات تغطي 0–100 دون فجوات أو تداخل.")</div> }
+                    </div>
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                        <thead><tr><th>@T("Order", "الترتيب")</th><th>@T("Min %", "من %")</th><th>@T("Max %", "إلى %")</th><th>@T("Code", "الرمز")</th><th>@T("Label (Ar)", "التسمية (ع)")</th><th>@T("Label (En)", "التسمية (E)")</th><th>@T("GPA", "نقاط")</th><th>@T("Pass", "ناجح")</th><th></th></tr></thead>
+                        <tbody>
+                        @foreach (var b in Model.Bands)
+                        {
+                            <tr>
+                                @if (locked)
+                                {
+                                    <td>@b.SortOrder</td><td>@b.MinPercent</td><td>@b.MaxPercent</td><td><span class="badge @(b.IsPassing ? "text-bg-success" : "text-bg-danger")">@b.BandCode</span></td><td dir="rtl">@b.LabelAr</td><td dir="ltr">@b.LabelEn</td><td>@(b.GpaPoints?.ToString("0.##") ?? "—")</td><td>@(b.IsPassing ? "✓" : "—")</td><td></td>
+                                }
+                                else
+                                {
+                                    var fid = $"band{b.Id}";
+                                    <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@b.SortOrder" /></td>
+                                    <td><input form="@fid" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MinPercent.ToString(CultureInfo.InvariantCulture)" /></td>
+                                    <td><input form="@fid" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MaxPercent.ToString(CultureInfo.InvariantCulture)" /></td>
+                                    <td><input form="@fid" name="code" class="form-control form-control-sm" style="width:4.5rem" value="@b.BandCode" /></td>
+                                    <td><input form="@fid" name="labelAr" class="form-control form-control-sm" dir="rtl" value="@b.LabelAr" /></td>
+                                    <td><input form="@fid" name="labelEn" class="form-control form-control-sm" dir="ltr" value="@b.LabelEn" /></td>
+                                    <td><input form="@fid" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" value="@(b.GpaPoints?.ToString(CultureInfo.InvariantCulture))" /></td>
+                                    <td><input form="@fid" name="isPassing" type="checkbox" class="form-check-input" value="true" checked="@b.IsPassing" /></td>
+                                    <td class="text-end text-nowrap">
+                                        <form id="@fid" method="post" asp-action="EditBand" asp-route-id="@sel.Id" asp-route-bandId="@b.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")"><i class="bi bi-check-lg"></i></button></form>
+                                        <form method="post" asp-action="DeleteBand" asp-route-id="@sel.Id" asp-route-bandId="@b.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove", "إزالة")"><i class="bi bi-trash"></i></button></form>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                        @if (!locked)
+                        {
+                            <tr class="table-light">
+                                <td><input form="newBand" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@(Model.Bands.Count + 1)" /></td>
+                                <td><input form="newBand" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="0" /></td>
+                                <td><input form="newBand" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="100" /></td>
+                                <td><input form="newBand" name="code" class="form-control form-control-sm" style="width:4.5rem" placeholder="A" /></td>
+                                <td><input form="newBand" name="labelAr" class="form-control form-control-sm" dir="rtl" placeholder="ممتاز" /></td>
+                                <td><input form="newBand" name="labelEn" class="form-control form-control-sm" dir="ltr" placeholder="Excellent" /></td>
+                                <td><input form="newBand" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" placeholder="4" /></td>
+                                <td><input form="newBand" name="isPassing" type="checkbox" class="form-check-input" value="true" checked /></td>
+                                <td class="text-end"><form id="newBand" method="post" asp-action="AddBand" asp-route-id="@sel.Id" asp-route-year="@yid"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                </div>
+                <div class="form-text">@T("Rubric / KG descriptor scales (BR-GRA-002) and IGCSE letter templates arrive with the full grading epic; this designer covers percentage-band scales with optional GPA points.", "سلالم الروبرك/رياض الأطفال (BR-GRA-002) وقوالب IGCSE تأتي مع حزمة الدرجات الكاملة؛ يغطي هذا المصمم سلالم النسب المئوية مع نقاط معدل اختيارية.")</div>
+            }
+        </div>
+    </div>
+}

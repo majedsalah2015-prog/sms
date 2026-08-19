@@ -48,7 +48,7 @@ namespace Sms.Web.Navigation
             M("ATT", "14", "Attendance", "الحضور والغياب", "bi-check2-square", "academics", "E-301", "14-Attendance.md"),
             M("TTB", "15", "Timetable", "الجدول الدراسي", "bi-table", "academics", "E-401", "15-Timetable.md"),
             M("EXM", "16", "Examinations", "الاختبارات", "bi-pencil-square", "academics", "E-402", "16-Examinations.md"),
-            M("GRA", "17", "Grading", "الدرجات والتقييم", "bi-bar-chart-line", "academics", "E-302", "17-Grading.md"),
+            M("GRA", "17", "Grading", "الدرجات والتقييم", "bi-bar-chart-line", "academics", "E-302", "17-Grading.md", "Grading", "Index"),
             M("CRT", "18", "Certificates", "الشهادات", "bi-award", "academics", "E-403", "18-Certificates.md"),
 
             // Finance

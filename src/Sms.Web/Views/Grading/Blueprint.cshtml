@@ -1,0 +1,77 @@
+@using System.Globalization
+@model BlueprintEditorViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var b = Model.Blueprint;
+    ViewData["Title"] = T("Blueprint", "المخطط") + " #" + b.Id;
+    ViewData["Breadcrumb"] = T("Grading / Blueprints / ", "الدرجات / المخططات / ") + "#" + b.Id;
+    ViewData["GradingYear"] = b.AcademicYearId;
+    var ok = Model.WeightSum == 100m;
+    var locked = b.IsLocked;
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@Model.Subject.Code</code> · @Model.Grade.Code @(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
+        <h1 class="sms-page-title">@(isRtl ? Model.Subject.Name.NameAr : Model.Subject.Name.NameEn) @if (locked) { <span class="badge fs-6 text-bg-dark"><i class="bi bi-lock-fill me-1"></i>@T("Finalized", "معتمد")</span> } else { <span class="badge fs-6 text-bg-warning">@T("Draft", "مسودة")</span> }</h1></div>
+    <a class="btn btn-outline-secondary" asp-action="Blueprints" asp-route-year="@b.AcademicYearId" asp-route-profile="@Model.ProfileId" asp-route-term="@b.TermId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("List", "القائمة")</a>
+</div>
+<partial name="_GradingNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="p-3 border-bottom d-flex align-items-center gap-3">
+                <h2 class="h6 mb-0">@T("Components", "المكوّنات")</h2>
+                <div class="ms-auto d-flex align-items-center gap-2 small"><span class="@(ok ? "text-success fw-semibold" : "text-warning-emphasis")">@Model.WeightSum.ToString("0.##") / 100 %</span><div class="sms-progress" style="width:10rem"><span style="width:@(Math.Min(100, (int)Model.WeightSum))%;@(ok ? "background:#16a34a" : (Model.WeightSum > 100 ? "background:#dc2626" : ""))"></span></div>@if (!ok) { <span class="badge text-bg-warning">@T("must sum to 100 (BR-GRA-003)", "يجب أن يبلغ 100 (BR-GRA-003)")</span> }</div>
+            </div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <thead><tr><th>@T("Name (Ar)", "الاسم (ع)")</th><th>@T("Name (En)", "الاسم (E)")</th><th>@T("Weight %", "الوزن %")</th><th>@T("Max score", "الدرجة القصوى")</th><th></th></tr></thead>
+                <tbody>
+                @foreach (var c in Model.Components)
+                {
+                    <tr>
+                        @if (locked) { <td dir="rtl">@c.NameAr</td><td dir="ltr">@c.NameEn</td><td>@c.Weight</td><td>@c.MaxScore</td><td></td> }
+                        else
+                        {
+                            var fid = $"cmp{c.Id}";
+                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" /></td>
+                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" /></td>
+                            <td><input form="@fid" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.Weight.ToString(CultureInfo.InvariantCulture)" /></td>
+                            <td><input form="@fid" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.MaxScore.ToString(CultureInfo.InvariantCulture)" /></td>
+                            <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditComponent" asp-route-id="@b.Id" asp-route-componentId="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")"><i class="bi bi-check-lg"></i></button></form> <form method="post" asp-action="DeleteComponent" asp-route-id="@b.Id" asp-route-componentId="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove", "إزالة")"><i class="bi bi-trash"></i></button></form></td>
+                        }
+                    </tr>
+                }
+                @if (!locked)
+                {
+                    <tr class="table-light">
+                        <td><input form="newCmp" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="اختبار قصير" /></td>
+                        <td><input form="newCmp" name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Quiz" /></td>
+                        <td><input form="newCmp" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="@((100m - Model.WeightSum).ToString("0.##", CultureInfo.InvariantCulture))" /></td>
+                        <td><input form="newCmp" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="100" /></td>
+                        <td class="text-end"><form id="newCmp" method="post" asp-action="AddComponent" asp-route-id="@b.Id"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form></td>
+                    </tr>
+                }
+                @if (Model.Components.Count == 0 && locked) { <tr><td colspan="5" class="text-center text-muted py-3">@T("No components.", "لا مكوّنات.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-2"><i class="bi bi-info-circle me-1"></i>@T("Settings", "الإعدادات")</h2>
+            <dl class="small mb-3"><dt>@T("Grading scale", "سلم التقدير")</dt><dd><a asp-action="Scales" asp-route-year="@b.AcademicYearId" asp-route-id="@Model.Scale.Id">@(isRtl ? Model.Scale.NameAr : Model.Scale.NameEn)</a> @(Model.Scale.IsLocked ? "🔒" : "")</dd><dt>@T("Exemption", "الإعفاء")</dt><dd>@(b.RedistributeWeightOnExemption ? T("redistribute weight over remaining components", "إعادة توزيع الوزن على المكوّنات المتبقية") : T("reduce the denominator", "تخفيض المقام"))</dd><dt>@T("Marksheets", "الكشوف")</dt><dd>@Model.MarksheetCount</dd></dl>
+            @if (!locked)
+            {
+                <form method="post" asp-action="LockBlueprint" asp-route-id="@b.Id" class="d-grid gap-2 mb-2" onsubmit="return confirm('@T("Finalize this blueprint? Components become permanent.", "اعتماد هذا المخطط؟ تصبح المكوّنات دائمة.")');"><button class="btn btn-dark btn-sm" type="submit" @(ok ? "" : "disabled")><i class="bi bi-lock me-1"></i>@T("Finalize", "اعتماد")</button></form>
+                <form method="post" asp-action="DeleteBlueprint" asp-route-id="@b.Id" asp-route-year="@b.AcademicYearId" asp-route-profile="@Model.ProfileId" asp-route-term="@b.TermId" class="d-grid" onsubmit="return confirm('@T("Delete this blueprint?", "حذف هذا المخطط؟")');"><button class="btn btn-outline-danger btn-sm" type="submit" @(Model.MarksheetCount > 0 ? "disabled" : "")><i class="bi bi-trash me-1"></i>@T("Delete", "حذف")</button></form>
+            }
+            else
+            {
+                <a class="btn btn-primary btn-sm w-100" asp-action="Index" asp-route-year="@b.AcademicYearId"><i class="bi bi-grid-3x3 me-1"></i>@T("Create marksheets →", "إنشاء كشوف الدرجات ←")</a>
+                <div class="form-text mt-2">@T("A finalized blueprint is immutable — a change request goes through a new blueprint next term.", "المخطط المعتمد ثابت — التغيير يكون بمخطط جديد للفترة التالية.")</div>
+            }
+        </div>
+    </div>
+</div>

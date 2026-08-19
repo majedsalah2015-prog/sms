@@ -56,4 +56,31 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>BR-GRA-001: a scale referenced by a blueprint cannot be deleted.</summary>
+    public class GradingScaleInUseException : InvalidOperationException
+    {
+        public GradingScaleInUseException(int gradingScaleId, int blueprintCount)
+            : base($"Grading scale {gradingScaleId} is referenced by {blueprintCount} blueprint(s) and cannot be deleted (BR-GRA-001).")
+        {
+        }
+    }
+
+    /// <summary>BR-GRA-003: a blueprint with marksheets cannot be deleted.</summary>
+    public class BlueprintInUseException : InvalidOperationException
+    {
+        public BlueprintInUseException(int blueprintId, int marksheetCount)
+            : base($"Blueprint {blueprintId} has {marksheetCount} marksheet(s) and cannot be deleted (BR-GRA-003).")
+        {
+        }
+    }
+
+    /// <summary>BR-GRA-011: only an untouched Draft marksheet may be deleted — marks are audited from first entry.</summary>
+    public class MarksheetInUseException : InvalidOperationException
+    {
+        public MarksheetInUseException(int marksheetId, string reason)
+            : base($"Marksheet {marksheetId} cannot be deleted: {reason} (BR-GRA-011).")
+        {
+        }
+    }
 }

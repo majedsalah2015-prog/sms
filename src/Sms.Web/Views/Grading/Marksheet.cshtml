@@ -1,0 +1,125 @@
+@using System.Globalization
+@using Sms.Domain.Grading
+@model MarksheetWorkspaceViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var s = Model.Sheet;
+    var subj = isRtl ? Model.Subject.Name.NameAr : Model.Subject.Name.NameEn;
+    ViewData["Title"] = T("Marksheet", "كشف الدرجات") + " #" + s.Id;
+    ViewData["Breadcrumb"] = T("Grading / Marksheets / ", "الدرجات / كشوف الدرجات / ") + "#" + s.Id;
+    ViewData["GradingYear"] = s.AcademicYearId;
+    var pct = Model.Total == 0 ? 0 : (int)Math.Round(100.0 * Model.Resolved / Model.Total);
+    string Name(Sms.Domain.Students.Student st) => isRtl ? $"{st.FirstNameAr} {st.FatherNameAr} {st.FamilyNameAr}" : $"{st.FirstNameEn} {st.FatherNameEn} {st.FamilyNameEn}";
+    var help = new HelpPanelViewModel
+    {
+        Id = "ms-help", Title = T("Marksheet workspace — help", "مساحة كشف الدرجات — مساعدة"),
+        Intro = T("Enter each component's score per student, or tick Absent / Exempt. Save progress as often as you like while the sheet is a Draft; the % and band columns preview the published result using the blueprint's weights and scale.", "أدخل درجة كل مكوّن لكل طالب أو علّم غائب/معفى. احفظ التقدم متى شئت ما دام الكشف مسودة؛ عمودا النسبة والتقدير يعرضان النتيجة المتوقعة وفق أوزان المخطط وسلمه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Chain", "السلسلة"), T("Submit (teacher) → HoD review → Approve (Registrar/Exams) → Publish. Each step is a button below; only legal moves are shown (BR-GRA-005). Publish is blocked while any cell is unresolved.", "تقديم (المعلم) → مراجعة رئيس القسم → اعتماد (المسجّل/الاختبارات) → نشر. كل خطوة زر أدناه ولا تظهر إلا الحركات المسموحة (BR-GRA-005). يُمنع النشر ما دامت خلية دون حلّ.")),
+            new HelpPanelViewModel.Item(T("Absent vs exempt", "غائب مقابل معفى"), T("Absent counts as zero for that component (BR-EXM-008 makeup policy is a later slice). Exempt removes the component from the student's aggregate — weight is redistributed or the denominator reduced, per the blueprint (BR-GRA-004).", "الغائب يُحتسب صفراً لذلك المكوّن (سياسة الإعادة BR-EXM-008 لاحقاً). المعفى يُستبعد من مجموع الطالب — يُعاد توزيع الوزن أو يُخفَّض المقام حسب المخطط (BR-GRA-004).")),
+            new HelpPanelViewModel.Item(T("Rounding", "التقريب"), T("2 dp, round-half-up once at the end — no cascading rounds (BR-GRA-003). Every published result stores its calculation snapshot for reproducibility.", "منزلتان عشريتان بتقريب نصفي مرة واحدة في النهاية (BR-GRA-003). كل نتيجة منشورة تحفظ لقطة حسابها.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@Model.Subject.Code</code> · @Model.Grade.Code @(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Section.NameAr : Model.Section.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
+        <h1 class="sms-page-title">@subj <span class="badge fs-6 @GradingLabels.MarksheetBadge(s.Status)">@GradingLabels.MarksheetStatus(s.Status, isRtl)</span></h1></div>
+    <div class="d-flex gap-2 align-items-center"><a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@s.AcademicYearId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("List", "القائمة")</a><partial name="_HelpModal" model="help" /></div>
+</div>
+<partial name="_GradingNav" />
+
+<div class="row g-3">
+    <div class="col-xl-9">
+        <div class="sms-card">
+            <div class="p-3 border-bottom d-flex flex-wrap align-items-center gap-3">
+                <div class="d-flex align-items-center gap-2 small"><span>@T("Progress", "التقدم")</span><div class="sms-progress" style="width:10rem"><span style="width:@(pct)%;@(pct == 100 ? "background:#16a34a" : "")"></span></div><span class="text-muted">@Model.Resolved / @Model.Total @T("students resolved", "طالباً محلولاً")</span></div>
+                <div class="small text-muted ms-auto">@T("Scale", "السلم"): @(isRtl ? Model.Scale.NameAr : Model.Scale.NameEn) · @T("Weights", "الأوزان"): @string.Join(" + ", Model.Components.Select(c => $"{(isRtl ? c.NameAr : c.NameEn)} {c.Weight}%"))@(Model.Blueprint.RedistributeWeightOnExemption ? " · " + T("exempt → redistribute", "المعفى → إعادة توزيع") : " · " + T("exempt → reduce denominator", "المعفى → تخفيض المقام"))</div>
+            </div>
+            <form method="post" asp-action="SaveMarks" asp-route-id="@s.Id" id="gridForm">
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <thead><tr><th style="min-width:14rem">@T("Student", "الطالب")</th>@foreach (var c in Model.Components) { <th class="text-center" style="min-width:9rem">@(isRtl ? c.NameAr : c.NameEn)<div class="small text-muted fw-normal">@T("max", "الحد") @c.MaxScore · @c.Weight%</div></th> }<th class="text-center">%</th><th class="text-center">@T("Band", "التقدير")</th></tr></thead>
+                    <tbody>@foreach (var r in Model.Students)
+                    {
+                        <tr class="@(r.Resolved ? "" : "table-warning")"><td><div class="fw-semibold"><a asp-controller="Students" asp-action="File" asp-route-id="@r.Student.Id">@Name(r.Student)</a></div><div class="small text-muted"><code>@r.Student.StudentNo</code></div></td>
+                            @foreach (var e in r.Entries)
+                            {
+                                var key = $"{e.EnrollmentId}_{e.BlueprintComponentId}";
+                                var comp = Model.Components.First(c => c.Id == e.BlueprintComponentId);
+                                <td class="text-center">
+                                    @if (Model.IsEditable)
+                                    {
+                                        <div class="d-flex flex-column align-items-center gap-1">
+                                            <input name="score_@key" type="number" step="0.01" min="0" max="@comp.MaxScore" class="form-control form-control-sm text-center" style="width:5.5rem" value="@(e.Score?.ToString(CultureInfo.InvariantCulture))" dir="ltr" @(e.IsAbsent || e.IsExempt ? "disabled" : "") />
+                                            <div class="d-flex gap-2 small text-nowrap"><label><input type="checkbox" class="form-check-input flag" name="absent_@key" value="true" checked="@e.IsAbsent" /> @T("abs", "غ")</label><label><input type="checkbox" class="form-check-input flag" name="exempt_@key" value="true" checked="@e.IsExempt" /> @T("exempt", "معفى")</label></div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        @if (e.IsExempt) { <span class="badge text-bg-light border">@T("Exempt", "معفى")</span> } else if (e.IsAbsent) { <span class="badge text-bg-secondary">@T("Absent", "غائب")</span> } else { <span>@(e.Score?.ToString("0.##") ?? "—")</span> }
+                                    }
+                                </td>
+                            }
+                            <td class="text-center fw-semibold">@(r.PreviewPercent?.ToString("0.00") ?? "—")</td>
+                            <td class="text-center">@if (r.PreviewBand != null) { <span class="badge @(r.PreviewBand.IsPassing ? "text-bg-success" : "text-bg-danger")">@r.PreviewBand.BandCode · @(isRtl ? r.PreviewBand.LabelAr : r.PreviewBand.LabelEn)</span> } else if (r.Resolved) { <span class="small text-muted">@T("no band", "بلا تقدير")</span> }</td></tr>
+                    }
+                    @if (Model.Students.Count == 0) { <tr><td colspan="@(Model.Components.Count + 3)" class="text-center text-muted py-4">@T("The section had no current members when this sheet was created.", "لم يكن في الشعبة طلاب حاليون عند إنشاء الكشف.")</td></tr> }</tbody>
+                </table></div>
+                @if (Model.IsEditable)
+                {
+                    <div class="p-3 border-top d-flex gap-2 align-items-center"><button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>@T("Save progress", "حفظ التقدم")</button><span class="small text-muted">@T("Ticking Absent or Exempt clears and disables the score cell.", "تعليم غائب أو معفى يمسح خلية الدرجة ويعطلها.")</span></div>
+                }
+            </form>
+        </div>
+    </div>
+    <div class="col-xl-3">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-3"><i class="bi bi-signpost-split me-1"></i>@T("Workflow (WF-07)", "سير العمل (WF-07)")</h2>
+            <ol class="small mb-3 ps-3">@foreach (MarksheetStatus st in Enum.GetValues(typeof(MarksheetStatus))) { <li class="@(st == s.Status ? "fw-bold" : (st < s.Status ? "text-success" : "text-muted"))">@GradingLabels.MarksheetStatus(st, isRtl)@(st == MarksheetStatus.Submitted && s.SubmittedAtUtc != null ? $" · {s.SubmittedAtUtc:yyyy-MM-dd}" : "")@(st == MarksheetStatus.HoDReviewed && s.ReviewedAtUtc != null ? $" · {s.ReviewedAtUtc:yyyy-MM-dd}" : "")@(st == MarksheetStatus.Approved && s.ApprovedAtUtc != null ? $" · {s.ApprovedAtUtc:yyyy-MM-dd}" : "")@(st == MarksheetStatus.Published && s.PublishedAtUtc != null ? $" · {s.PublishedAtUtc:yyyy-MM-dd}" : "")</li> }</ol>
+            <div class="d-grid gap-2">
+                @foreach (var t in Model.AllowedTransitions)
+                {
+                    var blocked = t == MarksheetStatus.Published && Model.Resolved < Model.Total;
+                    <form method="post" asp-action="MarksheetStatusChange" asp-route-id="@s.Id" onsubmit="return @(t == MarksheetStatus.Published ? "confirm('" + T("Publish this marksheet? Term results will be computed and released.", "نشر هذا الكشف؟ ستُحسب نتائج الفترة وتُصدر.") + "')" : "true");"><input type="hidden" name="target" value="@t" /><button class="btn btn-sm w-100 @(t == MarksheetStatus.Published ? "btn-success" : "btn-outline-primary")" type="submit" @(blocked ? "disabled" : "") title="@(blocked ? T("Resolve every cell first (§9).", "حلّ كل الخلايا أولاً (§9).") : "")"><i class="bi bi-arrow-right-circle me-1"></i>@GradingLabels.MarksheetStatus(t, isRtl)</button></form>
+                }
+                @if (Model.AllowedTransitions.Count == 0 && !Model.CanCorrect) { <span class="small text-muted">@T("No further steps.", "لا خطوات أخرى.")</span> }
+            </div>
+            @if (Model.CanCorrect)
+            {
+                <hr />
+                <form method="post" asp-action="CorrectMarksheet" asp-route-id="@s.Id" class="d-grid gap-2">
+                    <label class="form-label small mb-0">@T("Post-publication correction (WF-08) — reason mandatory", "تصحيح بعد النشر (WF-08) — السبب إلزامي")</label>
+                    <input name="reason" class="form-control form-control-sm" required placeholder="@T("reason", "السبب")" />
+                    <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-arrow-counterclockwise me-1"></i>@T("Reopen as Draft", "إعادة فتح كمسودة")</button>
+                </form>
+            }
+        </div>
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-2"><i class="bi bi-info-circle me-1"></i>@T("Details", "التفاصيل")</h2>
+            <dl class="small mb-0"><dt>@T("Blueprint", "المخطط")</dt><dd><a asp-action="Blueprint" asp-route-id="@Model.Blueprint.Id">#@Model.Blueprint.Id</a> · @Model.Components.Count @T("components", "مكوّنات")</dd><dt>@T("Scale bands", "نطاقات السلم")</dt><dd>@string.Join(" · ", Model.Bands.OrderByDescending(b => b.MinPercent).Select(b => $"{b.BandCode} {b.MinPercent}–{b.MaxPercent}"))</dd><dt>@T("Results", "النتائج")</dt><dd><a asp-action="Results" asp-route-year="@s.AcademicYearId" asp-route-section="@s.SectionId" asp-route-term="@Model.Term.Id">@T("Open results explorer →", "فتح مستكشف النتائج ←")</a></dd></dl>
+            @if (s.Status == MarksheetStatus.Draft)
+            {
+                <hr />
+                <form method="post" asp-action="DeleteMarksheet" asp-route-id="@s.Id" asp-route-year="@s.AcademicYearId" onsubmit="return confirm('@T("Delete this marksheet?", "حذف هذا الكشف؟")');"><button class="btn btn-sm btn-outline-danger w-100" type="submit" @(Model.HasAnyMark ? "disabled" : "") title="@(Model.HasAnyMark ? T("Marks were entered — kept for audit (BR-GRA-011).", "أُدخلت درجات — يُحتفظ به للتدقيق (BR-GRA-011).") : "")"><i class="bi bi-trash me-1"></i>@T("Delete marksheet", "حذف الكشف")</button></form>
+            }
+        </div>
+        @if (Model.Audit.Count > 0)
+        {
+            <div class="sms-card p-3"><h2 class="h6 mb-2"><i class="bi bi-clock-history me-1"></i>@T("Audit", "التدقيق")</h2><ul class="small text-muted mb-0 ps-3">@foreach (var a in Model.Audit.Take(15)) { <li>@a.At.ToString("yyyy-MM-dd HH:mm") · @a.Action @(a.Field != null ? $"{a.Field}: {a.Old} → {a.New}" : "")@(string.IsNullOrEmpty(a.Reason) ? "" : $" — {a.Reason}")</li> }</ul></div>
+        }
+    </div>
+</div>
+
+<script>
+    (function () {
+        document.querySelectorAll('#gridForm .flag').forEach(function (cb) {
+            cb.addEventListener('change', function () {
+                var cell = cb.closest('td'); var score = cell.querySelector('input[type=number]'); var flags = cell.querySelectorAll('.flag');
+                if (cb.checked) { flags.forEach(function (o) { if (o !== cb) o.checked = false; }); score.value = ''; score.disabled = true; }
+                else { score.disabled = false; }
+            });
+        });
+    })();
+</script>

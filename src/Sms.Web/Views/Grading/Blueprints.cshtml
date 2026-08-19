@@ -1,0 +1,65 @@
+@using System.Globalization
+@model BlueprintListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Blueprints & weights", "المخططات والأوزان");
+    ViewData["Breadcrumb"] = T("Grading / Blueprints", "الدرجات / المخططات");
+    ViewData["GradingYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id; var pid = Model.Profile?.ProfileId; var tid = Model.Term?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "bp-help", Title = T("Blueprints — help", "المخططات — مساعدة"),
+        Intro = T("A blueprint defines, per offering and term, the assessment components (name, weight %, max score) and the grading scale used to band the weighted result (BR-EXM-002 / BR-GRA-003).", "يحدد المخطط لكل مادة وفترة مكوّنات التقييم (الاسم، الوزن %، الدرجة القصوى) وسلم التقدير الذي يُصنَّف به الناتج الموزون (BR-EXM-002 / BR-GRA-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Weights", "الأوزان"), T("Component weights must sum to exactly 100 before the blueprint can be finalized; the meter on the editor shows the running total.", "يجب أن يبلغ مجموع الأوزان 100 بالضبط قبل الاعتماد؛ يعرض المؤشر في المحرر المجموع الجاري.")),
+            new HelpPanelViewModel.Item(T("Finalize (lock)", "الاعتماد (القفل)"), T("Marksheets can only be created from a finalized blueprint; after that its components are frozen. Exemption handling (redistribute vs reduce denominator) is set at creation (BR-GRA-004).", "لا تُنشأ كشوف الدرجات إلا من مخطط معتمد؛ بعده تُجمَّد مكوّناته. معالجة الإعفاء (إعادة توزيع/تخفيض المقام) تُضبط عند الإنشاء (BR-GRA-004).")),
+            new HelpPanelViewModel.Item(T("Delete", "حذف"), T("Only an unlocked blueprint with no marksheets can be deleted.", "لا يُحذف إلا مخطط غير معتمد بلا كشوف.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per offering × term: components, weight sum = 100, scale, lock indicator.", "لكل مادة × فترة: المكوّنات، مجموع الأوزان = 100، السلم، مؤشر القفل.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
+            <select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == tid)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select>
+        </form>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_GradingNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.") </div> }
+else if (Model.Profile == null) { <div class="alert alert-info">@T("Define a grade-year profile for this year first (Grades → Profile).", "عرّف ملف الصف السنوي لهذا العام أولاً (الصفوف → الملف).")</div> }
+else if (Model.Term == null) { <div class="alert alert-info">@T("Define semesters and terms for this year first (Academic Years → year → builder).", "عرّف الفصول والفترات لهذا العام أولاً (الأعوام الدراسية → العام → المنشئ).")</div> }
+else
+{
+    <div class="sms-card">
+        <div class="p-3 border-bottom d-flex align-items-center gap-3"><h2 class="h6 mb-0">@Model.Profile.Grade.Code @(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</h2>
+            @if (Model.Scales.Count == 0) { <span class="ms-auto small text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>@T("No grading scale in this year —", "لا سلم تقدير في هذا العام —") <a asp-action="Scales" asp-route-year="@yid">@T("create one first", "أنشئ واحداً أولاً")</a></span> }</div>
+        <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+            <thead><tr><th>@T("Offering", "المادة")</th><th>@T("Assessable", "تقييم")</th><th>@T("Blueprint", "المخطط")</th><th>@T("Components", "المكوّنات")</th><th>@T("Weights", "الأوزان")</th><th>@T("Marksheets", "الكشوف")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in Model.Offerings)
+            {
+                var ok = r.WeightSum == 100m;
+                <tr class="@(r.Offering.IsAssessable ? "" : "text-muted")">
+                    <td class="fw-semibold"><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td>
+                    <td>@(r.Offering.IsAssessable ? "✓" : T("no (BR-SUB-003)", "لا (BR-SUB-003)"))</td>
+                    <td>@if (r.Blueprint == null) { <span class="text-muted">—</span> } else if (r.Blueprint.IsLocked) { <span class="badge text-bg-dark"><i class="bi bi-lock-fill me-1"></i>@T("Finalized", "معتمد")</span> } else { <span class="badge text-bg-warning">@T("Draft", "مسودة")</span> }</td>
+                    <td>@(r.Blueprint == null ? "—" : r.ComponentCount.ToString())</td>
+                    <td>@if (r.Blueprint != null) { <div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(Math.Min(100, (int)r.WeightSum))%;@(ok ? "background:#16a34a" : (r.WeightSum > 100 ? "background:#dc2626" : ""))"></span></div><span class="small @(ok ? "text-success" : "text-warning-emphasis")">@r.WeightSum.ToString("0.##") / 100</span></div> }</td>
+                    <td>@(r.Blueprint == null ? "—" : r.MarksheetCount.ToString())</td>
+                    <td class="text-end">
+                        @if (r.Blueprint != null) { <a class="btn btn-sm btn-outline-primary" asp-action="Blueprint" asp-route-id="@r.Blueprint.Id"><i class="bi bi-pencil-square me-1"></i>@T("Open", "فتح")</a> }
+                        else if (r.Offering.IsAssessable && Model.Scales.Count > 0)
+                        {
+                            <form method="post" asp-action="CreateBlueprint" asp-route-year="@yid" asp-route-profile="@pid" asp-route-term="@tid" class="d-inline-flex gap-1 align-items-center"><input type="hidden" name="offeringId" value="@r.Offering.Id" /><select name="scaleId" class="form-select form-select-sm" style="width:11rem">@foreach (var s in Model.Scales) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)@(s.IsLocked ? " 🔒" : "")</option> }</select><label class="small text-nowrap"><input type="checkbox" name="redistribute" value="true" class="form-check-input" /> @T("redistribute", "إعادة توزيع")</label><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Offerings.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No current offerings for this grade — build the curriculum plan first (Subjects → Curriculum plan).", "لا مواد حالية لهذا الصف — أنشئ الخطة الدراسية أولاً (المواد → الخطة).")</td></tr> }</tbody>
+        </table></div>
+    </div>
+}

@@ -27,10 +27,17 @@ namespace Sms.Infrastructure.Grading
         }
 
         public async Task<GradingScale> DefineScaleAsync(
-            int stageId, string nameAr, string nameEn, int? curriculumLookupValueId = null, CancellationToken cancellationToken = default)
+            int stageId, string nameAr, string nameEn, int? curriculumLookupValueId = null, int? academicYearId = null, CancellationToken cancellationToken = default)
         {
+            // Year-versioned (BR-GRA-001): default to the Active year rather than leaving the IYearScoped column at 0.
+            var yearId = academicYearId ?? await _db.AcademicYears
+                .Where(y => y.Status == Sms.Domain.Schools.AcademicYearStatus.Active)
+                .Select(y => (int?)y.Id)
+                .FirstOrDefaultAsync(cancellationToken) ?? 0;
+
             var scale = new GradingScale
             {
+                AcademicYearId = yearId,
                 StageId = stageId,
                 CurriculumLookupValueId = curriculumLookupValueId,
                 NameAr = nameAr,
@@ -310,6 +317,158 @@ namespace Sms.Infrastructure.Grading
 
             await _db.SaveChangesAsync(cancellationToken);
             return yearResult;
+        }
+
+        // ---- E-302 screen support --------------------------------------------------------------
+
+        public async Task<GradingScale> UpdateScaleAsync(int gradingScaleId, string nameAr, string nameEn, CancellationToken cancellationToken = default)
+        {
+            var scale = await _db.GradingScales.SingleAsync(s => s.Id == gradingScaleId, cancellationToken);
+            scale.NameAr = nameAr;
+            scale.NameEn = nameEn;
+            await _db.SaveChangesAsync(cancellationToken);
+            return scale;
+        }
+
+        public async Task DeleteScaleAsync(int gradingScaleId, CancellationToken cancellationToken = default)
+        {
+            var scale = await _db.GradingScales.SingleAsync(s => s.Id == gradingScaleId, cancellationToken);
+            if (scale.IsLocked)
+            {
+                throw new GradingScaleLockedException(gradingScaleId);
+            }
+            var blueprintCount = await _db.Blueprints.CountAsync(b => b.GradingScaleId == gradingScaleId, cancellationToken);
+            if (blueprintCount > 0)
+            {
+                throw new GradingScaleInUseException(gradingScaleId, blueprintCount);
+            }
+
+            var bands = await _db.ScaleBands.Where(b => b.GradingScaleId == gradingScaleId).ToListAsync(cancellationToken);
+            _db.ScaleBands.RemoveRange(bands);
+            _db.GradingScales.Remove(scale);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<ScaleBand> UpdateScaleBandAsync(
+            int scaleBandId, decimal minPercent, decimal maxPercent, string bandCode, string labelAr, string labelEn,
+            bool isPassing, int sortOrder, decimal? gpaPoints = null, CancellationToken cancellationToken = default)
+        {
+            var band = await _db.ScaleBands.SingleAsync(b => b.Id == scaleBandId, cancellationToken);
+            var scale = await _db.GradingScales.SingleAsync(s => s.Id == band.GradingScaleId, cancellationToken);
+            if (scale.IsLocked)
+            {
+                throw new GradingScaleLockedException(scale.Id);
+            }
+
+            band.MinPercent = minPercent;
+            band.MaxPercent = maxPercent;
+            band.BandCode = bandCode;
+            band.LabelAr = labelAr;
+            band.LabelEn = labelEn;
+            band.IsPassing = isPassing;
+            band.SortOrder = sortOrder;
+            band.GpaPoints = gpaPoints;
+            await _db.SaveChangesAsync(cancellationToken);
+            return band;
+        }
+
+        public async Task RemoveScaleBandAsync(int scaleBandId, CancellationToken cancellationToken = default)
+        {
+            var band = await _db.ScaleBands.SingleAsync(b => b.Id == scaleBandId, cancellationToken);
+            var scale = await _db.GradingScales.SingleAsync(s => s.Id == band.GradingScaleId, cancellationToken);
+            if (scale.IsLocked)
+            {
+                throw new GradingScaleLockedException(scale.Id);
+            }
+
+            _db.ScaleBands.Remove(band);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<BlueprintComponent> UpdateBlueprintComponentAsync(
+            int blueprintComponentId, string nameAr, string nameEn, decimal weight, decimal maxScore, CancellationToken cancellationToken = default)
+        {
+            var component = await _db.BlueprintComponents.SingleAsync(c => c.Id == blueprintComponentId, cancellationToken);
+            var blueprint = await _db.Blueprints.SingleAsync(b => b.Id == component.BlueprintId, cancellationToken);
+            if (blueprint.IsLocked)
+            {
+                throw new BlueprintLockedException(blueprint.Id);
+            }
+
+            component.NameAr = nameAr;
+            component.NameEn = nameEn;
+            component.Weight = weight;
+            component.MaxScore = maxScore;
+            await _db.SaveChangesAsync(cancellationToken);
+            return component;
+        }
+
+        public async Task RemoveBlueprintComponentAsync(int blueprintComponentId, CancellationToken cancellationToken = default)
+        {
+            var component = await _db.BlueprintComponents.SingleAsync(c => c.Id == blueprintComponentId, cancellationToken);
+            var blueprint = await _db.Blueprints.SingleAsync(b => b.Id == component.BlueprintId, cancellationToken);
+            if (blueprint.IsLocked)
+            {
+                throw new BlueprintLockedException(blueprint.Id);
+            }
+
+            _db.BlueprintComponents.Remove(component);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task DeleteBlueprintAsync(int blueprintId, CancellationToken cancellationToken = default)
+        {
+            var blueprint = await _db.Blueprints.SingleAsync(b => b.Id == blueprintId, cancellationToken);
+            if (blueprint.IsLocked)
+            {
+                throw new BlueprintLockedException(blueprintId);
+            }
+            var marksheetCount = await _db.Marksheets.CountAsync(m => m.BlueprintId == blueprintId, cancellationToken);
+            if (marksheetCount > 0)
+            {
+                throw new BlueprintInUseException(blueprintId, marksheetCount);
+            }
+
+            var components = await _db.BlueprintComponents.Where(c => c.BlueprintId == blueprintId).ToListAsync(cancellationToken);
+            _db.BlueprintComponents.RemoveRange(components);
+            _db.Blueprints.Remove(blueprint);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task EnterMarksAsync(int marksheetId, System.Collections.Generic.IReadOnlyList<MarkInput> marks, CancellationToken cancellationToken = default)
+        {
+            var entries = await _db.MarkEntries.Where(e => e.MarksheetId == marksheetId).ToListAsync(cancellationToken);
+            foreach (var input in marks)
+            {
+                var entry = entries.SingleOrDefault(e => e.BlueprintComponentId == input.BlueprintComponentId && e.EnrollmentId == input.EnrollmentId);
+                if (entry == null)
+                {
+                    continue; // a stale cell (student left the section after the sheet was created) — ignore, don't invent rows
+                }
+                entry.Score = input.Score;
+                entry.IsAbsent = input.IsAbsent;
+                entry.IsExempt = input.IsExempt;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task DeleteMarksheetAsync(int marksheetId, CancellationToken cancellationToken = default)
+        {
+            var marksheet = await _db.Marksheets.SingleAsync(m => m.Id == marksheetId, cancellationToken);
+            if (marksheet.Status != MarksheetStatus.Draft)
+            {
+                throw new MarksheetInUseException(marksheetId, $"it is {marksheet.Status}");
+            }
+            var entries = await _db.MarkEntries.Where(e => e.MarksheetId == marksheetId).ToListAsync(cancellationToken);
+            if (entries.Any(e => e.Score != null || e.IsAbsent || e.IsExempt))
+            {
+                throw new MarksheetInUseException(marksheetId, "marks have already been entered");
+            }
+
+            _db.MarkEntries.RemoveRange(entries);
+            _db.Marksheets.Remove(marksheet);
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         private async Task PublishResultsAsync(Marksheet marksheet, System.Collections.Generic.List<MarkEntry> entries, CancellationToken cancellationToken)

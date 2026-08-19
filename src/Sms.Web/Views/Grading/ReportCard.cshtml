@@ -1,0 +1,68 @@
+@using System.Globalization
+@model ReportCardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var s = Model.Student;
+    ViewData["Title"] = T("Report card", "بطاقة التقرير") + " · " + s.StudentNo;
+    ViewData["Breadcrumb"] = T("Grading / Results / Report card", "الدرجات / النتائج / بطاقة التقرير");
+    ViewData["GradingYear"] = Model.Year.Id;
+    var nameAr = $"{s.FirstNameAr} {s.FatherNameAr} {s.GrandfatherNameAr} {s.FamilyNameAr}";
+    var nameEn = $"{s.FirstNameEn} {s.FatherNameEn} {s.GrandfatherNameEn} {s.FamilyNameEn}";
+}
+<style>
+    .rc-sheet { background: #fff; color: #111; max-width: 900px; margin: 0 auto; padding: 2rem 2.5rem; border: 1px solid #ddd; position: relative; }
+    .rc-sheet .rc-water { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 6rem; font-weight: 800; color: rgba(220, 38, 38, .12); transform: rotate(-25deg); pointer-events: none; }
+    .rc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .25rem 2rem; font-size: .9rem; }
+    .rc-table th, .rc-table td { border: 1px solid #cbd5e1; padding: .35rem .5rem; font-size: .9rem; }
+    .rc-table th { background: #f1f5f9; }
+    @@media print { body * { visibility: hidden; } .rc-print, .rc-print * { visibility: visible; } .rc-print { position: absolute; left: 0; top: 0; width: 100%; } .rc-sheet { border: 0; } }
+</style>
+
+<div class="sms-page-head d-print-none">
+    <div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Print-styled bilingual render. The immutable numbered PDF + portal release (BR-GRA-008) is pending the O6 engine decision.", "عرض ثنائي اللغة بتنسيق طباعة. ملف PDF المرقّم الثابت والنشر في البوابة (BR-GRA-008) بانتظار قرار محرك O6.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2"><select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == Model.Term.Id)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><label class="small d-flex align-items-center gap-1"><input type="checkbox" name="reprint" value="true" class="form-check-input" checked="@Model.IsReprint" onchange="this.form.submit()" /> @T("reprint (watermark)", "إعادة طباعة (علامة مائية)")</label></form>
+        <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary" asp-action="Results" asp-route-year="@Model.Year.Id" asp-route-section="@Model.Section?.Id" asp-route-term="@Model.Term.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Results", "النتائج")</a>
+    </div>
+</div>
+
+@if (!Model.AllPublished) { <div class="alert alert-warning d-print-none">@T("Not all offerings are published for this term — the card is provisional (BR-GRA-005 releases a section's report cards together).", "لم تُنشر كل المواد لهذه الفترة — البطاقة مؤقتة (BR-GRA-005 يصدر بطاقات الشعبة معاً).")</div> }
+
+<div class="rc-print">
+<div class="rc-sheet">
+    @if (Model.IsReprint) { <div class="rc-water">@T("COPY", "نسخة")</div> }
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div dir="rtl" class="text-end"><div class="fw-bold fs-5">@Model.SchoolNameAr</div><div class="text-muted small">بطاقة تقرير الطالب · @Model.Year.LabelAr · @Model.Term.NameAr</div></div>
+        <div dir="ltr" class="text-start"><div class="fw-bold fs-5">@Model.SchoolNameEn</div><div class="text-muted small">Student report card · @Model.Year.LabelEn · @Model.Term.NameEn</div></div>
+    </div>
+    <hr />
+    <div class="rc-grid mb-3">
+        <div dir="ltr"><strong>Student:</strong> @nameEn</div><div dir="rtl"><strong>الطالب:</strong> @nameAr</div>
+        <div dir="ltr"><strong>Student no.:</strong> @s.StudentNo</div><div dir="rtl"><strong>رقم الطالب:</strong> @s.StudentNo</div>
+        <div dir="ltr"><strong>Grade / section:</strong> @Model.Grade.Code @Model.Grade.Name.NameEn @(Model.Section == null ? "" : "/ " + Model.Section.NameEn)</div><div dir="rtl"><strong>الصف / الشعبة:</strong> @Model.Grade.Name.NameAr @(Model.Section == null ? "" : "/ " + Model.Section.NameAr)</div>
+        <div dir="ltr"><strong>Attendance:</strong> @(Model.AttendancePercent == null ? "—" : $"{Model.AttendancePercent}% ({Model.AbsentDays} absent of {Model.ScheduledDays})")</div><div dir="rtl"><strong>الحضور:</strong> @(Model.AttendancePercent == null ? "—" : $"{Model.AttendancePercent}% ({Model.AbsentDays} غياب من {Model.ScheduledDays})")</div>
+    </div>
+    <table class="rc-table w-100 mb-3">
+        <thead><tr><th style="width:8%">@T("Code", "الرمز")</th><th style="width:26%">Subject</th><th style="width:26%">المادة</th><th style="width:12%" class="text-center">%</th><th style="width:14%" class="text-center">Band / التقدير</th><th class="text-center">Status / الحالة</th></tr></thead>
+        <tbody>@foreach (var l in Model.Lines)
+        {
+            <tr><td>@l.Subject.Code</td><td dir="ltr">@l.Subject.Name.NameEn</td><td dir="rtl">@l.Subject.Name.NameAr</td>
+                <td class="text-center fw-semibold">@(l.Result?.ScorePercent.ToString("0.00") ?? "—")</td>
+                <td class="text-center">@if (l.Band != null) { <span class="fw-semibold">@l.Band.BandCode</span> <span class="small">@l.Band.LabelEn / @l.Band.LabelAr</span> } else { <span>—</span> }</td>
+                <td class="text-center small">@(l.Result == null ? T("not published", "غير منشور") : (l.Band == null ? "—" : (l.Band.IsPassing ? "Pass / ناجح" : "Fail / راسب")))</td></tr>
+        }
+        @if (Model.Lines.Count == 0) { <tr><td colspan="6" class="text-center text-muted">@T("No assessable offerings in this grade's plan.", "لا مواد مقيَّمة في خطة هذا الصف.")</td></tr> }</tbody>
+        <tfoot><tr><th colspan="3" dir="ltr">Weighted average / المتوسط الموزون</th><th class="text-center">@(Model.Average?.ToString("0.00") ?? "—")</th><th class="text-center">@(Model.AverageBand == null ? "—" : $"{Model.AverageBand.BandCode} · {Model.AverageBand.LabelEn} / {Model.AverageBand.LabelAr}")</th><th class="text-center">@(Model.Rank == null ? "—" : $"Rank {Model.Rank} / {Model.RankOf} · الترتيب")</th></tr></tfoot>
+    </table>
+    <div class="rc-grid small text-muted mb-4">
+        <div dir="ltr">Homeroom comment: ____________________________________</div><div dir="rtl">تعليق مربي الصف: ____________________________________</div>
+        <div dir="ltr">Behavior summary: per policy (Module 25)</div><div dir="rtl">ملخص السلوك: حسب السياسة (الوحدة 25)</div>
+    </div>
+    <div class="d-flex justify-content-between small mt-4">
+        <div dir="ltr">Homeroom teacher: ______________</div><div>Registrar: ______________</div><div dir="rtl">مدير المدرسة: ______________</div>
+    </div>
+    <div class="small text-muted mt-3" dir="ltr">Generated @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm") UTC · rounding 2 dp half-up at final band (BR-GRA-003) · attendance per BR-ATD-009 · rank per BR-GRA-007 (standard competition)</div>
+</div>
+</div>

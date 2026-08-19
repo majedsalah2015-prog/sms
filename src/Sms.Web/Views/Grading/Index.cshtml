@@ -1,0 +1,84 @@
+@using System.Globalization
+@using Sms.Domain.Grading
+@model MarksheetListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Marksheet workspace", "مساحة كشوف الدرجات");
+    ViewData["Breadcrumb"] = T("Grading / Marksheets", "الدرجات / كشوف الدرجات");
+    ViewData["GradingYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "gra-help", Title = T("Marksheets — help", "كشوف الدرجات — مساعدة"),
+        Intro = T("A marksheet is one offering × term × section grid, created from a finalized blueprint. It walks the WF-07 chain: Draft (teacher entry) → Submitted → HoD-reviewed → Approved → Published; publishing computes a term result per student (BR-GRA-003/005).", "كشف الدرجات شبكة لمادة × فترة × شعبة تُنشأ من مخطط معتمد، وتمر بسلسلة WF-07: مسودة (إدخال المعلم) → مُقدَّم → مراجعة رئيس القسم → معتمد → منشور؛ النشر يحسب نتيجة الفترة لكل طالب (BR-GRA-003/005)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Create", "إنشاء"), T("Pick a finalized blueprint (Blueprints & weights tab) and a section of the same grade. One row per current section member is pre-seeded — students who join later are not added automatically.", "اختر مخططاً معتمداً (تبويب المخططات) وشعبة من الصف نفسه. تُهيَّأ صفوف للطلاب الحاليين — من ينضم لاحقاً لا يُضاف تلقائياً.")),
+            new HelpPanelViewModel.Item(T("Entry & validation", "الإدخال والتحقق"), T("Scores are numeric within 0..max per component; Absent/Exempt resolve a cell without a score. Publication requires every cell resolved (§9). Exempt components redistribute or reduce weight per the blueprint's setting (BR-GRA-004).", "الدرجات أرقام ضمن 0..الحد الأقصى لكل مكوّن؛ غائب/معفى يحلّان الخلية بلا درجة. النشر يتطلب حلّ كل الخلايا (§9). المعفى يُعاد توزيع وزنه أو يُخفَّض المقام حسب إعداد المخطط (BR-GRA-004).")),
+            new HelpPanelViewModel.Item(T("Correction (WF-08)", "التصحيح (WF-08)"), T("A published sheet can be reopened only with a mandatory reason; re-publishing recomputes results and the audit trail keeps every change (T1, BR-GRA-011). The P4 Principal approval chain is not enforced in this build.", "يُعاد فتح الكشف المنشور بسبب إلزامي فقط؛ إعادة النشر تعيد الحساب ويحتفظ التدقيق بكل تغيير (T1، BR-GRA-011). سلسلة اعتماد المدير P4 غير مفعّلة في هذا الإصدار.")),
+            new HelpPanelViewModel.Item(T("Delete", "حذف"), T("Only an untouched Draft (no score, absent or exempt entered) can be deleted; anything else stays for audit.", "لا يُحذف إلا الكشف بحالة مسودة دون أي إدخال؛ ما عداه يبقى للتدقيق.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Teacher grid → HoD review → Registrar publication, per offering × term × section.", "شبكة المعلم → مراجعة رئيس القسم → نشر المسجّل، لكل مادة × فترة × شعبة.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
+<partial name="_GradingNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card">
+                <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+                    <input type="hidden" name="year" value="@yid" />
+                    <div class="btn-group btn-group-sm">
+                        <a class="btn @(Model.Status == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-year="@yid" asp-route-section="@Model.SectionId">@T("All", "الكل") <span class="badge text-bg-light border ms-1">@Model.CountsByStatus.Values.Sum()</span></a>
+                        @foreach (MarksheetStatus st in Enum.GetValues(typeof(MarksheetStatus))) { <a class="btn @(Model.Status == st ? "btn-primary" : "btn-outline-secondary")" asp-action="Index" asp-route-year="@yid" asp-route-status="@st" asp-route-section="@Model.SectionId">@GradingLabels.MarksheetStatus(st, isRtl) <span class="badge text-bg-light border ms-1">@(Model.CountsByStatus.TryGetValue(st, out var n) ? n : 0)</span></a> }
+                    </div>
+                    <select name="section" class="form-select form-select-sm ms-auto" style="max-width:14rem" onchange="this.form.submit()"><option value="">@T("Any section", "كل الشعب")</option>@foreach (var s in Model.Sections) { <option value="@s.Section.Id" selected="@(s.Section.Id == Model.SectionId)">@s.Grade?.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }</select>
+                    @if (Model.Status != null) { <input type="hidden" name="status" value="@Model.Status" /> }
+                </form>
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <thead><tr><th>#</th><th>@T("Subject", "المادة")</th><th>@T("Grade / section", "الصف / الشعبة")</th><th>@T("Term", "الفترة")</th><th>@T("Progress", "التقدم")</th><th>@T("Status", "الحالة")</th><th>@T("Published", "النشر")</th><th></th></tr></thead>
+                    <tbody>@foreach (var r in Model.Rows)
+                    {
+                        var pct = r.Total == 0 ? 0 : (int)Math.Round(100.0 * r.Resolved / r.Total);
+                        <tr><td><a asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><code>#@r.Sheet.Id</code></a></td><td class="fw-semibold"><a asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</a></td><td>@r.Grade?.Code · @(isRtl ? r.Section.NameAr : r.Section.NameEn)</td><td>@(isRtl ? r.Term.NameAr : r.Term.NameEn)</td>
+                            <td><div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(pct)%;@(pct == 100 ? "background:#16a34a" : "")"></span></div><span class="small text-muted">@r.Resolved/@r.Total</span></div></td>
+                            <td><span class="badge @GradingLabels.MarksheetBadge(r.Sheet.Status)">@GradingLabels.MarksheetStatus(r.Sheet.Status, isRtl)</span></td><td class="small text-muted">@(r.Sheet.PublishedAtUtc?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><i class="bi bi-grid-3x3"></i> @T("Open", "فتح")</a></td></tr>
+                    }
+                    @if (Model.Rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-4">@T("No marksheets match. Create one on the right — it needs a finalized blueprint.", "لا كشوف مطابقة. أنشئ واحداً من اليمين — يحتاج مخططاً معتمداً.")</td></tr> }</tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-4">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("New marksheet", "كشف درجات جديد")</h2>
+                @if (Model.LockedBlueprints.Count == 0) { <div class="alert alert-warning small mb-0">@T("No finalized blueprint in this year yet — build one under Blueprints & weights and finalize it (weights must sum to 100).", "لا مخطط معتمد في هذا العام — أنشئ واحداً في تبويب المخططات واعتمده (مجموع الأوزان 100).") <a asp-action="Blueprints" asp-route-year="@yid">@T("Go →", "انتقل ←")</a></div> }
+                else
+                {
+                    <form method="post" asp-action="CreateMarksheet" asp-route-year="@yid" class="d-grid gap-2">
+                        <div><label class="form-label small">@T("Blueprint (subject · grade · term)", "المخطط (المادة · الصف · الفترة)")</label><select name="blueprintId" id="bpPick" class="form-select form-select-sm" required><option value="">—</option>@foreach (var b in Model.LockedBlueprints) { <option value="@b.BlueprintId" data-profile="@b.ProfileId">@b.Subject.Code @(isRtl ? b.Subject.Name.NameAr : b.Subject.Name.NameEn) · @b.Grade?.Code · @(isRtl ? b.Term.NameAr : b.Term.NameEn)</option> }</select></div>
+                        <div><label class="form-label small">@T("Section", "الشعبة")</label><select name="sectionId" id="secPick" class="form-select form-select-sm" required><option value="">—</option>@foreach (var s in Model.Sections) { <option value="@s.Section.Id" data-profile="@s.Section.GradeYearProfileId">@s.Grade?.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }</select></div>
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create", "إنشاء")</button>
+                        <div class="form-text">@T("Sections of a different grade are hidden once a blueprint is picked.", "تُخفى شعب الصفوف الأخرى بعد اختيار المخطط.")</div>
+                    </form>
+                    <script>
+                        (function () {
+                            var bp = document.getElementById('bpPick'), sec = document.getElementById('secPick');
+                            function sync() { var p = bp.selectedOptions[0] ? bp.selectedOptions[0].getAttribute('data-profile') : null; Array.prototype.forEach.call(sec.options, function (o) { if (!o.value) return; o.hidden = !!(p && o.getAttribute('data-profile') !== p); }); if (sec.selectedOptions[0] && sec.selectedOptions[0].hidden) sec.value = ''; }
+                            bp.addEventListener('change', sync); sync();
+                        })();
+                    </script>
+                }
+            </div>
+        </div>
+    </div>
+}

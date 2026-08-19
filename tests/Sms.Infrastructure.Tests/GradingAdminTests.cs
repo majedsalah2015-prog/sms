@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Grading;
 using Sms.Domain.Common;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
@@ -389,6 +390,107 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(1, yearResult.FailedSubjectCount);
             Assert.Equal(PromotionOutcome.Retain, yearResult.PromotionOutcome);
+        }
+
+        // --- E-302 screen support: edit / delete / batch entry ---------------------
+
+        [Fact]
+        [BusinessRule("BR-GRA-001")]
+        public async Task Renaming_a_scale_requires_an_audit_reason_because_names_are_T1()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+
+            _audit.Reason = null;
+            await Assert.ThrowsAsync<MissingAuditReasonException>(() => admin.UpdateScaleAsync(scaleId, "جديد", "Renamed"));
+
+            _audit.Reason = "typo";
+            var scale = await admin.UpdateScaleAsync(scaleId, "جديد", "Renamed");
+            Assert.Equal("Renamed", scale.NameEn);
+            _audit.Reason = null;
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-001")]
+        public async Task Bands_can_be_edited_and_removed_until_the_scale_locks()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var band = db.ScaleBands.Single(b => b.GradingScaleId == scaleId && b.BandCode == "P");
+
+            await admin.UpdateScaleBandAsync(band.Id, 60m, 89.99m, "B", "جيد", "Good", isPassing: true, sortOrder: 2, gpaPoints: 3m);
+            Assert.Equal("B", db.ScaleBands.Single(b => b.Id == band.Id).BandCode);
+
+            await admin.RemoveScaleBandAsync(band.Id);
+            Assert.Equal(2, db.ScaleBands.Count(b => b.GradingScaleId == scaleId));
+
+            await admin.LockScaleAsync(scaleId);
+            var remaining = db.ScaleBands.First(b => b.GradingScaleId == scaleId);
+            await Assert.ThrowsAsync<GradingScaleLockedException>(() => admin.RemoveScaleBandAsync(remaining.Id));
+            await Assert.ThrowsAsync<GradingScaleLockedException>(() => admin.DeleteScaleAsync(scaleId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-001")]
+        public async Task Deleting_a_scale_is_refused_while_a_blueprint_references_it_and_removes_bands_otherwise()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprint = await admin.DefineBlueprintAsync(_offeringId, _termId, scaleId);
+
+            await Assert.ThrowsAsync<GradingScaleInUseException>(() => admin.DeleteScaleAsync(scaleId));
+
+            await admin.DeleteBlueprintAsync(blueprint.Id);
+            await admin.DeleteScaleAsync(scaleId);
+            Assert.Empty(db.ScaleBands.Where(b => b.GradingScaleId == scaleId));
+            Assert.Empty(db.GradingScales.Where(s => s.Id == scaleId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-003")]
+        public async Task Blueprint_components_can_be_edited_and_removed_until_locked_and_a_locked_blueprint_cannot_be_deleted()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprint = await admin.DefineBlueprintAsync(_offeringId, _termId, scaleId);
+            var quiz = await admin.AddBlueprintComponentAsync(blueprint.Id, "اختبار", "Quiz", 40m, 20m);
+            var extra = await admin.AddBlueprintComponentAsync(blueprint.Id, "زائد", "Extra", 10m, 10m);
+            await admin.AddBlueprintComponentAsync(blueprint.Id, "نهائي", "Final", 60m, 100m);
+
+            await admin.RemoveBlueprintComponentAsync(extra.Id);
+            await admin.UpdateBlueprintComponentAsync(quiz.Id, "اختبار", "Quiz", 40m, 25m);
+            await admin.LockBlueprintAsync(blueprint.Id);
+
+            await Assert.ThrowsAsync<BlueprintLockedException>(() => admin.UpdateBlueprintComponentAsync(quiz.Id, "x", "x", 40m, 25m));
+            await Assert.ThrowsAsync<BlueprintLockedException>(() => admin.DeleteBlueprintAsync(blueprint.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GRA-011")]
+        public async Task Batch_mark_entry_saves_the_grid_in_one_unit_and_an_untouched_draft_sheet_can_be_deleted_but_a_marked_one_cannot()
+        {
+            using var db = CreateContext();
+            var admin = new GradingAdmin(db, _clock, _audit);
+            var scaleId = await DefineStandardScale(admin);
+            var blueprintId = await DefineFinalizedBlueprint(admin, scaleId);
+            var sheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
+            var entries = db.MarkEntries.Where(e => e.MarksheetId == sheet.Id).ToList();
+            Assert.Equal(2, entries.Count);
+
+            // untouched -> deletable; recreate for the rest of the test
+            await admin.DeleteMarksheetAsync(sheet.Id);
+            Assert.Empty(db.Marksheets.Where(m => m.Id == sheet.Id));
+            sheet = await admin.CreateMarksheetAsync(blueprintId, _sectionId);
+            entries = db.MarkEntries.Where(e => e.MarksheetId == sheet.Id).ToList();
+
+            await admin.EnterMarksAsync(sheet.Id, entries.Select(e => new MarkInput(e.BlueprintComponentId, e.EnrollmentId, 15m, false, false)).ToList());
+            Assert.All(db.MarkEntries.Where(e => e.MarksheetId == sheet.Id), e => Assert.Equal(15m, e.Score));
+
+            await Assert.ThrowsAsync<MarksheetInUseException>(() => admin.DeleteMarksheetAsync(sheet.Id));
         }
     }
 }

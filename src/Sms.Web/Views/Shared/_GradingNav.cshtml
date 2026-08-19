@@ -1,0 +1,21 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var year = ViewData["GradingYear"] as int?;
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Index", "Marksheets", "كشوف الدرجات", "bi-pencil-square"),
+        ("Scales", "Scales", "سلالم التقدير", "bi-bar-chart-steps"),
+        ("Blueprints", "Blueprints & weights", "المخططات والأوزان", "bi-diagram-3"),
+        ("Criteria", "Pass criteria", "معايير النجاح", "bi-check2-circle"),
+        ("Results", "Results", "النتائج", "bi-trophy"),
+    };
+    bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || (a == "Index" && (action == "Marksheet")) || (a == "Blueprints" && action == "Blueprint");
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item"><a class="nav-link @(Active(t.Action) ? "active" : "")" asp-controller="Grading" asp-action="@t.Action" asp-route-year="@year"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

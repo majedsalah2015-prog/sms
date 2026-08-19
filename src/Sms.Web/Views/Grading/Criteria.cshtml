@@ -1,0 +1,51 @@
+@using System.Globalization
+@model CriteriaDesignerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Pass & promotion criteria", "معايير النجاح والانتقال");
+    ViewData["Breadcrumb"] = T("Grading / Criteria", "الدرجات / المعايير");
+    ViewData["GradingYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "cr-help", Title = T("Criteria — help", "المعايير — مساعدة"),
+        Intro = T("Per grade-year: the overall pass mark and the maximum number of failed subjects still allowed for promotion. Year results (GPA + promote/conditional/retain) are computed against these and feed the rollover's promotion proposals (BR-GRA-006, BR-AYR-008).", "لكل صف سنوي: درجة النجاح العامة والحد الأقصى للمواد الراسبة المسموح به للانتقال. تُحسب نتائج العام (المعدل + ينتقل/مشروط/يُعيد) وفقها وتغذي مقترحات الانتقال في الترحيل (BR-GRA-006, BR-AYR-008)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Preview", "المعاينة"), T("The plain-language sentence under each row is what the rules mean for a student.", "الجملة تحت كل صف تشرح معنى القواعد للطالب.")),
+            new HelpPanelViewModel.Item(T("Changes", "التغييرات"), T("Criteria are T1-audited once results reference them: give a reason when changing an existing row. Per-subject minimums, makeup gates and conditional-promotion definitions arrive with the full grading epic.", "المعايير مدققة T1 بعد أن تشير إليها النتائج: أعطِ سبباً عند تعديل صف قائم. الحدود الدنيا لكل مادة وبوابات الإعادة وتعريف الانتقال المشروط تأتي مع حزمة الدرجات الكاملة.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Rules per grade-year with a plain-language preview (“Student passes if…”).", "قواعد لكل صف سنوي مع معاينة بلغة بسيطة («ينجح الطالب إذا…»).")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_GradingNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+            <thead><tr><th>@T("Grade-year", "الصف السنوي")</th><th>@T("Assessable offerings", "المواد المقيَّمة")</th><th>@T("Overall pass mark %", "درجة النجاح العامة %")</th><th>@T("Max failed subjects", "الحد الأقصى للمواد الراسبة")</th><th>@T("Reason (edits)", "السبب (للتعديل)")</th><th></th></tr></thead>
+            <tbody>@foreach (var r in Model.Rows)
+            {
+                var c = r.Criteria; var fid = $"cr{r.Profile.ProfileId}";
+                <tr>
+                    <td class="fw-semibold">@r.Profile.Grade.Code @(isRtl ? r.Profile.Grade.Name.NameAr : r.Profile.Grade.Name.NameEn) <span class="small text-muted">· @(isRtl ? r.Profile.Stage.Name.NameAr : r.Profile.Stage.Name.NameEn)</span>@if (r.YearResultCount > 0) { <div class="small text-muted">@r.YearResultCount @T("year results computed", "نتيجة عام محسوبة")</div> }</td>
+                    <td>@r.OfferingCount</td>
+                    <td><input form="@fid" name="passMark" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" style="width:7rem" value="@(c?.OverallPassMark.ToString(CultureInfo.InvariantCulture))" placeholder="50" /></td>
+                    <td><input form="@fid" name="maxFailed" type="number" min="0" class="form-control form-control-sm" style="width:6rem" value="@(c?.MaxFailedSubjectsForPromotion)" placeholder="0" /></td>
+                    <td><input form="@fid" name="reason" class="form-control form-control-sm" placeholder="@(c == null ? "—" : T("required for changes (T1)", "مطلوب عند التعديل (T1)"))" @(c == null ? "disabled" : "") /></td>
+                    <td class="text-end"><form id="@fid" method="post" asp-action="SaveCriteria" asp-route-profileId="@r.Profile.ProfileId" asp-route-year="@yid"><button class="btn btn-sm @(c == null ? "btn-primary" : "btn-outline-primary")" type="submit"><i class="bi bi-@(c == null ? "plus-lg" : "check-lg") me-1"></i>@(c == null ? T("Define", "تعريف") : T("Save", "حفظ"))</button></form></td>
+                </tr>
+                <tr class="table-light"><td colspan="6" class="small text-muted py-1 ps-4">
+                    @if (c == null) { <i class="bi bi-dash-circle me-1"></i>@T("No criteria yet — year results cannot be computed for this grade until defined.", "لا معايير بعد — لا تُحسب نتائج العام لهذا الصف حتى تُعرَّف.") }
+                    else { <i class="bi bi-chat-quote me-1"></i>@(isRtl ? $"ينتقل الطالب إذا كان معدله العام الموزون ≥ {c.OverallPassMark}% وعدد المواد الراسبة ≤ {c.MaxFailedSubjectsForPromotion}؛ إذا رسب في مواد أكثر يُعيد؛ إذا بلغ المعدل ولكن تجاوزت الراسبة الحد فالانتقال مشروط." : $"Student is promoted if the weighted overall average is ≥ {c.OverallPassMark}% and failed subjects ≤ {c.MaxFailedSubjectsForPromotion}; more failed subjects than allowed → retain; average met but failed subjects above the limit → conditional.") }
+                </td></tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No grade-year profiles for this year.", "لا ملفات صفوف سنوية لهذا العام.")</td></tr> }</tbody>
+        </table></div>
+    </div>
+}
