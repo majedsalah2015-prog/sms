@@ -1,0 +1,23 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var yearId = ViewData["TtYear"] as int?;
+    var versionId = ViewData["TtVersion"] as int?;
+    var tabs = new (string Action, string En, string Ar, string Icon, bool Versioned)[]
+    {
+        ("Shape", "Shape designer", "مصمم الشكل", "bi-grid-1x2", false),
+        ("Builder", "Builder", "منشئ الجدول", "bi-table", true),
+        ("Validation", "Validation board", "لوحة التحقق", "bi-clipboard-check", true),
+        ("Publish", "Publication", "النشر", "bi-send-check", true),
+        ("Cover", "Daily cover", "التغطية اليومية", "bi-person-fill-exclamation", false),
+        ("Conflicts", "Session conflicts", "تعارضات الحصص", "bi-exclamation-diamond", false),
+    };
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        var active = string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Builder" && action is "Teacher" or "Section" or "Room");
+        <li class="nav-item"><a class="nav-link @(active ? "active" : "")" asp-controller="Timetable" asp-action="@t.Action" asp-route-year="@(t.Action is "Cover" or "Conflicts" ? null : yearId)" asp-route-version="@(t.Versioned ? versionId : null)"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

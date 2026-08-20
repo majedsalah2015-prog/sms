@@ -1,0 +1,123 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model CoverConsoleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Daily cover console", "وحدة التغطية اليومية");
+    ViewData["Breadcrumb"] = T("Timetable / Daily cover", "الجدول الدراسي / التغطية اليومية");
+    var d = Model.Date.ToString("yyyy-MM-dd");
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "cov-help", Title = T("Daily cover — help", "التغطية اليومية — مساعدة"),
+        Intro = T("BR-TTB-007: pick the absent teacher → their dated sessions for the day → substitute suggestions (free at that time, qualified first) → one-click assign. Substitutions apply to that dated session only and are counted per teacher for payroll-prep unless unticked. P1 console, no approval chain — everything is logged with reason (BR-TTB-010).", "BR-TTB-007: اختر المعلم الغائب → حصصه المؤرخة لليوم → اقتراحات البديل (متفرغ في ذلك الوقت، المؤهل أولاً) → تعيين بنقرة. التعويض لتلك الحصة المؤرخة فقط ويُحتسب للمعلم لإعداد الرواتب ما لم يُلغَ التحديد. وحدة P1 بلا سلسلة موافقات — كل شيء يُسجَّل مع السبب (BR-TTB-010)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Qualified / supervise-only", "مؤهل / إشراف فقط"), T("“Qualified” = holds an assignment for the same offering (the engine's proxy for the BR-SUB-006 matrix — identity-bridge gap noted in E-401). Others can cover in supervise-only mode (doc §14 Q2): flagged, not marked as qualified teaching.", "«مؤهل» = يحمل إسناداً للمادة نفسها (بديل المحرك لمصفوفة BR-SUB-006 — فجوة جسر الهوية المذكورة في E-401). الآخرون يغطون بوضع الإشراف فقط (الوثيقة §14 س2): مُعلَّم، لا يُعد تدريساً مؤهلاً.")),
+            new HelpPanelViewModel.Item(T("Absence feed", "تغذية الغياب"), T("Module 12 staff attendance/leave (BR-EMP-005/006) is not built yet, so the absent teacher is a manual pick here. Room change and cancel are per session with reason (BR-TTB-008).", "حضور/إجازات الموظفين (الوحدة 12، BR-EMP-005/006) غير مبني بعد، لذا المعلم الغائب يُختار يدوياً هنا. تغيير القاعة والإلغاء لكل حصة مع سبب (BR-TTB-008).")),
+            new HelpPanelViewModel.Item(T("Cover summary", "ملخص التغطية"), T("The bottom table is the staff-room printout: every substituted / room-changed / cancelled session of the day.", "الجدول السفلي هو مطبوعة غرفة المعلمين: كل حصة مُعوَّضة/مغيّرة القاعة/ملغاة في اليوم.")),
+        },
+    };
+}
+
+@if (!Model.Print)
+{
+<div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Absent teacher → affected sessions → substitute suggestions → one-click assign.", "معلم غائب → حصص متأثرة → اقتراحات بديل → تعيين بنقرة.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(-1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id"><i class="bi @(isRtl ? "bi-chevron-right" : "bi-chevron-left")"></i></a>
+            <input type="date" name="date" class="form-control form-control-sm" value="@d" onchange="this.form.submit()" />
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id"><i class="bi @(isRtl ? "bi-chevron-left" : "bi-chevron-right")"></i></a>
+            <input type="hidden" name="teacher" value="@Model.AbsentTeacher?.Profile.Id" />
+        </form>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@d" asp-route-print="true" target="_blank"><i class="bi bi-printer me-1"></i>@T("Cover summary", "ملخص التغطية")</a>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+@if (!Model.IsWorkingDay) { <div class="alert alert-secondary py-2 small"><i class="bi bi-moon me-1"></i>@T("Not a working day per the calendar.", "ليس يوم عمل وفق التقويم.")</div> }
+@if (Model.TotalSessions == 0) { <div class="alert alert-info">@T("No dated sessions on this day — publish a timetable version covering it (BR-TTB-006).", "لا حصص مؤرخة في هذا اليوم — انشر إصدار جدول يغطيه (BR-TTB-006).") <a asp-action="Publish">@T("Publication console", "وحدة النشر")</a></div> }
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-xl-3">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2"><i class="bi bi-person-fill-exclamation me-1"></i>@T("Absent teacher", "المعلم الغائب")</h2>
+                <form method="get"><input type="hidden" name="date" value="@d" />
+                    <select name="teacher" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">@T("choose…", "اختر…")</option>
+                        @foreach (var t in Model.Teachers) { <option value="@t.Profile.Id" selected="@(t.Profile.Id == Model.AbsentTeacher?.Profile.Id)">@Teacher(t.Employee) (@t.SessionsToday@(t.Uncovered < t.SessionsToday ? $" · {t.SessionsToday - t.Uncovered} " + T("covered", "مُغطّى") : ""))</option> }
+                    </select></form>
+                <div class="form-text">@T("Teachers with sessions on this day. Absence feed from Module 12 — deferred.", "معلمون لهم حصص في هذا اليوم. تغذية الغياب من الوحدة 12 — مؤجلة.")</div>
+                <hr />
+                <div class="small text-muted">@Model.TotalSessions @T("sessions today", "حصة اليوم") · @Model.Summary.Count(s => s.Session.Status == SessionStatus.Substituted) @T("substituted", "مُعوَّضة") · @Model.Summary.Count(s => s.Session.Status == SessionStatus.Cancelled) @T("cancelled", "ملغاة")</div>
+            </div>
+        </div>
+        <div class="col-xl-9">
+            @if (Model.AbsentTeacher == null) { <div class="sms-card p-4 text-center text-muted">@T("Pick the absent teacher to see affected sessions.", "اختر المعلم الغائب لعرض الحصص المتأثرة.")</div> }
+            else
+            {
+                <div class="sms-card">
+                    <div class="p-3 border-bottom"><h2 class="h6 mb-0">@Teacher(Model.AbsentTeacher.Employee) — @Model.Affected.Count @T("session(s) on", "حصة في") @d</h2></div>
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                        <thead><tr><th>@T("Slot", "الحصة")</th><th>@T("Section · subject", "الشعبة · المادة")</th><th>@T("Room", "القاعة")</th><th>@T("Status", "الحالة")</th><th style="min-width:22rem">@T("Cover", "التغطية")</th></tr></thead>
+                        <tbody>
+                        @foreach (var s in Model.Affected)
+                        {
+                            <tr>
+                                <td class="small">#@s.Cell.Slot.SequenceNumber<br /><span class="text-muted">@TimetableLabels.Span(s.Cell.Slot)</span></td>
+                                <td><strong>@TimetableLabels.SectionName(s.Cell.Section, isRtl)</strong><br /><span class="small"><code>@s.Cell.Subject.Code</code> @TimetableLabels.SubjectName(s.Cell.Subject, isRtl)</span></td>
+                                <td class="small">@(s.EffectiveRoom?.Code ?? "—")</td>
+                                <td><span class="badge @TimetableLabels.SessionBadge(s.Session.Status)">@TimetableLabels.SessionStatus(s.Session.Status, isRtl)</span>@if (s.Substitute != null) { <div class="small">→ @Teacher(s.Substitute)</div> }@if (s.Session.ChangeReason != null) { <div class="small text-muted">@s.Session.ChangeReason</div> }</td>
+                                <td>
+                                    @if (s.Session.Status == SessionStatus.Held || s.Session.Status == SessionStatus.RoomChanged)
+                                    {
+                                        <form method="post" asp-action="Substitute" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-grid gap-1">
+                                            <select name="substituteProfileId" class="form-select form-select-sm" required>
+                                                <option value="">@T("substitute… (free now)", "بديل… (متفرغ الآن)")</option>
+                                                @foreach (var c in s.Candidates) { <option value="@c.Profile.Id">@(c.Qualified ? "✓" : "○") @Teacher(c.Employee)@(c.Qualified ? "" : " — " + T("supervise-only", "إشراف فقط"))</option> }
+                                            </select>
+                                            <input name="reason" class="form-control form-control-sm" placeholder="@T("reason (required)", "السبب (مطلوب)")" required />
+                                            <div class="d-flex gap-2 align-items-center small">
+                                                <label><input type="checkbox" name="superviseOnly" value="true" class="form-check-input me-1" />@T("allow supervise-only", "السماح بالإشراف فقط")</label>
+                                                <label><input type="checkbox" name="notCounted" value="true" class="form-check-input me-1" />@T("not counted", "غير محتسب")</label>
+                                                <button class="btn btn-sm btn-primary ms-auto" type="submit">@T("Assign", "تعيين")</button>
+                                            </div>
+                                        </form>
+                                        <details class="mt-1"><summary class="small text-muted">@T("room change / cancel", "تغيير قاعة / إلغاء")</summary>
+                                            <form method="post" asp-action="ChangeRoom" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1"><select name="roomId" class="form-select form-select-sm">@foreach (var r in Model.Rooms) { <option value="@r.Id">@r.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit"><i class="bi bi-door-open"></i></button></form>
+                                            <form method="post" asp-action="CancelSession" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1" onsubmit="return confirm('@T("Cancel this session?", "إلغاء هذه الحصة؟")');"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle"></i></button></form>
+                                        </details>
+                                    }
+                                    else { <span class="small text-muted">—</span> }
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Affected.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-3">@T("No sessions for this teacher on this day.", "لا حصص لهذا المعلم في هذا اليوم.")</td></tr> }
+                        </tbody>
+                    </table></div>
+                </div>
+            }
+        </div>
+    </div>
+}
+</div>
+}
+
+<div class="sms-card @(Model.Print ? "border-0 shadow-none" : "")">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-printer me-1"></i>@T("Cover summary", "ملخص التغطية") — @d @if (Model.Print) { <span class="text-muted small">· @T("staff room", "غرفة المعلمين")</span> }</h2>@if (Model.Print) { <button class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer"></i></button> }</div>
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <thead><tr><th>@T("Slot", "الحصة")</th><th>@T("Section", "الشعبة")</th><th>@T("Subject", "المادة")</th><th>@T("Teacher", "المعلم")</th><th>@T("Status", "الحالة")</th><th>@T("Substitute / room", "البديل / القاعة")</th><th>@T("Reason", "السبب")</th></tr></thead>
+        <tbody>
+        @foreach (var s in Model.Summary)
+        {
+            <tr><td class="small">#@s.Cell.Slot.SequenceNumber @TimetableLabels.Time(s.Cell.Slot.StartTime)</td><td>@TimetableLabels.SectionName(s.Cell.Section, isRtl)</td><td><code>@s.Cell.Subject.Code</code></td><td>@Teacher(s.Cell.Teacher)</td>
+                <td><span class="badge @TimetableLabels.SessionBadge(s.Session.Status)">@TimetableLabels.SessionStatus(s.Session.Status, isRtl)</span></td>
+                <td class="small">@(s.Substitute != null ? Teacher(s.Substitute) + (s.Substitution?.IsCountedForPayroll == false ? " (" + T("not counted", "غير محتسب") + ")" : "") : "")@(s.Session.Status == SessionStatus.RoomChanged ? " → " + (s.EffectiveRoom?.Code ?? "?") : "")</td>
+                <td class="small text-muted">@(s.Substitution?.Reason ?? s.Session.ChangeReason)</td></tr>
+        }
+        @if (Model.Summary.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-3">@T("No cover, room changes or cancellations today.", "لا تغطية أو تغيير قاعات أو إلغاءات اليوم.")</td></tr> }
+        </tbody>
+    </table></div>
+</div>

@@ -22,12 +22,21 @@ namespace Sms.Application.Timetable
             int shapeId, DayOfWeek dayOfWeek, int sequenceNumber, TimeSpan startTime, TimeSpan endTime,
             bool isBreak = false, CancellationToken cancellationToken = default);
 
+        /// <summary>Throws <see cref="Common.Exceptions.PeriodSlotInUseException"/> when placements still reference the slot (BR-TTB-001).</summary>
+        Task RemovePeriodSlotAsync(int periodSlotId, CancellationToken cancellationToken = default);
+
         Task<TimetableVersion> DefineVersionAsync(int academicYearId, int? termId = null, CancellationToken cancellationToken = default);
 
-        /// <summary>Throws <see cref="Common.Exceptions.TeacherNotAssignedException"/> (BR-TCH-002) or <see cref="Common.Exceptions.PlacementConflictException"/> (BR-TTB-004).</summary>
+        /// <summary>Validated -> Draft (BR-TTB-002): unlock a version for further editing before publication.</summary>
+        Task ReopenVersionAsync(int timetableVersionId, CancellationToken cancellationToken = default);
+
+        /// <summary>Throws <see cref="Common.Exceptions.TimetableVersionLockedException"/> unless the version is Draft (doc §9), <see cref="Common.Exceptions.TeacherNotAssignedException"/> (BR-TCH-002) or <see cref="Common.Exceptions.PlacementConflictException"/> (BR-TTB-004).</summary>
         Task<Placement> PlaceAsync(
             int timetableVersionId, int sectionId, int periodSlotId, int curriculumOfferingId, int teacherProfileId,
             int? roomId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Throws <see cref="Common.Exceptions.TimetableVersionLockedException"/> unless the owning version is Draft (doc §9).</summary>
+        Task RemovePlacementAsync(int placementId, CancellationToken cancellationToken = default);
 
         /// <summary>Draft -> Validated (BR-TTB-002). Throws <see cref="Common.Exceptions.IncompletePlacementException"/> if a placed offering falls short of its weekly-periods plan (BR-TTB-003).</summary>
         Task ValidateVersionAsync(int timetableVersionId, CancellationToken cancellationToken = default);

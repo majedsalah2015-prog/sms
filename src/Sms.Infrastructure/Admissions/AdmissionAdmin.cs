@@ -213,6 +213,29 @@ namespace Sms.Infrastructure.Admissions
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task DeleteCampaignAsync(int campaignId, CancellationToken cancellationToken = default)
+        {
+            var campaign = await _db.AdmissionCampaigns.SingleAsync(c => c.Id == campaignId, cancellationToken);
+
+            // Hard delete: the campaign goes with every application filed against it (plus their
+            // assessments / waiting-list rows). Students already registered from an application are
+            // NOT touched — they live on in Students; only their admission trail is removed.
+            var applications = await _db.Applications.Where(a => a.CampaignId == campaignId).ToListAsync(cancellationToken);
+            var applicationIds = applications.Select(a => a.Id).ToList();
+            _db.ApplicationAssessments.RemoveRange(await _db.ApplicationAssessments.Where(x => applicationIds.Contains(x.ApplicationId)).ToListAsync(cancellationToken));
+            _db.WaitingListEntries.RemoveRange(await _db.WaitingListEntries.Where(x => applicationIds.Contains(x.ApplicationId)).ToListAsync(cancellationToken));
+            _db.Applications.RemoveRange(applications);
+            _db.AdmissionCampaigns.Remove(campaign);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new InvalidOperationException("Campaign cannot be deleted: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
+            }
+        }
+
         public async Task DeleteApplicationAsync(int applicationId, CancellationToken cancellationToken = default)
         {
             var application = await _db.Applications.SingleAsync(a => a.Id == applicationId, cancellationToken);
@@ -232,6 +255,19 @@ namespace Sms.Infrastructure.Admissions
             {
                 throw new InvalidOperationException("Application cannot be deleted: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
             }
+        }
+
+        public async Task RemoveFromWaitingListAsync(int waitingListEntryId, CancellationToken cancellationToken = default)
+        {
+            var entry = await _db.WaitingListEntries.SingleAsync(w => w.Id == waitingListEntryId, cancellationToken);
+            var application = await _db.Applications.SingleAsync(a => a.Id == entry.ApplicationId, cancellationToken);
+            _db.WaitingListEntries.Remove(entry);
+            if (application.Status == ApplicationStatus.Waitlisted)
+            {
+                application.Status = ApplicationStatus.Lapsed;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         public async Task<AdmissionApplication> UpdateApplicationAsync(

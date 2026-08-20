@@ -1,0 +1,39 @@
+@using System.Globalization
+@model StudentFormViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Register student", "تسجيل طالب");
+    ViewData["Breadcrumb"] = T("Students / Register", "الطلاب / تسجيل");
+}
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Direct registration (transfer-in / opening data). Admissions applicants register through the pipeline instead.", "تسجيل مباشر (منقول / بيانات افتتاح). متقدمو القبول يُسجَّلون عبر المسار.")</p></div></div>
+<form method="post" asp-action="Register" novalidate>
+    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card p-4 mb-3">
+                <h2 class="h6 mb-3">@T("Identity", "الهوية")</h2>
+                <div class="sms-bilingual mb-3">
+                    <div><label class="form-label small">@T("Name (Arabic): first / father / grandfather / family", "الاسم بالعربية: الأول / الأب / الجد / العائلة")</label><div class="row g-1"><div class="col-3"><input asp-for="FirstNameAr" class="form-control form-control-sm" dir="rtl" /></div><div class="col-3"><input asp-for="FatherNameAr" class="form-control form-control-sm" dir="rtl" /></div><div class="col-3"><input asp-for="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" /></div><div class="col-3"><input asp-for="FamilyNameAr" class="form-control form-control-sm" dir="rtl" /></div></div></div>
+                    <div><label class="form-label small">@T("Name (English)", "الاسم بالإنجليزية")</label><div class="row g-1"><div class="col-3"><input asp-for="FirstNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#FirstNameAr" /></div><div class="col-3"><input asp-for="FatherNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#FatherNameAr" /></div><div class="col-3"><input asp-for="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#GrandfatherNameAr" /></div><div class="col-3"><input asp-for="FamilyNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#FamilyNameAr" /></div></div></div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-2"><label class="form-label small">@T("Gender", "الجنس")</label><select asp-for="Gender" class="form-select form-select-sm"><option value="Male">@T("Male", "ذكر")</option><option value="Female">@T("Female", "أنثى")</option></select></div>
+                    <div class="col-md-3"><label class="form-label small">@T("Date of birth", "تاريخ الميلاد")</label><input asp-for="DateOfBirth" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control form-control-sm" /></div>
+                    <div class="col-md-3"><label class="form-label small">@T("Nationality", "الجنسية")</label><select asp-for="NationalityLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var n in Model.Nationalities) { <option value="@n.Id">@(isRtl ? n.Ar : n.En)</option> }</select></div>
+                    <div class="col-md-2"><label class="form-label small">@T("ID type", "نوع الهوية")</label><select asp-for="PrimaryIdTypeLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var t in Model.IdTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }</select></div>
+                    <div class="col-md-2"><label class="form-label small">@T("ID number", "رقم الهوية")</label><input asp-for="PrimaryIdNo" class="form-control form-control-sm" dir="ltr" /></div>
+                </div>
+            </div>
+            <div class="sms-card p-4">
+                <h2 class="h6 mb-3">@T("Enrollment & guardian (optional now)", "القيد وولي الأمر (اختياري الآن)")</h2>
+                <div class="row g-3">
+                    <div class="col-md-4"><label class="form-label small">@T("Grade-year", "الصف السنوي")</label><select asp-for="GradeYearProfileId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Profiles) { <option value="@p.ProfileId">@(isRtl ? p.GradeAr : p.GradeEn) · @(isRtl ? p.YearAr : p.YearEn)</option> }</select></div>
+                    <div class="col-md-5"><label class="form-label small">@T("Parent", "ولي الأمر")</label><select asp-for="ParentId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Parents) { <option value="@p.Id">@p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile</option> }</select></div>
+                    <div class="col-md-3"><label class="form-label small">@T("Relationship", "صلة القرابة")</label><select asp-for="RelationshipLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var r in Model.Relationships) { <option value="@r.Id">@(isRtl ? r.Ar : r.En)</option> }</select></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-4"><div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1"></i>@T("Register", "تسجيل")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a></div></div>
+    </div>
+</form>

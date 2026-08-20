@@ -1,0 +1,29 @@
+@using System.Globalization
+@model YearDefinitionViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var label = Model.Year == null ? string.Empty : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn);
+    ViewData["Title"] = T("Edit academic year", "تعديل العام الدراسي") + " — " + label;
+    ViewData["Breadcrumb"] = T("Academic Years / Edit", "الأعوام الدراسية / تعديل");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Allowed only while no student is enrolled in this year. Dates keep the 6–14 month span and no-overlap rules (BR-AYR-001); existing semesters must stay inside the new dates (BR-AYR-007). Labels are regenerated from the dates when left blank.", "مسموح فقط طالما لا يوجد طلاب مسجلون في هذا العام. تخضع التواريخ لقاعدة 6–14 شهراً وعدم التداخل (BR-AYR-001)؛ ويجب أن تبقى الفصول الحالية داخل التواريخ الجديدة (BR-AYR-007). تُولَّد التسميات من التواريخ إن تُركت فارغة.")</p></div></div>
+
+<div class="sms-card p-4" style="max-width:760px">
+    <form method="post" asp-action="Edit" asp-route-id="@Model.YearId" novalidate>
+        <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6"><label class="form-label">@T("Start date", "تاريخ البداية")</label><input asp-for="StartDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+            <div class="col-md-6"><label class="form-label">@T("End date", "تاريخ النهاية")</label><input asp-for="EndDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-4"><label class="form-label">@T("Label (English)", "التسمية (إنجليزي)")</label><input asp-for="LabelEn" class="form-control" dir="ltr" placeholder="2027-2028" /></div>
+            <div class="col-md-4"><label class="form-label">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="٢٠٢٧-٢٠٢٨" /></div>
+            <div class="col-md-4"><label class="form-label">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
+        </div>
+        <div class="mb-3"><label class="form-label">@T("Reason (optional, recorded in the audit trail)", "السبب (اختياري، يُسجَّل في سجل التدقيق)")</label><input asp-for="Reason" class="form-control" /></div>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>
+    </form>
+</div>

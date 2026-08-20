@@ -13,7 +13,7 @@
     var colors = new[] { "#2563eb", "#7c3aed", "#0ea5e9", "#16a34a" };
 }
 
-<div class="sms-page-head"><div><div class="text-muted small">@T("Academic year", "العام الدراسي") · @y.Status</div><h1 class="sms-page-title">@label <span class="text-muted fs-6">@y.HijriLabel</span></h1>
+<div class="sms-page-head"><div><div class="text-muted small">@T("Academic year", "العام الدراسي") · @Labels.YearStatus(y.Status, isRtl)</div><h1 class="sms-page-title">@label <span class="text-muted fs-6">@y.HijriLabel</span></h1>
     <p class="text-muted mb-0">@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd") · @T("Semester/term structure is per year (BR-AYR-007); terms nest in semesters, semesters in the year (§9).", "هيكل الفصول/الفترات لكل عام (BR-AYR-007)؛ الفترات داخل الفصول والفصول داخل العام (§9).")</p></div>
     <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Board", "اللوحة")</a></div>
 

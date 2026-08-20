@@ -104,13 +104,122 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { year });
         }
 
+        // --- Edit / delete (soft: deactivate) ------------------------------------
+
+        [HttpGet("stage/{id:int}/edit")]
+        public async Task<IActionResult> EditStage(int id, int? year)
+        {
+            var stage = await _db.Stages.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+            if (stage == null) return NotFound();
+            return View(new StageEditViewModel
+            {
+                Id = id, Year = year, NameAr = stage.Name.NameAr, NameEn = stage.Name.NameEn, Order = stage.SequenceOrder, Gender = stage.DefaultGenderPolicy,
+                GradeCount = await _db.GradeLevels.CountAsync(g => g.StageId == id),
+            });
+        }
+
+        [HttpPost("stage/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditStage(int id, StageEditViewModel form)
+        {
+            form.Id = id;
+            try
+            {
+                Require(form.NameAr, T("Stage name (Arabic)", "اسم المرحلة (عربي)"));
+                Require(form.NameEn, T("Stage name (English)", "اسم المرحلة (إنجليزي)"));
+                await _grades.UpdateStageAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim(), form.Order ?? 1, form.Gender);
+                TempData["Flash"] = T("Stage updated.", "تم تحديث المرحلة.");
+                return RedirectToAction(nameof(Index), new { year = form.Year });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                form.GradeCount = await _db.GradeLevels.CountAsync(g => g.StageId == id);
+                return View(form);
+            }
+        }
+
+        [HttpPost("stage/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteStage(int id, int? year)
+        {
+            try
+            {
+                await _grades.DeactivateStageAsync(id);
+                TempData["Flash"] = T("Stage removed (deactivated).", "تم حذف المرحلة (إلغاء تفعيل).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
+        [HttpGet("grade/{id:int}/edit")]
+        public async Task<IActionResult> EditGrade(int id, int? year)
+        {
+            var grade = await _db.GradeLevels.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id);
+            if (grade == null) return NotFound();
+            return View(new GradeEditViewModel
+            {
+                Id = id, Year = year, StageId = grade.StageId, Code = grade.Code, NameAr = grade.Name.NameAr, NameEn = grade.Name.NameEn, Order = grade.SequenceOrder,
+                Stages = await _db.Stages.AsNoTracking().OrderBy(s => s.SequenceOrder).ToListAsync(),
+            });
+        }
+
+        [HttpPost("grade/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditGrade(int id, GradeEditViewModel form)
+        {
+            form.Id = id;
+            try
+            {
+                if (form.StageId == null) throw new InvalidOperationException(T("Choose a stage.", "اختر مرحلة."));
+                Require(form.Code, T("Code", "الرمز"));
+                Require(form.NameAr, T("Grade name (Arabic)", "اسم الصف (عربي)"));
+                Require(form.NameEn, T("Grade name (English)", "اسم الصف (إنجليزي)"));
+                await _grades.UpdateGradeLevelAsync(id, form.StageId.Value, form.Code!.Trim(), form.NameAr!.Trim(), form.NameEn!.Trim(), form.Order ?? 1);
+                TempData["Flash"] = T("Grade updated.", "تم تحديث الصف.");
+                return RedirectToAction(nameof(Index), new { year = form.Year });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                form.Stages = await _db.Stages.AsNoTracking().OrderBy(s => s.SequenceOrder).ToListAsync();
+                return View(form);
+            }
+        }
+
+        [HttpPost("grade/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteGrade(int id, int? year)
+        {
+            try
+            {
+                await _grades.DeactivateGradeLevelAsync(id);
+                TempData["Flash"] = T("Grade removed (deactivated, BR-GRD-007).", "تم حذف الصف (إلغاء تفعيل، BR-GRD-007).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
+        [HttpPost("profile/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteProfile(int id, int? year)
+        {
+            try
+            {
+                await _grades.RemoveGradeYearProfileAsync(id);
+                TempData["Flash"] = T("Grade-year profile removed.", "تم حذف ملف الصف السنوي.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
         private async Task<GradeLadderViewModel> BuildAsync(int? yearId)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
             var year = years.FirstOrDefault(y => y.Id == (yearId ?? _workingYear.AcademicYearId)) ?? years.FirstOrDefault(y => y.Status == AcademicYearStatus.Active) ?? years.FirstOrDefault();
             var stages = await _db.Stages.AsNoTracking().OrderBy(s => s.SequenceOrder).ToListAsync();
             var grades = await _db.GradeLevels.AsNoTracking().OrderBy(g => g.SequenceOrder).ToListAsync();
-            var profiles = year == null ? new() : await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == year.Id).ToListAsync();
+            var profiles = year == null ? new() : await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == year.Id && p.IsActive).ToListAsync();
             var sections = year == null ? new() : await _db.Sections.AsNoTracking().Where(s => s.AcademicYearId == year.Id).ToListAsync();
             var enrolled = year == null
                 ? new System.Collections.Generic.Dictionary<int, int>()

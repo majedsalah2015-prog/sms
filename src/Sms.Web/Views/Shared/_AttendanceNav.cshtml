@@ -1,0 +1,27 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var navYear = ViewData["AttendanceYear"] as int?;
+    var navDate = ViewData["AttendanceDate"] as string;
+    var tabs = new (string Action, string En, string Ar, string Icon, bool Dated)[]
+    {
+        ("Index", "Monitor", "المتابعة", "bi-broadcast", true),
+        ("Capture", "Capture sheet", "كشف الرصد", "bi-check2-square", true),
+        ("Gate", "Gate console", "البوابة", "bi-door-open", true),
+        ("Justifications", "Excuses", "الأعذار", "bi-file-earmark-text", false),
+        ("Corrections", "Corrections", "التصحيحات", "bi-pencil-square", false),
+        ("Analytics", "Analytics", "التحليلات", "bi-graph-up", false),
+    };
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+               asp-controller="Attendance" asp-action="@t.Action" asp-route-year="@navYear" asp-route-date="@(t.Dated ? navDate : null)">
+                <i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)
+            </a>
+        </li>
+    }
+</ul>

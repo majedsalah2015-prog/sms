@@ -100,6 +100,102 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { tab = "departments" });
         }
 
+        // --- Edit / delete (soft: deactivate) ----------------------------------------
+
+        [HttpGet("subject/{id:int}/edit")]
+        public async Task<IActionResult> EditSubject(int id)
+        {
+            var s = await _db.Subjects.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (s == null) return NotFound();
+            return View(new SubjectEditViewModel
+            {
+                Id = id, Code = s.Code, NameAr = s.Name.NameAr, NameEn = s.Name.NameEn, Category = s.Category, DepartmentId = s.DepartmentId,
+                CurrentOfferings = await _db.CurriculumOfferings.CountAsync(o => o.SubjectId == id && o.EffectiveToUtc == null),
+                Departments = await _db.Departments.AsNoTracking().OrderBy(d => d.Name.NameEn).ToListAsync(),
+            });
+        }
+
+        [HttpPost("subject/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditSubject(int id, SubjectEditViewModel form)
+        {
+            form.Id = id;
+            try
+            {
+                Require(form.Code, T("Code", "الرمز")); Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _subjects.UpdateSubjectAsync(id, form.Code!.Trim().ToUpperInvariant(), form.NameAr!.Trim(), form.NameEn!.Trim(), form.Category ?? "core", form.DepartmentId);
+                TempData["Flash"] = T("Subject updated.", "تم تحديث المادة.");
+                return RedirectToAction(nameof(Index), new { tab = "catalog" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                form.Departments = await _db.Departments.AsNoTracking().OrderBy(d => d.Name.NameEn).ToListAsync();
+                form.CurrentOfferings = await _db.CurriculumOfferings.CountAsync(o => o.SubjectId == id && o.EffectiveToUtc == null);
+                return View(form);
+            }
+        }
+
+        [HttpPost("subject/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteSubject(int id)
+        {
+            try
+            {
+                await _subjects.DeactivateSubjectAsync(id);
+                TempData["Flash"] = T("Subject removed (deactivated; history kept).", "تم حذف المادة (إلغاء تفعيل مع حفظ السجل).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { tab = "catalog" });
+        }
+
+        [HttpGet("department/{id:int}/edit")]
+        public async Task<IActionResult> EditDepartment(int id)
+        {
+            var d = await _db.Departments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (d == null) return NotFound();
+            return View(new DepartmentEditViewModel
+            {
+                Id = id, NameAr = d.Name.NameAr, NameEn = d.Name.NameEn, HeadTeacherUserId = d.HeadTeacherUserId,
+                SubjectCount = await _db.Subjects.CountAsync(s => s.DepartmentId == id),
+                Teachers = await TeacherOptionsAsync(),
+            });
+        }
+
+        [HttpPost("department/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditDepartment(int id, DepartmentEditViewModel form)
+        {
+            form.Id = id;
+            try
+            {
+                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _subjects.UpdateDepartmentAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim(), form.HeadTeacherUserId);
+                TempData["Flash"] = T("Department updated.", "تم تحديث القسم.");
+                return RedirectToAction(nameof(Index), new { tab = "departments" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                form.Teachers = await TeacherOptionsAsync();
+                form.SubjectCount = await _db.Subjects.CountAsync(s => s.DepartmentId == id);
+                return View(form);
+            }
+        }
+
+        [HttpPost("department/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteDepartment(int id)
+        {
+            try
+            {
+                await _subjects.DeactivateDepartmentAsync(id);
+                TempData["Flash"] = T("Department removed (deactivated).", "تم حذف القسم (إلغاء تفعيل).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { tab = "departments" });
+        }
+
         [HttpPost("qualification")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DefineQualification(SubjectCatalogViewModel form)

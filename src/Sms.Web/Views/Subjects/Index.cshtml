@@ -9,9 +9,23 @@
     ViewData["SubjectsTab"] = Model.ActiveTab;
     string TeacherName(int userId) => Model.Teachers.FirstOrDefault(t => t.UserAccountId == userId) is { } t ? (isRtl ? t.NameAr : t.NameEn) : $"#{userId}";
     var subjectsAll = Model.Subjects.Select(r => r.Subject).ToList();
+    var help = new HelpPanelViewModel
+    {
+        Id = "subjects-help",
+        Title = T("Subjects — help", "المواد الدراسية — مساعدة"),
+        Intro = T("The subject catalog is the school-wide list of subjects; departments group them for the head-of-department chain; the qualification matrix says which teacher may teach which subject (and in which stages). The per-grade weekly plan is on the Curriculum plan tab.", "دليل المواد هو قائمة المواد على مستوى المدرسة؛ والأقسام تجمعها لسلسلة رئيس القسم؛ ومصفوفة التأهيل تحدد أي معلم يجوز له تدريس أي مادة (وفي أي مراحل). الخطة الأسبوعية لكل صف في تبويب الخطة الدراسية."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Catalog", "الدليل"), T("Code (unique per school, BR-SUB-001), Arabic/English names, category and department. Filter by department from the dropdown. 'Offerings' = how many current grade plans include the subject; 'Qualified teachers' = matrix coverage — 0 is a gap.", "الرمز (فريد على مستوى المدرسة، BR-SUB-001) والاسمان والفئة والقسم. صفِّ حسب القسم من القائمة. «في الخطط» = عدد خطط الصفوف الحالية التي تتضمن المادة؛ «المعلمون المؤهلون» = تغطية المصفوفة — الصفر فجوة.")),
+            new HelpPanelViewModel.Item(T("Edit ✎ / Delete 🗑", "تعديل ✎ / حذف 🗑"), T("Edit changes code/names/category/department. Delete deactivates the subject (never a hard delete) and is refused while a current curriculum plan still offers it — end-date the offering in the plan first (BR-SUB-004). Past offerings and qualifications stay as history.", "التعديل يغيّر الرمز/الأسماء/الفئة/القسم. الحذف يلغي تفعيل المادة (لا حذف فعلي) ويُرفض ما دامت خطة دراسية حالية تتضمنها — أنهِ المادة في الخطة أولاً (BR-SUB-004). تبقى العروض السابقة والتأهيلات كسجل.")),
+            new HelpPanelViewModel.Item(T("Departments", "الأقسام"), T("Group subjects and name a head of department (must be a teacher with a user account, BR-SUB-007). A department can be removed only after its subjects are moved elsewhere.", "تجمع المواد وتحدد رئيس القسم (يجب أن يكون معلماً له حساب مستخدم، BR-SUB-007). لا يُحذف القسم إلا بعد نقل مواده.")),
+            new HelpPanelViewModel.Item(T("Qualification matrix", "مصفوفة التأهيل"), T("Record teacher × subject (optionally limited to a stage). Assigning a teacher outside the matrix is blocked unless an approval-sourced entry exists (BR-SUB-006).", "سجّل معلم × مادة (مع تقييد اختياري بمرحلة). إسناد معلم خارج المصفوفة محجوب ما لم يوجد تأهيل باعتماد (BR-SUB-006).")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Catalog, departments and teacher qualifications (BR-SUB-001/002/006); the per-grade plan lives under Curriculum plan.", "الدليل والأقسام وتأهيل المعلمين (BR-SUB-001/002/006)؛ الخطة لكل صف تحت الخطة الدراسية.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Catalog, departments and teacher qualifications (BR-SUB-001/002/006); the per-grade plan lives under Curriculum plan.", "الدليل والأقسام وتأهيل المعلمين (BR-SUB-001/002/006)؛ الخطة لكل صف تحت الخطة الدراسية.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_SubjectsNav" />
 
 @if (Model.ActiveTab == "catalog")
@@ -24,9 +38,15 @@
                     <span class="small text-muted ms-auto">@Model.Subjects.Count @T("subjects", "مادة")</span>
                 </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">
-                    <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Subject", "المادة")</th><th>@T("Category", "الفئة")</th><th>@T("Department", "القسم")</th><th>@T("Offerings", "في الخطط")</th><th>@T("Qualified teachers", "المعلمون المؤهلون")</th></tr></thead>
-                    <tbody>@foreach (var r in Model.Subjects) { <tr><td><code>@r.Subject.Code</code></td><td class="fw-semibold">@(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td>@r.Subject.Category</td><td>@(r.Department == null ? "—" : (isRtl ? r.Department.Name.NameAr : r.Department.Name.NameEn))</td><td><span class="badge text-bg-light border">@r.Offerings</span></td><td>@if (r.QualifiedTeachers == 0) { <span class="badge text-bg-warning">0 · @T("gap", "فجوة")</span> } else { <span class="badge text-bg-light border">@r.QualifiedTeachers</span> }</td></tr> }
-                    @if (Model.Subjects.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No subjects yet.", "لا مواد بعد.")</td></tr> }</tbody>
+                    <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Subject", "المادة")</th><th>@T("Category", "الفئة")</th><th>@T("Department", "القسم")</th><th>@T("Offerings", "في الخطط")</th><th>@T("Qualified teachers", "المعلمون المؤهلون")</th><th></th></tr></thead>
+                    <tbody>@foreach (var r in Model.Subjects) { <tr><td><code>@r.Subject.Code</code></td><td class="fw-semibold">@(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td>@SubjectCatalogViewModel.CategoryLabel(r.Subject.Category, isRtl)</td><td>@(r.Department == null ? "—" : (isRtl ? r.Department.Name.NameAr : r.Department.Name.NameEn))</td><td><span class="badge text-bg-light border">@r.Offerings</span></td><td>@if (r.QualifiedTeachers == 0) { <span class="badge text-bg-warning">0 · @T("gap", "فجوة")</span> } else { <span class="badge text-bg-light border">@r.QualifiedTeachers</span> }</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-primary" asp-action="EditSubject" asp-route-id="@r.Subject.Id" title="@T("Edit subject", "تعديل المادة")"><i class="bi bi-pencil"></i></a>
+                            <form method="post" asp-action="DeleteSubject" asp-route-id="@r.Subject.Id" class="d-inline" onsubmit="return confirm('@T("Remove this subject from the catalog?", "حذف هذه المادة من الدليل؟")');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@(r.Offerings > 0 ? T("In current plans — end-date the offerings first", "في خطط حالية — أنهِ العروض أولاً") : T("Remove subject", "حذف المادة"))" disabled="@(r.Offerings > 0)"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td></tr> }
+                    @if (Model.Subjects.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No subjects yet.", "لا مواد بعد.")</td></tr> }</tbody>
                 </table></div>
             </div>
         </div>
@@ -36,7 +56,7 @@
                 <form method="post" asp-action="DefineSubject">
                     <div class="row g-2 mb-2"><div class="col-4"><input asp-for="Code" class="form-control form-control-sm" dir="ltr" placeholder="MATH" /></div><div class="col-8"><input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" placeholder="Mathematics" /></div></div>
                     <div class="mb-2"><input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" placeholder="رياضيات" /></div>
-                    <div class="row g-2 mb-2"><div class="col-6"><select asp-for="Category" class="form-select form-select-sm">@foreach (var c in SubjectCatalogViewModel.Categories) { <option value="@c">@c</option> }</select></div><div class="col-6"><select asp-for="DepartmentId" class="form-select form-select-sm"><option value="">@T("— department —", "— القسم —")</option>@foreach (var d in Model.Departments) { <option value="@d.Id">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</option> }</select></div></div>
+                    <div class="row g-2 mb-2"><div class="col-6"><select asp-for="Category" class="form-select form-select-sm">@foreach (var c in SubjectCatalogViewModel.Categories) { <option value="@c">@SubjectCatalogViewModel.CategoryLabel(c, isRtl)</option> }</select></div><div class="col-6"><select asp-for="DepartmentId" class="form-select form-select-sm"><option value="">@T("— department —", "— القسم —")</option>@foreach (var d in Model.Departments) { <option value="@d.Id">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</option> }</select></div></div>
                     <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create subject", "إنشاء مادة")</button>
                 </form>
             </div>
@@ -49,7 +69,14 @@ else if (Model.ActiveTab == "departments")
         <div class="col-xl-8">
             @foreach (var d in Model.Departments)
             {
-                <div class="sms-card mb-3"><div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</h2><span class="small text-muted">@T("Head:", "الرئيس:") @(d.HeadTeacherUserId == null ? "—" : TeacherName(d.HeadTeacherUserId.Value))</span></div>
+                var deptSubjects = subjectsAll.Count(s => s.DepartmentId == d.Id);
+                <div class="sms-card mb-3"><div class="p-3 border-bottom d-flex gap-2 align-items-center"><h2 class="h6 mb-0">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</h2><span class="small text-muted">@T("Head:", "الرئيس:") @(d.HeadTeacherUserId == null ? "—" : TeacherName(d.HeadTeacherUserId.Value))</span>
+                    <span class="ms-auto d-flex gap-1">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditDepartment" asp-route-id="@d.Id" title="@T("Edit department", "تعديل القسم")"><i class="bi bi-pencil"></i> @T("Edit", "تعديل")</a>
+                        <form method="post" asp-action="DeleteDepartment" asp-route-id="@d.Id" class="d-inline" onsubmit="return confirm('@T("Remove this department?", "حذف هذا القسم؟")');">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(deptSubjects > 0 ? T("Move its subjects first", "انقل مواده أولاً") : T("Remove department", "حذف القسم"))" disabled="@(deptSubjects > 0)"><i class="bi bi-trash"></i> @T("Delete", "حذف")</button>
+                        </form>
+                    </span></div>
                     <div class="p-3 d-flex flex-wrap gap-2">@foreach (var s in subjectsAll.Where(s => s.DepartmentId == d.Id)) { <span class="badge text-bg-light border">@s.Code · @(isRtl ? s.Name.NameAr : s.Name.NameEn)</span> }@if (!subjectsAll.Any(s => s.DepartmentId == d.Id)) { <span class="small text-muted">@T("No subjects assigned.", "لا مواد مسندة.")</span> }</div></div>
             }
             @if (Model.Departments.Count == 0) { <div class="sms-card p-4 text-center text-muted">@T("No departments yet.", "لا أقسام بعد.")</div> }

@@ -27,16 +27,16 @@
     <div class="col-xl-8">
         <div class="sms-card">
             <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Teacher", "المعلم")</th><th>@T("Subjects", "المواد")</th><th>@T("Sections", "الشعب")</th><th>@T("Load", "النصاب")</th><th>@T("Homeroom", "مربي")</th><th>@T("Contract", "العقد")</th></tr></thead>
+                <thead><tr><th>@T("Teacher", "المعلم")</th><th>@T("Subjects", "المواد")</th><th>@T("Sections", "الشعب")</th><th>@T("Load", "النصاب")</th><th>@T("Homeroom", "مربي")</th><th>@T("Contract", "العقد")</th><th class="text-end"></th></tr></thead>
                 <tbody>@foreach (var r in Model.Rows)
                 {
                     var e = r.Employee; var max = r.Profile.MaxWeeklyPeriods; var pct = max == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * r.Load / max));
                     <tr><td class="fw-semibold"><a asp-controller="Employees" asp-action="File" asp-route-id="@e.Id" asp-route-tab="teaching"><code>@e.EmployeeNo</code> @(isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}")</a></td>
                         <td class="small">@(r.Subjects.Count == 0 ? "—" : string.Join(" · ", r.Subjects))</td><td>@r.SectionCount</td>
                         <td><div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(pct)%;@(r.Load > max ? "background:#dc2626" : r.Load < max / 2 ? "background:#f59e0b" : "")"></span></div><span class="small @(r.Load > max ? "text-danger fw-semibold" : "")">@r.Load/@max</span></div></td>
-                        <td>@(r.Homeroom ?? "—")</td><td>@if (r.HasActiveContract) { <span class="badge text-bg-success">@T("active", "ساري")</span> } else { <span class="badge text-bg-warning">@T("none", "لا عقد")</span> }</td></tr>
+                        <td>@(r.Homeroom ?? "—")</td><td>@if (r.HasActiveContract) { <span class="badge text-bg-success">@T("active", "ساري")</span> } else { <span class="badge text-bg-warning">@T("none", "لا عقد")</span> }</td><td class="text-end text-nowrap"><form method="post" asp-action="RemoveDesignation" asp-route-teacherProfileId="@r.Profile.Id" asp-route-year="@Model.Year?.Id" class="d-inline" onsubmit="return confirm('@T($"Remove {e.EmployeeNo} from teachers? Teaching assignments are deleted; the employee record is kept.", $"إزالة {e.EmployeeNo} من المعلمين؟ تُحذف التكليفات التدريسية ويبقى سجل الموظف.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove teacher designation", "حذف تعيين المعلم")"><i class="bi bi-trash"></i></button></form></td></tr>
                 }
-                @if (Model.Rows.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No teachers designated yet.", "لم يُعيَّن معلمون بعد.")</td></tr> }</tbody>
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No teachers designated yet.", "لم يُعيَّن معلمون بعد.")</td></tr> }</tbody>
             </table></div>
         </div>
     </div>

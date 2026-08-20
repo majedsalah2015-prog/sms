@@ -1,0 +1,29 @@
+@using System.Globalization
+@using Sms.Domain.Grades
+@model SectionEditViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
+    ViewData["Title"] = T("Edit section", "تعديل الشعبة") + " — " + (isRtl ? Model.Section.NameAr : Model.Section.NameEn);
+    ViewData["Breadcrumb"] = T("Sections / Edit", "الشعب / تعديل");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@(isRtl ? Model.GradeLabelAr : Model.GradeLabelEn) · @T("plan section size", "حجم الشعبة في الخطة") @Model.PlanSectionSize · @T("grade gender", "جنس الصف") @Gender(Model.GradeGender) · @Model.CurrentMembers @T("students assigned now", "طالباً مسنداً حالياً")</p></div></div>
+
+<div class="sms-card p-4" style="max-width:640px">
+    <form method="post" asp-action="Edit" asp-route-id="@Model.Id" novalidate>
+        <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+            <div class="col-md-6"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-4"><label class="form-label">@T("Capacity", "السعة")</label><input asp-for="Capacity" class="form-control" type="number" min="@Math.Max(1, Model.CurrentMembers)" max="@Model.PlanSectionSize" /><div class="form-text">@T("≤ plan size (BR-SCN-001), ≥ current students", "≤ حجم الخطة (BR-SCN-001)، ≥ الطلاب الحاليين")</div></div>
+            <div class="col-md-4"><label class="form-label">@T("Gender", "الجنس")</label><select asp-for="GenderPolicy" class="form-select">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select><div class="form-text">@T("Narrows the grade's policy only (BR-SCN-003)", "يضيّق سياسة الصف فقط (BR-SCN-003)")</div></div>
+            <div class="col-md-4"><label class="form-label">@T("Default room", "القاعة الافتراضية")</label><select asp-for="DefaultClassroomId" class="form-select"><option value="">—</option>@foreach (var r in Model.Rooms) { <option value="@r.Id">@(isRtl ? r.NameAr : r.NameEn)</option> }</select></div>
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <a class="btn btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Id">@T("Cancel", "إلغاء")</a>
+    </form>
+</div>

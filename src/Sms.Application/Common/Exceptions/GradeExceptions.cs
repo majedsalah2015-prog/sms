@@ -12,6 +12,19 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>
+    /// BR-GRD-007: a stage / grade level / grade-year profile can only be edited or
+    /// deactivated while nothing downstream (grades, profiles, sections, enrollments,
+    /// promotion paths) depends on it.
+    /// </summary>
+    public class GradeStructureInUseException : InvalidOperationException
+    {
+        public GradeStructureInUseException(string reason)
+            : base($"Cannot change grade structure: {reason} (BR-GRD-007).")
+        {
+        }
+    }
+
     /// <summary>BR-GRD-004: a grade/section may narrow its stage's gender policy, never widen it.</summary>
     public class InvalidGenderPolicyNarrowingException : InvalidOperationException
     {

@@ -1,0 +1,94 @@
+@using System.Globalization
+@using Sms.Domain.Fees
+@model FeeStructureViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Fee structure workbench", "منضدة هيكل الرسوم");
+    ViewData["Breadcrumb"] = T("Fees / Fee structure", "الرسوم / هيكل الرسوم");
+    ViewData["FinanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "fs-help", Title = T("Fee structure — help", "هيكل الرسوم — مساعدة"),
+        Intro = T("One amount per grade-year × category. A line starts Draft, becomes Approved (immutable) and only then can be charged (BR-FEE-002).", "مبلغ واحد لكل صف-عام × فئة. يبدأ السطر مسودة ثم يُعتمد (ثابت) وعندها فقط يُفوتر (BR-FEE-002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Grid", "الشبكة"), T("Rows are the year's grade profiles, columns the active categories. Type an amount in an empty cell and press ↵ to add a Draft line; draft cells can be edited (reason required, T1), approved ✓ or removed 🗑.", "الصفوف ملفات الصفوف للعام والأعمدة الفئات الفعّالة. اكتب مبلغاً في خلية فارغة واضغط ↵ لإضافة سطر مسودة؛ خلايا المسودة تُعدَّل (بسبب، T1) أو تُعتمد ✓ أو تُحذف 🗑.")),
+            new HelpPanelViewModel.Item(T("Copy from last year", "نسخ من العام السابق"), T("Copies every approved line of the source year into this year's matching grades (by grade level) as Draft, with an optional % uplift. Existing pairs are skipped.", "ينسخ كل الأسطر المعتمدة من العام المصدر إلى صفوف هذا العام المطابقة كمسودات مع نسبة رفع اختيارية. الأزواج الموجودة تُتخطى.")),
+            new HelpPanelViewModel.Item(T("Approve all", "اعتماد الكل"), T("Approves every Draft line of the year in one go — use after review.", "يعتمد كل مسودات العام دفعة واحدة — بعد المراجعة.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Grade-year × category grid; approve before the registration wave.", "شبكة صف-عام × فئة؛ اعتمد قبل موجة التسجيل.")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_FinanceNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else if (Model.Categories.Count == 0) { <div class="alert alert-warning">@T("No fee categories yet —", "لا فئات رسوم بعد —") <a asp-action="Categories">@T("define the catalog first", "عرّف الفهرس أولاً")</a>.</div> }
+else if (Model.Profiles.Count == 0) { <div class="alert alert-warning">@T("This year has no grade-year profiles yet — set them up under Grades.", "لا ملفات صفوف لهذا العام بعد — أعدّها من الصفوف.")</div> }
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <span class="badge text-bg-warning">@Model.DraftCount @T("draft", "مسودة")</span>
+        <span class="badge text-bg-success">@Model.ApprovedCount @T("approved", "معتمد")</span>
+        <span class="text-muted small">· @(Model.Profiles.Count * Model.Categories.Count - Model.Lines.Count) @T("empty cells", "خلية فارغة")</span>
+        <span class="ms-auto"></span>
+        @if (Model.DraftCount > 0)
+        {
+            <form method="post" asp-action="ApproveAll" asp-route-year="@yid" onsubmit="return confirm('@T("Approve every draft line of this year?", "اعتماد كل مسودات هذا العام؟")');"><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-all me-1"></i>@T("Approve all drafts", "اعتماد كل المسودات")</button></form>
+        }
+        <form method="post" asp-action="CopyStructure" asp-route-year="@yid" class="d-flex gap-1 align-items-center">
+            <select name="sourceYear" class="form-select form-select-sm" style="width:auto">@foreach (var y in Model.Years.Where(y => y.Id != yid)) { <option value="@y.Id" selected="@(y.Id == Model.PreviousYear?.Id)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <div class="input-group input-group-sm" style="width:9rem"><input name="uplift" type="number" step="0.01" class="form-control" value="0" /><span class="input-group-text">%</span></div>
+            <button class="btn btn-sm btn-outline-primary" type="submit" @(Model.Years.Count < 2 ? "disabled" : "")><i class="bi bi-files me-1"></i>@T("Copy from year", "نسخ من عام")</button>
+        </form>
+    </div>
+
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+            <thead><tr><th>@T("Grade", "الصف")</th><th class="text-muted small">@T("enrolled", "مقيّد")</th>@foreach (var c in Model.Categories) { <th class="text-center" style="min-width:9rem">@(isRtl ? c.NameAr : c.NameEn)<br /><span class="small text-muted fw-normal">@(c.VatRate == null ? T("exempt", "معفاة") : (c.VatRate.Value * 100m).ToString("0.##") + " %")</span></th> }<th class="text-end">@T("Total", "المجموع")</th></tr></thead>
+            <tbody>
+            @foreach (var p in Model.Profiles)
+            {
+                var rowTotal = Model.Categories.Sum(c => Model.Lines.TryGetValue((p.Profile.Id, c.Id), out var l) ? l.Amount : 0m);
+                <tr>
+                    <td><span class="fw-semibold">@(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</span><br /><span class="small text-muted">@(isRtl ? p.Stage.Name.NameAr : p.Stage.Name.NameEn)</span></td>
+                    <td class="small text-muted">@p.Enrolled</td>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <td class="text-center">
+                        @if (Model.Lines.TryGetValue((p.Profile.Id, c.Id), out var line))
+                        {
+                            if (line.Status == FeeStructureLineStatus.Approved)
+                            {
+                                <div class="fw-semibold text-success" title="@T("Approved", "معتمد")">@line.Amount.ToString("N2") <i class="bi bi-lock-fill small"></i></div>
+                            }
+                            else
+                            {
+                                var fid = $"ln{line.Id}";
+                                <div class="d-flex gap-1 justify-content-center align-items-center">
+                                    <input form="@fid" name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" />
+                                    <input form="@fid" name="reason" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" />
+                                    <form id="@fid" method="post" asp-action="EditLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save amount", "حفظ المبلغ")"><i class="bi bi-pencil"></i></button></form>
+                                    <form method="post" asp-action="ApproveLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")"><i class="bi bi-check-lg"></i></button></form>
+                                    <form method="post" asp-action="DeleteLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove draft", "حذف المسودة")"><i class="bi bi-trash"></i></button></form>
+                                </div>
+                                <div class="small text-warning-emphasis">@T("draft", "مسودة")</div>
+                            }
+                        }
+                        else
+                        {
+                            <form method="post" asp-action="CreateLine" asp-route-year="@yid" class="d-flex justify-content-center"><input type="hidden" name="profileId" value="@p.Profile.Id" /><input type="hidden" name="categoryId" value="@c.Id" /><input name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and press Enter", "اكتب مبلغاً واضغط Enter")" /></form>
+                        }
+                        </td>
+                    }
+                    <td class="text-end fw-semibold">@rowTotal.ToString("N2")</td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <div class="p-2 small text-muted">@T("Amounts are net of VAT; the VAT rate is applied from the category at posting time and snapshotted on each invoice (BR-GLB-061).", "المبالغ صافية قبل الضريبة؛ تُطبَّق نسبة الضريبة من الفئة عند الترحيل وتُسجَّل على كل فاتورة (BR-GLB-061).")</div>
+    </div>
+}

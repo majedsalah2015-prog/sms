@@ -197,5 +197,56 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(teacher.Id, db.TeacherSubjectQualifications.Single(q => q.Id == qualification.Id).TeacherUserId);
         }
+
+        // --- edit / soft-delete of subjects and departments -------------------------
+
+        [Fact]
+        [BusinessRule("BR-SUB-001")]
+        public async Task Editing_a_subject_keeps_codes_unique()
+        {
+            using var db = CreateContext();
+            var admin = new SubjectAdmin(db);
+            var math = await admin.DefineSubjectAsync("MATH3", "رياضيات", "Math", "core");
+            var sci = await admin.DefineSubjectAsync("SCI3", "علوم", "Science", "core");
+
+            await admin.UpdateSubjectAsync(math.Id, "MATH3", "الرياضيات", "Mathematics", "core");
+            Assert.Equal("Mathematics", db.Subjects.Single(s => s.Id == math.Id).Name.NameEn);
+
+            await Assert.ThrowsAsync<DuplicateSubjectCodeException>(() => admin.UpdateSubjectAsync(sci.Id, "MATH3", "ع", "S", "core"));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SUB-004")]
+        public async Task A_subject_in_a_current_plan_cannot_be_removed_until_the_offering_is_end_dated()
+        {
+            using var db = CreateContext();
+            var admin = new SubjectAdmin(db);
+            var subject = await admin.DefineSubjectAsync("MATH3", "رياضيات", "Math", "core");
+            var offering = await admin.DefineOfferingAsync(_profileId, subject.Id, 5, true, 10, false, null, new DateTime(2026, 9, 1));
+
+            await Assert.ThrowsAsync<SubjectInUseException>(() => admin.DeactivateSubjectAsync(subject.Id));
+
+            await admin.EndDateOfferingAsync(offering.Id, new DateTime(2027, 1, 1));
+            await admin.DeactivateSubjectAsync(subject.Id);
+            Assert.Empty(db.Subjects.Where(s => s.Id == subject.Id)); // soft-active filter hides it
+            Assert.False(db.Subjects.IgnoreQueryFilters().Single(s => s.Id == subject.Id).IsActive);
+        }
+
+        [Fact]
+        public async Task A_department_with_subjects_cannot_be_removed()
+        {
+            using var db = CreateContext();
+            var admin = new SubjectAdmin(db);
+            var dept = await admin.DefineDepartmentAsync("العلوم", "Sciences");
+            var subject = await admin.DefineSubjectAsync("SCI3", "علوم", "Science", "core", dept.Id);
+
+            await admin.UpdateDepartmentAsync(dept.Id, "قسم العلوم", "Science dept.");
+            Assert.Equal("Science dept.", db.Departments.Single(d => d.Id == dept.Id).Name.NameEn);
+
+            await Assert.ThrowsAsync<SubjectInUseException>(() => admin.DeactivateDepartmentAsync(dept.Id));
+            await admin.UpdateSubjectAsync(subject.Id, "SCI3", "علوم", "Science", "core", null);
+            await admin.DeactivateDepartmentAsync(dept.Id);
+            Assert.Empty(db.Departments.Where(d => d.Id == dept.Id));
+        }
     }
 }

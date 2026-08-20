@@ -55,6 +55,87 @@ namespace Sms.Infrastructure.Schools
             return year;
         }
 
+        public async Task<AcademicYear> UpdateYearAsync(
+            int academicYearId, string labelAr, string labelEn, string hijriLabel, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
+        {
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
+            await RequireNoEnrollmentsAsync(academicYearId, cancellationToken);
+
+            if (!AcademicYearValidation.HasValidSpan(startDate, endDate))
+            {
+                throw new InvalidAcademicYearDatesException("span must be 6-14 months with an end date after the start date");
+            }
+
+            var otherYears = await _db.AcademicYears.AsNoTracking().Where(y => y.Id != academicYearId).ToListAsync(cancellationToken);
+            if (otherYears.Any(y => AcademicYearValidation.Overlaps(startDate, endDate, y.StartDate, y.EndDate)))
+            {
+                throw new InvalidAcademicYearDatesException("overlaps an existing academic year for this school");
+            }
+
+            // Shrinking the year must keep its semesters nested (BR-AYR-007).
+            var semesters = await _db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == academicYearId).ToListAsync(cancellationToken);
+            foreach (var s in semesters)
+            {
+                RequireNested(s.StartDate, s.EndDate, startDate, endDate, $"semester {s.SequenceNumber}", "academic year");
+            }
+
+            year.LabelAr = labelAr;
+            year.LabelEn = labelEn;
+            year.HijriLabel = hijriLabel;
+            year.StartDate = startDate;
+            year.EndDate = endDate;
+            await _db.SaveChangesAsync(cancellationToken);
+            return year;
+        }
+
+        public async Task DeleteYearAsync(int academicYearId, CancellationToken cancellationToken = default)
+        {
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
+            await RequireNoEnrollmentsAsync(academicYearId, cancellationToken);
+
+            // Proactive checks for the M03-adjacent dependents so the user gets a
+            // clear reason; every other FK is Restrict and surfaces as DbUpdateException.
+            if (await _db.RolloverBatches.AnyAsync(b => b.SourceAcademicYearId == academicYearId || b.TargetAcademicYearId == academicYearId, cancellationToken))
+            {
+                throw new AcademicYearInUseException("a rollover batch references this year");
+            }
+
+            if (await _db.GradeYearProfiles.AnyAsync(p => p.AcademicYearId == academicYearId, cancellationToken)
+                || await _db.Sections.AnyAsync(s => s.AcademicYearId == academicYearId, cancellationToken))
+            {
+                throw new AcademicYearInUseException("grade profiles or sections are defined for this year");
+            }
+
+            if (await _db.CalendarDays.AnyAsync(d => d.AcademicYearId == academicYearId, cancellationToken)
+                || await _db.CalendarEvents.AnyAsync(e => e.AcademicYearId == academicYearId, cancellationToken)
+                || await _db.CalendarVersions.AnyAsync(v => v.AcademicYearId == academicYearId, cancellationToken))
+            {
+                throw new AcademicYearInUseException("a calendar is defined for this year");
+            }
+
+            _db.Terms.RemoveRange(await _db.Terms.Where(t => t.AcademicYearId == academicYearId).ToListAsync(cancellationToken));
+            _db.Semesters.RemoveRange(await _db.Semesters.Where(s => s.AcademicYearId == academicYearId).ToListAsync(cancellationToken));
+            _db.AcademicYears.Remove(year);
+
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new AcademicYearInUseException("other records still reference this year (" + (ex.InnerException?.Message ?? ex.Message) + ")");
+            }
+        }
+
+        private async Task RequireNoEnrollmentsAsync(int academicYearId, CancellationToken cancellationToken)
+        {
+            var enrolled = await _db.Enrollments.CountAsync(e => e.AcademicYearId == academicYearId, cancellationToken);
+            if (enrolled > 0)
+            {
+                throw new AcademicYearInUseException($"{enrolled} student enrollment(s) exist for this year");
+            }
+        }
+
         public async Task ActivateAsync(int academicYearId, CancellationToken cancellationToken = default)
         {
             var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);

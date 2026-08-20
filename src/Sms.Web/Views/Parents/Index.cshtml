@@ -1,0 +1,25 @@
+@using System.Globalization
+@model ParentDirectoryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Parents", "أولياء الأمور");
+    ViewData["Breadcrumb"] = T("Parents / Directory", "أولياء الأمور / الدليل");
+    var help = new HelpPanelViewModel { Id = "par-help", Title = T("Parents — help", "أولياء الأمور — مساعدة"), Intro = T("A parent is an independent file linked to one or more students (BR-GLB-004). Search by name, mobile, email, file number or a child; filters surface multi-child families, data-quality flags and portal accounts.", "ولي الأمر ملف مستقل مرتبط بطالب أو أكثر (BR-GLB-004). ابحث بالاسم أو الجوال أو البريد أو رقم الملف أو الابن؛ المرشحات تُظهر الأسر متعددة الأبناء وعلامات جودة البيانات وحسابات البوابة."), Items = new[] { new HelpPanelViewModel.Item(T("New parent", "ولي أمر جديد"), T("Primary mobile is the dedup key (BR-PAR-002): an existing mobile is refused — open that file instead.", "الجوال الأساسي مفتاح التكرار (BR-PAR-002): الجوال الموجود يُرفض — افتح ذلك الملف.")), new HelpPanelViewModel.Item(T("Parent file", "ملف ولي الأمر"), T("Identity & contacts (✎, T1 audited), Children with link flags, possible duplicates, portal account, audit. Family statement and communications open with Finance/Messaging screens.", "الهوية والتواصل (✎)، الأبناء وأعلام الربط، التكرارات المحتملة، حساب البوابة، التدقيق. كشف الأسرة والمراسلات مع شاشات المالية/المراسلات.")), new HelpPanelViewModel.Item(T("Dedup workbench", "طاولة التكرار"), T("Candidate pairs by shared mobile / identical name / email. Merge (BR-PAR-004) needs the merge-log engine — coming.", "أزواج مرشحة بجوال مشترك / اسم مطابق / بريد. الدمج (BR-PAR-004) يحتاج محرك سجل الدمج — لاحقاً.")) } };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Total @T("parents", "ولي أمر")</p></div>
+    <div class="d-flex gap-2"><a class="btn btn-outline-secondary" asp-action="Dedup"><i class="bi bi-people me-1"></i>@T("Dedup workbench", "طاولة التكرار")</a><a class="btn btn-primary" asp-action="Register"><i class="bi bi-person-plus me-1"></i>@T("New parent", "ولي أمر جديد")</a><partial name="_HelpModal" model="help" /></div></div>
+
+<div class="sms-card">
+    <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+        <input name="q" class="form-control form-control-sm" style="max-width:20rem" value="@Model.Query" placeholder="@T("name, mobile, email, file no., child…", "الاسم، الجوال، البريد، رقم الملف، الابن…")" />
+        <select name="filter" class="form-select form-select-sm" style="max-width:12rem" onchange="this.form.submit()"><option value="">@T("All", "الكل")</option><option value="multi" selected="@(Model.Filter == "multi")">@T("Multi-child", "متعدد الأبناء")</option><option value="flags" selected="@(Model.Filter == "flags")">@T("Data-quality flags", "علامات جودة البيانات")</option><option value="portal" selected="@(Model.Filter == "portal")">@T("Has portal account", "له حساب بوابة")</option></select>
+        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+    </form>
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <thead><tr><th>@T("File no.", "رقم الملف")</th><th>@T("Name", "الاسم")</th><th>@T("Mobile", "الجوال")</th><th>@T("Email", "البريد")</th><th>@T("Children", "الأبناء")</th><th>@T("Portal", "البوابة")</th><th>@T("Flags", "علامات")</th><th class="text-end"></th></tr></thead>
+        <tbody>@foreach (var r in Model.Rows) { var p = r.Parent; <tr><td><a asp-action="File" asp-route-id="@p.Id"><code>@p.ParentFileNo</code></a></td><td class="fw-semibold"><a asp-action="File" asp-route-id="@p.Id">@(isRtl ? p.NameAr : p.NameEn)</a></td><td dir="ltr">@p.PrimaryMobile</td><td>@(p.Email ?? "—")</td><td><span class="badge text-bg-light border">@r.Children</span></td><td>@(r.HasPortalAccount ? "✓" : "—")</td><td>@foreach (var f in r.Flags) { <span class="badge text-bg-warning me-1">@f</span> }</td><td class="text-end text-nowrap"><form method="post" asp-action="Delete" asp-route-id="@p.Id" asp-route-q="@Model.Query" asp-route-filter="@Model.Filter" class="d-inline" onsubmit="return confirm('@T($"Delete parent {p.ParentFileNo}? This cannot be undone.", $"حذف ولي الأمر {p.ParentFileNo}؟ لا يمكن التراجع عن هذا الإجراء.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Delete parent", "حذف ولي الأمر")"><i class="bi bi-trash"></i></button></form></td></tr> }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-4">@T("No parents match.", "لا نتائج.")</td></tr> }</tbody>
+    </table></div>
+</div>

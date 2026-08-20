@@ -38,13 +38,13 @@
                         @if (a.RegisteredStudentId != null) { <dt class="col-sm-3">@T("Student", "الطالب")</dt><dd class="col-sm-9"><span class="badge text-bg-success">@T("registered — student #", "مسجَّل — طالب #")@a.RegisteredStudentId</span></dd> }
                     </dl>
                     <div class="form-text mt-2">@T("Document checklist (BR-ATT-006) appears here once attachment screens exist.", "قائمة المستندات (BR-ATT-006) ستظهر هنا مع شاشات المرفقات.")</div>
+                    @if (a.Status != ApplicationStatus.Registered && a.RegisteredStudentId == null)
+                    {
+                            <form method="post" asp-action="DeleteApplication" asp-route-id="@a.Id" class="d-inline" onsubmit="return confirm('@T("Delete this application permanently? Registered applications cannot be deleted.", "حذف هذا الطلب نهائياً؟ لا يمكن حذف الطلبات المسجّلة.")');"><button class="btn btn-sm btn-outline-danger mt-3" type="submit"><i class="bi bi-trash me-1"></i>@T("Delete application", "حذف الطلب")</button></form>
+                    }
                     @if (Model.CanEdit)
                     {
                         <button class="btn btn-sm btn-outline-primary mt-3" type="button" data-bs-toggle="collapse" data-bs-target="#edit-app"><i class="bi bi-pencil me-1"></i>@T("Edit applicant", "تعديل بيانات المتقدم")</button>
-                        @if (a.Status is ApplicationStatus.Draft or ApplicationStatus.Submitted)
-                        {
-                            <form method="post" asp-action="DeleteApplication" asp-route-id="@a.Id" class="d-inline" onsubmit="return confirm('@T("Delete this application permanently? Only undecided applications can be deleted.", "حذف هذا الطلب نهائياً؟ يمكن حذف الطلبات غير المبتوت فيها فقط.")');"><button class="btn btn-sm btn-outline-danger mt-3" type="submit"><i class="bi bi-trash me-1"></i>@T("Delete application", "حذف الطلب")</button></form>
-                        }
                         <div class="collapse mt-3" id="edit-app"><form method="post" asp-action="EditApplication" asp-route-id="@a.Id">
                             <div class="sms-bilingual mb-2">
                                 <div><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FirstNameAr" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FatherNameAr" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@a.GrandfatherNameAr" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@a.FamilyNameAr" /></div></div></div>

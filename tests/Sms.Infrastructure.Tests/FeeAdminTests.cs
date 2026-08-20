@@ -245,5 +245,144 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(700m, position);
         }
+
+        // --- E-303 screens: catalog edit/deactivate, draft-line edit/delete, copy-from-year, payer materialization ---
+
+        [Fact]
+        [BusinessRule("BR-FEE-001")]
+        public async Task A_category_referenced_by_a_structure_line_cannot_be_deactivated_but_an_unused_one_can()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var used = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            var unused = await admin.DefineCategoryAsync("نقل", "Transport", 0.15m, false, true, true);
+            await admin.DefineStructureLineAsync(_profileId, used.Id, 1000m);
+
+            await Assert.ThrowsAsync<FeeCategoryInUseException>(() => admin.DeactivateCategoryAsync(used.Id));
+            await admin.UpdateCategoryAsync(unused.Id, "حافلات", "Bus", 0.15m, false, true, true, "4100");
+            await admin.DeactivateCategoryAsync(unused.Id);
+
+            var row = db.FeeCategories.IgnoreQueryFilters().Single(c => c.Id == unused.Id);
+            Assert.False(row.IsActive);
+            Assert.Equal("Bus", row.NameEn);
+            Assert.Equal("4100", row.GlExportCode);
+        }
+
+        [Fact]
+        [BusinessRule("BR-FEE-002")]
+        public async Task Only_a_draft_line_can_be_edited_or_deleted_and_a_pair_cannot_be_defined_twice()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            var line = await admin.DefineStructureLineAsync(_profileId, category.Id, 1000m);
+
+            await Assert.ThrowsAsync<FeeStructureLineAlreadyExistsException>(() => admin.DefineStructureLineAsync(_profileId, category.Id, 900m));
+            _audit.Reason = "Board revised tuition";
+            await admin.UpdateStructureLineAsync(line.Id, 1200m);
+            Assert.Equal(1200m, db.FeeStructureLines.Single(l => l.Id == line.Id).Amount);
+
+            await admin.ApproveStructureLineAsync(line.Id);
+            await Assert.ThrowsAsync<FeeStructureLineNotDraftException>(() => admin.UpdateStructureLineAsync(line.Id, 1300m));
+            await Assert.ThrowsAsync<FeeStructureLineNotDraftException>(() => admin.DeleteStructureLineAsync(line.Id));
+
+            var draft = await admin.DefineStructureLineAsync(_profileId, (await admin.DefineCategoryAsync("كتب", "Books", null, false, false, false)).Id, 100m);
+            await admin.DeleteStructureLineAsync(draft.Id);
+            Assert.False(db.FeeStructureLines.Any(l => l.Id == draft.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-FEE-002")]
+        public async Task Copying_a_structure_to_the_next_year_creates_uplifted_draft_lines_once_per_pair()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            await DefineApprovedLine(admin, category.Id, 1000m);
+            var sourceYearId = db.GradeYearProfiles.Single(p => p.Id == _profileId).AcademicYearId;
+            var gradeLevelId = db.GradeYearProfiles.Single(p => p.Id == _profileId).GradeLevelId;
+
+            var nextYear = new AcademicYear
+            {
+                LabelAr = "٢٠٢٧-٢٠٢٨", LabelEn = "2027-2028", HijriLabel = "١٤٤٩هـ",
+                StartDate = new DateTime(2027, 9, 1), EndDate = new DateTime(2028, 6, 30), Status = AcademicYearStatus.Preparation,
+            };
+            db.AcademicYears.Add(nextYear);
+            await db.SaveChangesAsync();
+            var nextProfile = new GradeYearProfile { GradeLevelId = gradeLevelId, AcademicYearId = nextYear.Id, GenderPolicy = GenderPolicy.Mixed, TargetSections = 1, TargetSectionSize = 25 };
+            db.GradeYearProfiles.Add(nextProfile);
+            await db.SaveChangesAsync();
+
+            var created = await admin.CopyStructureAsync(sourceYearId, nextYear.Id, 5m);
+            var again = await admin.CopyStructureAsync(sourceYearId, nextYear.Id, 5m);
+
+            Assert.Equal(1, created);
+            Assert.Equal(0, again);
+            var copied = db.FeeStructureLines.Single(l => l.GradeYearProfileId == nextProfile.Id);
+            Assert.Equal(1050m, copied.Amount);
+            Assert.Equal(FeeStructureLineStatus.Draft, copied.Status);
+            Assert.Equal(nextYear.Id, copied.AcademicYearId);
+        }
+
+        // --- BR-GLB-062 void ("delete" on the charge explorer) ----------------------
+
+        [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public async Task Voiding_an_untouched_charge_marks_it_void_and_removes_it_from_the_position()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            var kept = await admin.PostManualChargeAsync(_studentId, _payerId, category.Id, 300m);
+            var voided = await admin.PostManualChargeAsync(_studentId, _payerId, category.Id, 200m);
+
+            _audit.Reason = "Posted against the wrong student";
+            await admin.VoidChargeAsync(voided.Id);
+
+            Assert.Equal(ChargeStatus.Void, (await db.Charges.AsNoTracking().SingleAsync(c => c.Id == voided.Id)).Status);
+            Assert.Equal(kept.GrossAmount, await admin.ComputeStudentPositionAsync(_studentId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public async Task A_charge_with_a_credit_note_cannot_be_voided()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, true, false);
+            var charge = await admin.PostManualChargeAsync(_studentId, _payerId, category.Id, 500m);
+            await admin.IssueCreditNoteAsync(charge.Id, 100m, "Partial correction");
+
+            await Assert.ThrowsAsync<ChargeHasActivityException>(() => admin.VoidChargeAsync(charge.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public async Task A_void_charge_cannot_be_voided_again()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            var charge = await admin.PostManualChargeAsync(_studentId, _payerId, category.Id, 200m);
+            await admin.VoidChargeAsync(charge.Id);
+
+            await Assert.ThrowsAsync<ChargeNotPostedException>(() => admin.VoidChargeAsync(charge.Id));
+        }
+
+        [Fact]
+        public async Task Ensuring_a_payer_for_a_parent_is_idempotent()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var parent = new Parent { ParentFileNo = "PAR-000002", NameAr = "ولي", NameEn = "Guardian 2", PrimaryMobile = "0500000001" };
+            db.Parents.Add(parent);
+            await db.SaveChangesAsync();
+
+            var first = await admin.EnsurePayerForParentAsync(parent.Id);
+            var second = await admin.EnsurePayerForParentAsync(parent.Id);
+
+            Assert.Equal(first.Id, second.Id);
+            Assert.Equal(1, db.Payers.Count(p => p.ParentId == parent.Id));
+        }
     }
 }

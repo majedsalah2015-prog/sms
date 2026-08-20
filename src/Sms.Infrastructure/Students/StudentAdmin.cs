@@ -63,6 +63,22 @@ namespace Sms.Infrastructure.Students
             return student;
         }
 
+        public async Task<Student> UpdateStudentAsync(
+            int studentId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
+            string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
+            Gender gender, DateTime dateOfBirth, int nationalityLookupId,
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
+            CancellationToken cancellationToken = default)
+        {
+            var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
+            student.FirstNameAr = firstNameAr; student.FatherNameAr = fatherNameAr; student.GrandfatherNameAr = grandfatherNameAr; student.FamilyNameAr = familyNameAr;
+            student.FirstNameEn = firstNameEn; student.FatherNameEn = fatherNameEn; student.GrandfatherNameEn = grandfatherNameEn; student.FamilyNameEn = familyNameEn;
+            student.Gender = gender; student.DateOfBirth = dateOfBirth; student.NationalityLookupId = nationalityLookupId;
+            student.PrimaryIdTypeLookupId = primaryIdTypeLookupId; student.PrimaryIdNo = primaryIdNo; student.PrimaryIdExpiry = primaryIdExpiry;
+            await _db.SaveChangesAsync(cancellationToken);
+            return student;
+        }
+
         public async Task ChangeStatusAsync(int studentId, StudentStatus newStatus, CancellationToken cancellationToken = default)
         {
             var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
@@ -162,6 +178,43 @@ namespace Sms.Infrastructure.Students
 
             await _db.SaveChangesAsync(cancellationToken);
             return enrollment;
+        }
+
+        public async Task DeleteStudentAsync(int studentId, CancellationToken cancellationToken = default)
+        {
+            var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
+
+            var enrollments = await _db.Enrollments.Where(e => e.StudentId == studentId).ToListAsync(cancellationToken);
+            var enrollmentIds = enrollments.Select(e => e.Id).ToList();
+
+            // History in other modules blocks deletion — those records must not lose their student.
+            if (await _db.AttendanceDays.AnyAsync(a => enrollmentIds.Contains(a.EnrollmentId), cancellationToken))
+                throw new InvalidOperationException("Student has attendance records and cannot be deleted.");
+            if (await _db.Charges.AnyAsync(c => c.StudentId == studentId, cancellationToken))
+                throw new InvalidOperationException("Student has fee charges and cannot be deleted.");
+            if (await _db.CertificateIssues.AnyAsync(c => c.StudentId == studentId, cancellationToken))
+                throw new InvalidOperationException("Student has issued certificates and cannot be deleted.");
+
+            foreach (var application in await _db.Applications.Where(a => a.RegisteredStudentId == studentId).ToListAsync(cancellationToken))
+            {
+                application.RegisteredStudentId = null;
+                application.Status = Sms.Domain.Admissions.ApplicationStatus.Approved;
+            }
+
+            _db.SectionMemberships.RemoveRange(await _db.SectionMemberships.Where(m => enrollmentIds.Contains(m.EnrollmentId)).ToListAsync(cancellationToken));
+            _db.Enrollments.RemoveRange(enrollments);
+            _db.StudentGuardianLinks.RemoveRange(await _db.StudentGuardianLinks.Where(l => l.StudentId == studentId).ToListAsync(cancellationToken));
+            _db.EmergencyContacts.RemoveRange(await _db.EmergencyContacts.Where(c => c.StudentId == studentId).ToListAsync(cancellationToken));
+            _db.Students.Remove(student);
+
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new InvalidOperationException("Student cannot be deleted: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
+            }
         }
     }
 }

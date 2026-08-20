@@ -39,22 +39,22 @@ namespace Sms.Web.Navigation
 
             // S2 — People
             M("ADM", "09", "Admissions", "القبول والتسجيل", "bi-person-plus", "people", "E-201", "09-Admissions.md", "Admissions", "Index"),
-            M("STU", "10", "Students", "الطلاب", "bi-mortarboard", "people", "E-202", "10-Student-Management.md"),
-            M("PAR", "11", "Parents", "أولياء الأمور", "bi-people", "people", "E-202", "11-Parent-Management.md"),
+            M("STU", "10", "Students", "الطلاب", "bi-mortarboard", "people", "E-202", "10-Student-Management.md", "Students", "Index"),
+            M("PAR", "11", "Parents", "أولياء الأمور", "bi-people", "people", "E-202", "11-Parent-Management.md", "Parents", "Index"),
             M("EMP", "12", "Employees", "الموظفون", "bi-person-badge", "people", "E-203", "12-Employees.md", "Employees", "Index"),
             M("TCH", "13", "Teachers", "المعلمون", "bi-person-workspace", "people", "E-203", "13-Teachers.md", "Teachers", "Index"),
 
             // S3 — Academic operations
             M("ATT", "14", "Attendance", "الحضور والغياب", "bi-check2-square", "academics", "E-301", "14-Attendance.md"),
-            M("TTB", "15", "Timetable", "الجدول الدراسي", "bi-table", "academics", "E-401", "15-Timetable.md"),
+            M("TTB", "15", "Timetable", "الجدول الدراسي", "bi-table", "academics", "E-401", "15-Timetable.md", "Timetable", "Builder"),
             M("EXM", "16", "Examinations", "الاختبارات", "bi-pencil-square", "academics", "E-402", "16-Examinations.md"),
             M("GRA", "17", "Grading", "الدرجات والتقييم", "bi-bar-chart-line", "academics", "E-302", "17-Grading.md", "Grading", "Index"),
             M("CRT", "18", "Certificates", "الشهادات", "bi-award", "academics", "E-403", "18-Certificates.md"),
 
             // Finance
-            M("FEE", "19", "Fees", "الرسوم الدراسية", "bi-receipt", "finance", "E-303", "19-Fees.md"),
+            M("FEE", "19", "Fees", "الرسوم الدراسية", "bi-receipt", "finance", "E-303", "19-Fees.md", "Fees", "Index"),
             M("INS", "20", "Installment Plans", "خطط التقسيط", "bi-calendar-check", "finance", "E-304", "20-Installment-Plans.md"),
-            M("PAY", "21", "Payments", "المدفوعات", "bi-cash-coin", "finance", "E-303", "21-Payments.md"),
+            M("PAY", "21", "Payments", "المدفوعات", "bi-cash-coin", "finance", "E-303", "21-Payments.md", "Payments", "Index"),
             M("DSC", "22", "Discounts", "الخصومات والمنح", "bi-percent", "finance", "E-304", "22-Discounts.md"),
 
             // Services

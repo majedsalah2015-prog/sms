@@ -1,0 +1,81 @@
+@using System.Globalization
+@using Sms.Domain.Payments
+@model RefundDeskViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Refund desk", "مكتب الاستردادات");
+    ViewData["Breadcrumb"] = T("Payments / Refunds", "المدفوعات / الاستردادات");
+    var sel = Model.Selected;
+    string Badge(RefundVoucherStatus s) => s switch { RefundVoucherStatus.Paid => "text-bg-success", RefundVoucherStatus.Rejected => "text-bg-secondary", RefundVoucherStatus.Approved => "text-bg-primary", _ => "text-bg-warning" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "rf-help", Title = T("Refunds — help", "الاستردادات — مساعدة"),
+        Intro = T("A refund voucher (RFD) can only be requested against the payer's advance balance — receipts not yet allocated to invoices — minus refunds already in flight (BR-PAY-005). Chain: Requested → Approved → Paid, or Rejected.", "سند الاسترداد (RFD) لا يُطلب إلا من الرصيد المقدّم للدافع — سندات لم تُخصّص لفواتير — ناقص الاستردادات الجارية (BR-PAY-005). السلسلة: مطلوب ← معتمد ← مدفوع، أو مرفوض."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Over-payment vs. withdrawal", "الدفع الزائد مقابل الانسحاب"), T("Only unallocated receipts are refundable here. A credit note on an already-paid invoice does not free its allocation — allocation reversal (FM) is deferred with the Allocation explorer.", "لا يُسترد هنا إلا السندات غير المخصّصة. الإشعار الدائن على فاتورة مدفوعة لا يحرّر تخصيصها — عكس التخصيص (المدير المالي) مؤجّل مع مستكشف التخصيصات.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Position check → voucher chain → payout confirmation.", "فحص الموقف ← سلسلة السند ← تأكيد الصرف.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_FinanceNav" />
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-2"><i class="bi bi-person-check me-1"></i>@T("1 · Payer position", "1 · موقف الدافع")</h2>
+            <form method="get"><select name="payerId" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">@T("— choose payer —", "— اختر الدافع —")</option>@foreach (var p in Model.Payers) { <option value="@p.Payer.Id" selected="@(p.Payer.Id == sel?.Payer.Id)">@FinanceLabels.ParentName(p.Parent, isRtl) · @p.Parent?.ParentFileNo</option> }</select></form>
+            @if (sel != null)
+            {
+                <dl class="row small mt-3 mb-0">
+                    <dt class="col-8">@T("Advance balance (unallocated receipts)", "الرصيد المقدّم (سندات غير مخصّصة)")</dt><dd class="col-4 text-end">@Model.AdvanceBalance.ToString("N2")</dd>
+                    <dt class="col-8">@T("Refunds in flight / paid", "استردادات جارية / مدفوعة")</dt><dd class="col-4 text-end">−@Model.Committed.ToString("N2")</dd>
+                    <dt class="col-8 fw-bold">@T("Refundable now", "القابل للاسترداد الآن")</dt><dd class="col-4 text-end fw-bold @(Model.Refundable > 0 ? "text-success" : "text-muted")">@Model.Refundable.ToString("N2")</dd>
+                </dl>
+            }
+        </div>
+        @if (sel != null)
+        {
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2"><i class="bi bi-file-earmark-plus me-1"></i>@T("2 · Request voucher", "2 · طلب سند")</h2>
+                <form method="post" asp-action="RequestRefund" class="d-grid gap-2">
+                    <input type="hidden" name="payerId" value="@sel.Payer.Id" />
+                    <div class="input-group input-group-sm"><span class="input-group-text">@T("Amount", "المبلغ")</span><input name="amount" type="number" step="0.01" min="0.01" max="@Model.Refundable.ToString("0.##", CultureInfo.InvariantCulture)" class="form-control text-end" value="@(Model.Refundable > 0 ? Model.Refundable.ToString("0.##", CultureInfo.InvariantCulture) : "")" required /></div>
+                    <select name="method" class="form-select form-select-sm">@foreach (var mth in new[] { PaymentMethod.BankTransfer, PaymentMethod.Cash, PaymentMethod.Cheque }) { <option value="@mth">@FinanceLabels.Method(mth, isRtl)</option> }</select>
+                    <input name="reason" class="form-control form-control-sm" placeholder="@T("Reason (mandatory)", "السبب (إلزامي)")" required />
+                    <button class="btn btn-primary btn-sm" type="submit" @(Model.Refundable <= 0 ? "disabled" : "")><i class="bi bi-send me-1"></i>@T("Request", "طلب")</button>
+                </form>
+            </div>
+        }
+    </div>
+    <div class="col-lg-8">
+        <div class="d-flex flex-wrap gap-1 mb-2">
+            <a class="btn btn-sm @(Model.Filter == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Refunds" asp-route-payerId="@sel?.Payer.Id">@T("All", "الكل")</a>
+            @foreach (var s in Enum.GetValues<RefundVoucherStatus>()) { <a class="btn btn-sm @(Model.Filter == s ? "btn-primary" : "btn-outline-secondary")" asp-action="Refunds" asp-route-payerId="@sel?.Payer.Id" asp-route-status="@s">@FinanceLabels.RefundStatus(s, isRtl)</a> }
+        </div>
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <thead><tr><th>@T("Voucher", "السند")</th><th>@T("Payer", "الدافع")</th><th class="text-end">@T("Amount", "المبلغ")</th><th>@T("Method", "الطريقة")</th><th>@T("Reason", "السبب")</th><th>@T("Status", "الحالة")</th><th>@T("Actions", "الإجراءات")</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var v = r.Voucher;
+                    <tr class="@(sel != null && v.PayerId == sel.Payer.Id ? "table-light" : "")">
+                        <td><code>@v.VoucherNo</code></td><td>@FinanceLabels.ParentName(r.Payer, isRtl)</td><td class="text-end fw-semibold">@v.Amount.ToString("N2")</td><td>@FinanceLabels.Method(v.Method, isRtl)</td><td class="small text-muted">@v.Reason</td>
+                        <td><span class="badge @Badge(v.Status)">@FinanceLabels.RefundStatus(v.Status, isRtl)</span></td>
+                        <td class="text-nowrap">
+                            @foreach (var next in r.Next)
+                            {
+                                <form method="post" asp-action="RefundStatusChange" asp-route-id="@v.Id" asp-route-payerId="@sel?.Payer.Id" asp-route-filter="@Model.Filter" class="d-inline" onsubmit="return confirm('@T($"Mark voucher {v.VoucherNo} as {FinanceLabels.RefundStatus(next, false)}?", $"تحويل السند {v.VoucherNo} إلى {FinanceLabels.RefundStatus(next, true)}؟")');"><input type="hidden" name="target" value="@next" /><button class="btn btn-sm @(next == RefundVoucherStatus.Rejected ? "btn-outline-danger" : next == RefundVoucherStatus.Paid ? "btn-outline-success" : "btn-outline-primary")" type="submit">@FinanceLabels.RefundStatus(next, isRtl)</button></form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No refund vouchers.", "لا سندات استرداد.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+</div>

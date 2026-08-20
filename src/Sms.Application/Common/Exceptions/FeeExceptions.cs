@@ -38,4 +38,43 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>BR-GLB-062: a charge with payments, credit notes or discounts against it can only be corrected by credit note, never voided.</summary>
+    public class ChargeHasActivityException : InvalidOperationException
+    {
+        public ChargeHasActivityException(int chargeId)
+            : base($"Charge {chargeId} has payments, credit notes or discounts against it and cannot be voided — correct it with a credit note instead (BR-GLB-062).")
+        {
+        }
+    }
+}
+
+namespace Sms.Application.Common.Exceptions
+{
+    /// <summary>E-303 screens: a fee category referenced by structure lines or charges cannot be deactivated.</summary>
+    public class FeeCategoryInUseException : InvalidOperationException
+    {
+        public FeeCategoryInUseException(int feeCategoryId, int structureLines, int charges)
+            : base($"Fee category {feeCategoryId} is referenced by {structureLines} structure line(s) and {charges} charge(s) and cannot be deactivated.")
+        {
+        }
+    }
+
+    /// <summary>BR-FEE-002: only a Draft structure line may be edited or deleted.</summary>
+    public class FeeStructureLineNotDraftException : InvalidOperationException
+    {
+        public FeeStructureLineNotDraftException(int feeStructureLineId)
+            : base($"Fee structure line {feeStructureLineId} is approved and immutable (BR-FEE-002).")
+        {
+        }
+    }
+
+    /// <summary>doc/Modules/19 §9: one line per grade-year profile × category.</summary>
+    public class FeeStructureLineAlreadyExistsException : InvalidOperationException
+    {
+        public FeeStructureLineAlreadyExistsException(int gradeYearProfileId, int feeCategoryId)
+            : base($"A fee structure line already exists for grade-year profile {gradeYearProfileId} / category {feeCategoryId}.")
+        {
+        }
+    }
 }

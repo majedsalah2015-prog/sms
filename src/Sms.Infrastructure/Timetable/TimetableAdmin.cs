@@ -48,6 +48,19 @@ namespace Sms.Infrastructure.Timetable
             return slot;
         }
 
+        public async Task RemovePeriodSlotAsync(int periodSlotId, CancellationToken cancellationToken = default)
+        {
+            var slot = await _db.PeriodSlots.SingleAsync(s => s.Id == periodSlotId, cancellationToken);
+            var inUse = await _db.Placements.CountAsync(p => p.PeriodSlotId == periodSlotId, cancellationToken);
+            if (inUse > 0)
+            {
+                throw new PeriodSlotInUseException(periodSlotId, inUse);
+            }
+
+            _db.PeriodSlots.Remove(slot);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<TimetableVersion> DefineVersionAsync(int academicYearId, int? termId = null, CancellationToken cancellationToken = default)
         {
             var version = new TimetableVersion { AcademicYearId = academicYearId, TermId = termId };
@@ -56,10 +69,32 @@ namespace Sms.Infrastructure.Timetable
             return version;
         }
 
+        public async Task ReopenVersionAsync(int timetableVersionId, CancellationToken cancellationToken = default)
+        {
+            var version = await _db.TimetableVersions.SingleAsync(v => v.Id == timetableVersionId, cancellationToken);
+            if (!TimetableVersionStatusTransitions.CanTransition(version.Status, TimetableVersionStatus.Draft))
+            {
+                throw new InvalidTimetableVersionStatusTransitionException(version.Status, TimetableVersionStatus.Draft);
+            }
+
+            version.Status = TimetableVersionStatus.Draft;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task RemovePlacementAsync(int placementId, CancellationToken cancellationToken = default)
+        {
+            var placement = await _db.Placements.SingleAsync(p => p.Id == placementId, cancellationToken);
+            await EnsureDraftAsync(placement.TimetableVersionId, cancellationToken);
+            _db.Placements.Remove(placement);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<Placement> PlaceAsync(
             int timetableVersionId, int sectionId, int periodSlotId, int curriculumOfferingId, int teacherProfileId,
             int? roomId = null, CancellationToken cancellationToken = default)
         {
+            await EnsureDraftAsync(timetableVersionId, cancellationToken);
+
             var hasAssignment = await _db.TeacherAssignments.AnyAsync(
                 a => a.TeacherProfileId == teacherProfileId && a.CurriculumOfferingId == curriculumOfferingId
                     && a.SectionId == sectionId && a.EffectiveToUtc == null,
@@ -116,7 +151,37 @@ namespace Sms.Infrastructure.Timetable
                 .Select(g => new { g.Key.SectionId, g.Key.CurriculumOfferingId, PlacedCount = g.Count() })
                 .ToListAsync(cancellationToken);
 
-            foreach (var group in placements)
+            // BR-TTB-003 "every offering fully placed": every section that appears in the version is
+            // checked against ALL current offerings of its grade-year profile — an offering with zero
+            // placements is a shortfall too, not invisible. Sections with no placement at all are out of
+            // the version's scope (e.g. a stage that is not timetabled) and are not blocked here; the
+            // validation board lists them so the owner sees the gap.
+            var sectionIds = placements.Select(p => p.SectionId).Distinct().ToList();
+            var sectionProfiles = await _db.Sections
+                .Where(s => sectionIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.GradeYearProfileId })
+                .ToListAsync(cancellationToken);
+            var profileIds = sectionProfiles.Select(s => s.GradeYearProfileId).Distinct().ToList();
+            var offerings = await _db.CurriculumOfferings
+                .Where(o => profileIds.Contains(o.GradeYearProfileId) && o.EffectiveToUtc == null)
+                .Select(o => new { o.Id, o.GradeYearProfileId, o.WeeklyPeriods })
+                .ToListAsync(cancellationToken);
+
+            foreach (var section in sectionProfiles)
+            {
+                foreach (var offering in offerings.Where(o => o.GradeYearProfileId == section.GradeYearProfileId))
+                {
+                    var placed = placements.FirstOrDefault(p => p.SectionId == section.Id && p.CurriculumOfferingId == offering.Id)?.PlacedCount ?? 0;
+                    if (!PlacementCompletenessEvaluator.IsComplete(placed, offering.WeeklyPeriods))
+                    {
+                        throw new IncompletePlacementException(
+                            offering.Id, section.Id, PlacementCompletenessEvaluator.Shortfall(placed, offering.WeeklyPeriods));
+                    }
+                }
+            }
+
+            // Placements against an ended offering (not current any more) are still counted against the plan they were made for.
+            foreach (var group in placements.Where(p => !offerings.Any(o => o.Id == p.CurriculumOfferingId)))
             {
                 var offering = await _db.CurriculumOfferings.SingleAsync(o => o.Id == group.CurriculumOfferingId, cancellationToken);
                 if (!PlacementCompletenessEvaluator.IsComplete(group.PlacedCount, offering.WeeklyPeriods))
@@ -226,6 +291,19 @@ namespace Sms.Infrastructure.Timetable
             session.Status = SessionStatus.Cancelled;
             session.ChangeReason = reason;
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>doc/Modules/15 §9: "version editing locked while under WF-12 review" — only Draft accepts placement edits.</summary>
+        private async Task EnsureDraftAsync(int timetableVersionId, CancellationToken cancellationToken)
+        {
+            var status = await _db.TimetableVersions
+                .Where(v => v.Id == timetableVersionId)
+                .Select(v => v.Status)
+                .SingleAsync(cancellationToken);
+            if (status != TimetableVersionStatus.Draft)
+            {
+                throw new TimetableVersionLockedException(status);
+            }
         }
     }
 }

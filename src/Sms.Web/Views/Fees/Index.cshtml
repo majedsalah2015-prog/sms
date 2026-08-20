@@ -1,0 +1,89 @@
+@using System.Globalization
+@using Sms.Domain.Fees
+@model ChargeExplorerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Charge explorer", "مستكشف الفواتير");
+    ViewData["Breadcrumb"] = T("Fees / Charges", "الرسوم / الفواتير");
+    ViewData["FinanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "fee-help", Title = T("Charges — help", "الفواتير — مساعدة"),
+        Intro = T("Every posted charge is a numbered tax invoice (INV series) with a VAT snapshot and a SHA-256 hash chain (BR-FEE-005). Posted documents are immutable — corrections are credit notes (BR-GLB-062).", "كل فاتورة مرحّلة مستند ضريبي مرقّم (سلسلة INV) بنسبة ضريبة مسجّلة وسلسلة تجزئة SHA-256 (BR-FEE-005). المستندات المرحّلة ثابتة — التصحيح بإشعار دائن (BR-GLB-062)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Filters", "التصفية"), T("Search by invoice no., student or payer; narrow by category, source and status; \"open only\" hides fully settled invoices.", "ابحث برقم الفاتورة أو الطالب أو الدافع؛ صفِّ بالفئة والمصدر والحالة؛ «المفتوحة فقط» تخفي الفواتير المسدّدة.")),
+            new HelpPanelViewModel.Item(T("Remaining", "المتبقي"), T("gross − credit notes − discounts − allocated payments (BR-FEE-008, one computation shared with the cashier and the portal).", "الإجمالي − الإشعارات الدائنة − الخصومات − المدفوعات المخصّصة (BR-FEE-008، حساب واحد مشترك مع الصندوق والبوابة).")),
+            new HelpPanelViewModel.Item(T("New charge", "فاتورة جديدة"), T("Posts from the approved fee structure (registration/re-registration/service) or a manual misc charge with a mandatory reason (BR-FEE-003).", "ترحيل من هيكل الرسوم المعتمد (تسجيل/إعادة تسجيل/خدمة) أو رسم يدوي بسبب إلزامي (BR-FEE-003).")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Posted tax invoices for the year — drill into a document, issue credit notes, or post a new charge.", "الفواتير المرحّلة للعام — افتح المستند أو أصدر إشعاراً دائناً أو رحّل فاتورة جديدة.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form>
+        <a class="btn btn-primary btn-sm" asp-action="NewCharge" asp-route-year="@yid"><i class="bi bi-plus-lg me-1"></i>@T("New charge", "فاتورة جديدة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
+<partial name="_FinanceNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-receipt"></i></span><span class="sms-tile__value">@Model.Rows.Count</span><span class="sms-tile__label">@T("invoices listed", "فاتورة معروضة")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-cash-stack"></i></span><span class="sms-tile__value">@Model.TotalGross.ToString("N2")</span><span class="sms-tile__label">@T("gross posted", "الإجمالي المرحّل")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-danger"><i class="bi bi-hourglass-split"></i></span><span class="sms-tile__value">@Model.TotalRemaining.ToString("N2")</span><span class="sms-tile__label">@T("still due", "لا يزال مستحقاً")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-people"></i></span><span class="sms-tile__value">@Model.PayerCount</span><span class="sms-tile__label">@T("payers", "دافعون")</span></div></div>
+    </div>
+
+    <div class="sms-card mb-3 p-3">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="year" value="@yid" />
+            <div class="col-md-3"><label class="form-label small mb-1">@T("Search", "بحث")</label><input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("invoice no. / student / payer / mobile", "رقم الفاتورة / الطالب / الدافع / الجوال")" /></div>
+            <div class="col-md-2"><label class="form-label small mb-1">@T("Category", "الفئة")</label><select name="category" class="form-select form-select-sm"><option value="">@T("All", "الكل")</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@(isRtl ? c.NameAr : c.NameEn)</option> }</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">@T("Source", "المصدر")</label><select name="source" class="form-select form-select-sm"><option value="">@T("All", "الكل")</option>@foreach (var s in Enum.GetValues<ChargeSourceType>()) { <option value="@s" selected="@(s == Model.Source)">@FinanceLabels.ChargeSource(s, isRtl)</option> }</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1">@T("Status", "الحالة")</label><select name="status" class="form-select form-select-sm"><option value="">@T("All", "الكل")</option>@foreach (var s in Enum.GetValues<ChargeStatus>()) { <option value="@s" selected="@(s == Model.Status)">@FinanceLabels.ChargeStatus(s, isRtl)</option> }</select></div>
+            <div class="col-md-2"><div class="form-check mt-4"><input class="form-check-input" type="checkbox" name="open" value="true" id="openOnly" checked="@Model.OpenOnly" /><label class="form-check-label small" for="openOnly">@T("Open only", "المفتوحة فقط")</label></div></div>
+            <div class="col-md-1"><button class="btn btn-outline-primary btn-sm w-100" type="submit"><i class="bi bi-funnel"></i></button></div>
+        </form>
+    </div>
+
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+            <thead><tr><th>@T("Invoice", "الفاتورة")</th><th>@T("Posted", "التاريخ")</th><th>@T("Student", "الطالب")</th><th>@T("Payer", "الدافع")</th><th>@T("Category", "الفئة")</th><th>@T("Source", "المصدر")</th><th class="text-end">@T("Net", "الصافي")</th><th class="text-end">@T("VAT", "الضريبة")</th><th class="text-end">@T("Gross", "الإجمالي")</th><th class="text-end">@T("Remaining", "المتبقي")</th><th>@T("Status", "الحالة")</th><th></th></tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td><a asp-action="Charge" asp-route-id="@r.Charge.Id"><code>@r.Charge.ChargeNo</code></a></td>
+                    <td class="text-nowrap">@r.Charge.PostedAtUtc.ToString("yyyy-MM-dd")</td>
+                    <td><span class="small text-muted">@r.Student.StudentNo</span><br />@FinanceLabels.StudentName(r.Student, isRtl)</td>
+                    <td>@FinanceLabels.ParentName(r.Payer, isRtl)</td>
+                    <td>@(isRtl ? r.Category.NameAr : r.Category.NameEn)</td>
+                    <td><span class="badge text-bg-light border">@FinanceLabels.ChargeSource(r.Charge.SourceType, isRtl)</span></td>
+                    <td class="text-end">@r.Charge.NetAmount.ToString("N2")</td>
+                    <td class="text-end">@r.Charge.VatAmount.ToString("N2")</td>
+                    <td class="text-end fw-semibold">@r.Charge.GrossAmount.ToString("N2")</td>
+                    <td class="text-end @(r.Remaining > 0 ? "text-danger" : "text-success")">@r.Remaining.ToString("N2")</td>
+                    <td><span class="badge @(r.Charge.Status == ChargeStatus.Posted ? "text-bg-success" : "text-bg-secondary")">@FinanceLabels.ChargeStatus(r.Charge.Status, isRtl)</span></td>
+                    <td class="text-end">
+                        @* BR-GLB-062: only an untouched posted invoice can be voided — anything paid/credited/discounted must go through a credit note. *@
+                        @if (r.Charge.Status == ChargeStatus.Posted && r.Remaining == r.Charge.GrossAmount)
+                        {
+                            <form method="post" asp-action="VoidCharge" asp-route-id="@r.Charge.Id" asp-route-year="@yid" class="d-inline"
+                                  onsubmit="var v = prompt(@Json.Serialize(T($"Void charge {r.Charge.ChargeNo}? Enter the mandatory reason (T1):", $"حذف الفاتورة {r.Charge.ChargeNo}؟ أدخل السبب الإلزامي (T1):"))); if (!v || !v.trim()) return false; this.reason.value = v.trim(); return true;">
+                                <input type="hidden" name="reason" value="" />
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="@T("Void (delete) — allowed only while nothing is paid or credited against it", "حذف (إلغاء) — متاح فقط ما دام لا يوجد سداد أو إشعار دائن عليها")"><i class="bi bi-trash"></i></button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0) { <tr><td colspan="12" class="text-center text-muted py-4">@T("No charges match.", "لا فواتير مطابقة.")</td></tr> }
+            </tbody>
+        </table></div>
+    </div>
+}

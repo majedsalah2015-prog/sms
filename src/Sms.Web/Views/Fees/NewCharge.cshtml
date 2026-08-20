@@ -1,0 +1,98 @@
+@using System.Globalization
+@using Sms.Domain.Fees
+@model MiscChargeViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("New charge", "فاتورة جديدة");
+    ViewData["Breadcrumb"] = T("Fees / Charges / New", "الرسوم / الفواتير / جديدة");
+    ViewData["FinanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var sel = Model.Selected;
+    var defaultPayer = Model.Payers.FirstOrDefault(p => p.IsFinanciallyResponsible) ?? Model.Payers.FirstOrDefault();
+    var help = new HelpPanelViewModel
+    {
+        Id = "nc-help", Title = T("New charge — help", "فاتورة جديدة — مساعدة"),
+        Intro = T("Two ways to post: from the approved fee structure of the student's grade-year (registration / re-registration / service), or a manual misc charge with an explicit amount and a mandatory reason (BR-FEE-003).", "طريقتان للترحيل: من هيكل الرسوم المعتمد لصف الطالب (تسجيل / إعادة تسجيل / خدمة)، أو رسم يدوي بمبلغ صريح وسبب إلزامي (BR-FEE-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Payer", "الدافع"), T("The guardian who pays. The financially-responsible guardian is pre-selected; a payer account is created on first charge.", "ولي الأمر الدافع. المسؤول مالياً مختار مسبقاً؛ يُنشأ حساب دافع عند أول فاتورة.")),
+            new HelpPanelViewModel.Item(T("VAT", "الضريبة"), T("Applied from the category and snapshotted on the invoice; the invoice number (INV) and hash chain are issued at posting (BR-FEE-005).", "تُطبَّق من الفئة وتُسجَّل على الفاتورة؛ يصدر رقم الفاتورة (INV) وسلسلة التجزئة عند الترحيل (BR-FEE-005).")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Pick a student, then post from the structure or enter a misc charge.", "اختر طالباً ثم رحّل من الهيكل أو أدخل رسماً يدوياً.")</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-year="@yid"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Charges", "الفواتير")</a><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_FinanceNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-4">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2">@T("1 · Student", "1 · الطالب")</h2>
+                <form method="get">
+                    <input type="hidden" name="year" value="@yid" />
+                    <select name="studentId" class="form-select" onchange="this.form.submit()" size="12">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                        @foreach (var o in Model.Students)
+                        {
+                            <option value="@o.Student.Id" selected="@(o.Student.Id == sel?.Id)">@o.Student.StudentNo · @FinanceLabels.StudentName(o.Student, isRtl) @(o.Grade == null ? "" : $"({(isRtl ? o.Grade.Name.NameAr : o.Grade.Name.NameEn)})")</option>
+                        }
+                    </select>
+                </form>
+                @if (Model.Students.Count == 0) { <div class="small text-muted mt-2">@T("No active enrollments in this year.", "لا قيود نشطة في هذا العام.") </div> }
+            </div>
+        </div>
+        <div class="col-lg-8">
+            @if (sel == null) { <div class="alert alert-light border">@T("Select a student on the left.", "اختر طالباً من القائمة.")</div> }
+            else if (Model.Payers.Count == 0) { <div class="alert alert-warning">@T("This student has no active guardian link — add a guardian before charging.", "لا رابط ولي أمر نشط لهذا الطالب — أضف ولي أمر قبل الفوترة.")</div> }
+            else
+            {
+                <div class="sms-card p-3 mb-3">
+                    <h2 class="h6 mb-2">@T("2 · Payer", "2 · الدافع")</h2>
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var p in Model.Payers)
+                        {
+                            <label class="border rounded px-2 py-1 small @(p == defaultPayer ? "border-primary" : "")"><input type="radio" name="parentIdPick" value="@p.Parent.Id" class="form-check-input me-1" checked="@(p == defaultPayer)" onchange="document.querySelectorAll('input[name=parentId]').forEach(i => i.value = this.value)" /> @FinanceLabels.ParentName(p.Parent, isRtl) <span class="text-muted">· @p.Parent.ParentFileNo · @p.Parent.PrimaryMobile</span> @if (p.IsFinanciallyResponsible) { <span class="badge text-bg-primary ms-1">@T("financially responsible", "مسؤول مالياً")</span> } @if (p.Payer == null) { <span class="badge text-bg-light border ms-1">@T("new payer", "دافع جديد")</span> }</label>
+                        }
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="sms-card p-3 h-100">
+                            <h2 class="h6 mb-2">@T("3a · From fee structure", "3أ · من هيكل الرسوم")</h2>
+                            @if (Model.StructureLines.Count == 0) { <div class="small text-muted">@T("No approved structure lines for this student's grade-year.", "لا أسطر هيكل معتمدة لصف هذا الطالب.") <a asp-action="Structure" asp-route-year="@yid">@T("Open the workbench", "افتح المنضدة")</a></div> }
+                            else
+                            {
+                                <form method="post" asp-action="PostCharge" asp-route-year="@yid" class="d-grid gap-2">
+                                    <input type="hidden" name="studentId" value="@sel.Id" /><input type="hidden" name="parentId" value="@defaultPayer?.Parent.Id" /><input type="hidden" name="mode" value="structure" />
+                                    <select name="categoryId" class="form-select form-select-sm" required>
+                                        @foreach (var (line, cat, charged) in Model.StructureLines) { <option value="@cat.Id" disabled="@charged">@(isRtl ? cat.NameAr : cat.NameEn) — @line.Amount.ToString("N2") @(charged ? T("(already charged)", "(مفوترة)") : "")</option> }
+                                    </select>
+                                    <select name="sourceType" class="form-select form-select-sm"><option value="@ChargeSourceType.Registration">@FinanceLabels.ChargeSource(ChargeSourceType.Registration, isRtl)</option><option value="@ChargeSourceType.ReRegistration">@FinanceLabels.ChargeSource(ChargeSourceType.ReRegistration, isRtl)</option><option value="@ChargeSourceType.ServiceAssignment">@FinanceLabels.ChargeSource(ChargeSourceType.ServiceAssignment, isRtl)</option></select>
+                                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-receipt me-1"></i>@T("Post from structure", "ترحيل من الهيكل")</button>
+                                </form>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="sms-card p-3 h-100">
+                            <h2 class="h6 mb-2">@T("3b · Misc / manual charge", "3ب · رسم يدوي")</h2>
+                            <form method="post" asp-action="PostCharge" asp-route-year="@yid" class="d-grid gap-2">
+                                <input type="hidden" name="studentId" value="@sel.Id" /><input type="hidden" name="parentId" value="@defaultPayer?.Parent.Id" /><input type="hidden" name="mode" value="manual" />
+                                <select name="categoryId" class="form-select form-select-sm" required><option value="">@T("Category", "الفئة")</option>@foreach (var c in Model.Categories) { <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn) @(c.VatRate == null ? "" : $"(+{(c.VatRate.Value * 100m):0.##}% VAT)")</option> }</select>
+                                <div class="input-group input-group-sm"><span class="input-group-text">@T("Net amount", "المبلغ الصافي")</span><input name="amount" type="number" step="0.01" min="0.01" class="form-control" required /></div>
+                                <input name="reason" class="form-control form-control-sm" placeholder="@T("Reason (mandatory, BR-FEE-003)", "السبب (إلزامي، BR-FEE-003)")" required />
+                                <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-pencil-square me-1"></i>@T("Post misc charge", "ترحيل رسم يدوي")</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}

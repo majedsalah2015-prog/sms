@@ -55,7 +55,7 @@
                     </select></div>
                 <div class="mb-2"><label class="form-label">@T("Value", "القيمة")</label><input name="Value" class="form-control" dir="ltr" value="@Model.Value" /></div>
                 <div class="mb-2"><label class="form-label">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
-                    <select name="AcademicYearId" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></div>
+                    <select name="AcademicYearId" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></div>
                 <div class="mb-3"><label class="form-label">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" class="form-control" value="@Model.Reason" /></div>
                 <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
             </form>

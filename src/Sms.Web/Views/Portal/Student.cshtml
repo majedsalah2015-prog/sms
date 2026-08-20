@@ -22,7 +22,10 @@
 <div class="sms-page-head">
     <div><div class="text-muted small"><code>@s.StudentNo</code> · @(Model.Grade == null ? T("not enrolled this year", "غير مقيّد هذا العام") : $"{Model.Grade.Code} {(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn)}{(Model.Section == null ? "" : " / " + (isRtl ? Model.Section.NameAr : Model.Section.NameEn))}") · @(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn))</div>
         <h1 class="sms-page-title">@name @if (Model.IsSelf) { <span class="badge fs-6 text-bg-light border">@T("me", "أنا")</span> }</h1></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("My family", "عائلتي")</a>
+    <div class="d-flex gap-2">
+        @if (Model.Section != null) { <a class="btn btn-outline-primary" asp-action="Timetable" asp-route-id="@s.Id"><i class="bi bi-table me-1"></i>@T("Timetable", "الجدول")</a> }
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("My family", "عائلتي")</a>
+    </div>
 </div>
 
 <div class="sms-card">

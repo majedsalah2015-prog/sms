@@ -20,6 +20,15 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>A building/floor/room can only be removed (deactivated) while nothing active still sits under or on it.</summary>
+    public class RoomInUseException : InvalidOperationException
+    {
+        public RoomInUseException(string reason)
+            : base($"Cannot remove: {reason}.")
+        {
+        }
+    }
+
     /// <summary>BR-ROM-004: the room is under maintenance or reserved for the requested window.</summary>
     public class RoomUnavailableException : InvalidOperationException
     {

@@ -18,6 +18,21 @@ namespace Sms.Application.Schools
         Task<AcademicYear> DefineYearAsync(
             string labelAr, string labelEn, string hijriLabel, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Edits labels/dates of a year that has no student enrollments. Same date rules as
+        /// <see cref="DefineYearAsync"/> (span, overlap with other years); existing semesters must
+        /// stay nested. Throws <see cref="Common.Exceptions.AcademicYearInUseException"/> when
+        /// students are enrolled.
+        /// </summary>
+        Task<AcademicYear> UpdateYearAsync(
+            int academicYearId, string labelAr, string labelEn, string hijriLabel, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Hard-deletes a year (with its semesters/terms) that has no student enrollments and no
+        /// other referencing data. Throws <see cref="Common.Exceptions.AcademicYearInUseException"/> otherwise.
+        /// </summary>
+        Task DeleteYearAsync(int academicYearId, CancellationToken cancellationToken = default);
+
         /// <summary>BR-AYR-004: Preparation → Active; the school's current Active year (if any) moves to Closing in the same operation.</summary>
         Task ActivateAsync(int academicYearId, CancellationToken cancellationToken = default);
 

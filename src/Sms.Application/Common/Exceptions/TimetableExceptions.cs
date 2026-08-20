@@ -39,6 +39,24 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>doc/Modules/15 §9: placements can only be edited while the version is Draft — Validated (under WF-12 review) and Published versions are locked.</summary>
+    public class TimetableVersionLockedException : InvalidOperationException
+    {
+        public TimetableVersionLockedException(TimetableVersionStatus status)
+            : base($"Timetable version is {status} — placements are locked; reopen a Validated version or create a new one for an amendment (BR-TTB-002/009).")
+        {
+        }
+    }
+
+    /// <summary>BR-TTB-001: a period slot that placements already reference cannot be removed (the placements go first).</summary>
+    public class PeriodSlotInUseException : InvalidOperationException
+    {
+        public PeriodSlotInUseException(int periodSlotId, int placementCount)
+            : base($"Period slot {periodSlotId} is referenced by {placementCount} placement(s) and cannot be removed (BR-TTB-001).")
+        {
+        }
+    }
+
     /// <summary>BR-TTB-007: the candidate substitute is neither qualified nor free at the session's slot.</summary>
     public class SubstituteNotEligibleException : InvalidOperationException
     {

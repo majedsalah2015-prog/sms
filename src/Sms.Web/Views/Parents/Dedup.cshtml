@@ -1,0 +1,24 @@
+@using System.Globalization
+@model DedupWorkbenchViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Dedup workbench", "طاولة التكرار");
+    ViewData["Breadcrumb"] = T("Parents / Dedup workbench", "أولياء الأمور / طاولة التكرار");
+}
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Pairs.Count @T("candidate pair(s) — same mobile, identical name or same email (BR-PAR-002/004).", "زوج مرشح — نفس الجوال أو اسم مطابق أو نفس البريد (BR-PAR-002/004).")</p></div><a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Directory", "الدليل")</a></div>
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+        <thead><tr><th>@T("Reason", "السبب")</th><th>@T("Parent A", "ولي الأمر أ")</th><th>@T("Children", "أبناء")</th><th>@T("Parent B", "ولي الأمر ب")</th><th>@T("Children", "أبناء")</th><th></th></tr></thead>
+        <tbody>@foreach (var x in Model.Pairs)
+        {
+            <tr><td><span class="badge text-bg-warning">@x.Reason</span></td>
+                <td><a asp-action="File" asp-route-id="@x.A.Id"><code>@x.A.ParentFileNo</code> @(isRtl ? x.A.NameAr : x.A.NameEn)</a><div class="small text-muted" dir="ltr">@x.A.PrimaryMobile @(x.A.Email ?? "")</div></td><td>@x.ChildrenA</td>
+                <td><a asp-action="File" asp-route-id="@x.B.Id"><code>@x.B.ParentFileNo</code> @(isRtl ? x.B.NameAr : x.B.NameEn)</a><div class="small text-muted" dir="ltr">@x.B.PrimaryMobile @(x.B.Email ?? "")</div></td><td>@x.ChildrenB</td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-secondary" disabled title="@T("Merge wizard with preview diff needs the merge-log engine (BR-PAR-004)", "معالج الدمج مع معاينة الفروق يحتاج محرك سجل الدمج (BR-PAR-004)")"><i class="bi bi-union me-1"></i>@T("Merge", "دمج")</button></td></tr>
+        }
+        @if (Model.Pairs.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No duplicate candidates.", "لا مرشحين للتكرار.")</td></tr> }</tbody>
+    </table></div>
+    <div class="p-3 form-text">@T("Side-by-side compare: open both files. Link/dismiss and the merge wizard (re-pointing guardian links, financial responsibility and the portal account, with an audit merge log) are deferred until the ParentMergeLog engine exists.", "قارن بفتح الملفين. الربط/التجاهل ومعالج الدمج (إعادة توجيه روابط الوصاية والمسؤولية المالية وحساب البوابة مع سجل دمج مدقق) مؤجلة حتى يوجد محرك ParentMergeLog.")</div>
+</div>

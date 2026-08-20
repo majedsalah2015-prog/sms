@@ -137,6 +137,44 @@ namespace Sms.Web.Models
         public DateTime? AgeCutoff { get; set; }
     }
 
+    /// <summary>Edit form for a stage (names/order/default gender).</summary>
+    public sealed class StageEditViewModel
+    {
+        public int Id { get; set; }
+
+        public int? Year { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public int? Order { get; set; }
+
+        public GenderPolicy Gender { get; set; } = GenderPolicy.Mixed;
+
+        public int GradeCount { get; set; }
+    }
+
+    /// <summary>Edit form for a grade level (stage/code/names/order; promotion path stays on the ladder).</summary>
+    public sealed class GradeEditViewModel
+    {
+        public int Id { get; set; }
+
+        public int? Year { get; set; }
+
+        public int? StageId { get; set; }
+
+        public string? Code { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public int? Order { get; set; }
+
+        public IReadOnlyList<Stage> Stages { get; set; } = Array.Empty<Stage>();
+    }
+
     // ---------------------------------------------------------------- Sections (doc/Modules/06 §8)
 
     public sealed class SectionListViewModel
@@ -161,6 +199,36 @@ namespace Sms.Web.Models
         public int? Capacity { get; set; }
 
         public GenderPolicy GenderPolicy { get; set; } = GenderPolicy.Mixed;
+    }
+
+    /// <summary>Edit form for a section (names/capacity/gender/room).</summary>
+    public sealed class SectionEditViewModel
+    {
+        public int Id { get; set; }
+
+        public Section Section { get; set; } = null!;
+
+        public string GradeLabelAr { get; set; } = string.Empty;
+
+        public string GradeLabelEn { get; set; } = string.Empty;
+
+        public int PlanSectionSize { get; set; }
+
+        public GenderPolicy GradeGender { get; set; }
+
+        public int CurrentMembers { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public int? Capacity { get; set; }
+
+        public GenderPolicy GenderPolicy { get; set; } = GenderPolicy.Mixed;
+
+        public int? DefaultClassroomId { get; set; }
+
+        public IReadOnlyList<(int Id, string NameAr, string NameEn)> Rooms { get; set; } = Array.Empty<(int, string, string)>();
     }
 
     public sealed class SectionDetailViewModel

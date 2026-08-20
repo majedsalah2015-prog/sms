@@ -1,0 +1,106 @@
+@using System.Globalization
+@using Sms.Application.ReadModels
+@using Sms.Application.Statements
+@model PayerPositionViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Statement of account", "كشف الحساب");
+    ViewData["Breadcrumb"] = T("Fees / Statement", "الرسوم / كشف الحساب");
+    var sel = Model.Selected;
+    var st = Model.Statement;
+    var help = new HelpPanelViewModel
+    {
+        Id = "pos-help", Title = T("Statement — help", "كشف الحساب — مساعدة"),
+        Intro = T("Payer-centric position across years: every invoice, credit note, discount, receipt and refund in date order with a running balance (BR-FEE-008). Gross, discounts and net are always separated (BR-DIS-010).", "موقف الدافع عبر الأعوام: كل فاتورة وإشعار دائن وخصم وسند قبض واسترداد بترتيب التاريخ مع رصيد جارٍ (BR-FEE-008). الإجمالي والخصومات والصافي منفصلة دائماً (BR-DIS-010)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("As-of date", "حتى تاريخ"), T("Rebuilds the statement as it stood at the end of that day.", "يعيد بناء الكشف كما كان نهاية ذلك اليوم.")),
+            new HelpPanelViewModel.Item(T("Aging", "الأعمار"), T("Open remainders bucketed by days since posting (30-day grace, RPT-FEE-004) — charges carry no due date; installment due dates live in Module 20.", "المتبقيات المفتوحة مصنّفة بالأيام منذ الترحيل (سماح 30 يوماً، RPT-FEE-004) — الفواتير بلا تاريخ استحقاق؛ استحقاقات الأقساط في الوحدة 20.")),
+            new HelpPanelViewModel.Item(T("Advance", "المقدّم"), T("Receipts not yet allocated to any invoice — refundable via the Refund desk.", "سندات لم تُخصّص لأي فاتورة بعد — قابلة للاسترداد من مكتب الاستردادات.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Multi-year payer statement, aging and per-child position.", "كشف الدافع متعدد الأعوام، الأعمار، وموقف كل ابن.")</p></div>
+    <div class="d-flex gap-2 align-items-center">@if (sel != null) { <button class="btn btn-outline-secondary btn-sm d-print-none" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button> }<partial name="_HelpModal" model="help" /></div></div>
+<partial name="_FinanceNav" />
+
+<div class="row g-3">
+    <div class="col-lg-3 d-print-none">
+        <div class="sms-card p-3 mb-3">
+            <form method="get" class="d-flex gap-1"><input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("payer / student / mobile", "الدافع / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-search"></i></button></form>
+        </div>
+        <div class="sms-card">
+            <div class="list-group list-group-flush" style="max-height:60vh;overflow:auto">
+                @foreach (var p in Model.Payers)
+                {
+                    <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Position" asp-route-payerId="@p.Payer.Id" asp-route-q="@Model.Q"><span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span><br /><span class="opacity-75">@p.Parent?.ParentFileNo · @p.Children.Count @T("children", "أبناء")</span></a>
+                }
+                @if (Model.Payers.Count == 0) { <div class="list-group-item small text-muted">@T("No payers match.", "لا دافعين مطابقين.")</div> }
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-9">
+        @if (sel == null || st == null) { <div class="alert alert-light border">@T("Pick a payer to build the statement.", "اختر دافعاً لبناء الكشف.")</div> }
+        else
+        {
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span><br /><span class="small text-muted">@string.Join(" · ", sel.Children.Select(ch => $"{ch.StudentNo} {FinanceLabels.StudentName(ch, isRtl)}"))</span></div>
+                <form method="get" class="d-flex gap-1 align-items-center d-print-none"><input type="hidden" name="payerId" value="@sel.Payer.Id" /><input type="hidden" name="q" value="@Model.Q" /><label class="small text-muted">@T("as of", "حتى")</label><input type="date" name="asOf" class="form-control form-control-sm" value="@Model.AsOf?.ToString("yyyy-MM-dd")" onchange="this.form.submit()" />@if (Model.AsOf != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="Position" asp-route-payerId="@sel.Payer.Id">@T("now", "الآن")</a> }</form>
+            </div>
+
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">@st.GrossCharges.ToString("N2")</span><span class="sms-tile__label">@T("gross invoices", "إجمالي الفواتير")</span></div></div>
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">−@((st.Discounts + st.CreditNotes).ToString("N2"))</span><span class="sms-tile__label">@T("discounts + credit notes", "خصومات + إشعارات")</span></div></div>
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">@st.NetCharges.ToString("N2")</span><span class="sms-tile__label">@T("net charges", "صافي الرسوم")</span></div></div>
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value text-success">−@st.Payments.ToString("N2")</span><span class="sms-tile__label">@T("payments", "المدفوعات")</span></div></div>
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value @(st.ClosingBalance > 0 ? "text-danger" : "text-success")">@st.ClosingBalance.ToString("N2")</span><span class="sms-tile__label">@T("closing balance", "الرصيد الختامي")</span></div></div>
+                <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">@Model.AdvanceBalance.ToString("N2")</span><span class="sms-tile__label">@T("advance (unallocated)", "مقدّم غير مخصّص")</span></div></div>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-7">
+                    <div class="sms-card h-100">
+                        <div class="p-2 border-bottom small fw-semibold">@T("Aging of open invoices (as of today)", "أعمار الفواتير المفتوحة (حتى اليوم)")</div>
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-0"><thead><tr>@foreach (var b in Enum.GetValues<AgingBucket>()) { <th class="text-end">@FinanceLabels.Aging(b, isRtl)</th> }<th class="text-end">@T("Total", "المجموع")</th></tr></thead>
+                        <tbody><tr>@foreach (var b in Enum.GetValues<AgingBucket>()) { var v = Model.Aging.GetValueOrDefault(b); <td class="text-end @(v > 0 && b >= AgingBucket.Days31To60 ? "text-danger" : "")">@v.ToString("N2")</td> }<td class="text-end fw-semibold">@Model.OpenCharges.Sum(r => r.Remaining).ToString("N2")</td></tr></tbody></table></div>
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <div class="sms-card h-100">
+                        <div class="p-2 border-bottom small fw-semibold">@T("Per child (all years, BR-FEE-008)", "لكل ابن (كل الأعوام، BR-FEE-008)")</div>
+                        <ul class="list-group list-group-flush">@foreach (var (child, pos) in Model.PerChild) { <li class="list-group-item small d-flex justify-content-between"><span>@child.StudentNo · @FinanceLabels.StudentName(child, isRtl)</span><span class="fw-semibold @(pos > 0 ? "text-danger" : "text-success")">@pos.ToString("N2")</span></li> }@if (Model.PerChild.Count == 0) { <li class="list-group-item small text-muted">—</li> }</ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sms-card">
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <thead><tr><th>@T("Date", "التاريخ")</th><th>@T("Kind", "النوع")</th><th>@T("Document", "المستند")</th><th>@T("Description", "الوصف")</th><th class="text-end">@T("Debit", "مدين")</th><th class="text-end">@T("Credit", "دائن")</th><th class="text-end">@T("Balance", "الرصيد")</th></tr></thead>
+                    <tbody>
+                    @foreach (var l in st.Lines)
+                    {
+                        var charge = l.Kind == StatementLineKind.Charge ? Model.AllCharges.FirstOrDefault(r => r.Charge.ChargeNo == l.DocumentNo)?.Charge : null;
+                        <tr>
+                            <td class="text-nowrap">@l.DateUtc.ToString("yyyy-MM-dd")</td>
+                            <td><span class="badge text-bg-light border">@FinanceLabels.StatementKind(l.Kind, isRtl)</span></td>
+                            <td>@if (charge != null) { <a asp-action="Charge" asp-route-id="@charge.Id"><code>@l.DocumentNo</code></a> } else { <code>@l.DocumentNo</code> }</td>
+                            <td class="small">@l.Description</td>
+                            <td class="text-end">@(l.Debit == 0 ? "" : l.Debit.ToString("N2"))</td>
+                            <td class="text-end">@(l.Credit == 0 ? "" : l.Credit.ToString("N2"))</td>
+                            <td class="text-end fw-semibold">@l.RunningBalance.ToString("N2")</td>
+                        </tr>
+                    }
+                    @if (st.Lines.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No documents for this payer.", "لا مستندات لهذا الدافع.")</td></tr> }
+                    </tbody>
+                </table></div>
+                <div class="p-2 d-flex gap-2 d-print-none">
+                    <a class="btn btn-sm btn-outline-success" asp-controller="Payments" asp-action="Index" asp-route-payerId="@sel.Payer.Id"><i class="bi bi-cash me-1"></i>@T("Cashier", "الصندوق")</a>
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Payments" asp-action="Allocations" asp-route-payerId="@sel.Payer.Id"><i class="bi bi-diagram-2 me-1"></i>@T("Allocations", "التخصيصات")</a>
+                    <a class="btn btn-sm btn-outline-secondary" asp-controller="Payments" asp-action="Refunds" asp-route-payerId="@sel.Payer.Id"><i class="bi bi-arrow-counterclockwise me-1"></i>@T("Refunds", "الاستردادات")</a>
+                </div>
+            </div>
+        }
+    </div>
+</div>

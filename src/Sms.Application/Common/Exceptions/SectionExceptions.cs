@@ -47,4 +47,13 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>A section can only be edited/deleted while its history (memberships, homeroom assignments, timetable) allows it.</summary>
+    public class SectionInUseException : InvalidOperationException
+    {
+        public SectionInUseException(int sectionId, string reason)
+            : base($"Section {sectionId} is in use: {reason}.")
+        {
+        }
+    }
 }

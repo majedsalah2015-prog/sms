@@ -30,7 +30,7 @@ namespace Sms.Web.Controllers
     /// request (M17 full), online payment (BR-PAY-007 dormant).
     /// </summary>
     [Route("portal")]
-    public class PortalController : Controller
+    public partial class PortalController : Controller
     {
         private readonly IParentPortalQuery _portal;
         private readonly AppDbContext _db;

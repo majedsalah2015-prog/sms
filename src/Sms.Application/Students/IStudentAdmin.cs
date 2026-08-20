@@ -21,6 +21,14 @@ namespace Sms.Application.Students
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
             CancellationToken cancellationToken = default);
 
+        /// <summary>Corrects identity/ID fields; identity edits are T1 with a mandatory audit reason (BR-STU-002).</summary>
+        Task<Student> UpdateStudentAsync(
+            int studentId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
+            string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
+            Gender gender, DateTime dateOfBirth, int nationalityLookupId,
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
+            CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.InvalidStudentStatusTransitionException"/>.</summary>
         Task ChangeStatusAsync(int studentId, StudentStatus newStatus, CancellationToken cancellationToken = default);
 
@@ -39,5 +47,14 @@ namespace Sms.Application.Students
         /// <summary>Throws <see cref="Common.Exceptions.DuplicateEnrollmentException"/> (BR-GLB-024).</summary>
         Task<Enrollment> EnrollAsync(
             int studentId, int gradeYearProfileId, DateTime enrollmentDate, EnrollmentSourceType sourceType, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Hard-deletes a student record together with its guardian links, emergency contacts,
+        /// enrollments and section memberships. Refused (InvalidOperationException) when the student
+        /// already has history in other modules (attendance, charges, certificates) or other records
+        /// still reference it. An admission application registered into this student is reverted to
+        /// Approved (seat kept, no student) so the admission trail stays consistent.
+        /// </summary>
+        Task DeleteStudentAsync(int studentId, CancellationToken cancellationToken = default);
     }
 }

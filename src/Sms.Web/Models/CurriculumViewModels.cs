@@ -32,6 +32,19 @@ namespace Sms.Web.Models
 
         public static readonly string[] Categories = { "core", "elective", "religious", "language", "activity" };
 
+        /// <summary>Display label for a category code (the stored value stays the English code).</summary>
+        public static string CategoryLabel(string? code, bool arabic) => (code ?? string.Empty).ToLowerInvariant() switch
+        {
+            "core" => arabic ? "أساسية" : "Core",
+            "elective" => arabic ? "اختيارية" : "Elective",
+            "religious" => arabic ? "دينية" : "Religious",
+            "language" => arabic ? "لغات" : "Language",
+            "activity" => arabic ? "نشاط" : "Activity",
+            "arts" => arabic ? "فنون" : "Arts",
+            "pe" => arabic ? "تربية بدنية" : "PE",
+            _ => code ?? string.Empty,
+        };
+
         // subject form
         public string? Code { get; set; }
 
@@ -58,6 +71,42 @@ namespace Sms.Web.Models
         public int? QStageId { get; set; }
 
         public QualificationSource QSource { get; set; } = QualificationSource.Qualification;
+    }
+
+    /// <summary>Edit form for a catalog subject.</summary>
+    public sealed class SubjectEditViewModel
+    {
+        public int Id { get; set; }
+
+        public string? Code { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public string? Category { get; set; }
+
+        public int? DepartmentId { get; set; }
+
+        public int CurrentOfferings { get; set; }
+
+        public IReadOnlyList<Department> Departments { get; set; } = Array.Empty<Department>();
+    }
+
+    /// <summary>Edit form for a department.</summary>
+    public sealed class DepartmentEditViewModel
+    {
+        public int Id { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public int? HeadTeacherUserId { get; set; }
+
+        public int SubjectCount { get; set; }
+
+        public IReadOnlyList<SubjectCatalogViewModel.TeacherOption> Teachers { get; set; } = Array.Empty<SubjectCatalogViewModel.TeacherOption>();
     }
 
     public sealed class CurriculumPlanViewModel
@@ -148,6 +197,45 @@ namespace Sms.Web.Models
         public int? ExamCapacity { get; set; } = 20;
 
         public GenderPolicy WingTag { get; set; } = GenderPolicy.Mixed;
+    }
+
+    /// <summary>Edit forms for the room catalog tree (building / floor / room).</summary>
+    public sealed class RoomEditViewModel
+    {
+        public int Id { get; set; }
+
+        /// <summary>"building" | "floor" | "room" — decides which fields the form shows.</summary>
+        public string Kind { get; set; } = "room";
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        // floor
+        public int? BuildingId { get; set; }
+
+        public int? Order { get; set; }
+
+        // room
+        public int? FloorId { get; set; }
+
+        public string? Code { get; set; }
+
+        public int? RoomTypeId { get; set; }
+
+        public int? StandardCapacity { get; set; }
+
+        public int? ExamCapacity { get; set; }
+
+        public GenderPolicy WingTag { get; set; } = GenderPolicy.Mixed;
+
+        public int ChildCount { get; set; }
+
+        public IReadOnlyList<Building> Buildings { get; set; } = Array.Empty<Building>();
+
+        public IReadOnlyList<(int Id, string BuildingAr, string BuildingEn, string Ar, string En)> Floors { get; set; } = Array.Empty<(int, string, string, string, string)>();
+
+        public IReadOnlyList<(int Id, string Ar, string En)> RoomTypes { get; set; } = Array.Empty<(int, string, string)>();
     }
 
     public sealed class RoomDetailViewModel

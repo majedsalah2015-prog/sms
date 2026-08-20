@@ -87,5 +87,25 @@ namespace Sms.Infrastructure.Tests
 
             Assert.NotEqual(first.ParentFileNo, second.ParentFileNo);
         }
+
+        [Fact]
+        [BusinessRule("BR-PAR-001")]
+        public async Task Renaming_a_parent_requires_an_audit_reason_but_contact_edits_do_not()
+        {
+            using var db = CreateContext();
+            var admin = new ParentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var parent = await admin.RegisterParentAsync("أحمد", "Ahmad", "0501111111");
+
+            _audit.Reason = null;
+            var contactOnly = await admin.UpdateParentAsync(parent.Id, "أحمد", "Ahmad", "0509999999", email: "a@example.com");
+            Assert.Equal("0509999999", contactOnly.PrimaryMobile);
+
+            await Assert.ThrowsAsync<Sms.Application.Common.Exceptions.MissingAuditReasonException>(() =>
+                admin.UpdateParentAsync(parent.Id, "أحمد علي", "Ahmad Ali", "0509999999"));
+
+            _audit.Reason = "ID correction";
+            Assert.Equal("Ahmad Ali", (await admin.UpdateParentAsync(parent.Id, "أحمد علي", "Ahmad Ali", "0509999999")).NameEn);
+            _audit.Reason = null;
+        }
     }
 }

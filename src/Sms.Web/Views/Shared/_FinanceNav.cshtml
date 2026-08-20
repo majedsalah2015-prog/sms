@@ -1,0 +1,26 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var year = ViewData["FinanceYear"] as int?;
+    var tabs = new (string Controller, string Action, string En, string Ar, string Icon, string[] Also)[]
+    {
+        ("Fees", "Index", "Charges", "الفواتير", "bi-receipt", new[] { "Charge", "NewCharge" }),
+        ("Fees", "Structure", "Fee structure", "هيكل الرسوم", "bi-grid-3x3", Array.Empty<string>()),
+        ("Fees", "Categories", "Categories", "الفئات", "bi-tags", Array.Empty<string>()),
+        ("Fees", "Position", "Statement", "كشف الحساب", "bi-journal-text", Array.Empty<string>()),
+        ("Payments", "Index", "Cashier", "الصندوق", "bi-cash-coin", new[] { "Receipt" }),
+        ("Payments", "Till", "Till sessions", "جلسات الصندوق", "bi-safe2", Array.Empty<string>()),
+        ("Payments", "Pdc", "PDC registry", "الشيكات الآجلة", "bi-calendar-check", Array.Empty<string>()),
+        ("Payments", "Refunds", "Refunds", "الاستردادات", "bi-arrow-counterclockwise", Array.Empty<string>()),
+        ("Payments", "Allocations", "Allocations", "التخصيصات", "bi-diagram-2", Array.Empty<string>()),
+    };
+    bool Active(string c, string a, string[] also) => string.Equals(c, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || also.Any(x => string.Equals(x, action, StringComparison.OrdinalIgnoreCase)));
+}
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        <li class="nav-item"><a class="nav-link @(Active(t.Controller, t.Action, t.Also) ? "active" : "")" asp-controller="@t.Controller" asp-action="@t.Action" asp-route-year="@(t.Controller == "Fees" && t.Action != "Position" && t.Action != "Categories" ? year : null)"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>

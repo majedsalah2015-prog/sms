@@ -7,22 +7,44 @@
     ViewData["Title"] = T("Classrooms", "القاعات الدراسية");
     ViewData["Breadcrumb"] = T("Classrooms / Catalog", "القاعات / الدليل");
     string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys wing", "جناح بنين"), GenderPolicy.Girls => T("Girls wing", "جناح بنات"), _ => T("Mixed", "مشترك") };
+    var help = new HelpPanelViewModel
+    {
+        Id = "rooms-help",
+        Title = T("Classrooms — help", "القاعات الدراسية — مساعدة"),
+        Intro = T("The room catalog is a building → floor → room tree. Every room has a unique code, a type, standard and exam capacities, a wing tag and feature tags; sections and bookings reference rooms from here.", "دليل القاعات شجرة مبنى → طابق → قاعة. لكل قاعة رمز فريد ونوع وسعة عادية وسعة اختبار ووسم جناح وتجهيزات؛ وتشير إليها الشعب والحجوزات."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Buildings & floors", "المباني والطوابق"), T("Create from the side cards. ✎ renames (and re-orders / re-parents a floor); 🗑 removes a building with no floors or a floor with no rooms.", "أنشئها من البطاقات الجانبية. ✎ يعيد التسمية (ويعيد ترتيب/نقل الطابق)؛ 🗑 يحذف مبنى بلا طوابق أو طابقاً بلا قاعات.")),
+            new HelpPanelViewModel.Item(T("Rooms", "القاعات"), T("Code unique per school (BR-ROM-001); exam capacity ≤ standard capacity (BR-ROM-002); the wing tag limits which sections may use it (BR-ROM-003). 'Open' shows features, maintenance windows, bookings and the sections using it.", "الرمز فريد على مستوى المدرسة (BR-ROM-001)؛ سعة الاختبار ≤ السعة العادية (BR-ROM-002)؛ وسم الجناح يحدد الشعب التي يمكنها استخدامها (BR-ROM-003). «فتح» يعرض التجهيزات ونوافذ الصيانة والحجوزات والشعب المستخدمة.")),
+            new HelpPanelViewModel.Item(T("Edit ✎ / Delete 🗑 a room", "تعديل ✎ / حذف 🗑 قاعة"), T("Edit changes floor, code, names, type, capacities and wing. Delete deactivates the room (bookings and history stay) and is refused while an active section uses it as its default classroom.", "التعديل يغيّر الطابق والرمز والأسماء والنوع والسعات والجناح. الحذف يلغي تفعيل القاعة (تبقى الحجوزات والسجل) ويُرفض ما دامت شعبة نشطة تستخدمها كقاعة افتراضية.")),
+            new HelpPanelViewModel.Item(T("Unavailable today", "غير متاحة اليوم"), T("A maintenance / reserved window covers today (BR-ROM-004) — set from the room page; bookings inside such windows are refused.", "نافذة صيانة/حجز تغطي اليوم (BR-ROM-004) — تُضبط من صفحة القاعة؛ وتُرفض الحجوزات داخلها.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Building → floor → room tree with standard/exam capacity, wing tag and feature tags (BR-ROM-001/002/003).", "شجرة مبنى → طابق → قاعة مع السعة العادية/الاختبارية ووسم الجناح والتجهيزات (BR-ROM-001/002/003).") · @Model.TotalRooms @T("rooms", "قاعة") · @Model.TotalSeats @T("seats", "مقعد")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Building → floor → room tree with standard/exam capacity, wing tag and feature tags (BR-ROM-001/002/003).", "شجرة مبنى → طابق → قاعة مع السعة العادية/الاختبارية ووسم الجناح والتجهيزات (BR-ROM-001/002/003).") · @Model.TotalRooms @T("rooms", "قاعة") · @Model.TotalSeats @T("seats", "مقعد")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="row g-3">
     <div class="col-xl-8">
         @foreach (var b in Model.Buildings)
         {
             <div class="sms-card mb-3">
-                <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-building me-1"></i>@(isRtl ? b.Building.Name.NameAr : b.Building.Name.NameEn)</h2></div>
+                <div class="p-3 border-bottom d-flex align-items-center gap-2"><h2 class="h6 mb-0"><i class="bi bi-building me-1"></i>@(isRtl ? b.Building.Name.NameAr : b.Building.Name.NameEn)</h2>
+                    <span class="ms-auto d-flex gap-1">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditBuilding" asp-route-id="@b.Building.Id" title="@T("Edit building", "تعديل المبنى")"><i class="bi bi-pencil"></i> @T("Edit", "تعديل")</a>
+                        <form method="post" asp-action="DeleteBuilding" asp-route-id="@b.Building.Id" class="d-inline" onsubmit="return confirm('@T("Remove this building?", "حذف هذا المبنى؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@(b.Floors.Count > 0 ? T("Remove its floors first", "احذف طوابقه أولاً") : T("Remove building", "حذف المبنى"))" disabled="@(b.Floors.Count > 0)"><i class="bi bi-trash"></i> @T("Delete", "حذف")</button></form>
+                    </span></div>
                 @foreach (var f in b.Floors)
                 {
-                    <div class="px-3 pt-2 small fw-semibold text-muted"><i class="bi bi-layers me-1"></i>@(isRtl ? f.Floor.Name.NameAr : f.Floor.Name.NameEn)</div>
+                    <div class="px-3 pt-2 small fw-semibold text-muted d-flex align-items-center gap-2"><span><i class="bi bi-layers me-1"></i>@(isRtl ? f.Floor.Name.NameAr : f.Floor.Name.NameEn)</span>
+                        <span class="ms-auto d-flex gap-1">
+                            <a class="btn btn-sm btn-link p-0" asp-action="EditFloor" asp-route-id="@f.Floor.Id" title="@T("Edit floor", "تعديل الطابق")"><i class="bi bi-pencil"></i></a>
+                            <form method="post" asp-action="DeleteFloor" asp-route-id="@f.Floor.Id" class="d-inline" onsubmit="return confirm('@T("Remove this floor?", "حذف هذا الطابق؟")');"><button class="btn btn-sm btn-link text-danger p-0" type="submit" title="@(f.Rooms.Count > 0 ? T("Remove its rooms first", "احذف قاعاته أولاً") : T("Remove floor", "حذف الطابق"))" disabled="@(f.Rooms.Count > 0)"><i class="bi bi-trash"></i></button></form>
+                        </span></div>
                     <div class="table-responsive"><table class="table table-sm sms-table mb-2">
                         <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Room", "القاعة")</th><th>@T("Type", "النوع")</th><th>@T("Std / exam", "عادية / اختبار")</th><th>@T("Wing", "الجناح")</th><th>@T("Features", "التجهيزات")</th><th>@T("Sections", "الشعب")</th><th></th></tr></thead>
-                        <tbody>@foreach (var r in f.Rooms) { <tr class="@(r.Room.IsActive ? "" : "text-muted")"><td><code>@r.Room.Code</code></td><td><a asp-action="Details" asp-route-id="@r.Room.Id" class="fw-semibold">@(isRtl ? r.Room.Name.NameAr : r.Room.Name.NameEn)</a>@if (r.UnavailableNow) { <span class="badge text-bg-warning ms-1">@T("unavailable today", "غير متاحة اليوم")</span> }</td><td>@r.TypeName</td><td>@r.Room.StandardCapacity / @r.Room.ExamCapacity</td><td>@Gender(r.Room.WingTag)</td><td>@foreach (var ft in r.Features) { <span class="badge text-bg-light border me-1">@ft</span> }</td><td>@(r.SectionsUsing?.ToString() ?? "—")</td><td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Room.Id">@T("Open", "فتح")</a></td></tr> }
+                        <tbody>@foreach (var r in f.Rooms) { <tr class="@(r.Room.IsActive ? "" : "text-muted")"><td><code>@r.Room.Code</code></td><td><a asp-action="Details" asp-route-id="@r.Room.Id" class="fw-semibold">@(isRtl ? r.Room.Name.NameAr : r.Room.Name.NameEn)</a>@if (r.UnavailableNow) { <span class="badge text-bg-warning ms-1">@T("unavailable today", "غير متاحة اليوم")</span> }</td><td>@r.TypeName</td><td>@r.Room.StandardCapacity / @r.Room.ExamCapacity</td><td>@Gender(r.Room.WingTag)</td><td>@foreach (var ft in r.Features) { <span class="badge text-bg-light border me-1">@ft</span> }</td><td>@(r.SectionsUsing?.ToString() ?? "—")</td><td class="text-end text-nowrap"><a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Room.Id">@T("Open", "فتح")</a> <a class="btn btn-sm btn-outline-primary" asp-action="EditRoom" asp-route-id="@r.Room.Id" title="@T("Edit room", "تعديل القاعة")"><i class="bi bi-pencil"></i></a> <form method="post" asp-action="DeleteRoom" asp-route-id="@r.Room.Id" class="d-inline" onsubmit="return confirm('@T("Remove this room?", "حذف هذه القاعة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@((r.SectionsUsing ?? 0) > 0 ? T("Sections use this room — reassign them first", "شعب تستخدم هذه القاعة — أعد إسنادها أولاً") : T("Remove room", "حذف القاعة"))" disabled="@((r.SectionsUsing ?? 0) > 0)"><i class="bi bi-trash"></i></button></form></td></tr> }
                         @if (f.Rooms.Count == 0) { <tr><td colspan="8" class="small text-muted text-center py-2">@T("No rooms on this floor.", "لا قاعات في هذا الطابق.")</td></tr> }</tbody>
                     </table></div>
                 }

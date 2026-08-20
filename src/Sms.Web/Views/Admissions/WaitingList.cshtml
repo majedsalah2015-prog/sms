@@ -28,7 +28,7 @@ else
                 <tr class="@(a.Status != Sms.Domain.Admissions.ApplicationStatus.Waitlisted ? "text-muted" : "")">
                     <td class="fw-semibold">@r.Entry.OrderRank</td>
                     <td><a asp-action="Details" asp-route-id="@a.Id">@(isRtl ? $"{a.FirstNameAr} {a.FamilyNameAr}" : $"{a.FirstNameEn} {a.FamilyNameEn}")</a> <code class="small">@a.ApplicationNo</code></td>
-                    <td>@a.Status</td>
+                    <td>@Labels.ApplicationStatus(a.Status, isRtl)</td>
                     <td class="small">@if (r.Entry.OfferedAtUtc == null) { <span class="text-muted">—</span> } else { <text>@T("offered", "عُرض") @r.Entry.OfferedAtUtc?.ToString("yyyy-MM-dd") → @r.Entry.OfferExpiresAtUtc?.ToString("yyyy-MM-dd") @(r.Entry.IsOfferAccepted == true ? "· " + T("accepted", "مقبول") : r.Entry.IsOfferAccepted == false ? "· " + T("declined", "مرفوض") : r.OfferExpired ? "· " + T("expired", "منتهٍ") : "· " + T("pending", "معلّق"))</text> }</td>
                     <td class="text-end text-nowrap">
                         @if (a.Status == Sms.Domain.Admissions.ApplicationStatus.Waitlisted && (r.Entry.OfferedAtUtc == null || r.OfferExpired))
@@ -40,6 +40,8 @@ else
                             <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="true" /><button class="btn btn-sm btn-success" type="submit">@T("Accepted", "قَبِل")</button></form>
                             <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="false" /><button class="btn btn-sm btn-outline-danger" type="submit">@T("Declined", "رفض")</button></form>
                         }
+                        <form method="post" asp-action="RemoveFromWaitlist" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline" onsubmit="return confirm('@T("Remove this applicant from the waiting list?", "إزالة هذا المتقدم من قائمة الانتظار؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove from waiting list", "إزالة من قائمة الانتظار")"><i class="bi bi-trash"></i></button></form>
+
                     </td>
                 </tr>
             }</tbody>

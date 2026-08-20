@@ -319,6 +319,21 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Org));
         }
 
+        [HttpPost("{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id, string? q, EmployeeStatus? status, int? org, bool? teachers)
+        {
+            var e = await _db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (e == null) return NotFound();
+            try
+            {
+                await _employees.DeleteEmployeeAsync(id);
+                TempData["Flash"] = T($"Employee {e.EmployeeNo} deleted.", $"تم حذف الموظف {e.EmployeeNo}.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { q, status, org, teachers });
+        }
+
         [HttpPost("org/{unitId:int}/delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteOrgUnit(int unitId)

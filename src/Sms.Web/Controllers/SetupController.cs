@@ -449,6 +449,129 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Lookups), new { category });
         }
 
+        // ------------------------------------------------------------------
+        // Nationalities (dedicated editor for the "Nationality" lookup list).
+        // The list is product-seeded, but schools need to extend/correct it
+        // (new nationalities, spelling) — so this screen is allowed to edit
+        // it, unlike the generic Lookups screen. Values are still never
+        // deleted (BR-SET-002): deactivate / reactivate only.
+        // ------------------------------------------------------------------
+
+        private const string NationalityCategory = "Nationality";
+
+        [HttpGet("nationalities")]
+        public async Task<IActionResult> Nationalities()
+        {
+            var values = await LookupValuesAsync(NationalityCategory, includeInactive: true);
+            return View(new NationalitiesViewModel { Values = values, NextSortOrder = values.Count == 0 ? 1 : values.Max(v => v.SortOrder) + 1 });
+        }
+
+        [HttpPost("nationalities/save")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveNationality(string? code, string? nameAr, string? nameEn, int? sortOrder)
+        {
+            try
+            {
+                Require(code, T("Code", "الرمز"));
+                Require(nameAr, T("Name (Arabic)", "الاسم بالعربية"));
+                Require(nameEn, T("Name (English)", "الاسم بالإنجليزية"));
+                var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == NationalityCategory);
+                if (cat == null)
+                {
+                    await _lookups.DefineCategoryAsync(NationalityCategory, LookupCategoryTier.ProductSeeded, "الجنسية", "Nationality");
+                }
+
+                await _lookups.DefineValueAsync(NationalityCategory, code!.Trim().ToUpperInvariant(), nameAr!.Trim(), nameEn!.Trim(), sortOrder ?? 0);
+                TempData["Flash"] = T("Nationality saved.", "تم حفظ الجنسية.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Nationalities));
+        }
+
+        [HttpPost("nationalities/{id:int}/deactivate")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeactivateNationality(int id)
+        {
+            try
+            {
+                await _lookups.DeactivateValueAsync(id);
+                TempData["Flash"] = T("Nationality deactivated (kept in historical records).", "تم إلغاء تفعيل الجنسية (تبقى في السجلات التاريخية).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Nationalities));
+        }
+
+        [HttpPost("nationalities/{id:int}/activate")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ActivateNationality(int id)
+        {
+            try
+            {
+                var v = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().SingleAsync(x => x.Id == id);
+                await _lookups.DefineValueAsync(NationalityCategory, v.Code, v.Name.NameAr, v.Name.NameEn, v.SortOrder); // upsert re-activates
+                TempData["Flash"] = T("Nationality reactivated.", "تمت إعادة تفعيل الجنسية.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Nationalities));
+        }
+
+        // ------------------------------------------------------------------
+        // Quick-add from any form (➕ next to a lookup drop-down). Returns JSON so
+        // the page can insert the new option without losing what was typed.
+        // Allowed for school-managed categories plus the product-seeded lists
+        // schools legitimately extend (nationalities, job titles).
+        // ------------------------------------------------------------------
+
+        private static readonly string[] QuickAddSeededAllowlist = { NationalityCategory, "JobTitle" };
+
+        [HttpPost("lookups/quick-add")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> QuickAddLookupValue(string? category, string? code, string? nameAr, string? nameEn)
+        {
+            try
+            {
+                Require(category, T("Category", "الفئة"));
+                Require(nameAr, T("Name (Arabic)", "الاسم بالعربية"));
+                Require(nameEn, T("Name (English)", "الاسم بالإنجليزية"));
+                var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == category);
+                if (cat == null) throw new InvalidOperationException(T("Unknown lookup category.", "فئة غير معروفة."));
+                if (cat.Tier == LookupCategoryTier.ProductSeeded && !QuickAddSeededAllowlist.Contains(cat.Code))
+                {
+                    throw new InvalidOperationException(T("Product-seeded lists are updated by product releases, not by schools (BR-SET-001).", "القوائم المزوَّدة من المنتج تُحدَّث بإصدارات المنتج وليس من المدرسة (BR-SET-001)."));
+                }
+
+                var existing = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().Where(v => v.LookupCategoryId == cat.Id && v.SchoolId == _tenant.SchoolId).ToListAsync();
+                var finalCode = string.IsNullOrWhiteSpace(code) ? GenerateCode(nameEn!, existing.Select(v => v.Code)) : code.Trim().ToUpperInvariant();
+                if (string.IsNullOrWhiteSpace(code) == false && existing.Any(v => v.Code == finalCode))
+                {
+                    throw new InvalidOperationException(T($"Code {finalCode} already exists in this list.", $"الرمز {finalCode} موجود مسبقاً في هذه القائمة."));
+                }
+
+                var sort = existing.Count == 0 ? 1 : existing.Max(v => v.SortOrder) + 1;
+                var value = await _lookups.DefineValueAsync(cat.Code, finalCode, nameAr!.Trim(), nameEn!.Trim(), sort);
+                return Json(new { ok = true, id = value.Id, code = value.Code, ar = value.Name.NameAr, en = value.Name.NameEn });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Json(new { ok = false, error = ex.Message });
+            }
+        }
+
+        private static string GenerateCode(string nameEn, IEnumerable<string> taken)
+        {
+            var baseCode = new string(nameEn.ToUpperInvariant().Where(ch => char.IsLetterOrDigit(ch)).ToArray());
+            if (baseCode.Length == 0) baseCode = "VAL";
+            if (baseCode.Length > 16) baseCode = baseCode.Substring(0, 16);
+            var set = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+            if (!set.Contains(baseCode)) return baseCode;
+            for (var i = 2; i < 1000; i++)
+            {
+                var candidate = baseCode + i;
+                if (!set.Contains(candidate)) return candidate;
+            }
+            return baseCode + Guid.NewGuid().ToString("N").Substring(0, 4).ToUpperInvariant();
+        }
+
         private async Task<LookupsViewModel> BuildLookupsAsync(string? category)
         {
             var categories = await _db.LookupCategories.AsNoTracking().OrderBy(c => c.Tier).ThenBy(c => c.Code).ToListAsync();
@@ -465,12 +588,14 @@ namespace Sms.Web.Controllers
 
         private const string SystemSetupAdminCurrency = "Currency";
 
-        private async Task<IReadOnlyList<LookupValue>> LookupValuesAsync(string categoryCode)
+        private async Task<IReadOnlyList<LookupValue>> LookupValuesAsync(string categoryCode, bool includeInactive = false)
         {
             var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == categoryCode);
-            return cat == null
-                ? Array.Empty<LookupValue>()
-                : await _db.LookupValues.AsNoTracking().Where(v => v.LookupCategoryId == cat.Id).OrderBy(v => v.SortOrder).ToListAsync();
+            if (cat == null) return Array.Empty<LookupValue>();
+            var query = includeInactive
+                ? _db.LookupValues.IgnoreQueryFilters().AsNoTracking().Where(v => v.LookupCategoryId == cat.Id && v.SchoolId == _tenant.SchoolId)
+                : _db.LookupValues.AsNoTracking().Where(v => v.LookupCategoryId == cat.Id);
+            return await query.OrderBy(v => v.SortOrder).ThenBy(v => v.Code).ToListAsync();
         }
 
         private static void Require(string? value, string field)

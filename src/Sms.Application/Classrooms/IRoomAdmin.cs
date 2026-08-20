@@ -20,6 +20,24 @@ namespace Sms.Application.Classrooms
 
         Task<RoomFeature> AddFeatureAsync(int roomId, int featureLookupId, CancellationToken cancellationToken = default);
 
+        Task<Building> UpdateBuildingAsync(int buildingId, string nameAr, string nameEn, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-deletes (deactivates) a building; throws <see cref="Common.Exceptions.RoomInUseException"/> while it still has active floors.</summary>
+        Task DeactivateBuildingAsync(int buildingId, CancellationToken cancellationToken = default);
+
+        Task<Floor> UpdateFloorAsync(int floorId, int buildingId, string nameAr, string nameEn, int sequenceOrder, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-deletes (deactivates) a floor; throws <see cref="Common.Exceptions.RoomInUseException"/> while it still has active rooms.</summary>
+        Task DeactivateFloorAsync(int floorId, CancellationToken cancellationToken = default);
+
+        /// <summary>Edits a room under the same rules as <see cref="DefineRoomAsync"/> (unique code BR-ROM-001, exam ≤ standard capacity BR-ROM-002).</summary>
+        Task<Room> UpdateRoomAsync(
+            int roomId, int floorId, string code, string nameAr, string nameEn, int roomTypeLookupId,
+            int standardCapacity, int examCapacity, GenderPolicy wingTag, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-deletes (deactivates) a room; throws <see cref="Common.Exceptions.RoomInUseException"/> while an active section uses it as default classroom or a future booking exists.</summary>
+        Task DeactivateRoomAsync(int roomId, CancellationToken cancellationToken = default);
+
         /// <summary>BR-ROM-004: records a maintenance/reserved window — the single source of truth for room availability.</summary>
         Task<RoomAvailabilityException> SetUnavailableAsync(
             int roomId, RoomAvailabilityReason reason, DateTime startDate, DateTime endDate, string? notes = null, CancellationToken cancellationToken = default);

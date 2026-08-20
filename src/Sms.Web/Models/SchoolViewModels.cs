@@ -98,6 +98,11 @@ namespace Sms.Web.Models
 
             public int Terms { get; set; }
 
+            /// <summary>Student enrollments in this year; edit/delete are offered only when zero.</summary>
+            public int Enrollments { get; set; }
+
+            public bool CanEditOrDelete => Enrollments == 0;
+
             public RolloverBatch? IncomingBatch { get; set; }
 
             public IReadOnlyList<ChecklistItem> OpeningChecklist { get; set; } = Array.Empty<ChecklistItem>();
@@ -134,6 +139,9 @@ namespace Sms.Web.Models
         public DateTime? StartDate { get; set; }
 
         public DateTime? EndDate { get; set; }
+
+        /// <summary>Optional audit reason for edits (T2 audit — not mandatory).</summary>
+        public string? Reason { get; set; }
 
         public IReadOnlyList<Semester> Semesters { get; set; } = Array.Empty<Semester>();
 

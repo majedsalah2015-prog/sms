@@ -1,0 +1,54 @@
+@using System.Globalization
+@model NationalitiesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Nationalities", "الجنسيات");
+    ViewData["Breadcrumb"] = T("System Setup / Nationalities", "إعداد النظام / الجنسيات");
+    var help = new HelpPanelViewModel { Id = "nat-help", Title = T("Nationalities — help", "الجنسيات — مساعدة"), Intro = T("This list feeds the nationality field on students, parents, applications and employees.", "هذه القائمة تغذي حقل الجنسية في الطلاب وأولياء الأمور والطلبات والموظفين."), Items = new[] { new HelpPanelViewModel.Item(T("Edit", "تعديل"), T("Change the Arabic / English name or the sort order in the row and press Save. The code is the stable key and cannot be changed.", "عدّل الاسم العربي / الإنجليزي أو الترتيب في الصف ثم اضغط حفظ. الرمز هو المفتاح الثابت ولا يُغيَّر.")), new HelpPanelViewModel.Item(T("Add", "إضافة"), T("Use the form at the bottom. Codes are ISO-style (SA, EG, …) and unique.", "استخدم النموذج في الأسفل. الرموز بنمط ISO (SA, EG, …) وفريدة.")), new HelpPanelViewModel.Item(T("Deactivate", "إلغاء التفعيل"), T("Values are never deleted (BR-SET-002); a deactivated nationality disappears from drop-downs but stays on historical records and can be reactivated.", "القيم لا تُحذف (BR-SET-002)؛ الجنسية المعطَّلة تختفي من القوائم المنسدلة لكنها تبقى في السجلات التاريخية ويمكن إعادة تفعيلها.")) } };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Values.Count(v => v.IsActive) @T("active", "فعّالة") · @Model.Values.Count(v => !v.IsActive) @T("inactive", "معطَّلة")</p></div>
+    <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="#nat-add"><i class="bi bi-plus-lg me-1"></i>@T("Add nationality", "إضافة جنسية")</a><partial name="_HelpModal" model="help" /></div></div>
+<partial name="_SetupNav" />
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+        <thead><tr><th style="width:5rem">#</th><th style="width:7rem">@T("Code", "الرمز")</th><th>@T("Arabic name", "الاسم بالعربية")</th><th>@T("English name", "الاسم بالإنجليزية")</th><th style="width:6rem">@T("Active", "فعّال")</th><th class="text-end" style="width:14rem"></th></tr></thead>
+        <tbody>
+        @foreach (var v in Model.Values)
+        {
+            var fid = $"nat-{v.Id}";
+            <tr class="@(v.IsActive ? "" : "table-light text-muted")">
+                <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" value="@v.SortOrder" /></td>
+                <td><code>@v.Code</code><input form="@fid" type="hidden" name="code" value="@v.Code" /></td>
+                <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@v.Name.NameAr" required /></td>
+                <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@v.Name.NameEn" required /></td>
+                <td>@if (v.IsActive) { <span class="badge text-bg-success">@T("Yes", "نعم")</span> } else { <span class="badge text-bg-secondary">@T("No", "لا")</span> }</td>
+                <td class="text-end text-nowrap">
+                    <form id="@fid" method="post" asp-action="SaveNationality" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save changes", "حفظ التعديلات")"><i class="bi bi-check-lg me-1"></i>@T("Save", "حفظ")</button></form>
+                    @if (v.IsActive)
+                    {
+                        <form method="post" asp-action="DeactivateNationality" asp-route-id="@v.Id" class="d-inline" onsubmit="return confirm('@T("Deactivate this nationality? It stays on historical records.", "إلغاء تفعيل هذه الجنسية؟ ستبقى في السجلات التاريخية.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Deactivate", "إلغاء التفعيل")"><i class="bi bi-slash-circle"></i></button></form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="ActivateNationality" asp-route-id="@v.Id" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise"></i></button></form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Values.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-4">@T("No nationalities yet — add the first one below.", "لا توجد جنسيات بعد — أضف الأولى أدناه.")</td></tr> }
+        </tbody>
+    </table></div>
+    <form id="nat-add" method="post" asp-action="SaveNationality" class="p-3 border-top">
+        <div class="small fw-semibold mb-2"><i class="bi bi-plus-lg me-1"></i>@T("Add nationality", "إضافة جنسية")</div>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-2"><label class="form-label small">@T("Code", "الرمز")</label><input name="code" class="form-control form-control-sm" dir="ltr" placeholder="SA" maxlength="10" required /></div>
+            <div class="col-md-4"><label class="form-label small">@T("Arabic name", "الاسم بالعربية")</label><input id="NewNatAr" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="سعودي" required /></div>
+            <div class="col-md-3"><label class="form-label small">@T("English name", "الاسم بالإنجليزية")</label><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Saudi" data-translit-from="#NewNatAr" required /></div>
+            <div class="col-md-1"><label class="form-label small">#</label><input name="sortOrder" class="form-control form-control-sm" type="number" value="@Model.NextSortOrder" /></div>
+            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button></div>
+        </div>
+    </form>
+</div>

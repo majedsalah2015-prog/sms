@@ -1,0 +1,23 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model PersonalTimetableViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var kindLabel = Model.Kind == "teacher" ? T("Teacher week", "أسبوع المعلم") : Model.Kind == "room" ? T("Room schedule", "جدول القاعة") : T("Section timetable", "جدول الشعبة");
+    ViewData["Title"] = $"{kindLabel} — {Model.Title}";
+    ViewData["Breadcrumb"] = T("Timetable / ", "الجدول الدراسي / ") + kindLabel;
+    ViewData["TtYear"] = Model.Year?.Id; ViewData["TtVersion"] = Model.Version?.Id;
+    var backMode = Model.Kind == "teacher" ? "teacher" : Model.Kind == "room" ? "room" : "section";
+}
+
+<div class="sms-page-head d-print-none"><div><h1 class="sms-page-title">@Model.Title</h1><p class="text-muted mb-0">@Model.Subtitle @if (Model.Year != null) { <span>· @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</span> } @if (Model.Version != null) { <span class="badge @TimetableLabels.VersionBadge(Model.Version.Status) ms-1">v@(Model.Version.Id) · @TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span> }</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        @if (Model.Kind == "section") { <a class="btn btn-sm btn-outline-secondary" asp-action="Builder" asp-route-year="@Model.Year?.Id" asp-route-version="@Model.Version?.Id" asp-route-section="@Model.BackId"><i class="bi bi-table me-1"></i>@T("Builder", "المنشئ")</a> }
+        else { <a class="btn btn-sm btn-outline-secondary" asp-action="Builder" asp-route-year="@Model.Year?.Id" asp-route-version="@Model.Version?.Id" asp-route-mode="@backMode" asp-route-teacher="@(Model.Kind == "teacher" ? Model.BackId : null)" asp-route-room="@(Model.Kind == "room" ? Model.BackId : null)"><i class="bi bi-table me-1"></i>@T("Builder", "المنشئ")</a> }
+        <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
+    </div></div>
+<div class="d-none d-print-block mb-2"><h1 class="h4 mb-0">@Model.Title</h1><div class="small">@Model.Subtitle · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelEn : Model.Year.LabelAr)</div></div>
+@if (!Model.Print) { <partial name="_TimetableNav" /> }
+
+<partial name="_TimetableWeekGrid" model="Model" />

@@ -24,5 +24,11 @@ namespace Sms.Application.Teachers
 
         /// <summary>BR-TCH-007: closes a current assignment (history kept) so the offering×section can be re-pointed to another teacher. Idempotent on an already-closed row.</summary>
         Task EndAssignmentAsync(int teacherAssignmentId, DateTime effectiveToUtc, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Removes a teacher designation: deletes the TeacherProfile and all its teaching assignments; the employee
+        /// record stays. Refused (InvalidOperationException) while timetable placements or substitutions reference it.
+        /// </summary>
+        Task RemoveDesignationAsync(int teacherProfileId, CancellationToken cancellationToken = default);
     }
 }

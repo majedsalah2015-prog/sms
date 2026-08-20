@@ -38,6 +38,18 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// Editing/deleting an academic year is only allowed while no student is
+    /// enrolled in it (and, for delete, while no other module data references it).
+    /// </summary>
+    public class AcademicYearInUseException : InvalidOperationException
+    {
+        public AcademicYearInUseException(string reason)
+            : base($"Academic year is in use: {reason}.")
+        {
+        }
+    }
 }
 
 namespace Sms.Application.Common.Exceptions

@@ -56,5 +56,13 @@ namespace Sms.Application.Employees
 
         /// <summary>Hard-deletes an org unit that has no child units and no assignment history.</summary>
         Task DeleteOrgUnitAsync(int orgUnitId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Hard-deletes an employee with its contracts, position assignments, qualifications and (if designated)
+        /// the teacher profile + teaching assignments. Refused (InvalidOperationException) while timetable
+        /// placements / substitutions, activity supervision, transport staffing or "manager of" links still
+        /// reference the employee.
+        /// </summary>
+        Task DeleteEmployeeAsync(int employeeId, CancellationToken cancellationToken = default);
     }
 }

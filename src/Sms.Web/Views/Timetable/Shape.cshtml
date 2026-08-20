@@ -1,0 +1,101 @@
+@using System.Globalization
+@model ShapeDesignerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Timetable shape designer", "مصمم شكل الجدول");
+    ViewData["Breadcrumb"] = T("Timetable / Shape designer", "الجدول الدراسي / مصمم الشكل");
+    ViewData["TtYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id; var sid = Model.Stage?.Stage.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "shape-help", Title = T("Shape designer — help", "مصمم الشكل — مساعدة"),
+        Intro = T("One shape per stage per year (BR-TTB-001): the working days and the period slots of each day with times. Breaks/assembly are non-teaching slots. A short day (e.g. Friday) is simply a day with fewer slots — day-level templates are built in (doc §14 Q3).", "شكل واحد لكل مرحلة في كل عام (BR-TTB-001): أيام العمل وحصص كل يوم بأوقاتها. الفسح/الطابور حصص غير تدريسية. اليوم القصير (مثل الجمعة) هو ببساطة يوم بحصص أقل — قوالب اليوم مدمجة (الوثيقة §14 س3)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Add slot", "إضافة حصة"), T("Sequence is the row number in the grid; tick “all working days” to stamp the same slot across the week, then trim days individually. Overlapping times or a taken sequence are skipped.", "الترتيب هو رقم الصف في الشبكة؛ علّم «كل أيام العمل» لختم الحصة نفسها عبر الأسبوع ثم قلّم الأيام فردياً. تُتخطى الأوقات المتداخلة أو الترتيب المستخدم.")),
+            new HelpPanelViewModel.Item(T("Locked slots 🔒", "حصص مقفلة 🔒"), T("A slot already referenced by placements cannot be removed — remove the placements first. Shape changes after publication should go through a new version (amendment flow, BR-TTB-001/009).", "لا يمكن حذف حصة تشير إليها مواضع — أزل المواضع أولاً. تغييرات الشكل بعد النشر تمر بإصدار جديد (مسار التعديل، BR-TTB-001/009).")),
+            new HelpPanelViewModel.Item(T("Working days", "أيام العمل"), T("Come from System Setup → Regional.WorkingDays (BR-CAL); the grid shows them first and any extra day that already has slots.", "من إعداد النظام → Regional.WorkingDays (BR-CAL)؛ تعرض الشبكة أولاً أيام العمل ثم أي يوم إضافي له حصص.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Periods and times per stage, with a visual day template.", "الحصص والأوقات لكل مرحلة مع قالب يوم مرئي.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="stage" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var s in Model.Stages) { <option value="@s.Stage.Id" selected="@(s.Stage.Id == sid)">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn) @(s.Shape == null ? T("(no shape)", "(بلا شكل)") : $"({s.SlotCount})")</option> }</select>
+        </form>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.") </div> }
+else if (Model.Stage == null) { <div class="alert alert-info">@T("Define stages first (Grades → Stages).", "عرّف المراحل أولاً (الصفوف → المراحل).")</div> }
+else if (Model.Stage.Shape == null)
+{
+    <div class="sms-card p-4 text-center">
+        <p class="mb-3">@T("No timetable shape for", "لا شكل جدول لـ") <strong>@(isRtl ? Model.Stage.Stage.Name.NameAr : Model.Stage.Stage.Name.NameEn)</strong> · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</p>
+        <form method="post" asp-action="DefineShape" asp-route-year="@yid"><input type="hidden" name="stageId" value="@sid" /><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create shape (BR-TTB-001)", "إنشاء الشكل (BR-TTB-001)")</button></form>
+    </div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-9">
+            <div class="sms-card">
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="h6 mb-0">@(isRtl ? Model.Stage.Stage.Name.NameAr : Model.Stage.Stage.Name.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) <span class="text-muted small">· @Model.Slots.Count @T("slots", "حصة")</span></h2>
+                    <form method="post" asp-action="CopyDay" asp-route-shapeId="@Model.Stage.Shape.Id" asp-route-year="@yid" asp-route-stage="@sid" class="d-flex gap-1 align-items-center">
+                        <span class="small text-muted">@T("Copy day", "نسخ يوم")</span>
+                        <select name="fromDay" class="form-select form-select-sm" style="width:8rem">@foreach (var d in Model.Days) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
+                        <i class="bi @(isRtl ? "bi-arrow-left" : "bi-arrow-right")"></i>
+                        <select name="toDay" class="form-select form-select-sm" style="width:8rem">@foreach (var d in Enum.GetValues<DayOfWeek>()) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-files"></i></button>
+                    </form>
+                </div>
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle text-center">
+                    <thead><tr><th style="width:4rem">#</th>@foreach (var d in Model.Days) { <th class="@(Model.WorkingDays.Contains(d) ? "" : "text-muted")">@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@Model.SequencesFor(d) @T("slots", "حصة")</div></th> }</tr></thead>
+                    <tbody>
+                    @foreach (var seq in Model.Sequences)
+                    {
+                        <tr><th class="text-muted">@seq</th>
+                        @foreach (var d in Model.Days)
+                        {
+                            var s = Model.Slot(d, seq);
+                            <td class="@(s == null ? "" : s.IsBreak ? "table-light" : "")">
+                                @if (s == null) { <span class="text-muted">·</span> }
+                                else
+                                {
+                                    var locked = Model.SlotsInUse.Contains(s.Id);
+                                    <div class="small @(s.IsBreak ? "text-muted fst-italic" : "")">@TimetableLabels.Span(s)@if (s.IsBreak) { <span> · @T("break", "فسحة")</span> }</div>
+                                    @if (locked) { <span class="small text-muted" title="@T("referenced by placements", "تشير إليها مواضع")">🔒</span> }
+                                    else { <form method="post" asp-action="RemoveSlot" asp-route-slotId="@s.Id" asp-route-year="@yid" asp-route-stage="@sid" class="d-inline"><button class="btn btn-link btn-sm p-0 text-danger" type="submit" title="@T("Remove slot", "حذف الحصة")"><i class="bi bi-x"></i></button></form> }
+                                }
+                            </td>
+                        }
+                        </tr>
+                    }
+                    @if (Model.Slots.Count == 0) { <tr><td colspan="@(Model.Days.Count + 1)" class="text-muted py-4">@T("No slots yet — add the first period on the right.", "لا حصص بعد — أضف الحصة الأولى من اليمين.")</td></tr> }
+                    </tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-3">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("Add period slot", "إضافة حصة")</h2>
+                <form method="post" asp-action="AddSlot" asp-route-shapeId="@Model.Stage.Shape.Id" asp-route-year="@yid" asp-route-stage="@sid">
+                    <div class="mb-2"><label class="form-label small">@T("Day", "اليوم")</label><select name="day" class="form-select form-select-sm">@foreach (var d in Model.Days) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
+                        <div class="form-check mt-1"><input class="form-check-input" type="checkbox" name="allWorkingDays" value="true" id="awd" /><label class="form-check-label small" for="awd">@T("all working days", "كل أيام العمل")</label></div></div>
+                    <div class="mb-2"><label class="form-label small">@T("Sequence", "الترتيب")</label><input name="sequence" type="number" min="1" class="form-control form-control-sm" value="@(Model.MaxSequence + 1)" /></div>
+                    <div class="row g-1 mb-2"><div class="col"><label class="form-label small">@T("Start", "البداية")</label><input name="start" type="time" class="form-control form-control-sm" value="07:30" /></div><div class="col"><label class="form-label small">@T("End", "النهاية")</label><input name="end" type="time" class="form-control form-control-sm" value="08:15" /></div></div>
+                    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="isBreak" value="true" id="isb" /><label class="form-check-label small" for="isb">@T("Break / assembly (non-teaching)", "فسحة / طابور (غير تدريسية)")</label></div>
+                    <button class="btn btn-primary btn-sm w-100" type="submit">@T("Add", "إضافة")</button>
+                </form>
+            </div>
+            <div class="sms-card p-3 mt-3">
+                <h2 class="h6 mb-2">@T("Stages this year", "مراحل هذا العام")</h2>
+                <ul class="list-unstyled small mb-0">@foreach (var s in Model.Stages) { <li class="d-flex justify-content-between"><a asp-action="Shape" asp-route-year="@yid" asp-route-stage="@s.Stage.Id">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</a><span class="@(s.Shape == null ? "text-danger" : "text-muted")">@(s.Shape == null ? T("no shape", "بلا شكل") : $"{s.SlotCount} " + T("slots", "حصة"))</span></li> }</ul>
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,71 @@
+@using System.Globalization
+@using Sms.Domain.Payments
+@model PdcRegistryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("PDC registry", "سجل الشيكات الآجلة");
+    ViewData["Breadcrumb"] = T("Payments / PDC registry", "المدفوعات / الشيكات الآجلة");
+    string Badge(PdcStatus s) => s switch { PdcStatus.Cleared => "text-bg-success", PdcStatus.Bounced => "text-bg-danger", PdcStatus.Deposited => "text-bg-primary", PdcStatus.Due => "text-bg-warning", PdcStatus.Settled or PdcStatus.Replaced => "text-bg-secondary", _ => "text-bg-light border" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "pdc-help", Title = T("PDC registry — help", "سجل الشيكات — مساعدة"),
+        Intro = T("Lifecycle: Lodged → Due → Deposited → Cleared (issues a receipt and allocates it) or Bounced → Replaced / Settled (BR-PAY-004). Cheques are not payments until cleared.", "دورة الحياة: مودَع ← مستحق ← أُودع بالبنك ← مُحصَّل (يصدر سنداً ويُخصّص) أو مرتجع ← مستبدَل / مسوّى (BR-PAY-004). الشيك ليس دفعة حتى يُحصَّل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Due this week", "مستحق هذا الأسبوع"), T("Highlighted amber; overdue (date passed, not yet deposited) in red.", "مظلَّل بالكهرماني؛ المتأخر (مرّ تاريخه ولم يودَع) بالأحمر.")),
+            new HelpPanelViewModel.Item(T("Bounce", "الارتجاع"), T("Un-covers the installments the cheque suppressed dunning for (BR-INS-009); bounce fees are Module 19 policy, not auto-posted.", "يرفع التغطية عن الأقساط التي كان الشيك يوقف تذكيرها (BR-INS-009)؛ رسوم الارتجاع سياسة الوحدة 19 ولا تُرحَّل تلقائياً.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Lifecycle board for post-dated cheques.", "لوحة دورة حياة الشيكات الآجلة.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_FinanceNav" />
+
+<div class="d-flex flex-wrap gap-1 mb-3">
+    <a class="btn btn-sm @(Model.Filter == null ? "btn-primary" : "btn-outline-secondary")" asp-action="Pdc">@T("All", "الكل") <span class="badge text-bg-light border ms-1">@Model.Counts.Values.Sum()</span></a>
+    @foreach (var s in Enum.GetValues<PdcStatus>()) { <a class="btn btn-sm @(Model.Filter == s ? "btn-primary" : "btn-outline-secondary")" asp-action="Pdc" asp-route-status="@s">@FinanceLabels.PdcStatus(s, isRtl) <span class="badge text-bg-light border ms-1">@Model.Counts.GetValueOrDefault(s)</span></a> }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <thead><tr><th>@T("Cheque", "الشيك")</th><th>@T("Bank", "البنك")</th><th>@T("Payer", "الدافع")</th><th>@T("Cheque date", "تاريخ الشيك")</th><th class="text-end">@T("Amount", "المبلغ")</th><th>@T("Status", "الحالة")</th><th>@T("Actions", "الإجراءات")</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var p = r.Pdc;
+                    <tr class="@(r.Overdue ? "table-danger" : r.DueThisWeek ? "table-warning" : "")">
+                        <td><code>@p.ChequeNo</code></td><td>@p.BankName</td><td>@FinanceLabels.ParentName(r.Payer, isRtl)</td>
+                        <td class="text-nowrap">@p.ChequeDate.ToString("yyyy-MM-dd") @if (r.Overdue) { <span class="badge text-bg-danger ms-1">@T("overdue", "متأخر")</span> } else if (r.DueThisWeek) { <span class="badge text-bg-warning ms-1">@T("this week", "هذا الأسبوع")</span> }</td>
+                        <td class="text-end fw-semibold">@p.Amount.ToString("N2")</td>
+                        <td><span class="badge @Badge(p.Status)">@FinanceLabels.PdcStatus(p.Status, isRtl)</span> @if (p.ClearedReceiptId != null) { <a class="small" asp-action="Receipt" asp-route-id="@p.ClearedReceiptId">@T("receipt", "السند")</a> }</td>
+                        <td class="text-nowrap">
+                            @foreach (var next in r.Next)
+                            {
+                                <form method="post" asp-action="PdcStatusChange" asp-route-id="@p.Id" asp-route-filter="@Model.Filter" class="d-inline" onsubmit="return confirm('@T($"Mark cheque {p.ChequeNo} as {FinanceLabels.PdcStatus(next, false)}?", $"تحويل الشيك {p.ChequeNo} إلى {FinanceLabels.PdcStatus(next, true)}؟")');"><input type="hidden" name="target" value="@next" /><button class="btn btn-sm @(next == PdcStatus.Bounced ? "btn-outline-danger" : next == PdcStatus.Cleared ? "btn-outline-success" : "btn-outline-primary")" type="submit">@FinanceLabels.PdcStatus(next, isRtl)</button></form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No cheques in this view.", "لا شيكات في هذا العرض.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-2"><i class="bi bi-plus-circle me-1"></i>@T("Lodge a cheque", "تسجيل شيك")</h2>
+            <form method="post" asp-action="LodgePdc" class="d-grid gap-2">
+                <select name="payerId" class="form-select form-select-sm" required><option value="">@T("Payer", "الدافع")</option>@foreach (var p in Model.Payers) { <option value="@p.Payer.Id">@FinanceLabels.ParentName(p.Parent, isRtl) · @p.Parent?.ParentFileNo</option> }</select>
+                <input name="bankName" class="form-control form-control-sm" placeholder="@T("Bank", "البنك")" required />
+                <input name="chequeNo" class="form-control form-control-sm" placeholder="@T("Cheque no.", "رقم الشيك")" required />
+                <input name="chequeDate" type="date" class="form-control form-control-sm" value="@Model.Today.ToString("yyyy-MM-dd")" required />
+                <div class="input-group input-group-sm"><span class="input-group-text">@T("Amount", "المبلغ")</span><input name="amount" type="number" step="0.01" min="0.01" class="form-control text-end" required /></div>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-calendar-plus me-1"></i>@T("Lodge", "تسجيل")</button>
+            </form>
+            <div class="small text-muted mt-2">@T("Lodging a PDC does not reduce the payer's balance — the receipt is issued on clearance.", "تسجيل الشيك لا يخفّض رصيد الدافع — يصدر السند عند التحصيل.")</div>
+        </div>
+    </div>
+</div>

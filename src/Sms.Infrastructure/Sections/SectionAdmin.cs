@@ -60,6 +60,71 @@ namespace Sms.Infrastructure.Sections
             return section;
         }
 
+        public async Task<Section> UpdateSectionAsync(
+            int sectionId, string nameAr, string nameEn, int capacity, GenderPolicy genderPolicy,
+            int? defaultClassroomId = null, CancellationToken cancellationToken = default)
+        {
+            var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);
+            var profile = await _db.GradeYearProfiles.SingleAsync(p => p.Id == section.GradeYearProfileId, cancellationToken);
+
+            if (!SectionCapacityGuard.WithinGradePlan(capacity, profile.TargetSectionSize))
+            {
+                throw new SectionCapacityPlanExceededException(capacity, profile.TargetSectionSize);
+            }
+
+            if (!GenderPolicyNarrowing.IsValidNarrowing(profile.GenderPolicy, genderPolicy))
+            {
+                throw new InvalidSectionGenderPolicyException(profile.GenderPolicy, genderPolicy);
+            }
+
+            var currentCount = await _db.SectionMemberships.CountAsync(m => m.SectionId == sectionId && m.EffectiveToUtc == null, cancellationToken);
+            if (capacity < currentCount)
+            {
+                throw new SectionInUseException(sectionId, $"capacity {capacity} is below the {currentCount} currently assigned student(s)");
+            }
+
+            var nameTaken = await _db.Sections.AnyAsync(
+                s => s.GradeYearProfileId == section.GradeYearProfileId && s.NameEn == nameEn && s.Id != sectionId, cancellationToken);
+            if (nameTaken)
+            {
+                throw new DuplicateSectionNameException(nameEn);
+            }
+
+            section.NameAr = nameAr;
+            section.NameEn = nameEn;
+            section.Capacity = capacity;
+            section.GenderPolicy = genderPolicy;
+            section.DefaultClassroomId = defaultClassroomId;
+            await _db.SaveChangesAsync(cancellationToken);
+            return section;
+        }
+
+        public async Task DeleteSectionAsync(int sectionId, CancellationToken cancellationToken = default)
+        {
+            var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);
+            var memberships = await _db.SectionMemberships.CountAsync(m => m.SectionId == sectionId, cancellationToken);
+            if (memberships > 0)
+            {
+                throw new SectionInUseException(sectionId, $"{memberships} membership record(s) exist — close the section instead (BR-SCN-007)");
+            }
+
+            var homerooms = await _db.HomeroomAssignments.CountAsync(h => h.SectionId == sectionId, cancellationToken);
+            if (homerooms > 0)
+            {
+                throw new SectionInUseException(sectionId, $"{homerooms} homeroom assignment(s) exist — close the section instead");
+            }
+
+            _db.Sections.Remove(section);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new SectionInUseException(sectionId, "other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ")");
+            }
+        }
+
         public async Task<HomeroomAssignment> AssignHomeroomTeacherAsync(
             int sectionId, int teacherUserId, DateTime effectiveFromUtc, CancellationToken cancellationToken = default)
         {

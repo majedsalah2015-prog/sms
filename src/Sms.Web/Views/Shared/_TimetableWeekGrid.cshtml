@@ -1,0 +1,53 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model PersonalTimetableViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+}
+@if (Model.Version == null) { <div class="alert alert-info">@T("No published timetable version for this year yet (BR-TTB-002).", "لا إصدار جدول منشور لهذا العام بعد (BR-TTB-002).")</div> }
+else if (Model.Sequences.Count == 0) { <div class="alert alert-info">@T("No timetable shape / placements to show.", "لا شكل جدول أو مواضع للعرض.")</div> }
+else
+{
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table table-sm table-bordered sms-table mb-0 align-top text-center" style="table-layout:fixed">
+            <thead><tr><th style="width:3rem">#</th>@foreach (var d in Model.Days) { <th>@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@TimetableLabels.Day(d, !isRtl)</div></th> }</tr></thead>
+            <tbody>
+            @foreach (var seq in Model.Sequences)
+            {
+                <tr><th class="text-muted small">@seq</th>
+                @foreach (var d in Model.Days)
+                {
+                    var slot = Model.Slots.GetValueOrDefault((d, seq));
+                    var cells = Model.Cells.GetValueOrDefault((d, seq)) ?? Array.Empty<PlacementCell>();
+                    if (slot == null)
+                    {
+                        <td class="bg-light"></td>
+                        continue;
+                    }
+                    <td class="@(slot.IsBreak ? "table-light" : "") p-1 small">
+                        <div class="text-muted" style="font-size:.75rem">@TimetableLabels.Span(slot)</div>
+                        @if (slot.IsBreak && cells.Count == 0) { <div class="fst-italic text-muted">@T("break", "فسحة")</div> }
+                        @foreach (var c in cells)
+                        {
+                            var s = Model.WeekSessions.GetValueOrDefault(c.Placement.Id);
+                            var room = s?.OverrideRoomId != null ? Model.Rooms.GetValueOrDefault(s.OverrideRoomId.Value) : c.Room;
+                            var sub = s == null ? null : Model.Substitutes.GetValueOrDefault(s.Id);
+                            <div class="mb-1 @(s?.Status == SessionStatus.Cancelled ? "text-decoration-line-through text-muted" : "")">
+                                <div class="fw-semibold">@(Model.Kind == "section" ? TimetableLabels.SubjectName(c.Subject, isRtl) : TimetableLabels.SectionName(c.Section, isRtl))</div>
+                                @if (Model.Kind == "section") { <div>@(isRtl ? c.Subject.Name.NameEn : c.Subject.Name.NameAr)</div> }
+                                @if (Model.Kind != "teacher") { <div>@(sub != null ? Teacher(sub) + " ↔ " : "")@Teacher(c.Teacher)</div> } else if (sub != null) { <div class="text-warning">↔ @Teacher(sub)</div> }
+                                @if (Model.Kind != "room") { <div class="text-muted">@(room?.Code ?? "—")@(s?.Status == SessionStatus.RoomChanged ? " ⚠" : "")</div> } else { <div class="text-muted"><code>@c.Subject.Code</code></div> }
+                                @if (s != null && s.Status != SessionStatus.Held) { <span class="badge @TimetableLabels.SessionBadge(s.Status)" style="font-size:.65rem">@TimetableLabels.SessionStatus(s.Status, isRtl) · @s.Date.ToString("MM-dd")</span> }
+                            </div>
+                        }
+                    </td>
+                }
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <div class="p-2 form-text d-print-none">@T("Weekly pattern of the operational version; badges show this week's dated changes (substitution / room change / cancellation) — BR-TTB-007/008.", "النمط الأسبوعي للإصدار المُشغَّل؛ الشارات تُظهر تغييرات هذا الأسبوع المؤرخة (تعويض / تغيير قاعة / إلغاء) — BR-TTB-007/008.") @T("Week of", "أسبوع") @Model.WeekStart.ToString("yyyy-MM-dd").</div>
+    </div>
+}

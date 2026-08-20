@@ -148,6 +148,14 @@ namespace Sms.Web.Models
     }
 
     /// <summary>doc/Modules/01 §8.2 Lookup management.</summary>
+    /// <summary>Dedicated Nationality list editor (values of lookup category "Nationality").</summary>
+    public sealed class NationalitiesViewModel
+    {
+        public IReadOnlyList<LookupValue> Values { get; set; } = Array.Empty<LookupValue>();
+
+        public int NextSortOrder { get; set; }
+    }
+
     public sealed class LookupsViewModel
     {
         public IReadOnlyList<LookupCategory> Categories { get; set; } = Array.Empty<LookupCategory>();

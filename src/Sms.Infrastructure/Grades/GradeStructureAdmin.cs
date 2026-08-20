@@ -63,6 +63,120 @@ namespace Sms.Infrastructure.Grades
             return grade;
         }
 
+        public async Task<Stage> UpdateStageAsync(int stageId, string nameAr, string nameEn, int sequenceOrder, GenderPolicy defaultGenderPolicy, CancellationToken cancellationToken = default)
+        {
+            var stage = await _db.Stages.SingleAsync(s => s.Id == stageId, cancellationToken);
+            if (stage.DefaultGenderPolicy != defaultGenderPolicy)
+            {
+                // Every existing profile of this stage's grades must remain a valid narrowing (BR-GRD-004).
+                var gradeIds = await _db.GradeLevels.Where(g => g.StageId == stageId).Select(g => g.Id).ToListAsync(cancellationToken);
+                var policies = await _db.GradeYearProfiles.AsNoTracking().Where(p => gradeIds.Contains(p.GradeLevelId) && p.IsActive).Select(p => p.GenderPolicy).Distinct().ToListAsync(cancellationToken);
+                var offending = policies.Where(p => !GenderPolicyNarrowing.IsValidNarrowing(defaultGenderPolicy, p)).ToList();
+                if (offending.Count > 0)
+                {
+                    throw new InvalidGenderPolicyNarrowingException(defaultGenderPolicy, offending[0]);
+                }
+            }
+
+            stage.Name = new LocalizedName(nameAr, nameEn);
+            stage.SequenceOrder = sequenceOrder;
+            stage.DefaultGenderPolicy = defaultGenderPolicy;
+            await _db.SaveChangesAsync(cancellationToken);
+            return stage;
+        }
+
+        public async Task DeactivateStageAsync(int stageId, CancellationToken cancellationToken = default)
+        {
+            var stage = await _db.Stages.SingleAsync(s => s.Id == stageId, cancellationToken);
+            var grades = await _db.GradeLevels.CountAsync(g => g.StageId == stageId, cancellationToken);
+            if (grades > 0)
+            {
+                throw new GradeStructureInUseException($"stage still has {grades} active grade level(s)");
+            }
+
+            stage.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<GradeLevel> UpdateGradeLevelAsync(int gradeLevelId, int stageId, string code, string nameAr, string nameEn, int sequenceOrder, CancellationToken cancellationToken = default)
+        {
+            var grade = await _db.GradeLevels.SingleAsync(g => g.Id == gradeLevelId, cancellationToken);
+            if (await _db.GradeLevels.AnyAsync(g => g.Code == code && g.Id != gradeLevelId, cancellationToken))
+            {
+                throw new DuplicateGradeCodeException(code);
+            }
+
+            if (grade.StageId != stageId)
+            {
+                // Moving to another stage: its profiles must still narrow the new stage's default (BR-GRD-004).
+                var stage = await _db.Stages.SingleAsync(s => s.Id == stageId, cancellationToken);
+                var policies = await _db.GradeYearProfiles.AsNoTracking().Where(p => p.GradeLevelId == gradeLevelId && p.IsActive).Select(p => p.GenderPolicy).Distinct().ToListAsync(cancellationToken);
+                var offending = policies.Where(p => !GenderPolicyNarrowing.IsValidNarrowing(stage.DefaultGenderPolicy, p)).ToList();
+                if (offending.Count > 0)
+                {
+                    throw new InvalidGenderPolicyNarrowingException(stage.DefaultGenderPolicy, offending[0]);
+                }
+            }
+
+            grade.StageId = stageId;
+            grade.Code = code;
+            grade.Name = new LocalizedName(nameAr, nameEn);
+            grade.SequenceOrder = sequenceOrder;
+            await _db.SaveChangesAsync(cancellationToken);
+            return grade;
+        }
+
+        public async Task DeactivateGradeLevelAsync(int gradeLevelId, CancellationToken cancellationToken = default)
+        {
+            var grade = await _db.GradeLevels.SingleAsync(g => g.Id == gradeLevelId, cancellationToken);
+            var profileIds = await _db.GradeYearProfiles.Where(p => p.GradeLevelId == gradeLevelId).Select(p => p.Id).ToListAsync(cancellationToken);
+
+            var enrollments = await _db.Enrollments.CountAsync(e => profileIds.Contains(e.GradeYearProfileId), cancellationToken);
+            if (enrollments > 0)
+            {
+                throw new GradeStructureInUseException($"{enrollments} enrollment(s) exist for this grade");
+            }
+
+            var sections = await _db.Sections.CountAsync(s => profileIds.Contains(s.GradeYearProfileId), cancellationToken);
+            if (sections > 0)
+            {
+                throw new GradeStructureInUseException($"{sections} section(s) exist for this grade");
+            }
+
+            var feeders = await _db.GradeLevels.Where(g => g.PromotionTargetGradeLevelId == gradeLevelId).Select(g => g.Code).ToListAsync(cancellationToken);
+            if (feeders.Count > 0)
+            {
+                throw new GradeStructureInUseException($"grade(s) {string.Join(", ", feeders)} promote into it — change their promotion path first (BR-GRD-002)");
+            }
+
+            foreach (var p in await _db.GradeYearProfiles.Where(p => profileIds.Contains(p.Id)).ToListAsync(cancellationToken))
+            {
+                p.IsActive = false;
+            }
+
+            grade.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task RemoveGradeYearProfileAsync(int gradeYearProfileId, CancellationToken cancellationToken = default)
+        {
+            var profile = await _db.GradeYearProfiles.SingleAsync(p => p.Id == gradeYearProfileId, cancellationToken);
+            var enrollments = await _db.Enrollments.CountAsync(e => e.GradeYearProfileId == gradeYearProfileId, cancellationToken);
+            if (enrollments > 0)
+            {
+                throw new GradeStructureInUseException($"{enrollments} enrollment(s) exist for this grade-year profile");
+            }
+
+            var sections = await _db.Sections.CountAsync(s => s.GradeYearProfileId == gradeYearProfileId, cancellationToken);
+            if (sections > 0)
+            {
+                throw new GradeStructureInUseException($"{sections} section(s) exist for this grade-year profile");
+            }
+
+            profile.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task SetPromotionPathAsync(int gradeLevelId, int? promotionTargetGradeLevelId, bool isGraduating, CancellationToken cancellationToken = default)
         {
             var grade = await _db.GradeLevels.SingleAsync(g => g.Id == gradeLevelId, cancellationToken);

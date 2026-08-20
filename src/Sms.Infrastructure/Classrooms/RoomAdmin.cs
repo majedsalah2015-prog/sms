@@ -80,6 +80,89 @@ namespace Sms.Infrastructure.Classrooms
             return feature;
         }
 
+        public async Task<Building> UpdateBuildingAsync(int buildingId, string nameAr, string nameEn, CancellationToken cancellationToken = default)
+        {
+            var building = await _db.Buildings.SingleAsync(b => b.Id == buildingId, cancellationToken);
+            building.Name = new LocalizedName(nameAr, nameEn);
+            await _db.SaveChangesAsync(cancellationToken);
+            return building;
+        }
+
+        public async Task DeactivateBuildingAsync(int buildingId, CancellationToken cancellationToken = default)
+        {
+            var building = await _db.Buildings.SingleAsync(b => b.Id == buildingId, cancellationToken);
+            var floors = await _db.Floors.CountAsync(f => f.BuildingId == buildingId, cancellationToken);
+            if (floors > 0)
+            {
+                throw new RoomInUseException($"building still has {floors} active floor(s)");
+            }
+
+            building.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<Floor> UpdateFloorAsync(int floorId, int buildingId, string nameAr, string nameEn, int sequenceOrder, CancellationToken cancellationToken = default)
+        {
+            var floor = await _db.Floors.SingleAsync(f => f.Id == floorId, cancellationToken);
+            floor.BuildingId = buildingId;
+            floor.Name = new LocalizedName(nameAr, nameEn);
+            floor.SequenceOrder = sequenceOrder;
+            await _db.SaveChangesAsync(cancellationToken);
+            return floor;
+        }
+
+        public async Task DeactivateFloorAsync(int floorId, CancellationToken cancellationToken = default)
+        {
+            var floor = await _db.Floors.SingleAsync(f => f.Id == floorId, cancellationToken);
+            var rooms = await _db.Rooms.CountAsync(r => r.FloorId == floorId, cancellationToken);
+            if (rooms > 0)
+            {
+                throw new RoomInUseException($"floor still has {rooms} active room(s)");
+            }
+
+            floor.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<Room> UpdateRoomAsync(
+            int roomId, int floorId, string code, string nameAr, string nameEn, int roomTypeLookupId,
+            int standardCapacity, int examCapacity, GenderPolicy wingTag, CancellationToken cancellationToken = default)
+        {
+            var room = await _db.Rooms.SingleAsync(r => r.Id == roomId, cancellationToken);
+            if (!RoomCapacityValidator.IsValidCapacity(standardCapacity, examCapacity))
+            {
+                throw new InvalidRoomCapacityException();
+            }
+
+            if (await _db.Rooms.AnyAsync(r => r.Code == code && r.Id != roomId, cancellationToken))
+            {
+                throw new DuplicateRoomCodeException(code);
+            }
+
+            room.FloorId = floorId;
+            room.Code = code;
+            room.Name = new LocalizedName(nameAr, nameEn);
+            room.RoomTypeLookupId = roomTypeLookupId;
+            room.StandardCapacity = standardCapacity;
+            room.ExamCapacity = examCapacity;
+            room.WingTag = wingTag;
+            await _db.SaveChangesAsync(cancellationToken);
+            return room;
+        }
+
+        public async Task DeactivateRoomAsync(int roomId, CancellationToken cancellationToken = default)
+        {
+            var room = await _db.Rooms.SingleAsync(r => r.Id == roomId, cancellationToken);
+            var sections = await _db.Sections.CountAsync(s => s.DefaultClassroomId == roomId && s.Status == Sms.Domain.Sections.SectionStatus.Active, cancellationToken);
+            if (sections > 0)
+            {
+                throw new RoomInUseException($"{sections} active section(s) use room '{room.Code}' as their default classroom — reassign them first");
+            }
+
+            room.IsActive = false;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<RoomAvailabilityException> SetUnavailableAsync(
             int roomId, RoomAvailabilityReason reason, DateTime startDate, DateTime endDate, string? notes = null, CancellationToken cancellationToken = default)
         {

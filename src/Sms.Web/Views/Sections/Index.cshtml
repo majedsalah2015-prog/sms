@@ -8,10 +8,27 @@
     ViewData["Breadcrumb"] = T("Sections / List", "الشعب / القائمة");
     string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
     var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "sections-help",
+        Title = T("Sections — help", "الشعب — مساعدة"),
+        Intro = T("A section is a class group inside a grade for one academic year. This list shows every section of the selected year with its capacity meter, gender policy, homeroom teacher and room.", "الشعبة هي مجموعة صفية داخل صف لعام دراسي واحد. تعرض هذه القائمة شعب العام المختار مع مقياس السعة وسياسة الجنس ورائد الفصل والقاعة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Create a section", "إنشاء شعبة"), T("Pick the grade (its grade-year profile must exist — Grades → Profile), give Arabic/English names, capacity and gender. Capacity can't exceed the grade plan's section size (BR-SCN-001) and gender may only narrow the grade's policy (BR-SCN-002/003).", "اختر الصف (يجب أن يكون ملفه السنوي معرّفاً — الصفوف → الملف)، وأدخل الاسمين والسعة والجنس. لا تتجاوز السعة حجم الشعبة في خطة الصف (BR-SCN-001) ويضيّق الجنس سياسة الصف فقط (BR-SCN-002/003).")),
+            new HelpPanelViewModel.Item(T("Open", "فتح"), T("The section page: roster, assign / transfer students, homeroom teacher history, close.", "صفحة الشعبة: قائمة الطلاب، إسناد/نقل الطلاب، سجل رائد الفصل، الإغلاق.")),
+            new HelpPanelViewModel.Item(T("Edit ✎", "تعديل ✎"), T("Change names, capacity, gender or default room. Capacity can't drop below the students currently assigned.", "تغيير الأسماء أو السعة أو الجنس أو القاعة الافتراضية. لا يمكن خفض السعة دون عدد الطلاب المسندين حالياً.")),
+            new HelpPanelViewModel.Item(T("Delete 🗑", "حذف 🗑"), T("Only for a section that never had students or a homeroom teacher. A section with history is closed from its page instead — history is kept (BR-SCN-005/006/007).", "فقط لشعبة لم يُسند إليها طلاب أو رائد فصل قط. الشعبة التي لها سجل تُغلق من صفحتها بدلاً من الحذف مع حفظ السجل (BR-SCN-005/006/007).")),
+            new HelpPanelViewModel.Item(T("Capacity meter", "مقياس السعة"), T("Current students / capacity; amber at 90 %, red when full.", "الطلاب الحاليون / السعة؛ برتقالي عند 90٪ وأحمر عند الامتلاء.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade and year: capacity meters, gender, homeroom, room, student counts (BR-SCN-001/002/004).", "لكل صف وعام: مقاييس السعة، الجنس، رائد الفصل، القاعة، عدد الطلاب (BR-SCN-001/002/004).")</p></div>
-    <form method="get" class="d-flex gap-2 align-items-center"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></form></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></form>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 
 <div class="row g-3">
     <div class="col-xl-8">
@@ -29,7 +46,13 @@
                         <td>@(r.HomeroomName ?? "—")</td>
                         <td>@(r.RoomName ?? "—")</td>
                         <td><div class="small">@r.Members / @r.Section.Capacity</div><div class="sms-progress"><span style="width:@(pct)%;@(pct >= 100 ? "background:#dc2626" : pct >= 90 ? "background:#f59e0b" : "")"></span></div></td>
-                        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Section.Id">@T("Open", "فتح")</a></td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@r.Section.Id">@T("Open", "فتح")</a>
+                            <a class="btn btn-sm btn-outline-primary" asp-action="Edit" asp-route-id="@r.Section.Id" title="@T("Edit section", "تعديل الشعبة")"><i class="bi bi-pencil"></i></a>
+                            <form method="post" asp-action="Delete" asp-route-id="@r.Section.Id" class="d-inline" onsubmit="return confirm('@T("Delete this section? Only possible when it never had students.", "حذف هذه الشعبة؟ ممكن فقط إن لم يُسند إليها طلاب قط.")');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@(r.Members > 0 ? T("Section has students — close it instead", "للشعبة طلاب — أغلقها بدلاً من ذلك") : T("Delete section", "حذف الشعبة"))" disabled="@(r.Members > 0)"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
                     </tr>
                 }
                 @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No sections for this year yet.", "لا شعب لهذا العام بعد.")</td></tr> }

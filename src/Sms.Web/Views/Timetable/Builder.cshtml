@@ -1,0 +1,156 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model BuilderViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Timetable builder", "منشئ الجدول");
+    ViewData["Breadcrumb"] = T("Timetable / Builder", "الجدول الدراسي / المنشئ");
+    ViewData["TtYear"] = Model.Year?.Id; ViewData["TtVersion"] = Model.Version?.Id;
+    var yid = Model.Year?.Id; var vid = Model.Version?.Id; var secId = Model.Section?.Section.Id;
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "bld-help", Title = T("Timetable builder — help", "منشئ الجدول — مساعدة"),
+        Intro = T("Assisted-manual construction (doc §13 — no solver in v1): pick a Draft version and a section, then place offering + teacher (+ room) into each slot. Hard constraints block at save (teacher / section / room double-booking, BR-TTB-004); the teacher picker only offers teachers holding the assignment for that offering × section (BR-TCH-002).", "بناء يدوي مُساعَد (الوثيقة §13 — لا مولّد تلقائياً في v1): اختر مسودة إصدار وشعبة، ثم ضع المادة + المعلم (+ القاعة) في كل حصة. القيود الصارمة تمنع الحفظ (حجز مزدوج لمعلم/شعبة/قاعة، BR-TTB-004)؛ منتقي المعلم يعرض فقط من يحمل إسناد تلك المادة × الشعبة (BR-TCH-002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Pivots", "المحاور"), T("Teacher-week and room-week show the same version from the other side — remove works there too; placing happens on the section grid.", "محور المعلم ومحور القاعة يعرضان الإصدار نفسه من الجهة الأخرى — الحذف يعمل هناك أيضاً؛ الوضع يتم على شبكة الشعبة.")),
+            new HelpPanelViewModel.Item(T("Completeness meter", "مؤشر الاكتمال"), T("Placed vs required periods per offering (BR-SUB-005/BR-TTB-003). Publication needs every timetabled section complete.", "الحصص الموضوعة مقابل المطلوبة لكل مادة (BR-SUB-005/BR-TTB-003). النشر يتطلب اكتمال كل شعبة موضوعة.")),
+            new HelpPanelViewModel.Item(T("Quality score", "درجة الجودة"), T("Soft constraints (BR-TTB-005): same subject twice a day, long consecutive runs, idle gaps — warn and score, never block. Details on the validation board.", "القيود المرنة (BR-TTB-005): المادة مرتين في اليوم، تتابع طويل، فجوات — تنبيه ودرجة دون منع. التفاصيل في لوحة التحقق.")),
+            new HelpPanelViewModel.Item(T("Locked", "مقفل"), T("Validated/Published versions are read-only (doc §9). Reopen a Validated one, or create a new Draft for a mid-year amendment (BR-TTB-009 — past sessions stay under the version that generated them).", "الإصدارات المُتحقَّقة/المنشورة للقراءة فقط (الوثيقة §9). أعد فتح المُتحقَّق أو أنشئ مسودة جديدة لتعديل منتصف العام (BR-TTB-009 — الحصص السابقة تبقى تحت إصدارها).")),
+            new HelpPanelViewModel.Item(T("Drag-drop", "السحب والإفلات"), T("Deferred — placement is form-based in this build; copy-section replays a sibling section's week.", "مؤجل — الوضع عبر نماذج في هذا الإصدار؛ «نسخ شعبة» يعيد أسبوع شعبة شقيقة.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Section-week grid with teacher/room pivots, live validation, completeness and quality.", "شبكة أسبوع الشعبة مع محاور المعلم/القاعة والتحقق الحي والاكتمال والجودة.")</p></div>
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="version" class="form-select form-select-sm" onchange="this.form.submit()">
+                @if (Model.Versions.Count == 0) { <option value="">@T("no versions", "لا إصدارات")</option> }
+                @foreach (var v in Model.Versions) { <option value="@v.Id" selected="@(v.Id == vid)">@TimetableLabels.VersionLabel(v, v.TermId == null ? null : Model.Terms.GetValueOrDefault(v.TermId.Value), isRtl) · @TimetableLabels.VersionStatus(v.Status, isRtl)</option> }
+            </select>
+            <input type="hidden" name="mode" value="@Model.Mode" />
+        </form>
+        @if (Model.Year != null) { <form method="post" asp-action="DefineVersion" asp-route-year="@yid" class="d-flex gap-1"><select name="termId" class="form-select form-select-sm" style="width:9rem"><option value="">@T("whole year", "العام كاملاً")</option>@foreach (var t in Model.Terms.Values.OrderBy(t => t.StartDate)) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("New draft", "مسودة جديدة")</button></form> }
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else if (Model.Version == null) { <div class="alert alert-info">@T("No timetable version for this year yet — create a draft (BR-TTB-002).", "لا إصدار جدول لهذا العام بعد — أنشئ مسودة (BR-TTB-002).")</div> }
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <span class="badge @TimetableLabels.VersionBadge(Model.Version.Status)">@TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span>
+        @if (!Model.Editable) { <span class="small text-muted"><i class="bi bi-lock me-1"></i>@T("read-only", "للقراءة فقط")</span> @if (Model.Version.Status == TimetableVersionStatus.Validated) { <form method="post" asp-action="ReopenVersion" asp-route-id="@vid" asp-route-year="@yid" asp-route-returnTo="builder" class="d-inline"><button class="btn btn-sm btn-outline-secondary" type="submit">@T("Reopen", "إعادة فتح")</button></form> } }
+        <span class="ms-auto"></span>
+        <span class="badge @(Model.HardConflictCount == 0 ? "text-bg-success" : "text-bg-danger")" title="BR-TTB-004">@Model.HardConflictCount @T("hard", "صارم")</span>
+        <a class="badge @(Model.QualityScore >= 80 ? "text-bg-success" : Model.QualityScore >= 50 ? "text-bg-warning" : "text-bg-danger") text-decoration-none" asp-action="Validation" asp-route-year="@yid" asp-route-version="@vid" title="BR-TTB-005">@T("quality", "الجودة") @Model.QualityScore/100 · @Model.WarningCount ⚠</a>
+        <div class="btn-group btn-group-sm">
+            <a class="btn @(Model.Mode == "section" ? "btn-primary" : "btn-outline-primary")" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@secId">@T("Section week", "أسبوع الشعبة")</a>
+            <a class="btn @(Model.Mode == "teacher" ? "btn-primary" : "btn-outline-primary")" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-mode="teacher" asp-route-teacher="@Model.Teacher?.Profile.Id">@T("Teacher week", "أسبوع المعلم")</a>
+            <a class="btn @(Model.Mode == "room" ? "btn-primary" : "btn-outline-primary")" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-mode="room" asp-route-room="@Model.Room?.Id">@T("Room week", "أسبوع القاعة")</a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-9">
+            <div class="sms-card">
+                <div class="p-3 border-bottom d-flex flex-wrap gap-2 align-items-center">
+                    <form method="get" class="d-flex gap-2 align-items-center">
+                        <input type="hidden" name="year" value="@yid" /><input type="hidden" name="version" value="@vid" /><input type="hidden" name="mode" value="@Model.Mode" />
+                        @if (Model.Mode == "section") { <select name="section" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var s in Model.Sections) { <option value="@s.Section.Id" selected="@(s.Section.Id == secId)">@s.Grade.Code · @TimetableLabels.SectionName(s.Section, isRtl)</option> }</select> }
+                        else if (Model.Mode == "teacher") { <select name="teacher" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Teachers) { <option value="@t.Profile.Id" selected="@(t.Profile.Id == Model.Teacher?.Profile.Id)">@Teacher(t.Employee)</option> }</select> }
+                        else { <select name="room" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var r in Model.Rooms) { <option value="@r.Id" selected="@(r.Id == Model.Room?.Id)">@TimetableLabels.RoomName(r, isRtl)</option> }</select> }
+                    </form>
+                    @if (Model.Mode == "section" && Model.Section != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="Section" asp-route-id="@secId" asp-route-year="@yid" asp-route-version="@vid" target="_blank"><i class="bi bi-printer me-1"></i>@T("Printable", "للطباعة")</a> }
+                    @if (Model.Mode == "teacher" && Model.Teacher != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="Teacher" asp-route-id="@Model.Teacher.Profile.Id" asp-route-year="@yid" asp-route-version="@vid" target="_blank"><i class="bi bi-printer me-1"></i>@T("Teacher sheet", "ورقة المعلم")</a> }
+                    @if (Model.Mode == "room" && Model.Room != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="Room" asp-route-id="@Model.Room.Id" asp-route-year="@yid" asp-route-version="@vid" target="_blank"><i class="bi bi-printer me-1"></i>@T("Room sheet", "ورقة القاعة")</a> }
+                    @if (Model.Mode == "section" && Model.Editable && Model.CopySources.Count > 0)
+                    {
+                        <form method="post" asp-action="CopySection" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@secId" class="ms-auto d-flex gap-1 align-items-center" onsubmit="return confirm('@T("Replay the source week onto this section?", "إعادة أسبوع الشعبة المصدر على هذه الشعبة؟")');">
+                            <span class="small text-muted">@T("Copy from", "نسخ من")</span>
+                            <select name="fromSection" class="form-select form-select-sm" style="width:10rem">@foreach (var s in Model.CopySources) { <option value="@s.Section.Id">@TimetableLabels.SectionName(s.Section, isRtl)</option> }</select>
+                            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-files"></i></button>
+                        </form>
+                    }
+                </div>
+                @if (!Model.HasShape) { <div class="p-4 text-center text-muted">@T("No timetable shape for this stage/year — define it in the shape designer first (BR-TTB-001).", "لا شكل جدول لهذه المرحلة/العام — عرّفه في مصمم الشكل أولاً (BR-TTB-001).") <a asp-action="Shape" asp-route-year="@yid" asp-route-stage="@Model.Section?.StageId">@T("Open shape designer", "فتح مصمم الشكل")</a></div> }
+                else
+                {
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-top text-center" style="table-layout:fixed">
+                        <thead><tr><th style="width:3rem">#</th>@foreach (var d in Model.Days) { <th>@TimetableLabels.Day(d, isRtl)</th> }</tr></thead>
+                        <tbody>
+                        @foreach (var seq in Model.Sequences)
+                        {
+                            <tr><th class="text-muted small">@seq</th>
+                            @foreach (var d in Model.Days)
+                            {
+                                var slot = Model.Slots.GetValueOrDefault((d, seq));
+                                var cells = Model.Cells.GetValueOrDefault((d, seq)) ?? Array.Empty<PlacementCell>();
+                                if (slot == null)
+                                {
+                                    <td class="bg-light"></td>
+                                    continue;
+                                }
+                                <td class="@(slot.IsBreak ? "table-light" : "") p-1">
+                                    <div class="small text-muted">@TimetableLabels.Span(slot)</div>
+                                    @if (slot.IsBreak) { <div class="small fst-italic text-muted">@T("break", "فسحة")</div> }
+                                    @foreach (var c in cells)
+                                    {
+                                        <div class="border rounded p-1 mb-1 text-start small" style="background:rgba(var(--sms-primary-rgb),.06)">
+                                            <div class="fw-semibold"><code>@c.Subject.Code</code> @(Model.Mode == "section" ? TimetableLabels.SubjectName(c.Subject, isRtl) : TimetableLabels.SectionName(c.Section, isRtl))</div>
+                                            @if (Model.Mode != "teacher") { <div class="text-truncate" title="@Teacher(c.Teacher)"><i class="bi bi-person me-1"></i>@Teacher(c.Teacher)</div> }
+                                            @if (Model.Mode != "room") { <div class="text-muted"><i class="bi bi-door-open me-1"></i>@(c.Room == null ? T("no room", "بلا قاعة") : c.Room.Code)</div> }
+                                            @if (Model.Editable) { <form method="post" asp-action="RemovePlacement" asp-route-id="@c.Placement.Id" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@secId" asp-route-mode="@Model.Mode" asp-route-teacher="@Model.Teacher?.Profile.Id" asp-route-room="@Model.Room?.Id" class="text-end"><button class="btn btn-link btn-sm p-0 text-danger" type="submit" title="@T("Remove", "إزالة")"><i class="bi bi-x-circle"></i></button></form> }
+                                        </div>
+                                    }
+                                    @if (Model.Mode == "section" && Model.Editable && !slot.IsBreak && cells.Count == 0)
+                                    {
+                                        <form method="post" asp-action="Place" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@secId" asp-route-slot="@slot.Id" class="d-grid gap-1">
+                                            <select name="pick" class="form-select form-select-sm" required>
+                                                <option value="">@T("offering · teacher…", "مادة · معلم…")</option>
+                                                @foreach (var o in Model.Offerings) { foreach (var t in o.AssignedTeachers) { <option value="@o.Offering.Id-@t.Profile.Id" class="@(o.Placed >= o.Required ? "text-muted" : "")">@o.Subject.Code · @Teacher(t.Employee) (@o.Placed/@o.Required)</option> } }
+                                            </select>
+                                            <div class="d-flex gap-1"><select name="room" class="form-select form-select-sm"><option value="">@T("room…", "قاعة…")</option>@foreach (var r in Model.Rooms) { <option value="@r.Id" selected="@(r.Id == Model.Section?.Section.DefaultClassroomId)">@r.Code</option> }</select><button class="btn btn-sm btn-primary" type="submit" title="@T("Place", "وضع")"><i class="bi bi-plus"></i></button></div>
+                                        </form>
+                                    }
+                                </td>
+                            }
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                }
+            </div>
+        </div>
+        <div class="col-xl-3">
+            @if (Model.Mode == "section" && Model.Section != null)
+            {
+                <div class="sms-card p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2"><h2 class="h6 mb-0"><i class="bi bi-list-check me-1"></i>@T("Completeness", "الاكتمال")</h2><span class="small @(Model.PlacedTotal == Model.RequiredTotal && Model.RequiredTotal > 0 ? "text-success fw-semibold" : "")">@Model.PlacedTotal/@Model.RequiredTotal</span></div>
+                    <div class="sms-progress mb-3"><span style="width:@(Model.RequiredTotal == 0 ? 0 : Math.Min(100, 100 * Model.PlacedTotal / Model.RequiredTotal))%"></span></div>
+                    @foreach (var o in Model.Offerings)
+                    {
+                        <div class="mb-2"><div class="d-flex justify-content-between small"><span><code>@o.Subject.Code</code> @TimetableLabels.SubjectName(o.Subject, isRtl)</span><span class="@(o.Placed == o.Required ? "text-success" : o.Placed > o.Required ? "text-danger" : "")">@o.Placed/@o.Required</span></div>
+                            <div class="sms-progress"><span style="width:@(Math.Min(100, 100 * o.Placed / Math.Max(1, o.Required)))%;@(o.Placed > o.Required ? "background:#dc2626" : "")"></span></div>
+                            @if (o.AssignedTeachers.Count == 0) { <div class="small text-warning">⚠ @T("no teacher assigned — ", "لا معلم مُسنَد — ") <a asp-controller="Teachers" asp-action="Matrix" asp-route-year="@yid">@T("assignment matrix", "مصفوفة الإسناد")</a></div> }
+                        </div>
+                    }
+                    @if (Model.Offerings.Count == 0) { <div class="small text-muted">@T("No current offerings for this grade — build the curriculum plan first.", "لا مواد حالية لهذا الصف — أنشئ الخطة الدراسية أولاً.")</div> }
+                </div>
+            }
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2"><i class="bi bi-speedometer2 me-1"></i>@T("Sections", "الشعب")</h2>
+                @foreach (var s in Model.Meters)
+                {
+                    var pct = s.Required == 0 ? 0 : Math.Min(100, 100 * s.Placed / s.Required);
+                    <div class="mb-1"><div class="d-flex justify-content-between small"><a asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@s.Section.Section.Id" class="@(s.Section.Section.Id == secId ? "fw-semibold" : "")">@s.Section.Grade.Code · @TimetableLabels.SectionName(s.Section.Section, isRtl)</a><span class="@(s.Placed == s.Required && s.Required > 0 ? "text-success" : s.Placed > s.Required ? "text-danger" : "text-muted")">@s.Placed/@s.Required</span></div><div class="sms-progress"><span style="width:@(pct)%"></span></div></div>
+                }
+                @if (Model.Meters.Count == 0) { <div class="small text-muted">@T("No sections this year.", "لا شعب هذا العام.")</div> }
+            </div>
+        </div>
+    </div>
+}

@@ -14,6 +14,21 @@ namespace Sms.Application.Sections
             int gradeYearProfileId, string nameAr, string nameEn, int capacity, GenderPolicy genderPolicy,
             int? defaultClassroomId = null, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Edits a section's names/capacity/gender/room under the same rules as
+        /// <see cref="DefineSectionAsync"/>; capacity can't drop below the current member count.
+        /// </summary>
+        Task<Section> UpdateSectionAsync(
+            int sectionId, string nameAr, string nameEn, int capacity, GenderPolicy genderPolicy,
+            int? defaultClassroomId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Hard-deletes a section that never had members or homeroom assignments (a section
+        /// with history is closed instead, <see cref="CloseSectionAsync"/>). Throws
+        /// <see cref="Common.Exceptions.SectionInUseException"/> otherwise.
+        /// </summary>
+        Task DeleteSectionAsync(int sectionId, CancellationToken cancellationToken = default);
+
         /// <summary>BR-SCN-004: closes out the section's current homeroom teacher (if any) and opens a new one.</summary>
         Task<HomeroomAssignment> AssignHomeroomTeacherAsync(
             int sectionId, int teacherUserId, DateTime effectiveFromUtc, CancellationToken cancellationToken = default);

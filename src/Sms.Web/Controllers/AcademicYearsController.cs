@@ -56,6 +56,10 @@ namespace Sms.Web.Controllers
             var terms = await _db.Terms.AsNoTracking().ToListAsync();
             var batches = await _db.RolloverBatches.AsNoTracking().ToListAsync();
             var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _tenant.SchoolId);
+            var enrollmentsByYear = await _db.Enrollments.AsNoTracking()
+                .GroupBy(e => e.AcademicYearId)
+                .Select(g => new { YearId = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(x => x.YearId, x => x.Count);
 
             var rows = new List<YearBoardViewModel.Row>();
             foreach (var y in years)
@@ -65,6 +69,7 @@ namespace Sms.Web.Controllers
                     Year = y,
                     Semesters = semesters.Count(s => s.AcademicYearId == y.Id),
                     Terms = terms.Count(t => t.AcademicYearId == y.Id),
+                    Enrollments = enrollmentsByYear.TryGetValue(y.Id, out var n) ? n : 0,
                     IncomingBatch = batches.FirstOrDefault(b => b.TargetAcademicYearId == y.Id),
                     OutgoingBatch = batches.FirstOrDefault(b => b.SourceAcademicYearId == y.Id),
                 };
@@ -151,6 +156,83 @@ namespace Sms.Web.Controllers
                 ModelState.AddModelError(string.Empty, ex.Message);
                 return View(form);
             }
+        }
+
+        // --- Edit / Delete: only while no student is enrolled in the year ----------
+
+        [HttpGet("{id:int}/edit")]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == id);
+            if (year == null)
+            {
+                return NotFound();
+            }
+
+            var enrolled = await _db.Enrollments.CountAsync(e => e.AcademicYearId == id);
+            if (enrolled > 0)
+            {
+                TempData["Error"] = T($"This year cannot be edited: {enrolled} student enrollment(s) exist.", $"لا يمكن تعديل هذا العام: يوجد {enrolled} تسجيل طلاب.");
+                return RedirectToAction(nameof(Index));
+            }
+
+            return View(new YearDefinitionViewModel
+            {
+                YearId = id, Year = year,
+                LabelAr = year.LabelAr, LabelEn = year.LabelEn, HijriLabel = year.HijriLabel, StartDate = year.StartDate, EndDate = year.EndDate,
+            });
+        }
+
+        [HttpPost("{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, YearDefinitionViewModel form)
+        {
+            var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == id);
+            if (year == null)
+            {
+                return NotFound();
+            }
+
+            form.YearId = id;
+            form.Year = year;
+            try
+            {
+                if (form.StartDate == null || form.EndDate == null)
+                {
+                    throw new InvalidOperationException(T("Start and end dates are required.", "تاريخا البداية والنهاية مطلوبان."));
+                }
+
+                var labelEn = string.IsNullOrWhiteSpace(form.LabelEn) ? $"{form.StartDate.Value.Year}-{form.EndDate.Value.Year}" : form.LabelEn.Trim();
+                var labelAr = string.IsNullOrWhiteSpace(form.LabelAr) ? ToArabicDigits(labelEn) : form.LabelAr.Trim();
+                var hijri = string.IsNullOrWhiteSpace(form.HijriLabel) ? HijriLabelFor(form.StartDate.Value) : form.HijriLabel.Trim();
+                _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
+                await _years.UpdateYearAsync(id, labelAr, labelEn, hijri, form.StartDate.Value, form.EndDate.Value);
+                TempData["Flash"] = T("Academic year updated.", "تم تحديث العام الدراسي.");
+                return RedirectToAction(nameof(Index));
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                return View(form);
+            }
+        }
+
+        [HttpPost("{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id, string? reason)
+        {
+            try
+            {
+                _audit.Reason = string.IsNullOrWhiteSpace(reason) ? null : reason;
+                await _years.DeleteYearAsync(id);
+                TempData["Flash"] = T("Academic year deleted.", "تم حذف العام الدراسي.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = ex.Message;
+            }
+
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpGet("{id:int}")]

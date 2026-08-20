@@ -1,0 +1,50 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model ConflictQueueViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Session conflict queue", "قائمة تعارضات الحصص");
+    ViewData["Breadcrumb"] = T("Timetable / Session conflicts", "الجدول الدراسي / تعارضات الحصص");
+    var from = Model.From.ToString("yyyy-MM-dd");
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "cq-help", Title = T("Session conflict queue — help", "قائمة التعارضات — مساعدة"),
+        Intro = T("BR-TTB-006: after publication, calendar amendments (a day later declared holiday/weekend, BR-CAL-004) and room maintenance/reservation windows (BR-ROM-004) raise conflicts on already-generated dated sessions — never silent drops. Resolve each one: cancel the session with reason, or move it to another room.", "BR-TTB-006: بعد النشر، تعديلات التقويم (يوم يُعلن لاحقاً عطلة، BR-CAL-004) ونوافذ صيانة/حجز القاعات (BR-ROM-004) تُظهر تعارضات على الحصص المؤرخة المولَّدة — لا تُسقط بصمت. عالج كلاً منها: ألغِ الحصة مع سبب أو انقلها إلى قاعة أخرى."),
+        Items = new[] { new HelpPanelViewModel.Item(T("Scope", "النطاق"), T("Future sessions from the chosen date for N days (max 120), operational year. Cancelled sessions are excluded.", "الحصص المستقبلية من التاريخ المختار لعدد N يوماً (حتى 120)، العام المُشغَّل. الحصص الملغاة مستثناة.")) },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Calendar/room-driven conflicts with resolution actions.", "تعارضات مصدرها التقويم/القاعات مع إجراءات الحل.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <input type="date" name="from" class="form-control form-control-sm" value="@from" />
+            <select name="days" class="form-select form-select-sm" style="width:7rem">@foreach (var n in new[] { 7, 14, 30, 60, 120 }) { <option value="@n" selected="@(n == Model.Days)">@n @T("days", "يوماً")</option> }</select>
+            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-search"></i></button>
+        </form>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+<div class="sms-card">
+    <div class="p-3 border-bottom d-flex justify-content-between"><h2 class="h6 mb-0">@Model.Rows.Count @T("conflict(s)", "تعارضاً") · @from → @Model.From.AddDays(Model.Days).ToString("yyyy-MM-dd")</h2></div>
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <thead><tr><th>@T("Date", "التاريخ")</th><th>@T("Slot", "الحصة")</th><th>@T("Section · subject · teacher", "الشعبة · المادة · المعلم")</th><th>@T("Conflict", "التعارض")</th><th style="min-width:20rem">@T("Resolve", "الحل")</th></tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td class="small">@r.Session.Date.ToString("yyyy-MM-dd")<br /><span class="text-muted">@TimetableLabels.Day(r.Session.Date.DayOfWeek, isRtl)</span></td>
+                <td class="small">#@r.Cell.Slot.SequenceNumber @TimetableLabels.Span(r.Cell.Slot)</td>
+                <td><strong>@TimetableLabels.SectionName(r.Cell.Section, isRtl)</strong> · <code>@r.Cell.Subject.Code</code><br /><span class="small">@Teacher(r.Cell.Teacher) · <span class="badge @TimetableLabels.SessionBadge(r.Session.Status)">@TimetableLabels.SessionStatus(r.Session.Status, isRtl)</span></span></td>
+                <td class="small"><span class="badge @(r.Kind == "calendar" ? "text-bg-secondary" : "text-bg-warning") me-1">@(r.Kind == "calendar" ? T("calendar", "تقويم") : T("room", "قاعة"))</span>@r.Detail</td>
+                <td>
+                    @if (r.Kind == "room") { <form method="post" asp-action="ChangeRoom" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1 mb-1"><select name="roomId" class="form-select form-select-sm">@foreach (var room in Model.Rooms) { <option value="@room.Id">@room.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit" title="@T("Move room (BR-TTB-008)", "نقل القاعة (BR-TTB-008)")"><i class="bi bi-door-open"></i></button></form> }
+                    <form method="post" asp-action="CancelSession" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Cancel session", "إلغاء الحصة")"><i class="bi bi-x-circle"></i></button></form>
+                </td>
+            </tr>
+        }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-4">✓ @T("No session conflicts in this window.", "لا تعارضات حصص في هذه النافذة.")</td></tr> }
+        </tbody>
+    </table></div>
+</div>

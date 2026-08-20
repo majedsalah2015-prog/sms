@@ -150,5 +150,63 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(room.Id, db.RoomFeatures.Single(f => f.Id == feature.Id).RoomId);
         }
+
+        // --- edit / soft-delete of the building → floor → room tree ------------------
+
+        [Fact]
+        [BusinessRule("BR-ROM-002")]
+        public async Task Editing_a_room_applies_the_code_and_capacity_rules()
+        {
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+            var a = await admin.DefineRoomAsync(_floorId, "101", "فصل ١٠١", "Room 101", 1, 30, 28, GenderPolicy.Mixed);
+            await admin.DefineRoomAsync(_floorId, "102", "فصل ١٠٢", "Room 102", 1, 30, 28, GenderPolicy.Mixed);
+
+            var updated = await admin.UpdateRoomAsync(a.Id, _floorId, "101", "قاعة ١٠١", "Hall 101", 1, 40, 30, GenderPolicy.Boys);
+            Assert.Equal(40, db.Rooms.Single(r => r.Id == a.Id).StandardCapacity);
+            Assert.Equal(GenderPolicy.Boys, updated.WingTag);
+
+            await Assert.ThrowsAsync<InvalidRoomCapacityException>(() => admin.UpdateRoomAsync(a.Id, _floorId, "101", "أ", "A", 1, 20, 25, GenderPolicy.Mixed));
+            await Assert.ThrowsAsync<DuplicateRoomCodeException>(() => admin.UpdateRoomAsync(a.Id, _floorId, "102", "أ", "A", 1, 30, 20, GenderPolicy.Mixed));
+        }
+
+        [Fact]
+        public async Task Removing_walks_the_tree_bottom_up_and_respects_sections_using_a_room()
+        {
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+            var floor = db.Floors.Single(f => f.Id == _floorId);
+            var room = await admin.DefineRoomAsync(_floorId, "101", "فصل ١٠١", "Room 101", 1, 30, 28, GenderPolicy.Mixed);
+
+            // floor with a room, building with a floor → refused
+            await Assert.ThrowsAsync<RoomInUseException>(() => admin.DeactivateFloorAsync(_floorId));
+            await Assert.ThrowsAsync<RoomInUseException>(() => admin.DeactivateBuildingAsync(floor.BuildingId));
+
+            // room used by an active section → refused until the section moves
+            var year = new Sms.Domain.Schools.AcademicYear { LabelAr = "ع", LabelEn = "2026-2027", HijriLabel = "h", StartDate = new DateTime(2026, 9, 1), EndDate = new DateTime(2027, 6, 30), Status = Sms.Domain.Schools.AcademicYearStatus.Active };
+            var stage = new Stage { Name = new Sms.Domain.Common.LocalizedName("م", "Stage"), SequenceOrder = 1 };
+            db.AcademicYears.Add(year); db.Stages.Add(stage);
+            await db.SaveChangesAsync();
+            var grade = new GradeLevel { StageId = stage.Id, Code = "G1", Name = new Sms.Domain.Common.LocalizedName("ص", "Grade 1"), SequenceOrder = 1 };
+            db.GradeLevels.Add(grade);
+            await db.SaveChangesAsync();
+            var profile = new GradeYearProfile { GradeLevelId = grade.Id, AcademicYearId = year.Id, TargetSections = 1, TargetSectionSize = 25 };
+            db.GradeYearProfiles.Add(profile);
+            await db.SaveChangesAsync();
+            db.Sections.Add(new Sms.Domain.Sections.Section { AcademicYearId = year.Id, GradeYearProfileId = profile.Id, NameAr = "أ", NameEn = "1-A", Capacity = 25, DefaultClassroomId = room.Id });
+            await db.SaveChangesAsync();
+            await Assert.ThrowsAsync<RoomInUseException>(() => admin.DeactivateRoomAsync(room.Id));
+            var section = db.Sections.Single();
+            section.DefaultClassroomId = null;
+            await db.SaveChangesAsync();
+
+            await admin.DeactivateRoomAsync(room.Id);
+            await admin.DeactivateFloorAsync(_floorId);
+            await admin.DeactivateBuildingAsync(floor.BuildingId);
+            Assert.Empty(db.Rooms);
+            Assert.Empty(db.Floors);
+            Assert.Empty(db.Buildings);
+            Assert.False(db.Rooms.IgnoreQueryFilters().Single(r => r.Id == room.Id).IsActive);
+        }
     }
 }

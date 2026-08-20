@@ -1,0 +1,20 @@
+@using System.Globalization
+@model PersonalTimetableViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Timetable", "الجدول الدراسي") + " — " + Model.Title;
+}
+
+<div class="sms-page-head d-print-none">
+    <div><div class="text-muted small">@Model.Subtitle · @(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn))</div>
+        <h1 class="sms-page-title">@T("Weekly timetable", "الجدول الأسبوعي") — @Model.Title</h1></div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary" asp-action="Student" asp-route-id="@Model.BackId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Student profile", "ملف الطالب")</a>
+    </div>
+</div>
+<div class="d-none d-print-block mb-2"><h1 class="h4 mb-0">@Model.Title</h1><div class="small">@Model.Subtitle · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div></div>
+
+<partial name="_TimetableWeekGrid" model="Model" />
+<div class="form-text mt-2 d-print-none">@T("Published timetable only (BR-SEC-012); this week's room changes and substitutions show as badges (BR-TTB-008).", "الجدول المنشور فقط (BR-SEC-012)؛ تغييرات القاعات والتعويضات لهذا الأسبوع تظهر كشارات (BR-TTB-008).")</div>

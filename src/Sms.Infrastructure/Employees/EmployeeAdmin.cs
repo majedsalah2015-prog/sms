@@ -305,5 +305,40 @@ namespace Sms.Infrastructure.Employees
                 throw new OrgUnitInUseException(orgUnitId, "other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ")");
             }
         }
+
+        public async Task DeleteEmployeeAsync(int employeeId, CancellationToken cancellationToken = default)
+        {
+            var employee = await _db.Employees.SingleAsync(e => e.Id == employeeId, cancellationToken);
+
+            var profiles = await _db.TeacherProfiles.Where(p => p.EmployeeId == employeeId).ToListAsync(cancellationToken);
+            var profileIds = profiles.Select(p => p.Id).ToList();
+            if (await _db.Placements.AnyAsync(p => profileIds.Contains(p.TeacherProfileId), cancellationToken))
+            {
+                throw new InvalidOperationException("Employee has timetable placements as a teacher; remove them first.");
+            }
+            if (await _db.Substitutions.AnyAsync(s => profileIds.Contains(s.SubstituteTeacherProfileId), cancellationToken))
+            {
+                throw new InvalidOperationException("Employee is recorded as a substitute teacher; remove those substitutions first.");
+            }
+            if (await _db.EmployeeAssignments.AnyAsync(a => a.ManagerEmployeeId == employeeId && a.EmployeeId != employeeId, cancellationToken))
+            {
+                throw new InvalidOperationException("Employee is the manager of other employees' assignments; reassign them first.");
+            }
+
+            _db.TeacherAssignments.RemoveRange(await _db.TeacherAssignments.Where(a => profileIds.Contains(a.TeacherProfileId)).ToListAsync(cancellationToken));
+            _db.TeacherProfiles.RemoveRange(profiles);
+            _db.Contracts.RemoveRange(await _db.Contracts.Where(c => c.EmployeeId == employeeId).ToListAsync(cancellationToken));
+            _db.EmployeeAssignments.RemoveRange(await _db.EmployeeAssignments.Where(a => a.EmployeeId == employeeId).ToListAsync(cancellationToken));
+            _db.Qualifications.RemoveRange(await _db.Qualifications.Where(q => q.EmployeeId == employeeId).ToListAsync(cancellationToken));
+            _db.Employees.Remove(employee);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new InvalidOperationException("Employee cannot be deleted: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
+            }
+        }
     }
 }

@@ -121,5 +121,29 @@ namespace Sms.Infrastructure.Teachers
             assignment.EffectiveToUtc = effectiveToUtc;
             await _db.SaveChangesAsync(cancellationToken);
         }
+
+        public async Task RemoveDesignationAsync(int teacherProfileId, CancellationToken cancellationToken = default)
+        {
+            var profile = await _db.TeacherProfiles.SingleAsync(p => p.Id == teacherProfileId, cancellationToken);
+            if (await _db.Placements.AnyAsync(p => p.TeacherProfileId == teacherProfileId, cancellationToken))
+            {
+                throw new InvalidOperationException("Teacher has timetable placements; remove them first.");
+            }
+            if (await _db.Substitutions.AnyAsync(s => s.SubstituteTeacherProfileId == teacherProfileId, cancellationToken))
+            {
+                throw new InvalidOperationException("Teacher is recorded as a substitute; remove those substitutions first.");
+            }
+
+            _db.TeacherAssignments.RemoveRange(await _db.TeacherAssignments.Where(a => a.TeacherProfileId == teacherProfileId).ToListAsync(cancellationToken));
+            _db.TeacherProfiles.Remove(profile);
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                throw new InvalidOperationException("Teacher designation cannot be removed: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
+            }
+        }
     }
 }

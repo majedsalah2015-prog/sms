@@ -62,7 +62,7 @@ namespace Sms.Web.Controllers
                 var teacherNames = await TeacherNamesByUserAsync();
                 var rooms = await _db.Rooms.AsNoTracking().ToDictionaryAsync(r => r.Id, r => IsArabic ? r.Name.NameAr : r.Name.NameEn);
 
-                model.Profiles = profiles.Select(p => { var g = grades.First(x => x.Id == p.GradeLevelId); return (p.Id, g.Name.NameAr, g.Name.NameEn, p.TargetSections, p.TargetSectionSize); }).OrderBy(x => x.NameEn).ToList();
+                model.Profiles = profiles.Where(p => p.IsActive).Select(p => { var g = grades.First(x => x.Id == p.GradeLevelId); return (p.Id, g.Name.NameAr, g.Name.NameEn, p.TargetSections, p.TargetSectionSize); }).OrderBy(x => x.NameEn).ToList();
                 model.Rows = sections.Select(s =>
                 {
                     var p = profiles.First(x => x.Id == s.GradeYearProfileId);
@@ -142,6 +142,75 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
             return RedirectToAction(nameof(Details), new { id });
+        }
+
+        // --- Edit / delete ---------------------------------------------------------
+
+        [HttpGet("{id:int}/edit")]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var model = await BuildEditAsync(id);
+            if (model == null) return NotFound();
+            model.NameAr = model.Section.NameAr;
+            model.NameEn = model.Section.NameEn;
+            model.Capacity = model.Section.Capacity;
+            model.GenderPolicy = model.Section.GenderPolicy;
+            model.DefaultClassroomId = model.Section.DefaultClassroomId;
+            return View(model);
+        }
+
+        [HttpPost("{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, SectionEditViewModel form)
+        {
+            var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+            if (section == null) return NotFound();
+            try
+            {
+                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)"));
+                Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _sections.UpdateSectionAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim(), form.Capacity ?? section.Capacity, form.GenderPolicy, form.DefaultClassroomId);
+                TempData["Flash"] = T("Section updated.", "تم تحديث الشعبة.");
+                return RedirectToAction(nameof(Index), new { year = section.AcademicYearId });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                var model = (await BuildEditAsync(id))!;
+                model.NameAr = form.NameAr; model.NameEn = form.NameEn; model.Capacity = form.Capacity; model.GenderPolicy = form.GenderPolicy; model.DefaultClassroomId = form.DefaultClassroomId;
+                return View(model);
+            }
+        }
+
+        [HttpPost("{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+            try
+            {
+                await _sections.DeleteSectionAsync(id);
+                TempData["Flash"] = T("Section deleted.", "تم حذف الشعبة.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { year = section?.AcademicYearId });
+        }
+
+        private async Task<SectionEditViewModel?> BuildEditAsync(int id)
+        {
+            var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+            if (section == null) return null;
+            var profile = await _db.GradeYearProfiles.AsNoTracking().SingleAsync(p => p.Id == section.GradeYearProfileId);
+            var grade = await _db.GradeLevels.AsNoTracking().SingleAsync(g => g.Id == profile.GradeLevelId);
+            var rooms = await _db.Rooms.AsNoTracking().ToListAsync();
+            return new SectionEditViewModel
+            {
+                Id = id, Section = section,
+                GradeLabelAr = $"{grade.Code} {grade.Name.NameAr}", GradeLabelEn = $"{grade.Code} {grade.Name.NameEn}",
+                PlanSectionSize = profile.TargetSectionSize, GradeGender = profile.GenderPolicy,
+                CurrentMembers = await _db.SectionMemberships.CountAsync(m => m.SectionId == id && m.EffectiveToUtc == null),
+                Rooms = rooms.Select(r => (r.Id, r.Name.NameAr, r.Name.NameEn)).OrderBy(r => r.NameEn).ToList(),
+            };
         }
 
         [HttpPost("{id:int}/close")]

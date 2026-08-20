@@ -208,5 +208,25 @@ namespace Sms.Infrastructure.Tests
             await Assert.ThrowsAsync<DuplicateEnrollmentException>(() =>
                 admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 2), EnrollmentSourceType.Admission));
         }
+
+        [Fact]
+        [BusinessRule("BR-STU-002")]
+        public async Task Renaming_a_student_requires_an_audit_reason_because_identity_is_T1()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var student = await Register(admin);
+
+            _audit.Reason = null;
+            await Assert.ThrowsAsync<Sms.Application.Common.Exceptions.MissingAuditReasonException>(() => admin.UpdateStudentAsync(
+                student.Id, "جديد", "أب", "جد", "عائلة", "Renamed", "Father", "Grandfather", "Family", Gender.Male, new DateTime(2018, 1, 1), 1));
+
+            _audit.Reason = "birth certificate";
+            var updated = await admin.UpdateStudentAsync(
+                student.Id, "جديد", "أب", "جد", "عائلة", "Renamed", "Father", "Grandfather", "Family", Gender.Male, new DateTime(2018, 1, 1), 1, primaryIdNo: "1098765432");
+            Assert.Equal("Renamed", updated.FirstNameEn);
+            Assert.Equal("1098765432", db.Students.Single(s => s.Id == student.Id).PrimaryIdNo);
+            _audit.Reason = null;
+        }
     }
 }

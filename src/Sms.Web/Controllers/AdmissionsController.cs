@@ -118,8 +118,14 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await _admissions.DeactivateCampaignAsync(id);
-                TempData["Flash"] = T("Campaign removed (deactivated; applications kept).", "تم حذف الحملة (إلغاء تفعيل مع حفظ الطلبات).");
+                var applications = await _db.Applications.AsNoTracking().CountAsync(a => a.CampaignId == id);
+                var registered = await _db.Applications.AsNoTracking().CountAsync(a => a.CampaignId == id && a.RegisteredStudentId != null);
+                await _admissions.DeleteCampaignAsync(id);
+                TempData["Flash"] = applications == 0
+                    ? T("Campaign deleted.", "تم حذف الحملة.")
+                    : registered == 0
+                        ? T($"Campaign and its {applications} application(s) deleted.", $"تم حذف الحملة و{applications} طلب/طلبات.")
+                        : T($"Campaign and its {applications} application(s) deleted; the {registered} student(s) already registered from it were kept.", $"تم حذف الحملة و{applications} طلب/طلبات؛ تم الإبقاء على {registered} طالب/طلاب سبق تسجيلهم منها.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
             return RedirectToAction(nameof(Index), new { year });
@@ -128,7 +134,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Pipeline board
 
         [HttpGet("board")]
-        public async Task<IActionResult> Board(int? campaign = null)
+        public async Task<IActionResult> Board(int? campaign = null, string? view = null)
         {
             var campaigns = await _db.AdmissionCampaigns.AsNoTracking().OrderByDescending(c => c.OpenDate).ToListAsync();
             var selected = campaigns.FirstOrDefault(c => c.Id == campaign) ?? campaigns.FirstOrDefault();
@@ -149,7 +155,7 @@ namespace Sms.Web.Controllers
 
             return View(new PipelineBoardViewModel
             {
-                Campaign = selected, Grade = grade, Year = year, Campaigns = campaigns, CampaignLabels = labels, ReviewSlaDays = ReviewSlaDays,
+                Campaign = selected, Grade = grade, Year = year, Campaigns = campaigns, CampaignLabels = labels, ReviewSlaDays = ReviewSlaDays, ViewMode = view == "grid" ? "grid" : "board",
                 Columns = order.Select(s => new PipelineBoardViewModel.Column(s, apps.Where(a => a.Status == s).Select(a =>
                 {
                     var age = (int)(now - (a.ModifiedAtUtc ?? a.CreatedAtUtc)).TotalDays;
@@ -169,7 +175,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T($"Application moved to {target}.", $"انتقل الطلب إلى {target}.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
-            return returnTo == "board" ? RedirectToAction(nameof(Board), new { campaign = (await _db.Applications.AsNoTracking().SingleAsync(a => a.Id == id)).CampaignId }) : RedirectToAction(nameof(Details), new { id });
+            return returnTo is "board" or "grid" ? RedirectToAction(nameof(Board), new { campaign = (await _db.Applications.AsNoTracking().SingleAsync(a => a.Id == id)).CampaignId, view = returnTo }) : RedirectToAction(nameof(Details), new { id });
         }
 
         // ------------------------------------------------------------ Counter capture
@@ -430,6 +436,19 @@ namespace Sms.Web.Controllers
             {
                 await _admissions.RespondToOfferAsync(entryId, accepted);
                 TempData["Flash"] = accepted ? T("Offer accepted — application Approved; proceed to registration.", "قُبل العرض — الطلب معتمد؛ تابع التسجيل.") : T("Offer declined — application Lapsed.", "رُفض العرض — الطلب ساقط.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(WaitingList), new { profile });
+        }
+
+        [HttpPost("waitlist/{entryId:int}/remove")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveFromWaitlist(int entryId, int? profile)
+        {
+            try
+            {
+                await _admissions.RemoveFromWaitingListAsync(entryId);
+                TempData["Flash"] = T("Removed from the waiting list.", "تمت الإزالة من قائمة الانتظار.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
             return RedirectToAction(nameof(WaitingList), new { profile });

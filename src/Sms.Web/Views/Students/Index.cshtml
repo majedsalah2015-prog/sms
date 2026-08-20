@@ -1,0 +1,28 @@
+@using System.Globalization
+@using Sms.Domain.Students
+@model StudentListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Students", "الطلاب");
+    ViewData["Breadcrumb"] = T("Students / List", "الطلاب / القائمة");
+    string Badge(StudentStatus s) => s switch { StudentStatus.Enrolled => "text-bg-success", StudentStatus.Suspended => "text-bg-warning", StudentStatus.Graduated or StudentStatus.Alumni => "text-bg-primary", _ => "text-bg-secondary" };
+    var help = new HelpPanelViewModel { Id = "stu-help", Title = T("Students — help", "الطلاب — مساعدة"), Intro = T("The student list searches by number, names or ID. Every student has a Student File with tabs; most tabs read through other modules and light up as those screens land.", "قائمة الطلاب تبحث بالرقم أو الأسماء أو الهوية. لكل طالب ملف بتبويبات؛ معظمها يقرأ من وحدات أخرى وتُفعَّل مع شاشاتها."), Items = new[] { new HelpPanelViewModel.Item(T("Register", "تسجيل"), T("Direct registration is for transfers-in and opening data; the normal path is Admissions → registration wizard (BR-ADM-007). Names in both languages are mandatory (BR-GLB-001); a student number is issued from the STU series.", "التسجيل المباشر للمنقولين وبيانات الافتتاح؛ المسار الطبيعي هو القبول → معالج التسجيل (BR-ADM-007). الاسمان بلغتين إلزاميان (BR-GLB-001)؛ يصدر رقم الطالب من سلسلة STU.")), new HelpPanelViewModel.Item(T("Student file", "ملف الطالب"), T("Personal (✎ identity edits need a reason, T1), Parents & guardians (the last financially-responsible link cannot be removed), Emergency contacts, Academic history, Status (transitions per BR-WF-001), Audit.", "الشخصية (✎ تعديل الهوية يتطلب سبباً)، أولياء الأمور (لا يُزال آخر مسؤول مالي)، جهات الطوارئ، السجل الأكاديمي، الحالة (BR-WF-001)، التدقيق.")) } };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Total @T("students", "طالب")</p></div>
+    <div class="d-flex gap-2"><a class="btn btn-primary" asp-action="Register"><i class="bi bi-person-plus me-1"></i>@T("Register student", "تسجيل طالب")</a><partial name="_HelpModal" model="help" /></div></div>
+
+<div class="sms-card">
+    <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+        <input name="q" class="form-control form-control-sm" style="max-width:20rem" value="@Model.Query" placeholder="@T("number, name, ID…", "الرقم، الاسم، الهوية…")" />
+        <select name="status" class="form-select form-select-sm" style="max-width:11rem" onchange="this.form.submit()"><option value="">@T("Any status", "كل الحالات")</option>@foreach (StudentStatus s in Enum.GetValues(typeof(StudentStatus))) { <option value="@s" selected="@(s == Model.Status)">@s</option> }</select>
+        <select name="grade" class="form-select form-select-sm" style="max-width:12rem" onchange="this.form.submit()"><option value="">@T("Any grade", "كل الصفوف")</option>@foreach (var g in Model.Grades) { <option value="@g.Id" selected="@(g.Id == Model.GradeId)">@g.Code @(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }</select>
+        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search"></i></button>
+    </form>
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <thead><tr><th>@T("Student no.", "رقم الطالب")</th><th>@T("Name", "الاسم")</th><th>@T("Gender", "الجنس")</th><th>@T("DOB", "الميلاد")</th><th>@T("Nationality", "الجنسية")</th><th>@T("Grade / section", "الصف / الشعبة")</th><th>@T("Primary parent", "ولي الأمر")</th><th>@T("Status", "الحالة")</th><th class="text-end"></th></tr></thead>
+        <tbody>@foreach (var r in Model.Rows) { var s = r.Student; <tr><td><a asp-action="File" asp-route-id="@s.Id"><code>@s.StudentNo</code></a></td><td class="fw-semibold"><a asp-action="File" asp-route-id="@s.Id">@(isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}")</a></td><td>@(s.Gender == Sms.Domain.Common.Gender.Male ? T("M", "ذ") : T("F", "أ"))</td><td>@s.DateOfBirth.ToString("yyyy-MM-dd")</td><td>@r.NationalityName</td><td>@(r.GradeName ?? "—")@(r.SectionName == null ? "" : " / " + r.SectionName)</td><td>@(r.PrimaryParent ?? "—")</td><td><span class="badge @Badge(s.Status)">@s.Status</span></td><td class="text-end text-nowrap"><form method="post" asp-action="Delete" asp-route-id="@s.Id" asp-route-q="@Model.Query" asp-route-status="@Model.Status" asp-route-grade="@Model.GradeId" class="d-inline" onsubmit="return confirm('@T($"Delete student {s.StudentNo}? This cannot be undone.", $"حذف الطالب {s.StudentNo}؟ لا يمكن التراجع عن هذا الإجراء.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Delete student", "حذف الطالب")"><i class="bi bi-trash"></i></button></form></td></tr> }
+        @if (Model.Rows.Count == 0) { <tr><td colspan="9" class="text-center text-muted py-4">@T("No students match.", "لا طلاب مطابقون.")</td></tr> }</tbody>
+    </table></div>
+</div>

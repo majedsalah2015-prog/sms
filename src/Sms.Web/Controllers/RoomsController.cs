@@ -112,6 +112,121 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // --- Edit / delete (soft: deactivate) for building / floor / room ---------
+
+        [HttpGet("building/{id:int}/edit")]
+        public async Task<IActionResult> EditBuilding(int id)
+        {
+            var b = await _db.Buildings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (b == null) return NotFound();
+            return View("Edit", new RoomEditViewModel { Id = id, Kind = "building", NameAr = b.Name.NameAr, NameEn = b.Name.NameEn, ChildCount = await _db.Floors.CountAsync(f => f.BuildingId == id) });
+        }
+
+        [HttpPost("building/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditBuilding(int id, RoomEditViewModel form)
+        {
+            form.Id = id; form.Kind = "building";
+            try
+            {
+                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _rooms.UpdateBuildingAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim());
+                TempData["Flash"] = T("Building updated.", "تم تحديث المبنى.");
+                return RedirectToAction(nameof(Index));
+            }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", form); }
+        }
+
+        [HttpPost("building/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteBuilding(int id)
+        {
+            try { await _rooms.DeactivateBuildingAsync(id); TempData["Flash"] = T("Building removed (deactivated).", "تم حذف المبنى (إلغاء تفعيل)."); }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet("floor/{id:int}/edit")]
+        public async Task<IActionResult> EditFloor(int id)
+        {
+            var f = await _db.Floors.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (f == null) return NotFound();
+            return View("Edit", await FillEditListsAsync(new RoomEditViewModel { Id = id, Kind = "floor", NameAr = f.Name.NameAr, NameEn = f.Name.NameEn, BuildingId = f.BuildingId, Order = f.SequenceOrder, ChildCount = await _db.Rooms.CountAsync(r => r.FloorId == id) }));
+        }
+
+        [HttpPost("floor/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditFloor(int id, RoomEditViewModel form)
+        {
+            form.Id = id; form.Kind = "floor";
+            try
+            {
+                if (form.BuildingId == null) throw new InvalidOperationException(T("Choose a building.", "اختر مبنى."));
+                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _rooms.UpdateFloorAsync(id, form.BuildingId.Value, form.NameAr!.Trim(), form.NameEn!.Trim(), form.Order ?? 1);
+                TempData["Flash"] = T("Floor updated.", "تم تحديث الطابق.");
+                return RedirectToAction(nameof(Index));
+            }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", await FillEditListsAsync(form)); }
+        }
+
+        [HttpPost("floor/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteFloor(int id)
+        {
+            try { await _rooms.DeactivateFloorAsync(id); TempData["Flash"] = T("Floor removed (deactivated).", "تم حذف الطابق (إلغاء تفعيل)."); }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpGet("{id:int}/edit")]
+        public async Task<IActionResult> EditRoom(int id)
+        {
+            var r = await _db.Rooms.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (r == null) return NotFound();
+            return View("Edit", await FillEditListsAsync(new RoomEditViewModel
+            {
+                Id = id, Kind = "room", NameAr = r.Name.NameAr, NameEn = r.Name.NameEn, FloorId = r.FloorId, Code = r.Code, RoomTypeId = r.RoomTypeLookupId,
+                StandardCapacity = r.StandardCapacity, ExamCapacity = r.ExamCapacity, WingTag = r.WingTag,
+                ChildCount = await _db.Sections.CountAsync(s => s.DefaultClassroomId == id && s.Status == Sms.Domain.Sections.SectionStatus.Active),
+            }));
+        }
+
+        [HttpPost("{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditRoom(int id, RoomEditViewModel form)
+        {
+            form.Id = id; form.Kind = "room";
+            try
+            {
+                if (form.FloorId == null || form.RoomTypeId == null) throw new InvalidOperationException(T("Choose a floor and a room type.", "اختر طابقاً ونوع القاعة."));
+                Require(form.Code, T("Code", "الرمز")); Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                await _rooms.UpdateRoomAsync(id, form.FloorId.Value, form.Code!.Trim().ToUpperInvariant(), form.NameAr!.Trim(), form.NameEn!.Trim(), form.RoomTypeId.Value, form.StandardCapacity ?? 30, form.ExamCapacity ?? 20, form.WingTag);
+                TempData["Flash"] = T("Room updated.", "تم تحديث القاعة.");
+                return RedirectToAction(nameof(Details), new { id });
+            }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", await FillEditListsAsync(form)); }
+        }
+
+        [HttpPost("{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteRoom(int id)
+        {
+            try { await _rooms.DeactivateRoomAsync(id); TempData["Flash"] = T("Room removed (deactivated; bookings/history kept).", "تم حذف القاعة (إلغاء تفعيل مع حفظ الحجوزات والسجل)."); }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index));
+        }
+
+        private async Task<RoomEditViewModel> FillEditListsAsync(RoomEditViewModel m)
+        {
+            var buildings = await _db.Buildings.AsNoTracking().OrderBy(b => b.Name.NameEn).ToListAsync();
+            var floors = await _db.Floors.AsNoTracking().OrderBy(f => f.SequenceOrder).ToListAsync();
+            m.Buildings = buildings;
+            m.Floors = floors.Select(f => { var b = buildings.First(x => x.Id == f.BuildingId); return (f.Id, b.Name.NameAr, b.Name.NameEn, f.Name.NameAr, f.Name.NameEn); }).ToList();
+            m.RoomTypes = (await LookupsAsync()).Types;
+            return m;
+        }
+
         [HttpGet("{id:int}")]
         public async Task<IActionResult> Details(int id)
         {

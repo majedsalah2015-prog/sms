@@ -1,0 +1,55 @@
+@using System.Globalization
+@model AllocationExplorerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Allocation explorer", "مستكشف التخصيصات");
+    ViewData["Breadcrumb"] = T("Payments / Allocations", "المدفوعات / التخصيصات");
+    var sel = Model.Selected;
+    var help = new HelpPanelViewModel
+    {
+        Id = "al-help", Title = T("Allocations — help", "التخصيصات — مساعدة"),
+        Intro = T("Every receipt and which invoices it settled. Allocation is automatic oldest-first (BR-PAY-003); manual re-allocation / reversal is deferred (FM role).", "كل سند والفواتير التي سدّدها. التخصيص تلقائي للأقدم أولاً (BR-PAY-003)؛ إعادة التخصيص اليدوي / العكس مؤجّل (دور المدير المالي)."),
+        Items = new[] { new HelpPanelViewModel.Item(T("Unallocated", "غير مخصّص"), T("Receipt amount not matched to any invoice = advance balance (refundable, or consumed by the next charge's receipt).", "مبلغ السند غير المطابق لأي فاتورة = رصيد مقدّم (قابل للاسترداد أو يُستهلك بسند الفاتورة التالية).")) },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Payer allocation history.", "سجل تخصيصات الدافع.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_FinanceNav" />
+
+<div class="row g-3">
+    <div class="col-lg-3">
+        <div class="sms-card p-3 mb-3"><form method="get" class="d-flex gap-1"><input name="q" class="form-control form-control-sm" placeholder="@T("payer / student / mobile", "الدافع / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-search"></i></button></form></div>
+        <div class="sms-card"><div class="list-group list-group-flush" style="max-height:60vh;overflow:auto">
+            @foreach (var p in Model.Payers) { <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Allocations" asp-route-payerId="@p.Payer.Id"><span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span><br /><span class="opacity-75">@p.Parent?.ParentFileNo</span></a> }
+            @if (Model.Payers.Count == 0) { <div class="list-group-item small text-muted">@T("No payers match.", "لا دافعين مطابقين.")</div> }
+        </div></div>
+    </div>
+    <div class="col-lg-9">
+        @if (sel == null) { <div class="alert alert-light border">@T("Pick a payer.", "اختر دافعاً.")</div> }
+        else
+        {
+            <div class="row g-2 mb-3">
+                <div class="col-4"><div class="sms-tile"><span class="sms-tile__value">@Model.TotalReceived.ToString("N2")</span><span class="sms-tile__label">@T("received", "المستلم")</span></div></div>
+                <div class="col-4"><div class="sms-tile"><span class="sms-tile__value">@Model.TotalAllocated.ToString("N2")</span><span class="sms-tile__label">@T("allocated to invoices", "مخصّص لفواتير")</span></div></div>
+                <div class="col-4"><div class="sms-tile"><span class="sms-tile__value">@((Model.TotalReceived - Model.TotalAllocated).ToString("N2"))</span><span class="sms-tile__label">@T("unallocated (advance)", "غير مخصّص (مقدّم)")</span></div></div>
+            </div>
+            @foreach (var r in Model.Receipts)
+            {
+                <div class="sms-card mb-2">
+                    <div class="p-2 border-bottom d-flex justify-content-between align-items-center small">
+                        <span><a asp-action="Receipt" asp-route-id="@r.Receipt.Id"><code>@r.Receipt.ReceiptNo</code></a> · @r.Receipt.IssuedAtUtc.ToString("yyyy-MM-dd HH:mm") · @FinanceLabels.Method(r.Receipt.Method, isRtl) @(string.IsNullOrEmpty(r.Receipt.MethodRefNo) ? "" : $"· {r.Receipt.MethodRefNo}") @if (r.Receipt.Status == Sms.Domain.Payments.ReceiptStatus.Void) { <span class="badge text-bg-secondary">void</span> }</span>
+                        <span><span class="fw-semibold">@r.Receipt.Amount.ToString("N2")</span> <span class="text-muted">· @T("allocated", "مخصّص") @r.Allocated.ToString("N2")</span> @if (r.Receipt.Amount - r.Allocated > 0) { <span class="badge text-bg-info ms-1">@T("advance", "مقدّم") @((r.Receipt.Amount - r.Allocated).ToString("N2"))</span> }</span>
+                    </div>
+                    <table class="table table-sm mb-0 small">
+                        <tbody>
+                        @foreach (var (a, c, cat, s) in r.Allocations) { <tr><td style="width:12rem"><a asp-controller="Fees" asp-action="Charge" asp-route-id="@c.Id"><code>@c.ChargeNo</code></a></td><td>@s.StudentNo · @FinanceLabels.StudentName(s, isRtl)</td><td>@(isRtl ? cat.NameAr : cat.NameEn)</td><td class="text-muted">@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@a.AllocatedAmount.ToString("N2")</td></tr> }
+                        @if (r.Allocations.Count == 0) { <tr><td class="text-muted">@T("No allocation — held as advance.", "لا تخصيص — محفوظ كمقدّم.")</td></tr> }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            @if (Model.Receipts.Count == 0) { <div class="alert alert-light border">@T("No receipts for this payer.", "لا سندات لهذا الدافع.")</div> }
+        }
+    </div>
+</div>

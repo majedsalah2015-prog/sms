@@ -8,17 +8,41 @@
     ViewData["Breadcrumb"] = T("Grades / Ladder", "الصفوف / السلم الدراسي");
     string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
     var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "grades-help",
+        Title = T("Grade ladder — help", "السلم الدراسي — مساعدة"),
+        Intro = T("This screen defines the school's academic structure: stages, the grades inside each stage, how students are promoted, and the per-year profile (capacity, gender, curriculum, age rule) of every grade.", "تعرّف هذه الشاشة الهيكل الأكاديمي للمدرسة: المراحل، والصفوف داخل كل مرحلة، ومسار ترفيع الطلاب، والملف السنوي لكل صف (السعة والجنس والمنهج وقاعدة العمر)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Stages", "المراحل"), T("Ordered groups such as KG / Elementary / Intermediate / Secondary. Create them from the 'New stage' card; use ✎ to rename/reorder and 🗑 to remove a stage that has no grades left (BR-GRD-001).", "مجموعات مرتبة مثل الروضة / الابتدائية / المتوسطة / الثانوية. أنشئها من بطاقة «مرحلة جديدة»؛ استخدم ✎ للتعديل و🗑 لحذف مرحلة لم يبقَ فيها صفوف (BR-GRD-001).")),
+            new HelpPanelViewModel.Item(T("Grades", "الصفوف"), T("Each grade has a unique code, a stage and an order. ✎ edits code/name/stage/order; 🗑 deactivates a grade that has no enrollments, sections or feeder grades (BR-GRD-007/009).", "لكل صف رمز فريد ومرحلة وترتيب. ✎ يعدّل الرمز/الاسم/المرحلة/الترتيب؛ 🗑 يلغي تفعيل صف ليس له تسجيلات ولا شعب ولا صفوف ترفَّع إليه (BR-GRD-007/009).")),
+            new HelpPanelViewModel.Item(T("Promotion path", "مسار الترفيع"), T("Every non-graduating grade must point to the next grade; the path cannot loop. A missing target blocks activating the year (BR-GRD-002, BR-AYR-004).", "كل صف غير تخرّجي يجب أن يشير إلى الصف التالي؛ ولا يجوز أن يشكّل المسار حلقة. غياب الهدف يمنع تفعيل العام (BR-GRD-002، BR-AYR-004).")),
+            new HelpPanelViewModel.Item(T("Grade-year profile", "ملف الصف السنوي"), T("Per grade and academic year: gender policy (may only narrow the stage default), sections × section size = planned seats, curriculum and the age rule at the cutoff date. 'Profile' pre-selects the grade in the form; 🗑 removes a profile with no sections/enrollments (BR-GRD-003..006).", "لكل صف وعام دراسي: سياسة الجنس (تضيّق افتراضي المرحلة فقط)، الشعب × حجم الشعبة = المقاعد المخططة، المنهج وقاعدة العمر عند تاريخ القطع. زر «الملف» يختار الصف في النموذج؛ 🗑 يحذف ملفاً ليس له شعب أو تسجيلات (BR-GRD-003..006).")),
+            new HelpPanelViewModel.Item(T("Capacity meter", "مقياس السعة"), T("Enrolled / planned seats for the selected year; red means the plan is full.", "المسجّلون / المقاعد المخططة للعام المختار؛ اللون الأحمر يعني اكتمال الخطة.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@T("Grade ladder", "السلم الدراسي")</h1><p class="text-muted mb-0">@T("Stages → grades in order, promotion arrows and graduating flags (BR-GRD-001/002); grade-year profiles hold curriculum, gender, age rule and capacity per year (BR-GRD-004).", "المراحل → الصفوف بالترتيب، أسهم الترفيع وعلامات التخرج (BR-GRD-001/002)؛ ملف الصف السنوي يحمل المنهج والجنس وقاعدة العمر والسعة لكل عام (BR-GRD-004).")</p></div>
-    <form method="get" class="d-flex gap-2 align-items-center"><label class="small text-muted">@T("Year", "العام")</label><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select></form></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center"><label class="small text-muted">@T("Year", "العام")</label><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></form>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 
 <div class="row g-3">
     <div class="col-xl-8">
         @foreach (var s in Model.Stages)
         {
             <div class="sms-card mb-3">
-                <div class="p-3 border-bottom d-flex align-items-center gap-2"><span class="badge text-bg-light border">@s.Stage.SequenceOrder</span><h2 class="h6 mb-0">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</h2><span class="small text-muted">· @Gender(s.Stage.DefaultGenderPolicy)</span></div>
+                <div class="p-3 border-bottom d-flex align-items-center gap-2"><span class="badge text-bg-light border">@s.Stage.SequenceOrder</span><h2 class="h6 mb-0">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</h2><span class="small text-muted">· @Gender(s.Stage.DefaultGenderPolicy)</span>
+                    <span class="ms-auto d-flex gap-1">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditStage" asp-route-id="@s.Stage.Id" asp-route-year="@yid" title="@T("Edit stage", "تعديل المرحلة")"><i class="bi bi-pencil"></i> @T("Edit", "تعديل")</a>
+                        <form method="post" asp-action="DeleteStage" asp-route-id="@s.Stage.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this stage?", "حذف هذه المرحلة؟")');">
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(s.Grades.Count > 0 ? T("Remove its grades first", "احذف صفوفها أولاً") : T("Remove stage", "حذف المرحلة"))" disabled="@(s.Grades.Count > 0)"><i class="bi bi-trash"></i> @T("Delete", "حذف")</button>
+                        </form>
+                    </span>
+                </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">
                     <thead><tr><th>#</th><th>@T("Grade", "الصف")</th><th>@T("Promotes to", "يرفَّع إلى")</th><th>@T("Profile", "الملف السنوي") (@(Model.Year == null ? "—" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)))</th><th>@T("Capacity", "السعة")</th><th></th></tr></thead>
                     <tbody>
@@ -39,7 +63,19 @@
                             </td>
                             <td class="small">@if (g.Profile == null) { <span class="text-muted">@T("not defined", "غير معرَّف")</span> } else { <text>@Gender(g.Profile.GenderPolicy) · @g.Profile.TargetSections × @g.Profile.TargetSectionSize@if (g.Profile.MinAgeAtCutoff != null || g.Profile.MaxAgeAtCutoff != null) { <text> · @T("age", "العمر") @g.Profile.MinAgeAtCutoff–@g.Profile.MaxAgeAtCutoff</text> }</text> }</td>
                             <td style="min-width:9rem">@if (g.Profile != null) { <div class="small">@g.Enrolled / @planned · @g.Sections @T("sec.", "شعب")</div><div class="sms-progress"><span style="width:@(pct)%;@(pct >= 100 ? "background:#dc2626" : "")"></span></div> }</td>
-                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="#profile" onclick="document.getElementById('ProfileGradeId').value='@g.Grade.Id'">@T("Profile", "الملف")</a></td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" href="#profile" onclick="document.getElementById('ProfileGradeId').value='@g.Grade.Id'" title="@T("Define / edit the grade-year profile", "تعريف / تعديل الملف السنوي")">@T("Profile", "الملف")</a>
+                                @if (g.Profile != null)
+                                {
+                                    <form method="post" asp-action="DeleteProfile" asp-route-id="@g.Profile.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this grade-year profile?", "حذف ملف الصف السنوي؟")');">
+                                        <button class="btn btn-sm btn-outline-warning" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Profile has sections/enrollments", "للملف شعب أو تسجيلات") : T("Remove profile", "حذف الملف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-x-circle"></i></button>
+                                    </form>
+                                }
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditGrade" asp-route-id="@g.Grade.Id" asp-route-year="@yid" title="@T("Edit grade", "تعديل الصف")"><i class="bi bi-pencil"></i></a>
+                                <form method="post" asp-action="DeleteGrade" asp-route-id="@g.Grade.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this grade?", "حذف هذا الصف؟")');">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Grade has sections/enrollments", "للصف شعب أو تسجيلات") : T("Remove grade", "حذف الصف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </td>
                         </tr>
                     }
                     @if (s.Grades.Count == 0) { <tr><td colspan="6" class="text-muted small text-center py-3">@T("No grades in this stage yet.", "لا صفوف في هذه المرحلة بعد.")</td></tr> }

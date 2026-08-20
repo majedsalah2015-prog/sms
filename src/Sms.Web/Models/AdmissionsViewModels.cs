@@ -48,6 +48,9 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<Column> Columns { get; set; } = Array.Empty<Column>();
 
+        /// <summary>"board" (kanban, default) or "grid" (flat table of the same cards).</summary>
+        public string ViewMode { get; set; } = "board";
+
         public IReadOnlyList<AdmissionCampaign> Campaigns { get; set; } = Array.Empty<AdmissionCampaign>();
 
         public IReadOnlyDictionary<int, string> CampaignLabels { get; set; } = new Dictionary<int, string>();

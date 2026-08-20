@@ -360,5 +360,84 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(SessionStatus.Cancelled, updated.Status);
             Assert.Equal("school trip", updated.ChangeReason);
         }
+
+        // --- E-401 screens: edit lock, reopen, remove placement/slot, zero-placement completeness -----
+
+        [Fact]
+        [BusinessRule("BR-TTB-002")]
+        public async Task Placements_are_locked_once_the_version_leaves_Draft_and_unlock_on_reopen()
+        {
+            using var db = CreateContext();
+            var teacherId = await RegisterTeacherAsync(db, "1");
+            await AssignAsync(db, teacherId, _sectionId);
+            var timetableAdmin = new TimetableAdmin(db, _clock);
+            var version = await timetableAdmin.DefineVersionAsync(_yearId);
+            var first = await timetableAdmin.PlaceAsync(version.Id, _sectionId, _slotAId, _offeringId, teacherId);
+            await timetableAdmin.PlaceAsync(version.Id, _sectionId, _slotBId, _offeringId, teacherId);
+            await timetableAdmin.ValidateVersionAsync(version.Id);
+
+            await Assert.ThrowsAsync<TimetableVersionLockedException>(() => timetableAdmin.RemovePlacementAsync(first.Id));
+            await Assert.ThrowsAsync<TimetableVersionLockedException>(() => timetableAdmin.PlaceAsync(version.Id, _sectionBId, _slotAId, _offeringId, teacherId));
+
+            await timetableAdmin.ReopenVersionAsync(version.Id);
+            Assert.Equal(TimetableVersionStatus.Draft, db.TimetableVersions.Single(v => v.Id == version.Id).Status);
+
+            await timetableAdmin.RemovePlacementAsync(first.Id);
+            Assert.Equal(1, db.Placements.Count(p => p.TimetableVersionId == version.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-TTB-002")]
+        public async Task A_published_version_cannot_be_reopened()
+        {
+            using var db = CreateContext();
+            var (timetableAdmin, version, _) = await PublishedVersionAsync(db);
+
+            await Assert.ThrowsAsync<InvalidTimetableVersionStatusTransitionException>(() => timetableAdmin.ReopenVersionAsync(version.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-TTB-001")]
+        public async Task A_period_slot_referenced_by_placements_cannot_be_removed_but_a_free_one_can()
+        {
+            using var db = CreateContext();
+            var teacherId = await RegisterTeacherAsync(db, "1");
+            await AssignAsync(db, teacherId, _sectionId);
+            var timetableAdmin = new TimetableAdmin(db, _clock);
+            var version = await timetableAdmin.DefineVersionAsync(_yearId);
+            await timetableAdmin.PlaceAsync(version.Id, _sectionId, _slotAId, _offeringId, teacherId);
+
+            await Assert.ThrowsAsync<PeriodSlotInUseException>(() => timetableAdmin.RemovePeriodSlotAsync(_slotAId));
+
+            await timetableAdmin.RemovePeriodSlotAsync(_slotBId);
+            Assert.False(db.PeriodSlots.Any(s => s.Id == _slotBId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-TTB-003")]
+        public async Task Validation_counts_an_offering_with_zero_placements_as_a_shortfall_for_a_timetabled_section()
+        {
+            using var db = CreateContext();
+            // A second current offering (Science, 1 period/wk) for the same grade-year profile, never placed.
+            var profileId = db.Sections.Single(s => s.Id == _sectionId).GradeYearProfileId;
+            var science = new Subject { SchoolId = 1, Code = "SCI", Name = new LocalizedName("علوم", "Science"), Category = "core" };
+            db.Subjects.Add(science);
+            db.SaveChanges();
+            db.CurriculumOfferings.Add(new CurriculumOffering
+            {
+                SchoolId = 1, AcademicYearId = _yearId, GradeYearProfileId = profileId, SubjectId = science.Id,
+                WeeklyPeriods = 1, IsAssessable = true, GpaWeight = 1m, EffectiveFromUtc = new DateTime(2027, 9, 1),
+            });
+            db.SaveChanges();
+
+            var teacherId = await RegisterTeacherAsync(db, "1");
+            await AssignAsync(db, teacherId, _sectionId);
+            var timetableAdmin = new TimetableAdmin(db, _clock);
+            var version = await timetableAdmin.DefineVersionAsync(_yearId);
+            await timetableAdmin.PlaceAsync(version.Id, _sectionId, _slotAId, _offeringId, teacherId);
+            await timetableAdmin.PlaceAsync(version.Id, _sectionId, _slotBId, _offeringId, teacherId); // Math complete, Science untouched
+
+            await Assert.ThrowsAsync<IncompletePlacementException>(() => timetableAdmin.ValidateVersionAsync(version.Id));
+        }
     }
 }

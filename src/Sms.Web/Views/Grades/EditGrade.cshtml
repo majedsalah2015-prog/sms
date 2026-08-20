@@ -1,0 +1,30 @@
+@using System.Globalization
+@model GradeEditViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Edit grade", "تعديل الصف");
+    ViewData["Breadcrumb"] = T("Grades / Edit grade", "الصفوف / تعديل الصف");
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"] — @Model.Code</h1><p class="text-muted mb-0">@T("Stage, code, names and order. Codes are unique per school (BR-GRD-009); the promotion path and graduating flag are edited on the ladder itself.", "المرحلة والرمز والأسماء والترتيب. الرموز فريدة على مستوى المدرسة (BR-GRD-009)؛ ويُعدَّل مسار الترفيع وعلامة التخرج من السلم نفسه.")</p></div></div>
+
+<div class="sms-card p-4" style="max-width:640px">
+    <form method="post" asp-action="EditGrade" asp-route-id="@Model.Id" novalidate>
+        <input type="hidden" asp-for="Year" />
+        <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-8"><label class="form-label">@T("Stage", "المرحلة")</label><select asp-for="StageId" class="form-select"><option value="">@T("— stage —", "— المرحلة —")</option>@foreach (var s in Model.Stages) { <option value="@s.Id">@(isRtl ? s.Name.NameAr : s.Name.NameEn)</option> }</select></div>
+            <div class="col-md-4"><label class="form-label">@T("Code", "الرمز")</label><input asp-for="Code" class="form-control" dir="ltr" /></div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-6"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+            <div class="col-md-6"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+        </div>
+        <div class="row g-3 mb-3">
+            <div class="col-md-4"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="Order" class="form-control" type="number" min="1" /></div>
+        </div>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year">@T("Cancel", "إلغاء")</a>
+    </form>
+</div>

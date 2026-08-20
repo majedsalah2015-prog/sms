@@ -1,0 +1,97 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model ValidationBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Conflict & validation board", "لوحة التعارضات والتحقق");
+    ViewData["Breadcrumb"] = T("Timetable / Validation", "الجدول الدراسي / التحقق");
+    ViewData["TtYear"] = Model.Year?.Id; ViewData["TtVersion"] = Model.Version?.Id;
+    var yid = Model.Year?.Id; var vid = Model.Version?.Id;
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "val-help", Title = T("Validation board — help", "لوحة التحقق — مساعدة"),
+        Intro = T("Everything that stands between this version and Validated: completeness per section × offering (BR-TTB-003), hard double-bookings (BR-TTB-004 — the builder blocks new ones, this lists any that slipped in through later data changes), and soft warnings with the quality score (BR-TTB-005, never blocking). Click a row to open the builder at that section.", "كل ما يقف بين هذا الإصدار وحالة «مُتحقَّق»: الاكتمال لكل شعبة × مادة (BR-TTB-003)، الحجوزات المزدوجة الصارمة (BR-TTB-004 — المنشئ يمنع الجديدة، وهنا تُعرض ما تسلل عبر تغييرات لاحقة)، والتنبيهات المرنة مع درجة الجودة (BR-TTB-005، لا تمنع). انقر صفاً لفتح المنشئ عند تلك الشعبة."),
+        Items = new[] { new HelpPanelViewModel.Item(T("Validate", "تحقق"), T("Moves Draft → Validated and locks editing (WF-12). The engine re-checks completeness itself; the board is the preview.", "ينقل المسودة → مُتحقَّق ويقفل التحرير (WF-12). المحرك يعيد فحص الاكتمال بنفسه؛ اللوحة معاينة.")) },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All violations listed, click-to-locate.", "كل المخالفات مدرجة مع الانتقال إلى موضعها.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="version" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var v in Model.Versions) { <option value="@v.Id" selected="@(v.Id == vid)">@TimetableLabels.VersionLabel(v, v.TermId == null ? null : Model.Terms.GetValueOrDefault(v.TermId.Value), isRtl) · @TimetableLabels.VersionStatus(v.Status, isRtl)</option> }</select>
+        </form>
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+@if (Model.Version == null) { <div class="alert alert-info">@T("No timetable version selected.", "لم يُحدَّد إصدار جدول.")</div> }
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-3"><div class="sms-card p-3 text-center"><div class="small text-muted">@T("Completeness rows short/over", "صفوف ناقصة/زائدة")</div><div class="h3 mb-0 @(Model.ShortfallRows == 0 ? "text-success" : "text-danger")">@Model.ShortfallRows</div></div></div>
+        <div class="col-md-3"><div class="sms-card p-3 text-center"><div class="small text-muted">@T("Hard conflicts", "تعارضات صارمة")</div><div class="h3 mb-0 @(Model.HardConflicts.Count == 0 ? "text-success" : "text-danger")">@Model.HardConflicts.Count</div></div></div>
+        <div class="col-md-3"><div class="sms-card p-3 text-center"><div class="small text-muted">@T("Soft warnings", "تنبيهات مرنة")</div><div class="h3 mb-0 @(Model.Warnings.Count == 0 ? "text-success" : "text-warning")">@Model.Warnings.Count</div></div></div>
+        <div class="col-md-3"><div class="sms-card p-3 text-center"><div class="small text-muted">@T("Quality score", "درجة الجودة")</div><div class="h3 mb-0">@Model.QualityScore<span class="small text-muted">/100</span></div></div></div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center mb-3">
+        <span class="badge @TimetableLabels.VersionBadge(Model.Version.Status)">@TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span>
+        @if (Model.Version.Status == TimetableVersionStatus.Draft) { <form method="post" asp-action="ValidateVersion" asp-route-id="@vid" asp-route-year="@yid"><button class="btn btn-sm btn-primary" type="submit" disabled="@(!Model.ReadyToValidate)"><i class="bi bi-clipboard-check me-1"></i>@T("Validate version (WF-12)", "تحقق من الإصدار (WF-12)")</button></form> @if (!Model.ReadyToValidate) { <span class="small text-muted">@T("resolve the items below first", "عالج البنود أدناه أولاً")</span> } }
+        @if (Model.Version.Status == TimetableVersionStatus.Validated) { <form method="post" asp-action="ReopenVersion" asp-route-id="@vid" asp-route-year="@yid"><button class="btn btn-sm btn-outline-secondary" type="submit">@T("Reopen for editing", "إعادة فتح للتحرير")</button></form> <a class="btn btn-sm btn-success" asp-action="Publish" asp-route-year="@yid" asp-route-version="@vid">@T("Go to publication", "إلى النشر")</a> }
+    </div>
+
+    @if (Model.SectionsWithoutShape.Count > 0) { <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>@T("Sections whose stage has no timetable shape this year:", "شعب مرحلتها بلا شكل جدول هذا العام:") @string.Join(", ", Model.SectionsWithoutShape.Select(s => TimetableLabels.SectionName(s, isRtl))) — <a asp-action="Shape" asp-route-year="@yid">@T("shape designer", "مصمم الشكل")</a></div> }
+
+    <div class="row g-3">
+        <div class="col-xl-6">
+            <div class="sms-card">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Completeness — placed vs required (BR-TTB-003)", "الاكتمال — الموضوع مقابل المطلوب (BR-TTB-003)")</h2></div>
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <thead><tr><th>@T("Section", "الشعبة")</th><th>@T("Offering", "المادة")</th><th class="text-center">@T("Placed/req.", "موضوع/مطلوب")</th><th>@T("Assigned teachers", "المعلمون المُسنَدون")</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in Model.Completeness)
+                    {
+                        var ok = c.Placed == c.Required;
+                        <tr class="@(ok ? "" : c.Placed > c.Required ? "table-danger" : "table-warning")">
+                            <td><a asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@c.Section.Id">@TimetableLabels.SectionName(c.Section, isRtl)</a></td>
+                            <td><code>@c.Subject.Code</code> @TimetableLabels.SubjectName(c.Subject, isRtl)</td>
+                            <td class="text-center">@c.Placed/@c.Required @(ok ? "✓" : "")</td>
+                            <td class="small">@(c.AssignedTeachers.Count == 0 ? T("⚠ none (BR-TCH-002)", "⚠ لا أحد (BR-TCH-002)") : string.Join(", ", c.AssignedTeachers.Select(Teacher)))</td>
+                        </tr>
+                    }
+                    @if (Model.Completeness.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-4">@T("No placements yet — nothing to check.", "لا مواضع بعد — لا شيء للفحص.")</td></tr> }
+                    </tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="sms-card mb-3">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Hard constraints (BR-TTB-004)", "القيود الصارمة (BR-TTB-004)")</h2></div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var h in Model.HardConflicts)
+                    {
+                        <li class="list-group-item small"><span class="badge text-bg-danger me-1">@h.Kind</span>@TimetableLabels.Day(h.Slot.DayOfWeek, isRtl) #@h.Slot.SequenceNumber — @foreach (var c in h.Cells) { <a class="me-2" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@c.Section.Id">@TimetableLabels.SectionName(c.Section, isRtl) · @c.Subject.Code · @Teacher(c.Teacher)@(c.Room == null ? "" : " · " + c.Room.Code)</a> }</li>
+                    }
+                    @if (Model.HardConflicts.Count == 0) { <li class="list-group-item small text-success">✓ @T("No double-bookings.", "لا حجوزات مزدوجة.")</li> }
+                </ul>
+            </div>
+            <div class="sms-card">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Soft constraints (BR-TTB-005) — warn + score", "القيود المرنة (BR-TTB-005) — تنبيه ودرجة")</h2></div>
+                <ul class="list-group list-group-flush">
+                    @foreach (var w in Model.Warnings)
+                    {
+                        <li class="list-group-item small"><span class="badge text-bg-warning me-1">⚠</span>@TimetableLabels.Day(w.Warning.DayOfWeek, isRtl): @TimetableLabels.Warning(w.Warning, isRtl)
+                            @if (w.Section != null) { <a class="ms-1" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-section="@w.Section.Id">@TimetableLabels.SectionName(w.Section, isRtl)</a> }
+                            @if (w.Subject != null) { <span class="ms-1"><code>@w.Subject.Code</code></span> }
+                            @if (w.Teacher != null) { <a class="ms-1" asp-action="Builder" asp-route-year="@yid" asp-route-version="@vid" asp-route-mode="teacher" asp-route-teacher="@w.Warning.TeacherProfileId">@Teacher(w.Teacher)</a> }
+                        </li>
+                    }
+                    @if (Model.Warnings.Count == 0) { <li class="list-group-item small text-success">✓ @T("No soft warnings.", "لا تنبيهات مرنة.")</li> }
+                </ul>
+                <div class="p-2 form-text">@T("Scored here: subject repeated in a day, teacher consecutive run over 4, teacher idle gaps. Heavy-subjects-early, home-room stability and room travel need config with no source yet — not scored.", "المحتسب هنا: تكرار المادة في اليوم، تتابع المعلم فوق 4، فجوات المعلم. المواد الثقيلة مبكراً وثبات القاعة ومسافة التنقل تحتاج إعدادات لا مصدر لها بعد — غير محتسبة.")</div>
+            </div>
+        </div>
+    </div>
+}

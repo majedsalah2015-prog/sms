@@ -274,5 +274,58 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(SectionStatus.Closed, db.Sections.Single(s => s.Id == section.Id).Status);
         }
+
+        // --- edit / delete ------------------------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-SCN-001")]
+        public async Task Editing_a_section_applies_the_same_plan_gender_and_name_rules()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var a = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+
+            var updated = await admin.UpdateSectionAsync(a.Id, "ثالث-أ (بنين)", "3-A boys", 2, GenderPolicy.Boys);
+            Assert.Equal("3-A boys", db.Sections.Single(s => s.Id == a.Id).NameEn);
+            Assert.Equal(GenderPolicy.Boys, updated.GenderPolicy);
+
+            await Assert.ThrowsAsync<SectionCapacityPlanExceededException>(() => admin.UpdateSectionAsync(a.Id, "أ", "3-A", 4, GenderPolicy.Mixed)); // plan size is 3
+            await Assert.ThrowsAsync<DuplicateSectionNameException>(() => admin.UpdateSectionAsync(a.Id, "أ", "3-B", 3, GenderPolicy.Mixed));
+        }
+
+        [Fact]
+        public async Task Capacity_cannot_drop_below_the_currently_assigned_students()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var section = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            await admin.AssignMembershipAsync(section.Id, await CreateEnrollment(db), new DateTime(2026, 9, 1));
+            await admin.AssignMembershipAsync(section.Id, await CreateEnrollment(db), new DateTime(2026, 9, 1));
+
+            await Assert.ThrowsAsync<SectionInUseException>(() => admin.UpdateSectionAsync(section.Id, "ثالث-أ", "3-A", 1, GenderPolicy.Mixed));
+            await admin.UpdateSectionAsync(section.Id, "ثالث-أ", "3-A", 2, GenderPolicy.Mixed);
+            Assert.Equal(2, db.Sections.Single(s => s.Id == section.Id).Capacity);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-007")]
+        public async Task A_section_is_deletable_only_while_it_never_had_students_or_a_homeroom()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var fresh = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var used = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+            var enrollmentId = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(used.Id, enrollmentId, new DateTime(2026, 9, 1));
+            await admin.TransferMembershipAsync(enrollmentId, fresh.Id, "BALANCE", new DateTime(2026, 10, 1)); // `used` now has 0 current members but history
+
+            await Assert.ThrowsAsync<SectionInUseException>(() => admin.DeleteSectionAsync(used.Id));
+            Assert.Single(db.Sections.Where(s => s.Id == used.Id));
+
+            var empty = await admin.DefineSectionAsync(_profileId, "ثالث-ج", "3-C", 3, GenderPolicy.Mixed);
+            await admin.DeleteSectionAsync(empty.Id);
+            Assert.Empty(db.Sections.Where(s => s.Id == empty.Id));
+        }
     }
 }

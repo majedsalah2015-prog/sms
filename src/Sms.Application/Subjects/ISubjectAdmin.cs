@@ -15,6 +15,19 @@ namespace Sms.Application.Subjects
         Task<Subject> DefineSubjectAsync(
             string code, string nameAr, string nameEn, string category, int? departmentId = null, CancellationToken cancellationToken = default);
 
+        /// <summary>Edits a subject's code/names/category/department; throws <see cref="Common.Exceptions.DuplicateSubjectCodeException"/> on a repeated code.</summary>
+        Task<Subject> UpdateSubjectAsync(
+            int subjectId, string code, string nameAr, string nameEn, string category, int? departmentId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-deletes (deactivates) a subject; throws <see cref="Common.Exceptions.SubjectInUseException"/> while any current (not end-dated) curriculum offering references it. Ended offerings and qualifications stay as history.</summary>
+        Task DeactivateSubjectAsync(int subjectId, CancellationToken cancellationToken = default);
+
+        /// <summary>Edits a department's names/head teacher.</summary>
+        Task<Department> UpdateDepartmentAsync(int departmentId, string nameAr, string nameEn, int? headTeacherUserId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>Soft-deletes (deactivates) a department; throws <see cref="Common.Exceptions.SubjectInUseException"/> while active subjects are assigned to it.</summary>
+        Task DeactivateDepartmentAsync(int departmentId, CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.DuplicateOfferingException"/> or <see cref="Common.Exceptions.InvalidOfferingWeightException"/>.</summary>
         Task<CurriculumOffering> DefineOfferingAsync(
             int gradeYearProfileId, int subjectId, int weeklyPeriods, bool isAssessable, decimal gpaWeight,

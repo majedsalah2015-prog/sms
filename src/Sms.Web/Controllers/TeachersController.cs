@@ -97,6 +97,19 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { year });
         }
 
+        [HttpPost("{teacherProfileId:int}/remove")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RemoveDesignation(int teacherProfileId, int? year)
+        {
+            try
+            {
+                await _teachers.RemoveDesignationAsync(teacherProfileId);
+                TempData["Flash"] = T("Teacher designation removed (the employee record is kept).", "أُزيل تعيين المعلم (سجل الموظف محفوظ).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
         // ================================================================== 8.2 Assignment matrix
 
         [HttpGet("matrix")]

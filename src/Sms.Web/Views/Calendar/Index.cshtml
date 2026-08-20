@@ -19,7 +19,7 @@
         <p class="text-muted mb-0">@T("Weekends come from the working-week setting; painted days override them (BR-CAL-001/002). Instructional days:", "عطلات نهاية الأسبوع من إعداد أسبوع العمل؛ الأيام المعيَّنة تتجاوزها (BR-CAL-001/002). الأيام الدراسية:") <strong>@Model.InstructionalDays</strong> · @Model.OverrideCount @T("overrides", "تجاوزات")</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2 align-items-center">
-            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn) · @y.Status</option> }</select>
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select>
             <input type="hidden" name="hijri" value="@(!Model.HijriOverlay ? "true" : "false")" />
             <button class="btn btn-sm @(Model.HijriOverlay ? "btn-primary" : "btn-outline-secondary")" type="submit" title="@T("Toggle Hijri overlay", "تبديل عرض الهجري")"><i class="bi bi-moon-stars"></i> @T("Hijri", "هجري")</button>
         </form>

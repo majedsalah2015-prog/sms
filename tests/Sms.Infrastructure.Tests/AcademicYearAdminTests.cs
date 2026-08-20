@@ -5,7 +5,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Common;
+using Sms.Domain.Grades;
 using Sms.Domain.Schools;
+using Sms.Domain.Students;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
@@ -207,6 +210,80 @@ namespace Sms.Infrastructure.Tests
             var updated = await admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول (محدث)", "Semester 1 (updated)", new DateTime(2026, 9, 1), new DateTime(2027, 1, 31));
             Assert.Equal(s1.Id, updated.Id);
             Assert.Equal(2, db.Semesters.Count(s => s.AcademicYearId == year.Id));
+        }
+
+        // --- Edit / delete: only while no student is enrolled -----------------------
+
+        private static async Task EnrollOneStudent(AppDbContext db, int yearId)
+        {
+            var stage = new Stage { Name = new LocalizedName("مرحلة", "Stage"), SequenceOrder = 1, DefaultGenderPolicy = GenderPolicy.Mixed };
+            db.Stages.Add(stage);
+            await db.SaveChangesAsync();
+            var grade = new GradeLevel { StageId = stage.Id, Code = "G1", Name = new LocalizedName("صف", "Grade 1"), SequenceOrder = 1 };
+            db.GradeLevels.Add(grade);
+            await db.SaveChangesAsync();
+            var profile = new GradeYearProfile { GradeLevelId = grade.Id, AcademicYearId = yearId, GenderPolicy = GenderPolicy.Mixed, TargetSections = 1, TargetSectionSize = 25 };
+            db.GradeYearProfiles.Add(profile);
+            var student = new Student
+            {
+                StudentNo = "STU-1", FirstNameAr = "س", FatherNameAr = "أ", GrandfatherNameAr = "ج", FamilyNameAr = "ع",
+                FirstNameEn = "S", FatherNameEn = "F", GrandfatherNameEn = "G", FamilyNameEn = "Fam", Gender = Gender.Male, DateOfBirth = new DateTime(2018, 1, 1), NationalityLookupId = 1,
+            };
+            db.Students.Add(student);
+            await db.SaveChangesAsync();
+            db.Enrollments.Add(new Enrollment { AcademicYearId = yearId, StudentId = student.Id, GradeYearProfileId = profile.Id, EnrollmentDate = new DateTime(2026, 9, 1), SourceType = EnrollmentSourceType.Admission });
+            await db.SaveChangesAsync();
+        }
+
+        [Fact]
+        [BusinessRule("BR-AYR-001")]
+        public async Task A_year_without_enrollments_can_be_edited_under_the_same_date_rules()
+        {
+            using var db = CreateContext();
+            var admin = new AcademicYearAdmin(db);
+            var year = await DefineYear(admin, new DateTime(2026, 9, 1), new DateTime(2027, 6, 30));
+            await admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول", "Semester 1", new DateTime(2026, 9, 1), new DateTime(2027, 1, 31));
+
+            var updated = await admin.UpdateYearAsync(year.Id, "عام محدث", "2026-2027 (v2)", "١٤٤٨هـ", new DateTime(2026, 8, 25), new DateTime(2027, 7, 15));
+            Assert.Equal("2026-2027 (v2)", db.AcademicYears.Single(y => y.Id == year.Id).LabelEn);
+            Assert.Equal(new DateTime(2026, 8, 25), updated.StartDate);
+
+            // invalid span
+            await Assert.ThrowsAsync<InvalidAcademicYearDatesException>(() =>
+                admin.UpdateYearAsync(year.Id, "أ", "A", "h", new DateTime(2026, 9, 1), new DateTime(2026, 11, 1)));
+            // shrinking below an existing semester
+            await Assert.ThrowsAsync<InvalidPeriodDatesException>(() =>
+                admin.UpdateYearAsync(year.Id, "أ", "A", "h", new DateTime(2026, 10, 1), new DateTime(2027, 6, 30)));
+        }
+
+        [Fact]
+        public async Task A_year_with_enrolled_students_can_be_neither_edited_nor_deleted()
+        {
+            using var db = CreateContext();
+            var admin = new AcademicYearAdmin(db);
+            var year = await DefineYear(admin, new DateTime(2026, 9, 1), new DateTime(2027, 6, 30));
+            await EnrollOneStudent(db, year.Id);
+
+            await Assert.ThrowsAsync<AcademicYearInUseException>(() =>
+                admin.UpdateYearAsync(year.Id, "أ", "A", "h", new DateTime(2026, 9, 1), new DateTime(2027, 6, 30)));
+            await Assert.ThrowsAsync<AcademicYearInUseException>(() => admin.DeleteYearAsync(year.Id));
+            Assert.Single(db.AcademicYears.Where(y => y.Id == year.Id));
+        }
+
+        [Fact]
+        public async Task Deleting_a_year_without_enrollments_removes_it_with_its_semesters_and_terms()
+        {
+            using var db = CreateContext();
+            var admin = new AcademicYearAdmin(db);
+            var year = await DefineYear(admin, new DateTime(2026, 9, 1), new DateTime(2027, 6, 30));
+            var s1 = await admin.DefineSemesterAsync(year.Id, 1, "الفصل الأول", "Semester 1", new DateTime(2026, 9, 1), new DateTime(2027, 1, 31));
+            await admin.DefineTermAsync(s1.Id, 1, "الفترة الأولى", "Term 1", new DateTime(2026, 9, 1), new DateTime(2026, 11, 15));
+
+            await admin.DeleteYearAsync(year.Id);
+
+            Assert.Empty(db.AcademicYears.Where(y => y.Id == year.Id));
+            Assert.Empty(db.Semesters.Where(s => s.AcademicYearId == year.Id));
+            Assert.Empty(db.Terms.Where(t => t.AcademicYearId == year.Id));
         }
     }
 }

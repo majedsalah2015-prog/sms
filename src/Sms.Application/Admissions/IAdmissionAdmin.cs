@@ -21,6 +21,9 @@ namespace Sms.Application.Admissions
         /// <summary>Soft-removes a campaign (IsActive = false); refused while any non-terminal application exists on it.</summary>
         Task DeactivateCampaignAsync(int campaignId, CancellationToken cancellationToken = default);
 
+        /// <summary>Hard-deletes a campaign together with all its applications (assessments, waiting-list rows). Students already registered from it are kept; only their admission trail goes. Use <see cref="DeactivateCampaignAsync"/> to close a campaign while keeping history.</summary>
+        Task DeleteCampaignAsync(int campaignId, CancellationToken cancellationToken = default);
+
         /// <summary>Hard-deletes an application together with its assessments/waiting-list rows; refused once it is Registered (linked to a student record).</summary>
         Task DeleteApplicationAsync(int applicationId, CancellationToken cancellationToken = default);
 

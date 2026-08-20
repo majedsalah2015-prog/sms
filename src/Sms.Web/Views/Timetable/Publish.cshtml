@@ -1,0 +1,118 @@
+@using System.Globalization
+@using Sms.Domain.Timetable
+@model PublishConsoleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Publication console", "وحدة النشر");
+    ViewData["Breadcrumb"] = T("Timetable / Publication", "الجدول الدراسي / النشر");
+    ViewData["TtYear"] = Model.Year?.Id; ViewData["TtVersion"] = Model.Version?.Id;
+    var yid = Model.Year?.Id; var vid = Model.Version?.Id;
+    string Teacher(Sms.Domain.Employees.Employee e) => TimetableLabels.TeacherName(e, isRtl);
+    string CellText(PlacementCell? c) => c == null ? "—" : $"{c.Subject.Code} · {Teacher(c.Teacher)}{(c.Room == null ? "" : " · " + c.Room.Code)}";
+    var help = new HelpPanelViewModel
+    {
+        Id = "pub-help", Title = T("Publication — help", "النشر — مساعدة"),
+        Intro = T("WF-12: Draft → Validated → Published (BR-TTB-002). Publishing generates dated sessions from the weekly pattern × academic calendar for the chosen range, working days only (BR-TTB-006), and switches portal/personal views to this version. The VP approval step of WF-12 is a direct Validate→Publish here (same status-table substitution as the other workflows in this build).", "WF-12: مسودة → مُتحقَّق → منشور (BR-TTB-002). النشر يولّد حصصاً مؤرخة من النمط الأسبوعي × التقويم الدراسي للنطاق المختار، أيام العمل فقط (BR-TTB-006)، ويحوّل البوابة والعروض الشخصية إلى هذا الإصدار. خطوة موافقة الوكيل في WF-12 هنا تحقق→نشر مباشر (البديل نفسه بجدول الحالات كسائر المسارات في هذا الإصدار)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Diff vs operational", "الفرق مقابل المُشغَّل"), T("Cell-by-cell differences against the currently published version of this year — what an amendment changes for whom (BR-TTB-009). Past sessions of the old version are never rewritten.", "فروق خلية بخلية مقابل الإصدار المنشور حالياً لهذا العام — ما يغيّره التعديل ولمن (BR-TTB-009). حصص الإصدار القديم السابقة لا تُعاد كتابتها.")),
+            new HelpPanelViewModel.Item(T("Range", "النطاق"), T("Defaults to today (or the term/year start) through the term/year end. Weekend days come from Regional.WorkingDays; calendar holidays are skipped.", "افتراضياً من اليوم (أو بداية الفصل/العام) حتى نهاية الفصل/العام. أيام العطلة من Regional.WorkingDays؛ تُتخطى عطل التقويم.")),
+            new HelpPanelViewModel.Item(T("Operational version", "الإصدار المُشغَّل"), T("Exactly one is operational: the most recently published. Publishing a newer version supersedes it for all views; old sessions stay under their version.", "واحد فقط مُشغَّل: الأحدث نشراً. نشر إصدار أحدث يحل محله في كل العروض؛ الحصص القديمة تبقى تحت إصدارها.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Version diff vs current, checklist, WF-12 submission.", "فرق الإصدار مقابل الحالي، قائمة التحقق، تقديم WF-12.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+        </form>
+        @if (Model.Year != null) { <form method="post" asp-action="DefineVersion" asp-route-year="@yid" asp-route-returnTo="publish" class="d-flex gap-1"><select name="termId" class="form-select form-select-sm" style="width:9rem"><option value="">@T("whole year", "العام كاملاً")</option>@foreach (var t in Model.YearTerms) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("New draft", "مسودة جديدة")</button></form> }
+        <partial name="_HelpModal" model="help" /></div></div>
+<partial name="_TimetableNav" />
+
+@if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-5">
+            <div class="sms-card">
+                <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Versions", "الإصدارات") · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</h2></div>
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <thead><tr><th>@T("Version", "الإصدار")</th><th>@T("Status", "الحالة")</th><th class="text-end">@T("Placements", "المواضع")</th><th class="text-end">@T("Sessions", "الحصص")</th><th>@T("Published", "نُشر")</th></tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        var isOp = Model.CurrentPublished?.Id == r.Version.Id;
+                        <tr class="@(r.Version.Id == vid ? "table-active" : "")">
+                            <td><a asp-action="Publish" asp-route-year="@yid" asp-route-version="@r.Version.Id">@TimetableLabels.VersionLabel(r.Version, r.Term, isRtl)</a>@if (isOp) { <span class="badge text-bg-success ms-1" title="@T("operational (BR-TTB-002)", "مُشغَّل (BR-TTB-002)")">●</span> }</td>
+                            <td><span class="badge @TimetableLabels.VersionBadge(r.Version.Status)">@TimetableLabels.VersionStatus(r.Version.Status, isRtl)</span></td>
+                            <td class="text-end">@r.Placements</td><td class="text-end">@r.Sessions</td>
+                            <td class="small text-muted">@(r.Version.PublishedAtUtc?.ToString("yyyy-MM-dd") ?? "—")</td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-4">@T("No versions yet.", "لا إصدارات بعد.")</td></tr> }
+                    </tbody>
+                </table></div>
+            </div>
+        </div>
+        <div class="col-xl-7">
+            @if (Model.Version == null) { <div class="alert alert-info">@T("Select a version.", "اختر إصداراً.")</div> }
+            else
+            {
+                <div class="sms-card p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2"><h2 class="h6 mb-0">@T("Checklist", "قائمة التحقق") — @TimetableLabels.VersionLabel(Model.Version, Model.Version.TermId == null ? null : Model.Terms.GetValueOrDefault(Model.Version.TermId.Value), isRtl)</h2><span class="badge @TimetableLabels.VersionBadge(Model.Version.Status)">@TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span></div>
+                    <ul class="list-unstyled mb-3">
+                        @foreach (var c in Model.Checklist) { <li class="d-flex gap-2 small mb-1"><span class="@(c.Ok ? "text-success" : "text-warning")">@(c.Ok ? "✓" : "○")</span><span>@c.Label @if (c.Detail != null) { <span class="text-muted">— @c.Detail</span> }</span></li> }
+                    </ul>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Validation" asp-route-year="@yid" asp-route-version="@vid"><i class="bi bi-clipboard-check me-1"></i>@T("Validation board", "لوحة التحقق")</a>
+                        @if (Model.Version.Status == TimetableVersionStatus.Draft) { <form method="post" asp-action="ValidateVersion" asp-route-id="@vid" asp-route-year="@yid" asp-route-returnTo="publish"><button class="btn btn-sm btn-primary" type="submit">@T("Validate (WF-12)", "تحقق (WF-12)")</button></form> }
+                        @if (Model.Version.Status == TimetableVersionStatus.Validated) { <form method="post" asp-action="ReopenVersion" asp-route-id="@vid" asp-route-year="@yid" asp-route-returnTo="publish"><button class="btn btn-sm btn-outline-secondary" type="submit">@T("Reopen", "إعادة فتح")</button></form> }
+                    </div>
+                </div>
+
+                @if (Model.CanPublish)
+                {
+                    <div class="sms-card p-3 mb-3 border-success">
+                        <h2 class="h6 mb-2"><i class="bi bi-send-check me-1"></i>@T("Publish & generate sessions (BR-TTB-006)", "نشر وتوليد الحصص (BR-TTB-006)")</h2>
+                        <form method="post" asp-action="PublishVersion" asp-route-id="@vid" asp-route-year="@yid" onsubmit="return confirm('@T("Publish this version? Views switch immediately.", "نشر هذا الإصدار؟ تتحول العروض فوراً.")');">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-sm-4"><label class="form-label small">@T("From", "من")</label><input name="rangeStart" type="date" class="form-control form-control-sm" value="@Model.RangeStart.ToString("yyyy-MM-dd")" /></div>
+                                <div class="col-sm-4"><label class="form-label small">@T("To", "إلى")</label><input name="rangeEnd" type="date" class="form-control form-control-sm" value="@Model.RangeEnd.ToString("yyyy-MM-dd")" /></div>
+                                <div class="col-sm-4"><button class="btn btn-success btn-sm w-100" type="submit">@T("Publish", "نشر")</button></div>
+                            </div>
+                            <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="acknowledgeSoft" value="true" id="ack" /><label class="form-check-label small" for="ack">@T("I acknowledge the soft-constraint warnings and quality score (BR-TTB-005).", "أقرّ بتنبيهات القيود المرنة ودرجة الجودة (BR-TTB-005).")</label></div>
+                            <div class="form-text">@T("Weekend days skipped:", "أيام العطلة المتخطاة:") @string.Join(", ", Model.WeekendDays.Select(d => TimetableLabels.Day(d, isRtl))) · @T("calendar holidays/weekend overrides skipped (BR-CAL-003).", "تُتخطى عطل التقويم وتجاوزات العطلة (BR-CAL-003).")</div>
+                        </form>
+                    </div>
+                }
+                else if (Model.Version.Status == TimetableVersionStatus.Published)
+                {
+                    <div class="alert alert-success py-2 small">✓ @T("Published", "منشور") @(Model.Version.PublishedAtUtc?.ToString("yyyy-MM-dd HH:mm")) UTC — @T("sessions exist; daily operations run in the cover console.", "الحصص موجودة؛ العمليات اليومية في وحدة التغطية.") <a asp-action="Cover">@T("Open cover console", "فتح وحدة التغطية")</a></div>
+                }
+
+                <div class="sms-card">
+                    <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Diff vs operational version", "الفرق مقابل الإصدار المُشغَّل") @if (Model.CurrentPublished != null && Model.CurrentPublished.Id != Model.Version.Id) { <span class="text-muted small">(v@(Model.CurrentPublished.Id))</span> }</h2></div>
+                    @if (Model.CurrentPublished == null) { <div class="p-3 small text-muted">@T("No published version yet — this will be the first.", "لا إصدار منشور بعد — سيكون هذا الأول.")</div> }
+                    else if (Model.CurrentPublished.Id == Model.Version.Id) { <div class="p-3 small text-muted">@T("This is the operational version.", "هذا هو الإصدار المُشغَّل.")</div> }
+                    else if (Model.Diff.Count == 0) { <div class="p-3 small text-success">✓ @T("Identical to the operational version.", "مطابق للإصدار المُشغَّل.")</div> }
+                    else
+                    {
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle small">
+                            <thead><tr><th></th><th>@T("Section", "الشعبة")</th><th>@T("Slot", "الحصة")</th><th>@T("Before", "قبل")</th><th>@T("After", "بعد")</th></tr></thead>
+                            <tbody>
+                            @foreach (var d in Model.Diff)
+                            {
+                                <tr><td><span class="badge @(d.Kind == "added" ? "text-bg-success" : d.Kind == "removed" ? "text-bg-danger" : "text-bg-warning")">@(d.Kind == "added" ? T("added", "أُضيف") : d.Kind == "removed" ? T("removed", "أُزيل") : T("changed", "تغيّر"))</span></td>
+                                    <td>@TimetableLabels.SectionName(d.Section, isRtl)</td><td>@TimetableLabels.Day(d.Slot.DayOfWeek, isRtl) #@d.Slot.SequenceNumber</td><td>@CellText(d.Before)</td><td>@CellText(d.After)</td></tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
