@@ -9,6 +9,6 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only: only announcements the school has sent appear here (BR-SEC-012).", "للقراءة فقط: تظهر هنا الإعلانات التي أرسلتها المدرسة فقط (BR-SEC-012).")</p></div></div>
 
 <div class="sms-card"><div class="list-group list-group-flush">
-    @foreach (var a in Model.Announcements) { <div class="list-group-item py-3"><div class="d-flex align-items-center gap-2"><span class="fw-semibold">@(isRtl ? a.TitleAr : a.TitleEn)</span><span class="badge text-bg-light border small">@a.AudienceScope</span><span class="ms-auto small text-muted">@(a.SentAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "")</span></div><div class="mt-2" style="white-space:pre-wrap">@(isRtl ? a.BodyAr : a.BodyEn)</div></div> }
+    @foreach (var a in Model.Announcements) { <div class="list-group-item py-3"><div class="d-flex align-items-center gap-2"><h2 class="h6 fw-semibold mb-0">@(isRtl ? a.TitleAr : a.TitleEn)</h2><span class="badge text-bg-light border small">@a.AudienceScope</span><span class="ms-auto small text-muted">@(a.SentAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "")</span></div><div class="mt-2" style="white-space:pre-wrap">@(isRtl ? a.BodyAr : a.BodyEn)</div></div> }
     @if (Model.Announcements.Count == 0) { <div class="list-group-item text-muted">@T("No announcements yet.", "لا إعلانات بعد.")</div> }
 </div></div>

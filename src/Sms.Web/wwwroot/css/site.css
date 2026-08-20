@@ -11,7 +11,7 @@
   --sms-sidebar-bg: #ffffff;
   --sms-sidebar-border: #e6e9f2;
   --sms-topbar-bg: rgba(255, 255, 255, 0.88);
-  --sms-muted: #6b7280;
+  --sms-muted: #5b6270; /* E-803: 5.6:1 on --sms-body-bg — #6b7280 fell to ~4.47:1 off-white (WCAG 1.4.3) */
   --sms-text: #111827;
   --sms-nav-hover-bg: #eef2ff;
   --sms-nav-active-color: #1d4ed8;
@@ -208,6 +208,18 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
 .sms-table td, .sms-table th { vertical-align: middle; }
 .form-check-input:checked { background-color: var(--sms-primary); border-color: var(--sms-primary); }
 .sms-flip { transform: scaleX(-1); }
+
+/* ---- E-803 P1 (WCAG/RTL sweep) ---- */
+/* Latin identifiers (INV/RCP/STU numbers, ISO dates) must not reorder inside RTL runs */
+.sms-table code, td code, th code, dd code, .list-group-item code { unicode-bidi: isolate; direction: ltr; display: inline-block; }
+.sms-num { unicode-bidi: isolate; direction: ltr; display: inline-block; }
+/* amber readable as foreground text (text-warning is 1.63:1 on white) */
+.sms-amber { color: #8a6100; }
+/* visible focus for custom interactive surfaces */
+.sms-nav-link:focus-visible, .sms-tile:focus-visible, .sms-card a:focus-visible, .sms-inline-link:focus-visible,
+.sms-icon-btn:focus-visible, .sms-stepper__item:focus-visible, .sms-cal-day:focus-visible {
+  outline: 2px solid var(--sms-primary); outline-offset: 2px;
+}
 .validation-summary-valid { display: none; }
 input[type=number].form-control { min-width: 4.5rem; }
 

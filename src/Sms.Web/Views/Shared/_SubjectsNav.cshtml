@@ -12,9 +12,12 @@
     };
     bool Active((string Action, string Tab, string En, string Ar, string Icon) t) => string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) && (t.Tab == "" || t.Tab == tab);
 }
+<nav aria-label="@(isRtl ? "المواد" : "Subjects")">
 <ul class="nav nav-pills sms-subnav mb-4">
     @foreach (var t in tabs)
     {
-        <li class="nav-item"><a class="nav-link @(Active(t) ? "active" : "")" asp-controller="Subjects" asp-action="@t.Action" asp-route-tab="@(t.Tab == "" ? null : t.Tab)"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+        var isActive = Active(t);
+        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="Subjects" asp-action="@t.Action" asp-route-tab="@(t.Tab == "" ? null : t.Tab)"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
     }
 </ul>
+</nav>

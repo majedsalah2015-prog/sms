@@ -23,7 +23,7 @@
             <div class="col-md-4"><label class="form-label">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
         </div>
         <div class="mb-3"><label class="form-label">@T("Reason (optional, recorded in the audit trail)", "السبب (اختياري، يُسجَّل في سجل التدقيق)")</label><input asp-for="Reason" class="form-control" /></div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
         <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

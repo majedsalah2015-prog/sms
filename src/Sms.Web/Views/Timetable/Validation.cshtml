@@ -38,18 +38,19 @@ else
 
     <div class="d-flex gap-2 align-items-center mb-3">
         <span class="badge @TimetableLabels.VersionBadge(Model.Version.Status)">@TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span>
-        @if (Model.Version.Status == TimetableVersionStatus.Draft) { <form method="post" asp-action="ValidateVersion" asp-route-id="@vid" asp-route-year="@yid"><button class="btn btn-sm btn-primary" type="submit" disabled="@(!Model.ReadyToValidate)"><i class="bi bi-clipboard-check me-1"></i>@T("Validate version (WF-12)", "تحقق من الإصدار (WF-12)")</button></form> @if (!Model.ReadyToValidate) { <span class="small text-muted">@T("resolve the items below first", "عالج البنود أدناه أولاً")</span> } }
+        @if (Model.Version.Status == TimetableVersionStatus.Draft) { <form method="post" asp-action="ValidateVersion" asp-route-id="@vid" asp-route-year="@yid"><button class="btn btn-sm btn-primary" type="submit" disabled="@(!Model.ReadyToValidate)"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>@T("Validate version (WF-12)", "تحقق من الإصدار (WF-12)")</button></form> @if (!Model.ReadyToValidate) { <span class="small text-muted">@T("resolve the items below first", "عالج البنود أدناه أولاً")</span> } }
         @if (Model.Version.Status == TimetableVersionStatus.Validated) { <form method="post" asp-action="ReopenVersion" asp-route-id="@vid" asp-route-year="@yid"><button class="btn btn-sm btn-outline-secondary" type="submit">@T("Reopen for editing", "إعادة فتح للتحرير")</button></form> <a class="btn btn-sm btn-success" asp-action="Publish" asp-route-year="@yid" asp-route-version="@vid">@T("Go to publication", "إلى النشر")</a> }
     </div>
 
-    @if (Model.SectionsWithoutShape.Count > 0) { <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>@T("Sections whose stage has no timetable shape this year:", "شعب مرحلتها بلا شكل جدول هذا العام:") @string.Join(", ", Model.SectionsWithoutShape.Select(s => TimetableLabels.SectionName(s, isRtl))) — <a asp-action="Shape" asp-route-year="@yid">@T("shape designer", "مصمم الشكل")</a></div> }
+    @if (Model.SectionsWithoutShape.Count > 0) { <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Sections whose stage has no timetable shape this year:", "شعب مرحلتها بلا شكل جدول هذا العام:") @string.Join(", ", Model.SectionsWithoutShape.Select(s => TimetableLabels.SectionName(s, isRtl))) — <a asp-action="Shape" asp-route-year="@yid">@T("shape designer", "مصمم الشكل")</a></div> }
 
     <div class="row g-3">
         <div class="col-xl-6">
             <div class="sms-card">
                 <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Completeness — placed vs required (BR-TTB-003)", "الاكتمال — الموضوع مقابل المطلوب (BR-TTB-003)")</h2></div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                    <thead><tr><th>@T("Section", "الشعبة")</th><th>@T("Offering", "المادة")</th><th class="text-center">@T("Placed/req.", "موضوع/مطلوب")</th><th>@T("Assigned teachers", "المعلمون المُسنَدون")</th></tr></thead>
+                    <caption class="visually-hidden">@T("Completeness: placed versus required periods", "الاكتمال: الحصص الموضوعة مقابل المطلوبة")</caption>
+                    <thead><tr><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Offering", "المادة")</th><th scope="col" class="text-center">@T("Placed/req.", "موضوع/مطلوب")</th><th scope="col">@T("Assigned teachers", "المعلمون المُسنَدون")</th></tr></thead>
                     <tbody>
                     @foreach (var c in Model.Completeness)
                     {

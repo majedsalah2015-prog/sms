@@ -28,7 +28,7 @@
             <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
             <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
         </form>
-        @if (Model.PreviousYearProfileId != null) { <form method="post" asp-action="CopyFromPreviousYear" asp-route-year="@yid" asp-route-profile="@pid" onsubmit="return confirm('@T("Copy last year's assignments for this grade?", "نسخ إسنادات العام الماضي لهذا الصف؟")');"><input type="hidden" name="sourceProfile" value="@Model.PreviousYearProfileId" /><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-files me-1"></i>@T("Copy from last year", "نسخ من العام الماضي")</button></form> }
+        @if (Model.PreviousYearProfileId != null) { <form method="post" asp-action="CopyFromPreviousYear" asp-route-year="@yid" asp-route-profile="@pid" onsubmit="return confirm('@T("Copy last year's assignments for this grade?", "نسخ إسنادات العام الماضي لهذا الصف؟")');"><input type="hidden" name="sourceProfile" value="@Model.PreviousYearProfileId" /><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-files me-1" aria-hidden="true"></i>@T("Copy from last year", "نسخ من العام الماضي")</button></form> }
         <partial name="_HelpModal" model="help" /></div></div>
 <partial name="_StaffNav" />
 
@@ -40,11 +40,12 @@ else
             <div class="sms-card">
                 <div class="p-3 border-bottom"><h2 class="h6 mb-0">@Model.Profile.Grade.Code @(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) · @(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)</h2></div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                    <thead><tr><th style="min-width:12rem">@T("Offering", "المادة")</th>@foreach (var s in Model.Sections) { <th class="text-center" style="min-width:13rem">@(isRtl ? s.NameAr : s.NameEn)</th> }</tr></thead>
+                    <caption class="visually-hidden">@T("Assignment matrix — offerings by sections", "مصفوفة الإسناد — المواد حسب الشعب")</caption>
+                    <thead><tr><th scope="col" style="min-width:12rem">@T("Offering", "المادة")</th>@foreach (var s in Model.Sections) { <th scope="col" class="text-center" style="min-width:13rem">@(isRtl ? s.NameAr : s.NameEn)</th> }</tr></thead>
                     <tbody>
                     @foreach (var (o, subj) in Model.Offerings)
                     {
-                        <tr><td class="fw-semibold"><code>@subj.Code</code> @(isRtl ? subj.Name.NameAr : subj.Name.NameEn)<div class="small text-muted fw-normal">@o.WeeklyPeriods @T("periods/wk", "حصص/أسبوع")</div></td>
+                        <tr><th scope="row" class="fw-semibold"><code>@subj.Code</code> @(isRtl ? subj.Name.NameAr : subj.Name.NameEn)<div class="small text-muted fw-normal">@o.WeeklyPeriods @T("periods/wk", "حصص/أسبوع")</div></th>
                             @foreach (var s in Model.Sections)
                             {
                                 var cells = Model.Cells.TryGetValue((o.Id, s.Id), out var cs) ? cs : Array.Empty<AssignmentMatrixViewModel.Cell>();
@@ -54,15 +55,15 @@ else
                                     @foreach (var c in cells)
                                     {
                                         var unq = !c.Teacher.QualifiedUnknown && !c.Teacher.QualifiedSubjectIds.Contains(subj.Id);
-                                        <div class="d-flex align-items-center gap-1 mb-1"><span class="badge @(c.Assignment.Role == TeacherRole.Primary ? "text-bg-primary" : "text-bg-light border")" title="@StaffLabels.TeacherRole(c.Assignment.Role, isRtl)">@(c.Assignment.Role == TeacherRole.Primary ? "P" : "C")</span><span class="small">@TName(c.Teacher.Employee)</span>@if (c.Teacher.QualifiedUnknown) { <span class="small text-muted" title="@T("qualification unknown — no user account", "التأهيل غير معروف — بلا حساب مستخدم")">?</span> } else if (unq) { <span class="text-warning" title="@T("not in the qualification matrix (BR-SUB-006)", "ليس في مصفوفة التأهيل (BR-SUB-006)")">⚠</span> }
-                                            <form method="post" asp-action="EndAssignment" asp-route-assignmentId="@c.Assignment.Id" asp-route-year="@yid" asp-route-profile="@pid" class="ms-auto d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" style="width:8.5rem" value="@today" /><button class="btn btn-sm btn-outline-danger py-0" type="submit" title="@T("End assignment", "إنهاء الإسناد")"><i class="bi bi-x"></i></button></form></div>
+                                        <div class="d-flex align-items-center gap-1 mb-1"><span class="badge @(c.Assignment.Role == TeacherRole.Primary ? "text-bg-primary" : "text-bg-light border")" title="@StaffLabels.TeacherRole(c.Assignment.Role, isRtl)"><span aria-hidden="true">@(c.Assignment.Role == TeacherRole.Primary ? "P" : "C")</span><span class="visually-hidden">@StaffLabels.TeacherRole(c.Assignment.Role, isRtl)</span></span><span class="small">@TName(c.Teacher.Employee)</span>@if (c.Teacher.QualifiedUnknown) { <span class="small text-muted" title="@T("qualification unknown — no user account", "التأهيل غير معروف — بلا حساب مستخدم")"><span aria-hidden="true">?</span><span class="visually-hidden">@T("qualification unknown — no user account", "التأهيل غير معروف — بلا حساب مستخدم")</span></span> } else if (unq) { <span class="text-warning" title="@T("not in the qualification matrix (BR-SUB-006)", "ليس في مصفوفة التأهيل (BR-SUB-006)")"><span aria-hidden="true">⚠</span><span class="visually-hidden">@T("not in the qualification matrix (BR-SUB-006)", "ليس في مصفوفة التأهيل (BR-SUB-006)")</span></span> }
+                                            <form method="post" asp-action="EndAssignment" asp-route-assignmentId="@c.Assignment.Id" asp-route-year="@yid" asp-route-profile="@pid" class="ms-auto d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" style="width:8.5rem" value="@today" aria-label="@T("Assignment end date", "تاريخ إنهاء الإسناد")" /><button class="btn btn-sm btn-outline-danger py-0" type="submit" title="@T("End assignment", "إنهاء الإسناد")" aria-label="@T("End assignment", "إنهاء الإسناد")"><i class="bi bi-x" aria-hidden="true"></i></button></form></div>
                                     }
                                     <form id="@fid" method="post" asp-action="Assign" asp-route-year="@yid" asp-route-profile="@pid" class="d-flex gap-1 align-items-center">
                                         <input type="hidden" name="offeringId" value="@o.Id" /><input type="hidden" name="sectionId" value="@s.Id" />
                                         <select name="teacherProfileId" class="form-select form-select-sm"><option value="">@T("teacher…", "معلم…")</option>@foreach (var t in Model.Teachers) { var q = t.QualifiedUnknown ? "?" : (t.QualifiedSubjectIds.Contains(subj.Id) ? "✓" : "⚠"); <option value="@t.Profile.Id">@q @TName(t.Employee) (@t.Load/@t.Profile.MaxWeeklyPeriods)</option> }</select>
                                         <select name="role" class="form-select form-select-sm" style="width:5.5rem"><option value="Primary" selected="@(!hasPrimary)">@T("Primary", "أساسي")</option><option value="CoTeacher" selected="@hasPrimary">@T("Co", "مساعد")</option></select>
-                                        <label class="small text-nowrap" title="@T("override load (BR-TCH-004)", "تجاوز النصاب (BR-TCH-004)")"><input type="checkbox" name="overrideLoad" value="true" class="form-check-input" /></label>
-                                        <button class="btn btn-sm btn-primary py-0" type="submit" title="@T("Assign", "إسناد")"><i class="bi bi-plus"></i></button>
+                                        <label class="small text-nowrap" title="@T("override load (BR-TCH-004)", "تجاوز النصاب (BR-TCH-004)")"><input type="checkbox" name="overrideLoad" value="true" class="form-check-input" aria-label="@T("Override weekly load cap (BR-TCH-004)", "تجاوز حد النصاب الأسبوعي (BR-TCH-004)")" /></label>
+                                        <button class="btn btn-sm btn-primary py-0" type="submit" title="@T("Assign", "إسناد")" aria-label="@T("Assign", "إسناد")"><i class="bi bi-plus" aria-hidden="true"></i></button>
                                     </form>
                                 </td>
                             }
@@ -76,11 +77,11 @@ else
         </div>
         <div class="col-xl-3">
             <div class="sms-card p-3">
-                <h2 class="h6 mb-3"><i class="bi bi-speedometer2 me-1"></i>@T("Load meters", "مؤشرات النصاب")</h2>
+                <h2 class="h6 mb-3"><i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>@T("Load meters", "مؤشرات النصاب")</h2>
                 @foreach (var t in Model.Teachers)
                 {
                     var max = t.Profile.MaxWeeklyPeriods; var pct = max == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * t.Load / max));
-                    <div class="mb-2"><div class="d-flex justify-content-between small"><span>@TName(t.Employee)</span><span class="@(t.Load > max ? "text-danger fw-semibold" : "")">@t.Load/@max</span></div><div class="sms-progress"><span style="width:@(pct)%;@(t.Load > max ? "background:#dc2626" : t.Load < max / 2 ? "background:#f59e0b" : "")"></span></div></div>
+                    <div class="mb-2"><div class="d-flex justify-content-between small"><span>@TName(t.Employee)</span><span class="@(t.Load > max ? "text-danger fw-semibold" : "")">@t.Load/@max</span></div><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Load", "النصاب")"><span style="width:@(pct)%;@(t.Load > max ? "background:#dc2626" : t.Load < max / 2 ? "background:#f59e0b" : "")"></span></div></div>
                 }
                 @if (Model.Teachers.Count == 0) { <div class="small text-muted">@T("No teachers designated.", "لا معلمون معيَّنون.")</div> }
                 <div class="form-text mt-2">@T("Red = over max (override logged); amber = under half (reported, not blocked — BR-TCH-004).", "أحمر = تجاوز الحد (تجاوز مسجَّل)؛ كهرماني = أقل من النصف (يُبلَّغ ولا يُمنع — BR-TCH-004).")</div>

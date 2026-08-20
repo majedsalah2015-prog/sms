@@ -47,12 +47,12 @@
                 <div class="col-md-3"><label class="form-label">@T("Wing", "الجناح")</label><select asp-for="WingTag" class="form-select">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div>
             </div>
         }
-        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>
+        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>
             @if (Model.Kind == "building") { <text>@Model.ChildCount @T("floor(s) in this building.", "طابق/طوابق في هذا المبنى.")</text> }
             else if (Model.Kind == "floor") { <text>@Model.ChildCount @T("room(s) on this floor.", "قاعة/قاعات في هذا الطابق.")</text> }
             else { <text>@Model.ChildCount @T("active section(s) use this room as default classroom.", "شعبة/شعب نشطة تستخدم هذه القاعة كقاعة افتراضية.")</text> }
         </div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
         <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

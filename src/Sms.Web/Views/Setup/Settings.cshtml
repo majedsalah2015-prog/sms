@@ -15,15 +15,16 @@
 
 <ul class="nav nav-tabs mb-3">
     @foreach (var g in groups) { <li class="nav-item"><a class="nav-link @(Model.ActiveGroup == g.Key ? "active" : "")" asp-action="Settings" asp-route-group="@g.Key">@(isRtl ? g.Ar : g.En)</a></li> }
-    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="NTF">@T("Notifications defaults", "افتراضيات الإشعارات") <i class="bi bi-box-arrow-up-right small"></i></a></li>
-    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="SYS">@T("Numbering", "الترقيم") <i class="bi bi-box-arrow-up-right small"></i></a></li>
+    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="NTF">@T("Notifications defaults", "افتراضيات الإشعارات") <i class="bi bi-box-arrow-up-right small" aria-hidden="true"></i></a></li>
+    <li class="nav-item"><a class="nav-link" asp-controller="Modules" asp-action="Index" asp-route-code="SYS">@T("Numbering", "الترقيم") <i class="bi bi-box-arrow-up-right small" aria-hidden="true"></i></a></li>
 </ul>
 
 <div class="row g-3">
     <div class="col-lg-8">
         <div class="sms-card">
             <div class="table-responsive"><table class="table sms-table mb-0">
-                <thead><tr><th>@T("Setting", "الإعداد")</th><th>@T("Value", "القيمة")</th><th>@T("Scope", "النطاق")</th><th></th></tr></thead>
+                <caption class="visually-hidden">@T("Settings", "الإعدادات")</caption>
+                <thead><tr><th scope="col">@T("Setting", "الإعداد")</th><th scope="col">@T("Value", "القيمة")</th><th scope="col">@T("Scope", "النطاق")</th><th scope="col"></th></tr></thead>
                 <tbody>
                 @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup))
                 {
@@ -57,7 +58,7 @@
                 <div class="mb-2"><label class="form-label">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
                     <select name="AcademicYearId" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></div>
                 <div class="mb-3"><label class="form-label">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" class="form-control" value="@Model.Reason" /></div>
-                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
+                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
             </form>
         </div>
     </div>

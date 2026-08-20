@@ -14,20 +14,20 @@
     <div><div class="text-muted small">@(isRtl ? Model.Building.Name.NameAr : Model.Building.Name.NameEn) / @(isRtl ? Model.Floor.Name.NameAr : Model.Floor.Name.NameEn) · @Model.TypeName</div>
         <h1 class="sms-page-title"><code>@Model.Room.Code</code> @name</h1>
         <div class="small text-muted">@T("Standard", "عادية") @Model.Room.StandardCapacity · @T("Exam", "اختبار") @Model.Room.ExamCapacity · @Model.Room.WingTag @if (Model.SectionsUsing.Count > 0) { <text>· @T("home room of", "قاعة") @string.Join(", ", Model.SectionsUsing.Select(s => isRtl ? s.NameAr : s.NameEn))</text> }</div></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Catalog", "الدليل")</a>
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Catalog", "الدليل")</a>
 </div>
 
 <div class="row g-3">
     <div class="col-xl-8">
         <div class="sms-card mb-3">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Maintenance / reserved windows", "فترات الصيانة / الحجز")</h2><span class="small text-muted">BR-ROM-004</span></div>
-            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><thead><tr><th>@T("Reason", "السبب")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th><th>@T("Notes", "ملاحظات")</th></tr></thead>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><caption class="visually-hidden">@T("Maintenance / reserved windows", "فترات الصيانة / الحجز")</caption><thead><tr><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Notes", "ملاحظات")</th></tr></thead>
                 <tbody>@foreach (var u in Model.Unavailability) { <tr><td><span class="badge @(u.Reason == RoomAvailabilityReason.Maintenance ? "text-bg-warning" : "text-bg-info")">@(u.Reason == RoomAvailabilityReason.Maintenance ? T("Maintenance", "صيانة") : T("Reserved", "محجوزة"))</span></td><td>@u.StartDate.ToString("yyyy-MM-dd")</td><td>@u.EndDate.ToString("yyyy-MM-dd")</td><td class="small">@u.Notes</td></tr> }
                 @if (Model.Unavailability.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("Always available.", "متاحة دائماً.")</td></tr> }</tbody></table></div>
         </div>
         <div class="sms-card">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Bookings", "الحجوزات")</h2><span class="small text-muted">@T("Free slots auto-approve; maintenance/reserved windows reject; teaching-session collisions need Timetable (M15).", "الفترات الحرة تُعتمد تلقائياً؛ فترات الصيانة تُرفض؛ تعارض الحصص يحتاج الجدول (M15).")</span></div>
-            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><thead><tr><th>@T("Purpose", "الغرض")</th><th>@T("Start", "البداية")</th><th>@T("End", "النهاية")</th><th>@T("Status", "الحالة")</th></tr></thead>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><caption class="visually-hidden">@T("Bookings", "الحجوزات")</caption><thead><tr><th scope="col">@T("Purpose", "الغرض")</th><th scope="col">@T("Start", "البداية")</th><th scope="col">@T("End", "النهاية")</th><th scope="col">@T("Status", "الحالة")</th></tr></thead>
                 <tbody>@foreach (var b in Model.Bookings) { <tr><td>@b.Purpose</td><td>@b.StartUtc.ToString("yyyy-MM-dd HH:mm")</td><td>@b.EndUtc.ToString("yyyy-MM-dd HH:mm")</td><td><span class="badge @(b.Status == RoomBookingStatus.Approved ? "text-bg-success" : b.Status == RoomBookingStatus.Rejected ? "text-bg-danger" : "text-bg-secondary")">@(b.Status == RoomBookingStatus.Approved ? T("Approved", "معتمد") : b.Status == RoomBookingStatus.Rejected ? T("Rejected", "مرفوض") : T("Requested", "مطلوب"))</span></td></tr> }
                 @if (Model.Bookings.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("No bookings.", "لا حجوزات.")</td></tr> }</tbody></table></div>
         </div>
@@ -35,20 +35,20 @@
     <div class="col-xl-4">
         <div class="sms-card p-3 mb-3"><h2 class="h6">@T("Features", "التجهيزات")</h2>
             <div class="d-flex flex-wrap gap-1 mb-2">@foreach (var f in Model.Features) { <span class="badge text-bg-light border">@(isRtl ? f.Ar : f.En)</span> }@if (Model.Features.Count == 0) { <span class="small text-muted">@T("None yet.", "لا شيء بعد.")</span> }</div>
-            @if (Model.AvailableFeatures.Count > 0) { <form method="post" asp-action="AddFeature" asp-route-id="@Model.Room.Id" class="d-flex gap-1"><select name="featureLookupId" class="form-select form-select-sm">@foreach (var f in Model.AvailableFeatures) { <option value="@f.Id">@(isRtl ? f.Ar : f.En)</option> }</select><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form> }</div>
+            @if (Model.AvailableFeatures.Count > 0) { <form method="post" asp-action="AddFeature" asp-route-id="@Model.Room.Id" class="d-flex gap-1"><select name="featureLookupId" class="form-select form-select-sm">@foreach (var f in Model.AvailableFeatures) { <option value="@f.Id">@(isRtl ? f.Ar : f.En)</option> }</select><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Add feature", "إضافة ميزة")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form> }</div>
         <div class="sms-card p-3 mb-3"><h2 class="h6">@T("Set unavailable", "تعيين عدم التوفر")</h2>
             <form method="post" asp-action="SetUnavailable" asp-route-id="@Model.Room.Id">
                 <div class="mb-2"><select name="reason" class="form-select form-select-sm"><option value="Maintenance">@T("Maintenance", "صيانة")</option><option value="Reserved">@T("Reserved", "محجوزة")</option></select></div>
                 <div class="row g-2 mb-2"><div class="col-6"><input name="startDate" type="date" class="form-control form-control-sm" value="@today" /></div><div class="col-6"><input name="endDate" type="date" class="form-control form-control-sm" value="@today" /></div></div>
                 <div class="mb-2"><input name="notes" class="form-control form-control-sm" placeholder="@T("notes", "ملاحظات")" /></div>
-                <button class="btn btn-sm btn-warning w-100" type="submit"><i class="bi bi-tools me-1"></i>@T("Record window", "تسجيل الفترة")</button>
+                <button class="btn btn-sm btn-warning w-100" type="submit"><i class="bi bi-tools me-1" aria-hidden="true"></i>@T("Record window", "تسجيل الفترة")</button>
             </form></div>
         <div class="sms-card p-3"><h2 class="h6">@T("Request booking", "طلب حجز")</h2>
             <form method="post" asp-action="RequestBooking" asp-route-id="@Model.Room.Id">
                 <div class="mb-2"><input name="purpose" class="form-control form-control-sm" placeholder="@T("purpose", "الغرض")" /></div>
                 <div class="mb-2"><select name="academicYearId" class="form-select form-select-sm">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.WorkingYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></div>
                 <div class="row g-2 mb-2"><div class="col-6"><input name="start" type="datetime-local" class="form-control form-control-sm" /></div><div class="col-6"><input name="end" type="datetime-local" class="form-control form-control-sm" /></div></div>
-                <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-calendar-check me-1"></i>@T("Request", "طلب")</button>
+                <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-calendar-check me-1" aria-hidden="true"></i>@T("Request", "طلب")</button>
             </form></div>
     </div>
 </div>

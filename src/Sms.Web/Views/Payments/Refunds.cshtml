@@ -25,13 +25,13 @@
 <div class="row g-3">
     <div class="col-lg-4">
         <div class="sms-card p-3 mb-3">
-            <h2 class="h6 mb-2"><i class="bi bi-person-check me-1"></i>@T("1 · Payer position", "1 · موقف الدافع")</h2>
+            <h2 class="h6 mb-2"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("1 · Payer position", "1 · موقف الدافع")</h2>
             <form method="get"><select name="payerId" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">@T("— choose payer —", "— اختر الدافع —")</option>@foreach (var p in Model.Payers) { <option value="@p.Payer.Id" selected="@(p.Payer.Id == sel?.Payer.Id)">@FinanceLabels.ParentName(p.Parent, isRtl) · @p.Parent?.ParentFileNo</option> }</select></form>
             @if (sel != null)
             {
                 <dl class="row small mt-3 mb-0">
                     <dt class="col-8">@T("Advance balance (unallocated receipts)", "الرصيد المقدّم (سندات غير مخصّصة)")</dt><dd class="col-4 text-end">@Model.AdvanceBalance.ToString("N2")</dd>
-                    <dt class="col-8">@T("Refunds in flight / paid", "استردادات جارية / مدفوعة")</dt><dd class="col-4 text-end">−@Model.Committed.ToString("N2")</dd>
+                    <dt class="col-8">@T("Refunds in flight / paid", "استردادات جارية / مدفوعة")</dt><dd class="col-4 text-end"><bdi dir="ltr">−@Model.Committed.ToString("N2")</bdi></dd>
                     <dt class="col-8 fw-bold">@T("Refundable now", "القابل للاسترداد الآن")</dt><dd class="col-4 text-end fw-bold @(Model.Refundable > 0 ? "text-success" : "text-muted")">@Model.Refundable.ToString("N2")</dd>
                 </dl>
             }
@@ -39,13 +39,13 @@
         @if (sel != null)
         {
             <div class="sms-card p-3">
-                <h2 class="h6 mb-2"><i class="bi bi-file-earmark-plus me-1"></i>@T("2 · Request voucher", "2 · طلب سند")</h2>
+                <h2 class="h6 mb-2"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>@T("2 · Request voucher", "2 · طلب سند")</h2>
                 <form method="post" asp-action="RequestRefund" class="d-grid gap-2">
                     <input type="hidden" name="payerId" value="@sel.Payer.Id" />
                     <div class="input-group input-group-sm"><span class="input-group-text">@T("Amount", "المبلغ")</span><input name="amount" type="number" step="0.01" min="0.01" max="@Model.Refundable.ToString("0.##", CultureInfo.InvariantCulture)" class="form-control text-end" value="@(Model.Refundable > 0 ? Model.Refundable.ToString("0.##", CultureInfo.InvariantCulture) : "")" required /></div>
                     <select name="method" class="form-select form-select-sm">@foreach (var mth in new[] { PaymentMethod.BankTransfer, PaymentMethod.Cash, PaymentMethod.Cheque }) { <option value="@mth">@FinanceLabels.Method(mth, isRtl)</option> }</select>
                     <input name="reason" class="form-control form-control-sm" placeholder="@T("Reason (mandatory)", "السبب (إلزامي)")" required />
-                    <button class="btn btn-primary btn-sm" type="submit" @(Model.Refundable <= 0 ? "disabled" : "")><i class="bi bi-send me-1"></i>@T("Request", "طلب")</button>
+                    <button class="btn btn-primary btn-sm" type="submit" @(Model.Refundable <= 0 ? "disabled" : "")><i class="bi bi-send me-1" aria-hidden="true"></i>@T("Request", "طلب")</button>
                 </form>
             </div>
         }
@@ -57,7 +57,8 @@
         </div>
         <div class="sms-card">
             <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Voucher", "السند")</th><th>@T("Payer", "الدافع")</th><th class="text-end">@T("Amount", "المبلغ")</th><th>@T("Method", "الطريقة")</th><th>@T("Reason", "السبب")</th><th>@T("Status", "الحالة")</th><th>@T("Actions", "الإجراءات")</th></tr></thead>
+                <caption class="visually-hidden">@T("Refund vouchers", "سندات الاسترداد")</caption>
+                <thead><tr><th scope="col">@T("Voucher", "السند")</th><th scope="col">@T("Payer", "الدافع")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th><th scope="col">@T("Method", "الطريقة")</th><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th></tr></thead>
                 <tbody>
                 @foreach (var r in Model.Rows)
                 {

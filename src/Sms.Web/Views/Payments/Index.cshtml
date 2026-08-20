@@ -22,8 +22,8 @@
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Speed-critical capture: payer → position → amount → receipt.", "تحصيل سريع: الدافع ← الموقف ← المبلغ ← السند.")</p></div>
     <div class="d-flex gap-2 align-items-center">
-        @if (Model.MySession != null) { <span class="badge text-bg-success"><i class="bi bi-safe2 me-1"></i>@T("Till", "الصندوق") @Model.MySession.TillCode · @T("open since", "مفتوح منذ") @Model.MySession.OpenedAtUtc.ToString("HH:mm")</span> }
-        else { <a class="btn btn-outline-warning btn-sm" asp-action="Till"><i class="bi bi-safe2 me-1"></i>@T("No open till session", "لا جلسة صندوق مفتوحة")</a> }
+        @if (Model.MySession != null) { <span class="badge text-bg-success"><i class="bi bi-safe2 me-1" aria-hidden="true"></i>@T("Till", "الصندوق") @Model.MySession.TillCode · @T("open since", "مفتوح منذ") @Model.MySession.OpenedAtUtc.ToString("HH:mm")</span> }
+        else { <a class="btn btn-outline-warning btn-sm" asp-action="Till"><i class="bi bi-safe2 me-1" aria-hidden="true"></i>@T("No open till session", "لا جلسة صندوق مفتوحة")</a> }
         <partial name="_HelpModal" model="help" />
     </div></div>
 <partial name="_FinanceNav" />
@@ -31,7 +31,7 @@
 <div class="row g-3">
     <div class="col-lg-4">
         <div class="sms-card p-3 mb-3">
-            <form method="get" class="d-flex gap-1"><input name="q" value="@Model.Q" class="form-control" placeholder="@T("payer name / file no / mobile / student no", "اسم الدافع / رقم الملف / الجوال / رقم الطالب")" autofocus /><button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button></form>
+            <form method="get" class="d-flex gap-1"><input name="q" value="@Model.Q" class="form-control" placeholder="@T("payer name / file no / mobile / student no", "اسم الدافع / رقم الملف / الجوال / رقم الطالب")" autofocus /><button class="btn btn-primary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button></form>
             @if (!string.IsNullOrWhiteSpace(Model.Q))
             {
                 <div class="list-group list-group-flush mt-2">
@@ -55,10 +55,11 @@
             <div class="sms-card mb-3">
                 <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span><br /><span class="small text-muted">@string.Join(" · ", sel.Children.Select(ch => $"{ch.StudentNo} {FinanceLabels.StudentName(ch, isRtl)}"))</span></div>
-                    <div class="text-end"><div class="small text-muted">@T("Total due", "إجمالي المستحق")</div><div class="fs-4 fw-bold @(Model.TotalDue > 0 ? "text-danger" : "text-success")">@Model.TotalDue.ToString("N2")</div>@if (Model.AdvanceBalance > 0) { <div class="small text-success">@T("advance", "مقدّم") @Model.AdvanceBalance.ToString("N2")</div> }</div>
+                    <div class="text-end"><div class="small text-muted">@T("Total due", "إجمالي المستحق")</div><div class="fs-4 fw-bold @(Model.TotalDue > 0 ? "text-danger" : "text-success")">@Model.TotalDue.ToString("N2") <span class="visually-hidden">@(Model.TotalDue > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></div>@if (Model.AdvanceBalance > 0) { <div class="small text-success">@T("advance", "مقدّم") @Model.AdvanceBalance.ToString("N2")</div> }</div>
                 </div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                    <thead><tr><th>@T("Invoice", "الفاتورة")</th><th>@T("Posted", "التاريخ")</th><th>@T("Student", "الطالب")</th><th>@T("Category", "الفئة")</th><th class="text-end">@T("Gross", "الإجمالي")</th><th class="text-end">@T("Remaining", "المتبقي")</th><th class="text-end">@T("Will allocate", "سيُخصّص")</th></tr></thead>
+                    <caption class="visually-hidden">@T("Open invoices for the selected payer", "الفواتير المفتوحة للدافع المحدد")</caption>
+                    <thead><tr><th scope="col">@T("Invoice", "الفاتورة")</th><th scope="col">@T("Posted", "التاريخ")</th><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col" class="text-end">@T("Gross", "الإجمالي")</th><th scope="col" class="text-end">@T("Remaining", "المتبقي")</th><th scope="col" class="text-end">@T("Will allocate", "سيُخصّص")</th></tr></thead>
                     <tbody>
                     @foreach (var r in Model.OpenCharges)
                     {
@@ -80,7 +81,7 @@
             </div>
 
             <div class="sms-card p-3">
-                <h2 class="h6 mb-3"><i class="bi bi-cash-coin me-1"></i>@T("Capture payment", "تسجيل دفعة")</h2>
+                <h2 class="h6 mb-3"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Capture payment", "تسجيل دفعة")</h2>
                 <form method="post" asp-action="Capture" asp-route-q="@Model.Q" class="row g-2 align-items-end" id="capture">
                     <input type="hidden" name="payerId" value="@sel.Payer.Id" />
                     <div class="col-md-3"><label class="form-label small mb-1">@T("Amount", "المبلغ")</label><input name="amount" type="number" step="0.01" min="0.01" class="form-control form-control-lg text-end" value="@Model.PreviewAmount?.ToString("0.##", CultureInfo.InvariantCulture)" required onchange="document.getElementById('previewLink').href = '@Url.Action("Index", new { q = Model.Q, payerId = sel.Payer.Id })' + '&amount=' + this.value" /></div>
@@ -88,9 +89,9 @@
                     <div class="col-md-3"><label class="form-label small mb-1">@T("Reference", "المرجع")</label><input name="methodRefNo" class="form-control form-control-lg" placeholder="@T("slip / transfer / cheque no.", "القسيمة / التحويل / رقم الشيك")" /></div>
                     <div class="col-md-3"><label class="form-label small mb-1">@T("Till session", "جلسة الصندوق")</label><select name="tillSessionId" class="form-select form-select-lg"><option value="">@T("— none (non-cash) —", "— بدون (غير نقدي) —")</option>@foreach (var s in Model.OpenSessions) { <option value="@s.Id" selected="@(s.Id == Model.MySession?.Id)">@s.TillCode @(s.Id == Model.MySession?.Id ? T("(mine)", "(جلستي)") : "")</option> }</select></div>
                     <div class="col-12 d-flex gap-2 mt-3">
-                        <button class="btn btn-success btn-lg px-4" type="submit"><i class="bi bi-receipt-cutoff me-1"></i>@T("Issue receipt", "إصدار سند")</button>
-                        <a id="previewLink" class="btn btn-outline-secondary btn-lg" href="@Url.Action("Index", new { q = Model.Q, payerId = sel.Payer.Id, amount = Model.PreviewAmount })"><i class="bi bi-eye me-1"></i>@T("Preview allocation", "معاينة التخصيص")</a>
-                        <a class="btn btn-outline-secondary btn-lg ms-auto" asp-action="Pdc"><i class="bi bi-calendar-check me-1"></i>@T("Lodge PDC", "تسجيل شيك آجل")</a>
+                        <button class="btn btn-success btn-lg px-4" type="submit"><i class="bi bi-receipt-cutoff me-1" aria-hidden="true"></i>@T("Issue receipt", "إصدار سند")</button>
+                        <a id="previewLink" class="btn btn-outline-secondary btn-lg" href="@Url.Action("Index", new { q = Model.Q, payerId = sel.Payer.Id, amount = Model.PreviewAmount })"><i class="bi bi-eye me-1" aria-hidden="true"></i>@T("Preview allocation", "معاينة التخصيص")</a>
+                        <a class="btn btn-outline-secondary btn-lg ms-auto" asp-action="Pdc"><i class="bi bi-calendar-check me-1" aria-hidden="true"></i>@T("Lodge PDC", "تسجيل شيك آجل")</a>
                     </div>
                 </form>
             </div>

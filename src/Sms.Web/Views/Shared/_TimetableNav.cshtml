@@ -14,10 +14,12 @@
         ("Conflicts", "Session conflicts", "تعارضات الحصص", "bi-exclamation-diamond", false),
     };
 }
+<nav aria-label="@(isRtl ? "الجدول" : "Timetable")">
 <ul class="nav nav-pills sms-subnav mb-4">
     @foreach (var t in tabs)
     {
         var active = string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Builder" && action is "Teacher" or "Section" or "Room");
-        <li class="nav-item"><a class="nav-link @(active ? "active" : "")" asp-controller="Timetable" asp-action="@t.Action" asp-route-year="@(t.Action is "Cover" or "Conflicts" ? null : yearId)" asp-route-version="@(t.Versioned ? versionId : null)"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+        <li class="nav-item"><a class="nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)" asp-controller="Timetable" asp-action="@t.Action" asp-route-year="@(t.Action is "Cover" or "Conflicts" ? null : yearId)" asp-route-version="@(t.Versioned ? versionId : null)"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
     }
 </ul>
+</nav>

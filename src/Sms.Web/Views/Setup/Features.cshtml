@@ -14,7 +14,8 @@
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0">
-        <thead><tr><th>@T("Feature", "الميزة")</th><th>@T("Code", "الرمز")</th><th>@T("Depends on", "يعتمد على")</th><th>@T("Module", "الوحدة")</th><th class="text-center">@T("State", "الحالة")</th><th></th></tr></thead>
+        <caption class="visually-hidden">@T("Feature toggles", "الميزات")</caption>
+        <thead><tr><th scope="col">@T("Feature", "الميزة")</th><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Depends on", "يعتمد على")</th><th scope="col">@T("Module", "الوحدة")</th><th scope="col" class="text-center">@T("State", "الحالة")</th><th scope="col"></th></tr></thead>
         <tbody>
         @foreach (var f in FeatureCatalog.Features)
         {
@@ -35,7 +36,7 @@
                             @(on ? T("Disable", "تعطيل") : T("Enable", "تفعيل"))
                         </button>
                     </form>
-                    @if (blockers.Count > 0) { <div class="small text-warning-emphasis mt-1"><i class="bi bi-exclamation-triangle me-1"></i>@T("Blocked by", "محجوب بسبب") @string.Join(", ", blockers.Select(Title))</div> }
+                    @if (blockers.Count > 0) { <div class="small text-warning-emphasis mt-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Blocked by", "محجوب بسبب") @string.Join(", ", blockers.Select(Title))</div> }
                 </td>
             </tr>
         }

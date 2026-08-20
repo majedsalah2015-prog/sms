@@ -46,7 +46,7 @@
     {
         <div class="col-6 col-md-4 col-xl">
             <a class="sms-tile" asp-controller="Modules" asp-action="Index" asp-route-code="@t.Code">
-                <span class="sms-tile__icon"><i class="bi @t.Icon"></i></span>
+                <span class="sms-tile__icon"><i class="bi @t.Icon" aria-hidden="true"></i></span>
                 <span class="sms-tile__value">@t.Value.ToString("N0", CultureInfo.InvariantCulture)</span>
                 <span class="sms-tile__label">@T(t.En, t.Ar)</span>
             </a>
@@ -60,12 +60,12 @@
     {
         <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
             <a class="sms-card sms-module-card" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">
-                <span class="sms-module-card__icon"><i class="bi @m.Icon"></i></span>
+                <span class="sms-module-card__icon"><i class="bi @m.Icon" aria-hidden="true"></i></span>
                 <span class="sms-module-card__body">
                     <span class="sms-module-card__num">@m.Number</span>
                     <span class="sms-module-card__title">@(isRtl ? m.TitleAr : m.TitleEn)</span>
                 </span>
-                <i class="bi bi-chevron-right sms-module-card__chevron"></i>
+                <i class="bi bi-chevron-right sms-module-card__chevron" aria-hidden="true"></i>
             </a>
         </div>
     }

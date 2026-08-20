@@ -48,48 +48,49 @@ else
 {
     @if (!Model.DateInYear)
     {
-        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1"></i>@T("This date falls outside the selected academic year.", "هذا التاريخ خارج نطاق العام الدراسي المحدد.")</div>
+        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1" aria-hidden="true"></i>@T("This date falls outside the selected academic year.", "هذا التاريخ خارج نطاق العام الدراسي المحدد.")</div>
     }
     else if (Model.DayType == null)
     {
-        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1"></i>@T("The year's calendar has no entry for this date — build the calendar so working days are unambiguous (BR-CAL-003).", "لا يوجد إدخال لهذا التاريخ في تقويم العام — ابنِ التقويم ليكون يوم الدراسة محدداً (BR-CAL-003).")</div>
+        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1" aria-hidden="true"></i>@T("The year's calendar has no entry for this date — build the calendar so working days are unambiguous (BR-CAL-003).", "لا يوجد إدخال لهذا التاريخ في تقويم العام — ابنِ التقويم ليكون يوم الدراسة محدداً (BR-CAL-003).")</div>
     }
     else if (!Model.IsWorkingDay)
     {
-        <div class="alert alert-secondary"><i class="bi bi-moon me-1"></i>@string.Format(T("{0} — attendance is not captured on this day.", "{0} — لا يُرصد الحضور في هذا اليوم."), AttendanceLabels.CalendarDayType(Model.DayType.Value, isRtl))</div>
+        <div class="alert alert-secondary"><i class="bi bi-moon me-1" aria-hidden="true"></i>@string.Format(T("{0} — attendance is not captured on this day.", "{0} — لا يُرصد الحضور في هذا اليوم."), AttendanceLabels.CalendarDayType(Model.DayType.Value, isRtl))</div>
     }
 
     <div class="row g-3 mb-3">
-        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-people sms-tile__icon"></i><span class="sms-tile__value">@Model.CapturedTotal / @Model.ExpectedTotal</span><span class="sms-tile__label">@T("Captured / expected", "المرصود / المتوقع")</span></div></div>
-        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-x-octagon sms-tile__icon"></i><span class="sms-tile__value">@(Model.CountsByStatus.Where(c => c.Key == AttendanceStatus.AbsentUnexcused || c.Key == AttendanceStatus.AbsentExcused || c.Key == AttendanceStatus.MedicalLeave).Sum(c => c.Value))</span><span class="sms-tile__label">@T("Absent today", "غياب اليوم")</span></div></div>
-        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-clock sms-tile__icon"></i><span class="sms-tile__value">@(Model.CountsByStatus.TryGetValue(AttendanceStatus.Late, out var lateN) ? lateN : 0)</span><span class="sms-tile__label">@T("Late", "متأخر")</span></div></div>
-        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-hourglass-split sms-tile__icon"></i><span class="sms-tile__value">@Model.PendingJustifications</span><span class="sms-tile__label">@T("Excuses awaiting review", "أعذار بانتظار المراجعة")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-people sms-tile__icon" aria-hidden="true"></i><span class="sms-tile__value">@Model.CapturedTotal / @Model.ExpectedTotal</span><span class="sms-tile__label">@T("Captured / expected", "المرصود / المتوقع")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-x-octagon sms-tile__icon" aria-hidden="true"></i><span class="sms-tile__value">@(Model.CountsByStatus.Where(c => c.Key == AttendanceStatus.AbsentUnexcused || c.Key == AttendanceStatus.AbsentExcused || c.Key == AttendanceStatus.MedicalLeave).Sum(c => c.Value))</span><span class="sms-tile__label">@T("Absent today", "غياب اليوم")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-clock sms-tile__icon" aria-hidden="true"></i><span class="sms-tile__value">@(Model.CountsByStatus.TryGetValue(AttendanceStatus.Late, out var lateN) ? lateN : 0)</span><span class="sms-tile__label">@T("Late", "متأخر")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><i class="bi bi-hourglass-split sms-tile__icon" aria-hidden="true"></i><span class="sms-tile__value">@Model.PendingJustifications</span><span class="sms-tile__label">@T("Excuses awaiting review", "أعذار بانتظار المراجعة")</span></div></div>
     </div>
 
     <div class="row g-3">
         <div class="col-xl-7">
             <div class="sms-card">
                 <div class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
-                    <h2 class="h6 mb-0 me-auto"><i class="bi bi-list-check me-1"></i>@T("Capture completeness by section", "اكتمال الرصد حسب الشعبة")</h2>
+                    <h2 class="h6 mb-0 me-auto"><i class="bi bi-list-check me-1" aria-hidden="true"></i>@T("Capture completeness by section", "اكتمال الرصد حسب الشعبة")</h2>
                     @if (Model.LockedRows > 0)
                     {
-                        <span class="badge text-bg-secondary"><i class="bi bi-lock me-1"></i>@string.Format(T("{0} locked", "{0} مقفل"), Model.LockedRows)</span>
+                        <span class="badge text-bg-secondary"><i class="bi bi-lock me-1" aria-hidden="true"></i>@string.Format(T("{0} locked", "{0} مقفل"), Model.LockedRows)</span>
                     }
                     <form method="post" asp-action="CloseDay" asp-route-year="@yid" onsubmit="return confirm('@T("Close the day? Every captured row locks and later changes will need a reason.", "إقفال اليوم؟ ستُقفل كل السجلات وأي تعديل لاحق سيحتاج سبباً.")');">
                         <input type="hidden" name="date" value="@d" />
-                        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-lock me-1"></i>@T("Close day", "إقفال اليوم")</button>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("Close day", "إقفال اليوم")</button>
                     </form>
                 </div>
                 <div class="table-responsive">
                     <table class="table sms-table mb-0">
-                        <thead><tr><th>@T("Section", "الشعبة")</th><th>@T("Progress", "التقدم")</th><th class="text-center">@T("Absent", "غياب")</th><th class="text-center">@T("Late", "متأخر")</th><th></th></tr></thead>
+                        <caption class="visually-hidden">@T("Capture completeness by section", "اكتمال الرصد حسب الشعبة")</caption>
+                        <thead><tr><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Progress", "التقدم")</th><th scope="col" class="text-center">@T("Absent", "غياب")</th><th scope="col" class="text-center">@T("Late", "متأخر")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
                         <tbody>
                             @foreach (var r in Model.Sections)
                             {
                                 var pct = r.Expected == 0 ? 0 : (int)Math.Round(100.0 * r.Captured / r.Expected);
                                 var bar = r.Expected == 0 ? "#adb5bd" : r.Captured == 0 ? "#dc3545" : pct >= 100 ? "#16a34a" : "#f59e0b";
                                 <tr>
-                                    <td class="fw-semibold">@r.Grade?.Code · @(isRtl ? r.Section.NameAr : r.Section.NameEn) @if (r.AnyLocked) { <i class="bi bi-lock text-muted small" title="@T("Closed", "مقفل")"></i> }</td>
+                                    <td class="fw-semibold">@r.Grade?.Code · @(isRtl ? r.Section.NameAr : r.Section.NameEn) @if (r.AnyLocked) { <i class="bi bi-lock text-muted small" title="@T("Closed", "مقفل")" aria-hidden="true"></i><span class="visually-hidden">@T("Closed", "مقفل")</span> }</td>
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
                                             <div class="sms-progress" style="width:6rem"><span style="width:@(pct)%;background:@bar"></span></div>
@@ -98,7 +99,7 @@ else
                                     </td>
                                     <td class="text-center">@(r.Absent == 0 ? "—" : r.Absent.ToString())</td>
                                     <td class="text-center">@(r.Late == 0 ? "—" : r.Late.ToString())</td>
-                                    <td class="text-end"><a class="btn btn-sm @(r.Captured == 0 ? "btn-primary" : "btn-outline-primary")" asp-action="Capture" asp-route-year="@yid" asp-route-date="@d" asp-route-section="@r.Section.Id"><i class="bi bi-check2-square"></i> @(r.Captured == 0 ? T("Capture", "رصد") : T("Open", "فتح"))</a></td>
+                                    <td class="text-end"><a class="btn btn-sm @(r.Captured == 0 ? "btn-primary" : "btn-outline-primary")" asp-action="Capture" asp-route-year="@yid" asp-route-date="@d" asp-route-section="@r.Section.Id"><i class="bi bi-check2-square" aria-hidden="true"></i> @(r.Captured == 0 ? T("Capture", "رصد") : T("Open", "فتح"))</a></td>
                                 </tr>
                             }
                             @if (Model.Sections.Count == 0)
@@ -112,9 +113,10 @@ else
         </div>
         <div class="col-xl-5">
             <div class="sms-card mb-3">
-                <div class="p-2 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-exclamation-triangle me-1"></i>@string.Format(T("Threshold alerts (≥ {0} consecutive unexcused)", "تنبيهات الحد (≥ {0} غياب متتالٍ بدون عذر)"), Model.ConsecutiveThreshold)</h2></div>
+                <div class="p-2 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@string.Format(T("Threshold alerts (≥ {0} consecutive unexcused)", "تنبيهات الحد (≥ {0} غياب متتالٍ بدون عذر)"), Model.ConsecutiveThreshold)</h2></div>
                 <div class="table-responsive" style="max-height:16rem;overflow-y:auto">
                     <table class="table sms-table table-sm mb-0">
+                        <caption class="visually-hidden">@T("Students at or above the consecutive-absence threshold", "الطلاب البالغون حد الغياب المتتالي أو المتجاوزون له")</caption>
                         <tbody>
                             @foreach (var a in Model.Alerts)
                             {
@@ -133,10 +135,11 @@ else
                 </div>
             </div>
             <div class="sms-card">
-                <div class="p-2 border-bottom d-flex align-items-center"><h2 class="h6 mb-0 me-auto"><i class="bi bi-person-dash me-1"></i>@T("Today's exceptions", "استثناءات اليوم")</h2><span class="badge text-bg-light border">@Model.Absences.Count</span></div>
+                <div class="p-2 border-bottom d-flex align-items-center"><h2 class="h6 mb-0 me-auto"><i class="bi bi-person-dash me-1" aria-hidden="true"></i>@T("Today's exceptions", "استثناءات اليوم")</h2><span class="badge text-bg-light border">@Model.Absences.Count</span></div>
                 <div class="table-responsive" style="max-height:26rem;overflow-y:auto">
                     <table class="table sms-table table-sm mb-0">
-                        <thead><tr><th>@T("Student", "الطالب")</th><th>@T("Section", "الشعبة")</th><th>@T("Status", "الحالة")</th><th>@T("Excuse", "العذر")</th></tr></thead>
+                        <caption class="visually-hidden">@T("Today's absences and late arrivals", "غيابات اليوم وحالات التأخر")</caption>
+                        <thead><tr><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Excuse", "العذر")</th></tr></thead>
                         <tbody>
                             @foreach (var a in Model.Absences)
                             {

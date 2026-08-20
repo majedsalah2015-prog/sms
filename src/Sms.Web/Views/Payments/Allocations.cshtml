@@ -19,7 +19,7 @@
 
 <div class="row g-3">
     <div class="col-lg-3">
-        <div class="sms-card p-3 mb-3"><form method="get" class="d-flex gap-1"><input name="q" class="form-control form-control-sm" placeholder="@T("payer / student / mobile", "الدافع / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-search"></i></button></form></div>
+        <div class="sms-card p-3 mb-3"><form method="get" class="d-flex gap-1"><input name="q" class="form-control form-control-sm" placeholder="@T("payer / student / mobile", "الدافع / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button></form></div>
         <div class="sms-card"><div class="list-group list-group-flush" style="max-height:60vh;overflow:auto">
             @foreach (var p in Model.Payers) { <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Allocations" asp-route-payerId="@p.Payer.Id"><span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span><br /><span class="opacity-75">@p.Parent?.ParentFileNo</span></a> }
             @if (Model.Payers.Count == 0) { <div class="list-group-item small text-muted">@T("No payers match.", "لا دافعين مطابقين.")</div> }
@@ -42,6 +42,8 @@
                         <span><span class="fw-semibold">@r.Receipt.Amount.ToString("N2")</span> <span class="text-muted">· @T("allocated", "مخصّص") @r.Allocated.ToString("N2")</span> @if (r.Receipt.Amount - r.Allocated > 0) { <span class="badge text-bg-info ms-1">@T("advance", "مقدّم") @((r.Receipt.Amount - r.Allocated).ToString("N2"))</span> }</span>
                     </div>
                     <table class="table table-sm mb-0 small">
+                        <caption class="visually-hidden">@T("Invoices settled by this receipt", "الفواتير المسدّدة بهذا السند")</caption>
+                        <thead><tr><th scope="col">@T("Invoice no.", "رقم الفاتورة")</th><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col">@T("Date", "التاريخ")</th><th scope="col">@T("Amount", "المبلغ")</th></tr></thead>
                         <tbody>
                         @foreach (var (a, c, cat, s) in r.Allocations) { <tr><td style="width:12rem"><a asp-controller="Fees" asp-action="Charge" asp-route-id="@c.Id"><code>@c.ChargeNo</code></a></td><td>@s.StudentNo · @FinanceLabels.StudentName(s, isRtl)</td><td>@(isRtl ? cat.NameAr : cat.NameEn)</td><td class="text-muted">@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@a.AllocatedAmount.ToString("N2")</td></tr> }
                         @if (r.Allocations.Count == 0) { <tr><td class="text-muted">@T("No allocation — held as advance.", "لا تخصيص — محفوظ كمقدّم.")</td></tr> }

@@ -18,9 +18,12 @@
     };
     bool Active(string c, string a, string[] also) => string.Equals(c, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || also.Any(x => string.Equals(x, action, StringComparison.OrdinalIgnoreCase)));
 }
+<nav aria-label="@(isRtl ? "المالية" : "Finance")">
 <ul class="nav nav-pills sms-subnav mb-4">
     @foreach (var t in tabs)
     {
-        <li class="nav-item"><a class="nav-link @(Active(t.Controller, t.Action, t.Also) ? "active" : "")" asp-controller="@t.Controller" asp-action="@t.Action" asp-route-year="@(t.Controller == "Fees" && t.Action != "Position" && t.Action != "Categories" ? year : null)"><i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)</a></li>
+        var isActive = Active(t.Controller, t.Action, t.Also);
+        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@t.Controller" asp-action="@t.Action" asp-route-year="@(t.Controller == "Fees" && t.Action != "Position" && t.Action != "Categories" ? year : null)"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
     }
 </ul>
+</nav>

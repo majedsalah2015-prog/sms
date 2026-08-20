@@ -23,8 +23,8 @@
             <div class="col-md-4"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="Order" class="form-control" type="number" min="1" /></div>
             <div class="col-md-8"><label class="form-label">@T("Default gender policy", "سياسة الجنس الافتراضية")</label><select asp-for="Gender" class="form-select">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div>
         </div>
-        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>@Model.GradeCount @T("grade(s) in this stage.", "صف/صفوف في هذه المرحلة.")</div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@Model.GradeCount @T("grade(s) in this stage.", "صف/صفوف في هذه المرحلة.")</div>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
         <a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

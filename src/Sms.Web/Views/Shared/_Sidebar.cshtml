@@ -34,8 +34,8 @@
         if (!nav.HasChildren)
         {
             var active = IsActive(nav);
-            <a class="sms-nav-link @(active ? "active" : "")" href="@Href(nav)" title="@nav.Title(isRtl)">
-                <i class="sms-nav-icon bi @nav.Icon"></i>
+            <a class="sms-nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)" href="@Href(nav)" title="@nav.Title(isRtl)">
+                <i class="sms-nav-icon bi @nav.Icon" aria-hidden="true"></i>
                 <span class="sms-nav-label">@nav.Title(isRtl)</span>
             </a>
         }
@@ -46,17 +46,17 @@
             <div class="sms-nav-group @(groupActive ? "is-active" : "")">
                 <button class="sms-nav-link" type="button" data-bs-toggle="collapse"
                         data-bs-target="#@collapseId" aria-expanded="@(groupActive ? "true" : "false")" aria-controls="@collapseId" title="@nav.Title(isRtl)">
-                    <i class="sms-nav-icon bi @nav.Icon"></i>
+                    <i class="sms-nav-icon bi @nav.Icon" aria-hidden="true"></i>
                     <span class="sms-nav-label">@nav.Title(isRtl)</span>
-                    <i class="sms-nav-caret bi bi-chevron-down"></i>
+                    <i class="sms-nav-caret bi bi-chevron-down" aria-hidden="true"></i>
                 </button>
                 <div class="collapse @(groupActive ? "show" : "")" id="@collapseId">
                     <div class="sms-nav-group__items">
                         @foreach (var item in nav.Items)
                         {
                             var active = IsActive(item);
-                            <a class="sms-nav-link @(active ? "active" : "")" href="@Href(item)" title="@item.Title(isRtl)">
-                                <i class="sms-nav-icon bi @item.Icon"></i>
+                            <a class="sms-nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)" href="@Href(item)" title="@item.Title(isRtl)">
+                                <i class="sms-nav-icon bi @item.Icon" aria-hidden="true"></i>
                                 <span class="sms-nav-label">@item.Title(isRtl)</span>
                             </a>
                         }

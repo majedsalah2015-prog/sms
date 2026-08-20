@@ -14,8 +14,8 @@
 }
 
 <div class="sms-page-head"><div><div class="text-muted small">@T("Academic year", "العام الدراسي") · @Labels.YearStatus(y.Status, isRtl)</div><h1 class="sms-page-title">@label <span class="text-muted fs-6">@y.HijriLabel</span></h1>
-    <p class="text-muted mb-0">@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd") · @T("Semester/term structure is per year (BR-AYR-007); terms nest in semesters, semesters in the year (§9).", "هيكل الفصول/الفترات لكل عام (BR-AYR-007)؛ الفترات داخل الفصول والفصول داخل العام (§9).")</p></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Board", "اللوحة")</a></div>
+    <p class="text-muted mb-0"><bdi>@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd")</bdi> · @T("Semester/term structure is per year (BR-AYR-007); terms nest in semesters, semesters in the year (§9).", "هيكل الفصول/الفترات لكل عام (BR-AYR-007)؛ الفترات داخل الفصول والفصول داخل العام (§9).")</p></div>
+    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Board", "اللوحة")</a></div>
 
 <div class="sms-card p-4 mb-3">
     <h2 class="h6 text-muted">@T("Timeline", "الخط الزمني")</h2>
@@ -42,7 +42,8 @@
         <div class="sms-card">
             <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Semesters & terms", "الفصول والفترات")</h2></div>
             <div class="table-responsive"><table class="table sms-table mb-0">
-                <thead><tr><th>#</th><th>@T("Name", "الاسم")</th><th>@T("From", "من")</th><th>@T("To", "إلى")</th></tr></thead>
+                <caption class="visually-hidden">@T("Semesters and terms", "الفصول والفترات")</caption>
+                <thead><tr><th scope="col">#</th><th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th></tr></thead>
                 <tbody>
                 @foreach (var s in Model.Semesters)
                 {

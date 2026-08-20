@@ -23,8 +23,8 @@
     <div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Print-styled bilingual render. The immutable numbered PDF + portal release (BR-GRA-008) is pending the O6 engine decision.", "عرض ثنائي اللغة بتنسيق طباعة. ملف PDF المرقّم الثابت والنشر في البوابة (BR-GRA-008) بانتظار قرار محرك O6.")</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2"><select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == Model.Term.Id)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><label class="small d-flex align-items-center gap-1"><input type="checkbox" name="reprint" value="true" class="form-check-input" checked="@Model.IsReprint" onchange="this.form.submit()" /> @T("reprint (watermark)", "إعادة طباعة (علامة مائية)")</label></form>
-        <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
-        <a class="btn btn-outline-secondary" asp-action="Results" asp-route-year="@Model.Year.Id" asp-route-section="@Model.Section?.Id" asp-route-term="@Model.Term.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Results", "النتائج")</a>
+        <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary" asp-action="Results" asp-route-year="@Model.Year.Id" asp-route-section="@Model.Section?.Id" asp-route-term="@Model.Term.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Results", "النتائج")</a>
     </div>
 </div>
 
@@ -45,7 +45,8 @@
         <div dir="ltr"><strong>Attendance:</strong> @(Model.AttendancePercent == null ? "—" : $"{Model.AttendancePercent}% ({Model.AbsentDays} absent of {Model.ScheduledDays})")</div><div dir="rtl"><strong>الحضور:</strong> @(Model.AttendancePercent == null ? "—" : $"{Model.AttendancePercent}% ({Model.AbsentDays} غياب من {Model.ScheduledDays})")</div>
     </div>
     <table class="rc-table w-100 mb-3">
-        <thead><tr><th style="width:8%">@T("Code", "الرمز")</th><th style="width:26%">Subject</th><th style="width:26%">المادة</th><th style="width:12%" class="text-center">%</th><th style="width:14%" class="text-center">Band / التقدير</th><th class="text-center">Status / الحالة</th></tr></thead>
+        <caption class="visually-hidden">@T("Subject results for the term", "نتائج المواد للفترة")</caption>
+        <thead><tr><th scope="col" style="width:8%">@T("Code", "الرمز")</th><th scope="col" style="width:26%">Subject</th><th scope="col" style="width:26%">المادة</th><th scope="col" style="width:12%" class="text-center">%</th><th scope="col" style="width:14%" class="text-center">Band / التقدير</th><th scope="col" class="text-center">Status / الحالة</th></tr></thead>
         <tbody>@foreach (var l in Model.Lines)
         {
             <tr><td>@l.Subject.Code</td><td dir="ltr">@l.Subject.Name.NameEn</td><td dir="rtl">@l.Subject.Name.NameAr</td>

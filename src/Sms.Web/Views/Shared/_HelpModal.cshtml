@@ -5,12 +5,12 @@
     var label = Model.ButtonLabel ?? (isRtl ? "مساعدة" : "Help");
     var close = isRtl ? "إغلاق" : "Close";
 }
-<button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#@Model.Id" title="@label"><i class="bi bi-question-circle me-1"></i>@label</button>
+<button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" data-bs-target="#@Model.Id"><i class="bi bi-question-circle me-1" aria-hidden="true"></i>@label</button>
 <div class="modal fade" id="@Model.Id" tabindex="-1" aria-labelledby="@(Model.Id)-title" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="@(Model.Id)-title"><i class="bi bi-question-circle me-2"></i>@Model.Title</h5>
+                <h2 class="modal-title h5" id="@(Model.Id)-title"><i class="bi bi-question-circle me-2" aria-hidden="true"></i>@Model.Title</h2>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@close"></button>
             </div>
             <div class="modal-body">

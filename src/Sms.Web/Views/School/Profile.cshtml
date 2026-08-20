@@ -55,7 +55,7 @@
                 </div>
             </div>
             <div class="tab-pane fade @Show("branding")" id="tab-branding">
-                <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-1"></i>@T("Logo/seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) lands with the attachment store screens (doc 10). Templates render current branding at issue time.", "رفع الشعار/الختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات المرفقات (الوثيقة 10).")</div>
+                <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Logo/seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) lands with the attachment store screens (doc 10). Templates render current branding at issue time.", "رفع الشعار/الختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات المرفقات (الوثيقة 10).")</div>
             </div>
             <div class="tab-pane fade @Show("stages")" id="tab-stages">
                 @if (Model.StagesOffered.Count == 0) { <div class="alert alert-warning small">@T("No stages defined yet — see the Setup wizard's Stage structure step or Module 05.", "لا مراحل بعد — انظر خطوة الهيكل الدراسي في المعالج أو الوحدة 05.")</div> }
@@ -65,7 +65,7 @@
         </div>
         <div class="p-3 border-top d-flex gap-2 align-items-end">
             <div style="max-width:420px" class="flex-grow-1"><label class="form-label small">@T("Reason (required when changing identity fields)", "السبب (مطلوب عند تعديل حقول الهوية)")</label><input asp-for="Reason" class="form-control" /></div>
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>@T("Save", "حفظ")</button>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
         </div>
     </div>
 </form>

@@ -24,9 +24,9 @@
 
 <div class="sms-page-head d-print-none"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Bilingual tax-invoice layout (BR-FEE-005, ZATCA Phase-1 QR payload). The stored PDF is pending the O6 engine decision.", "تنسيق فاتورة ضريبية ثنائي اللغة (BR-FEE-005، حمولة QR لهيئة الزكاة المرحلة 1). ملف PDF المخزّن بانتظار قرار محرك O6.")</p></div>
     <div class="d-flex gap-2 align-items-center">
-        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
-        <a class="btn btn-outline-secondary btn-sm" asp-action="Position" asp-route-payerId="@c.PayerId"><i class="bi bi-journal-text me-1"></i>@T("Payer statement", "كشف حساب الدافع")</a>
-        <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-year="@c.AcademicYearId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Charges", "الفواتير")</a>
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Position" asp-route-payerId="@c.PayerId"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Payer statement", "كشف حساب الدافع")</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-year="@c.AcademicYearId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Charges", "الفواتير")</a>
     </div></div>
 <partial name="_FinanceNav" />
 
@@ -56,7 +56,8 @@
                 </div>
             </div>
             <table class="inv-table w-100 mb-3">
-                <thead><tr><th>#</th><th>@Model.Category.NameAr · @Model.Category.NameEn</th><th class="text-end">Net / الصافي</th><th class="text-end">VAT % / الضريبة</th><th class="text-end">VAT / الضريبة</th><th class="text-end">Gross / الإجمالي</th></tr></thead>
+                <caption class="visually-hidden">@T("Invoice lines", "بنود الفاتورة")</caption>
+                <thead><tr><th scope="col">#</th><th scope="col">@Model.Category.NameAr · @Model.Category.NameEn</th><th scope="col" class="text-end">Net / الصافي</th><th scope="col" class="text-end">VAT % / الضريبة</th><th scope="col" class="text-end">VAT / الضريبة</th><th scope="col" class="text-end">Gross / الإجمالي</th></tr></thead>
                 <tbody><tr><td>1</td><td>@(isRtl ? Model.Category.NameAr : Model.Category.NameEn) @(c.SourceType == ChargeSourceType.OpeningBalance ? $"(opening balance / رصيد افتتاحي, year {c.SourceAcademicYearId})" : "")</td><td class="text-end">@c.NetAmount.ToString("N2")</td><td class="text-end">@(isVat ? (c.VatRateSnapshot!.Value * 100m).ToString("0.##") + " %" : "—")</td><td class="text-end">@c.VatAmount.ToString("N2")</td><td class="text-end fw-semibold">@c.GrossAmount.ToString("N2")</td></tr></tbody>
                 <tfoot>
                     <tr><th colspan="5" class="text-end">Total excl. VAT / المجموع قبل الضريبة</th><th class="text-end">@c.NetAmount.ToString("N2")</th></tr>
@@ -68,7 +69,7 @@
                 <div>
                     @if (Model.Credited > 0 || Model.Discounted > 0 || Model.Allocated > 0)
                     {
-                        <div class="small"><span class="text-muted">Credit notes / إشعارات دائنة</span> −@Model.Credited.ToString("N2") · <span class="text-muted">Discounts / خصومات</span> −@Model.Discounted.ToString("N2") · <span class="text-muted">Paid / مدفوع</span> −@Model.Allocated.ToString("N2")</div>
+                        <div class="small"><span class="text-muted">Credit notes / إشعارات دائنة</span> <bdi dir="ltr">−@Model.Credited.ToString("N2")</bdi> · <span class="text-muted">Discounts / خصومات</span> <bdi dir="ltr">−@Model.Discounted.ToString("N2")</bdi> · <span class="text-muted">Paid / مدفوع</span> <bdi dir="ltr">−@Model.Allocated.ToString("N2")</bdi></div>
                         <div class="fw-semibold">Balance due / المتبقي: @Model.Remaining.ToString("N2")</div>
                     }
                     <div class="small text-muted mt-1">Hash: <code class="small">@(c.InvoiceHash?[..Math.Min(16, c.InvoiceHash.Length)])…</code> @(c.PreviousInvoiceHash == null ? "(chain genesis)" : "")</div>
@@ -86,10 +87,10 @@
     </div>
     <div class="col-lg-4 d-print-none">
         <div class="sms-card mb-3">
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-arrow-return-left me-1"></i>@T("Credit notes", "الإشعارات الدائنة")</h2><span class="badge text-bg-light border">@Model.CreditNotes.Count</span></div>
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-arrow-return-left me-1" aria-hidden="true"></i>@T("Credit notes", "الإشعارات الدائنة")</h2><span class="badge text-bg-light border">@Model.CreditNotes.Count</span></div>
             @if (Model.CreditNotes.Count > 0)
             {
-                <ul class="list-group list-group-flush">@foreach (var n in Model.CreditNotes) { <li class="list-group-item small d-flex justify-content-between"><span><code>@n.CreditNoteNo</code> · @n.IssuedAtUtc.ToString("yyyy-MM-dd")<br /><span class="text-muted">@n.Reason</span> @if (n.IsCarryForward) { <span class="badge text-bg-secondary">carry-forward</span> }</span><span class="fw-semibold">−@n.Amount.ToString("N2")</span></li> }</ul>
+                <ul class="list-group list-group-flush">@foreach (var n in Model.CreditNotes) { <li class="list-group-item small d-flex justify-content-between"><span><code>@n.CreditNoteNo</code> · @n.IssuedAtUtc.ToString("yyyy-MM-dd")<br /><span class="text-muted">@n.Reason</span> @if (n.IsCarryForward) { <span class="badge text-bg-secondary">carry-forward</span> }</span><span class="fw-semibold"><bdi dir="ltr">−@n.Amount.ToString("N2")</bdi></span></li> }</ul>
             }
             <div class="p-3">
                 @if (!voided && c.GrossAmount - Model.Credited > 0)
@@ -97,20 +98,20 @@
                     <form method="post" asp-action="IssueCreditNote" asp-route-id="@c.Id" class="d-grid gap-2">
                         <div class="input-group input-group-sm"><span class="input-group-text">@T("Amount", "المبلغ")</span><input name="amount" type="number" step="0.01" min="0.01" max="@((c.GrossAmount - Model.Credited).ToString("0.##", CultureInfo.InvariantCulture))" class="form-control" required /><span class="input-group-text small text-muted">≤ @((c.GrossAmount - Model.Credited).ToString("N2"))</span></div>
                         <input name="reason" class="form-control form-control-sm" placeholder="@T("Reason (mandatory)", "السبب (إلزامي)")" required />
-                        <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('@T("Issue a credit note against this invoice?", "إصدار إشعار دائن على هذه الفاتورة؟")');"><i class="bi bi-file-earmark-minus me-1"></i>@T("Issue credit note", "إصدار إشعار دائن")</button>
+                        <button class="btn btn-outline-danger btn-sm" type="submit" onclick="return confirm('@T("Issue a credit note against this invoice?", "إصدار إشعار دائن على هذه الفاتورة؟")');"><i class="bi bi-file-earmark-minus me-1" aria-hidden="true"></i>@T("Issue credit note", "إصدار إشعار دائن")</button>
                     </form>
                 }
                 else { <div class="small text-muted">@(voided ? T("Voided invoice.", "فاتورة ملغاة.") : T("Nothing left to credit.", "لا متبقٍ للإشعار."))</div> }
             </div>
         </div>
         <div class="sms-card">
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-cash-coin me-1"></i>@T("Payments allocated", "المدفوعات المخصّصة")</h2><span class="badge text-bg-light border">@Model.Allocations.Count</span></div>
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Payments allocated", "المدفوعات المخصّصة")</h2><span class="badge text-bg-light border">@Model.Allocations.Count</span></div>
             <ul class="list-group list-group-flush">
                 @foreach (var (a, r) in Model.Allocations) { <li class="list-group-item small d-flex justify-content-between"><span><a asp-controller="Payments" asp-action="Receipt" asp-route-id="@r.Id"><code>@r.ReceiptNo</code></a> · @r.IssuedAtUtc.ToString("yyyy-MM-dd") · @FinanceLabels.Method(r.Method, isRtl)</span><span class="fw-semibold text-success">@a.AllocatedAmount.ToString("N2")</span></li> }
                 @if (Model.Allocations.Count == 0) { <li class="list-group-item small text-muted">@T("No payments yet.", "لا مدفوعات بعد.")</li> }
             </ul>
-            <div class="p-3 d-flex justify-content-between"><span>@T("Remaining", "المتبقي")</span><span class="fw-bold @(Model.Remaining > 0 ? "text-danger" : "text-success")">@Model.Remaining.ToString("N2")</span></div>
-            @if (Model.Remaining > 0) { <div class="px-3 pb-3"><a class="btn btn-success btn-sm w-100" asp-controller="Payments" asp-action="Index" asp-route-payerId="@c.PayerId" asp-route-amount="@Model.Remaining.ToString("0.##", CultureInfo.InvariantCulture)"><i class="bi bi-cash me-1"></i>@T("Collect at cashier", "تحصيل في الصندوق")</a></div> }
+            <div class="p-3 d-flex justify-content-between"><span>@T("Remaining", "المتبقي")</span><span class="fw-bold @(Model.Remaining > 0 ? "text-danger" : "text-success")">@Model.Remaining.ToString("N2") <span class="visually-hidden">@(Model.Remaining > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></span></div>
+            @if (Model.Remaining > 0) { <div class="px-3 pb-3"><a class="btn btn-success btn-sm w-100" asp-controller="Payments" asp-action="Index" asp-route-payerId="@c.PayerId" asp-route-amount="@Model.Remaining.ToString("0.##", CultureInfo.InvariantCulture)"><i class="bi bi-cash me-1" aria-hidden="true"></i>@T("Collect at cashier", "تحصيل في الصندوق")</a></div> }
         </div>
     </div>
 </div>

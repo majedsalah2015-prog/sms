@@ -24,7 +24,7 @@
         <div class="row g-3 mb-3">
             <div class="col-md-4"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="Order" class="form-control" type="number" min="1" /></div>
         </div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
         <a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

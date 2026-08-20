@@ -10,7 +10,7 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only contents of the active pack (BR-SET-004). Change it from the wizard's Country pack step.", "محتويات الحزمة الفعّالة للقراءة فقط (BR-SET-004). يمكن تغييرها من خطوة حزمة الدولة في المعالج.")</p></div>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-pencil me-1"></i>@T("Change", "تغيير")</a></div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Change", "تغيير")</a></div>
 <partial name="_SetupNav" />
 
 @if (Model == null)

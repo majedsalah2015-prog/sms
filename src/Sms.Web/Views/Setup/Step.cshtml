@@ -20,7 +20,7 @@
         <h1 class="sms-page-title">@title</h1>
     </div>
     <div>
-        @if (done) { <span class="badge text-bg-success"><i class="bi bi-check2 me-1"></i>@T("Completed", "مكتملة")</span> }
+        @if (done) { <span class="badge text-bg-success"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Completed", "مكتملة")</span> }
         else if (Model.State.IsReady) { <span class="badge text-bg-primary">@T("Ready", "جاهزة")</span> }
         else { <span class="badge text-bg-secondary">@T("Pending", "قيد الانتظار")</span> }
     </div>
@@ -155,7 +155,8 @@
                         else
                         {
                             <div class="table-responsive"><table class="table table-sm sms-table mb-3">
-                                <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Entity", "الكيان")</th><th>@T("Format", "الصيغة")</th></tr></thead>
+                                <caption class="visually-hidden">@T("Numbering series", "سلاسل الترقيم")</caption>
+                                <thead><tr><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Entity", "الكيان")</th><th scope="col">@T("Format", "الصيغة")</th></tr></thead>
                                 <tbody>@foreach (var s in Model.NumberingSeries) { <tr><td><code>@s.Code</code></td><td>@s.Entity</td><td dir="ltr"><code>@s.Format</code></td></tr> }</tbody>
                             </table></div>
                         }
@@ -166,7 +167,8 @@
                         @if (Model.Stages.Count > 0)
                         {
                             <div class="table-responsive mb-3"><table class="table table-sm sms-table">
-                                <thead><tr><th>#</th><th>@T("Stage", "المرحلة")</th><th>@T("Grades", "الصفوف")</th></tr></thead>
+                                <caption class="visually-hidden">@T("Stages and grades", "المراحل والصفوف")</caption>
+                                <thead><tr><th scope="col">#</th><th scope="col">@T("Stage", "المرحلة")</th><th scope="col">@T("Grades", "الصفوف")</th></tr></thead>
                                 <tbody>@foreach (var s in Model.Stages) { <tr><td>@s.Order</td><td>@(isRtl ? s.StageAr : s.StageEn)</td><td>@string.Join(" · ", s.Grades.Select(g => $"{g.Code} {(isRtl ? g.Ar : g.En)}"))</td></tr> }</tbody>
                             </table></div>
                         }
@@ -198,7 +200,7 @@
                 </div>
 
                 <div class="d-flex gap-2 align-items-center">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>@(done ? T("Save & keep completed", "حفظ والإبقاء مكتملة") : T("Save & complete step", "حفظ وإكمال الخطوة"))</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@(done ? T("Save & keep completed", "حفظ والإبقاء مكتملة") : T("Save & complete step", "حفظ وإكمال الخطوة"))</button>
                     <a class="btn btn-outline-secondary" asp-action="Index">@T("Back to wizard", "العودة للمعالج")</a>
                     @if (Model.NextStepCode != null) { <a class="ms-auto small" asp-action="Step" asp-route-code="@Model.NextStepCode">@T("Skip to next step", "التخطي للخطوة التالية") →</a> }
                 </div>

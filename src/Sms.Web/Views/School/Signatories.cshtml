@@ -21,7 +21,8 @@
                 @if (rows.Count > 0)
                 {
                     <div class="table-responsive"><table class="table table-sm sms-table mb-0">
-                        <thead><tr><th>@T("Name", "الاسم")</th><th>@T("Title", "المسمى")</th><th>@T("Effective from", "ساري من")</th><th>@T("Effective to", "ساري إلى")</th></tr></thead>
+                        <caption class="visually-hidden">@T("Signatories", "الموقّعون") — @(isRtl ? cls.Ar : cls.En)</caption>
+                        <thead><tr><th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Title", "المسمى")</th><th scope="col">@T("Effective from", "ساري من")</th><th scope="col">@T("Effective to", "ساري إلى")</th></tr></thead>
                         <tbody>@foreach (var s in rows) { <tr class="@(s.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@(isRtl ? s.NameAr : s.NameEn)</td><td>@(isRtl ? s.TitleAr : s.TitleEn)</td><td>@s.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(s.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? "—")</td></tr> }</tbody>
                     </table></div>
                 }
@@ -39,7 +40,7 @@
                 <div class="mb-2"><label class="form-label">@T("Title (Arabic)", "المسمى (عربي)")</label><input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" /></div>
                 <div class="mb-2"><label class="form-label">@T("Title (English)", "المسمى (إنجليزي)")</label><input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" /></div>
                 <div class="mb-3"><label class="form-label">@T("Effective from", "ساري من")</label><input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
-                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-pen me-1"></i>@T("Save", "حفظ")</button>
+                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-pen me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
             </form>
         </div>
     </div>

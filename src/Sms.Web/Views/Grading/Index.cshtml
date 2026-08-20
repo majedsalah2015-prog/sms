@@ -45,14 +45,15 @@ else
                     @if (Model.Status != null) { <input type="hidden" name="status" value="@Model.Status" /> }
                 </form>
                 <div class="table-responsive"><table class="table sms-table mb-0">
-                    <thead><tr><th>#</th><th>@T("Subject", "المادة")</th><th>@T("Grade / section", "الصف / الشعبة")</th><th>@T("Term", "الفترة")</th><th>@T("Progress", "التقدم")</th><th>@T("Status", "الحالة")</th><th>@T("Published", "النشر")</th><th></th></tr></thead>
+                    <caption class="visually-hidden">@T("Marksheets for the selected year", "كشوف الدرجات للعام المحدد")</caption>
+                    <thead><tr><th scope="col">#</th><th scope="col">@T("Subject", "المادة")</th><th scope="col">@T("Grade / section", "الصف / الشعبة")</th><th scope="col">@T("Term", "الفترة")</th><th scope="col">@T("Progress", "التقدم")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Published", "النشر")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
                     <tbody>@foreach (var r in Model.Rows)
                     {
                         var pct = r.Total == 0 ? 0 : (int)Math.Round(100.0 * r.Resolved / r.Total);
                         <tr><td><a asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><code>#@r.Sheet.Id</code></a></td><td class="fw-semibold"><a asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</a></td><td>@r.Grade?.Code · @(isRtl ? r.Section.NameAr : r.Section.NameEn)</td><td>@(isRtl ? r.Term.NameAr : r.Term.NameEn)</td>
                             <td><div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(pct)%;@(pct == 100 ? "background:#16a34a" : "")"></span></div><span class="small text-muted">@r.Resolved/@r.Total</span></div></td>
                             <td><span class="badge @GradingLabels.MarksheetBadge(r.Sheet.Status)">@GradingLabels.MarksheetStatus(r.Sheet.Status, isRtl)</span></td><td class="small text-muted">@(r.Sheet.PublishedAtUtc?.ToString("yyyy-MM-dd") ?? "—")</td>
-                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><i class="bi bi-grid-3x3"></i> @T("Open", "فتح")</a></td></tr>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="Marksheet" asp-route-id="@r.Sheet.Id"><i class="bi bi-grid-3x3" aria-hidden="true"></i> @T("Open", "فتح")</a></td></tr>
                     }
                     @if (Model.Rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-4">@T("No marksheets match. Create one on the right — it needs a finalized blueprint.", "لا كشوف مطابقة. أنشئ واحداً من اليمين — يحتاج مخططاً معتمداً.")</td></tr> }</tbody>
                 </table></div>
@@ -60,14 +61,14 @@ else
         </div>
         <div class="col-xl-4">
             <div class="sms-card p-3">
-                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("New marksheet", "كشف درجات جديد")</h2>
+                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New marksheet", "كشف درجات جديد")</h2>
                 @if (Model.LockedBlueprints.Count == 0) { <div class="alert alert-warning small mb-0">@T("No finalized blueprint in this year yet — build one under Blueprints & weights and finalize it (weights must sum to 100).", "لا مخطط معتمد في هذا العام — أنشئ واحداً في تبويب المخططات واعتمده (مجموع الأوزان 100).") <a asp-action="Blueprints" asp-route-year="@yid">@T("Go →", "انتقل ←")</a></div> }
                 else
                 {
                     <form method="post" asp-action="CreateMarksheet" asp-route-year="@yid" class="d-grid gap-2">
                         <div><label class="form-label small">@T("Blueprint (subject · grade · term)", "المخطط (المادة · الصف · الفترة)")</label><select name="blueprintId" id="bpPick" class="form-select form-select-sm" required><option value="">—</option>@foreach (var b in Model.LockedBlueprints) { <option value="@b.BlueprintId" data-profile="@b.ProfileId">@b.Subject.Code @(isRtl ? b.Subject.Name.NameAr : b.Subject.Name.NameEn) · @b.Grade?.Code · @(isRtl ? b.Term.NameAr : b.Term.NameEn)</option> }</select></div>
                         <div><label class="form-label small">@T("Section", "الشعبة")</label><select name="sectionId" id="secPick" class="form-select form-select-sm" required><option value="">—</option>@foreach (var s in Model.Sections) { <option value="@s.Section.Id" data-profile="@s.Section.GradeYearProfileId">@s.Grade?.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }</select></div>
-                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create", "إنشاء")</button>
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create", "إنشاء")</button>
                         <div class="form-text">@T("Sections of a different grade are hidden once a blueprint is picked.", "تُخفى شعب الصفوف الأخرى بعد اختيار المخطط.")</div>
                     </form>
                     <script>

@@ -23,8 +23,8 @@
             <div class="col-md-6"><label class="form-label">@T("Category", "الفئة")</label><select asp-for="Category" class="form-select">@foreach (var c in SubjectCatalogViewModel.Categories) { <option value="@c">@SubjectCatalogViewModel.CategoryLabel(c, isRtl)</option> }</select></div>
             <div class="col-md-6"><label class="form-label">@T("Department", "القسم")</label><select asp-for="DepartmentId" class="form-select"><option value="">—</option>@foreach (var d in Model.Departments) { <option value="@d.Id">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</option> }</select></div>
         </div>
-        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1"></i>@Model.CurrentOfferings @T("current curriculum plan(s) include this subject.", "خطة/خطط دراسية حالية تتضمن هذه المادة.")</div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <div class="small text-muted mb-3"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@Model.CurrentOfferings @T("current curriculum plan(s) include this subject.", "خطة/خطط دراسية حالية تتضمن هذه المادة.")</div>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
         <a class="btn btn-outline-secondary" asp-action="Index" asp-route-tab="catalog">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

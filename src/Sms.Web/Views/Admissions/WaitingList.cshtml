@@ -21,7 +21,8 @@ else
     <div class="sms-card">
         <div class="p-3 border-bottom small text-muted">@T("Planned seats", "المقاعد المخططة") <strong>@Model.PlannedSeats</strong> · @T("enrolled", "مسجَّل") <strong>@Model.Enrolled</strong> · @T("free", "متاح") <strong class="@(free > 0 ? "text-success" : "text-danger")">@free</strong></div>
         <div class="table-responsive"><table class="table sms-table mb-0">
-            <thead><tr><th>#</th><th>@T("Applicant", "المتقدم")</th><th>@T("Status", "الحالة")</th><th>@T("Offer", "العرض")</th><th></th></tr></thead>
+            <caption class="visually-hidden">@T("Waiting list", "قائمة الانتظار")</caption>
+            <thead><tr><th scope="col">#</th><th scope="col">@T("Applicant", "المتقدم")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Offer", "العرض")</th><th scope="col"></th></tr></thead>
             <tbody>@foreach (var r in Model.Rows)
             {
                 var a = r.Application;
@@ -33,14 +34,14 @@ else
                     <td class="text-end text-nowrap">
                         @if (a.Status == Sms.Domain.Admissions.ApplicationStatus.Waitlisted && (r.Entry.OfferedAtUtc == null || r.OfferExpired))
                         {
-                            <form method="post" asp-action="Offer" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline-flex gap-1"><input name="expires" type="date" class="form-control form-control-sm" value="@next7" style="width:9.5rem" /><button class="btn btn-sm btn-primary" type="submit" @(free == 0 ? "disabled" : "") title="@(free == 0 ? T("no free seat", "لا مقعد متاحاً") : "")"><i class="bi bi-envelope-paper me-1"></i>@T("Offer seat", "عرض مقعد")</button></form>
+                            <form method="post" asp-action="Offer" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline-flex gap-1"><input name="expires" type="date" class="form-control form-control-sm" value="@next7" style="width:9.5rem" aria-label="@T("Offer expiry date", "تاريخ انتهاء العرض")" /><button class="btn btn-sm btn-primary" type="submit" @(free == 0 ? "disabled" : "") title="@(free == 0 ? T("no free seat", "لا مقعد متاحاً") : "")"><i class="bi bi-envelope-paper me-1" aria-hidden="true"></i>@T("Offer seat", "عرض مقعد")</button></form>
                         }
                         else if (a.Status == Sms.Domain.Admissions.ApplicationStatus.Waitlisted && r.Entry.IsOfferAccepted == null)
                         {
                             <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="true" /><button class="btn btn-sm btn-success" type="submit">@T("Accepted", "قَبِل")</button></form>
                             <form method="post" asp-action="Respond" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline"><input type="hidden" name="accepted" value="false" /><button class="btn btn-sm btn-outline-danger" type="submit">@T("Declined", "رفض")</button></form>
                         }
-                        <form method="post" asp-action="RemoveFromWaitlist" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline" onsubmit="return confirm('@T("Remove this applicant from the waiting list?", "إزالة هذا المتقدم من قائمة الانتظار؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove from waiting list", "إزالة من قائمة الانتظار")"><i class="bi bi-trash"></i></button></form>
+                        <form method="post" asp-action="RemoveFromWaitlist" asp-route-entryId="@r.Entry.Id" asp-route-profile="@Model.ProfileId" class="d-inline" onsubmit="return confirm('@T("Remove this applicant from the waiting list?", "إزالة هذا المتقدم من قائمة الانتظار؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove from waiting list", "إزالة من قائمة الانتظار")" aria-label="@T("Remove from waiting list", "إزالة من قائمة الانتظار")"><i class="bi bi-trash" aria-hidden="true"></i></button></form>
 
                     </td>
                 </tr>

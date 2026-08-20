@@ -6,22 +6,23 @@
     ViewData["Title"] = T("My statement", "كشف حسابي");
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All children, posted invoices only — gross, discounts and balance shown separately (BR-DIS-010).", "كل الأبناء، الفواتير المرحّلة فقط — الإجمالي والخصومات والرصيد معروضة منفصلة (BR-DIS-010).")</p></div><button class="btn btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All children, posted invoices only — gross, discounts and balance shown separately (BR-DIS-010).", "كل الأبناء، الفواتير المرحّلة فقط — الإجمالي والخصومات والرصيد معروضة منفصلة (BR-DIS-010).")</p></div><button class="btn btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button></div>
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0">
-        <thead><tr><th>@T("Student", "الطالب")</th><th>@T("Invoice", "الفاتورة")</th><th>@T("Posted", "التاريخ")</th><th class="text-end">@T("Amount", "المبلغ")</th></tr></thead>
+        <caption class="visually-hidden">@T("Family statement: posted invoices per child", "كشف حساب العائلة: الفواتير المرحّلة لكل ابن")</caption>
+        <thead><tr><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Invoice", "الفاتورة")</th><th scope="col">@T("Posted", "التاريخ")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th></tr></thead>
         <tbody>
         @foreach (var l in Model.Lines)
         {
             var s = l.Student; var name = isRtl ? $"{s.FirstNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FamilyNameEn}";
             var first = true;
             foreach (var c in l.Position.Charges.OrderBy(c => c.PostedAtUtc)) { <tr><td>@(first ? name : "")</td><td><code>@c.ChargeNo</code></td><td>@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@c.GrossAmount.ToString("N2")</td></tr> first = false; }
-            <tr class="table-light"><td class="fw-semibold">@(first ? name : "")</td><td colspan="2" class="small text-muted">@T("gross", "الإجمالي") @l.Position.GrossCharges.ToString("N2") · @T("discounts", "الخصومات") @l.Position.Discounts.ToString("N2")</td><td class="text-end fw-semibold @(l.Position.Position > 0 ? "text-danger" : "text-success")">@l.Position.Position.ToString("N2")</td></tr>
+            <tr class="table-light"><td class="fw-semibold">@(first ? name : "")</td><td colspan="2" class="small text-muted">@T("gross", "الإجمالي") @l.Position.GrossCharges.ToString("N2") · @T("discounts", "الخصومات") @l.Position.Discounts.ToString("N2")</td><td class="text-end fw-semibold @(l.Position.Position > 0 ? "text-danger" : "text-success")">@l.Position.Position.ToString("N2") <span class="visually-hidden">@(l.Position.Position > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></td></tr>
         }
         @if (Model.Lines.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-4">@T("No students linked to this account.", "لا طلاب مرتبطون بهذا الحساب.")</td></tr> }
         </tbody>
-        <tfoot><tr><th colspan="3">@T("Family balance due", "رصيد العائلة المستحق")</th><th class="text-end fs-5 @(Model.Total > 0 ? "text-danger" : "text-success")">@Model.Total.ToString("N2")</th></tr></tfoot>
+        <tfoot><tr><th colspan="3">@T("Family balance due", "رصيد العائلة المستحق")</th><th class="text-end fs-5 @(Model.Total > 0 ? "text-danger" : "text-success")">@Model.Total.ToString("N2") <span class="visually-hidden">@(Model.Total > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></th></tr></tfoot>
     </table></div>
     <div class="p-3 small text-muted">@T("This page requires re-authentication after 15 idle minutes (BR-SEC-013). Online payment is not enabled (BR-PAY-007).", "تتطلب هذه الصفحة إعادة تسجيل الدخول بعد 15 دقيقة خمول (BR-SEC-013). الدفع الإلكتروني غير مفعّل (BR-PAY-007).")</div>
 </div>

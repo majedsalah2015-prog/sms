@@ -37,24 +37,25 @@ else
 {
     <div class="sms-card">
         <div class="p-3 border-bottom d-flex align-items-center gap-3"><h2 class="h6 mb-0">@Model.Profile.Grade.Code @(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</h2>
-            @if (Model.Scales.Count == 0) { <span class="ms-auto small text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>@T("No grading scale in this year —", "لا سلم تقدير في هذا العام —") <a asp-action="Scales" asp-route-year="@yid">@T("create one first", "أنشئ واحداً أولاً")</a></span> }</div>
+            @if (Model.Scales.Count == 0) { <span class="ms-auto small text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("No grading scale in this year —", "لا سلم تقدير في هذا العام —") <a asp-action="Scales" asp-route-year="@yid">@T("create one first", "أنشئ واحداً أولاً")</a></span> }</div>
         <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
-            <thead><tr><th>@T("Offering", "المادة")</th><th>@T("Assessable", "تقييم")</th><th>@T("Blueprint", "المخطط")</th><th>@T("Components", "المكوّنات")</th><th>@T("Weights", "الأوزان")</th><th>@T("Marksheets", "الكشوف")</th><th></th></tr></thead>
+            <caption class="visually-hidden">@T("Blueprints per subject offering", "المخططات حسب المادة")</caption>
+            <thead><tr><th scope="col">@T("Offering", "المادة")</th><th scope="col">@T("Assessable", "تقييم")</th><th scope="col">@T("Blueprint", "المخطط")</th><th scope="col">@T("Components", "المكوّنات")</th><th scope="col">@T("Weights", "الأوزان")</th><th scope="col">@T("Marksheets", "الكشوف")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
             <tbody>@foreach (var r in Model.Offerings)
             {
                 var ok = r.WeightSum == 100m;
                 <tr class="@(r.Offering.IsAssessable ? "" : "text-muted")">
                     <td class="fw-semibold"><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td>
                     <td>@(r.Offering.IsAssessable ? "✓" : T("no (BR-SUB-003)", "لا (BR-SUB-003)"))</td>
-                    <td>@if (r.Blueprint == null) { <span class="text-muted">—</span> } else if (r.Blueprint.IsLocked) { <span class="badge text-bg-dark"><i class="bi bi-lock-fill me-1"></i>@T("Finalized", "معتمد")</span> } else { <span class="badge text-bg-warning">@T("Draft", "مسودة")</span> }</td>
+                    <td>@if (r.Blueprint == null) { <span class="text-muted">—</span> } else if (r.Blueprint.IsLocked) { <span class="badge text-bg-dark"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("Finalized", "معتمد")</span> } else { <span class="badge text-bg-warning">@T("Draft", "مسودة")</span> }</td>
                     <td>@(r.Blueprint == null ? "—" : r.ComponentCount.ToString())</td>
                     <td>@if (r.Blueprint != null) { <div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem"><span style="width:@(Math.Min(100, (int)r.WeightSum))%;@(ok ? "background:#16a34a" : (r.WeightSum > 100 ? "background:#dc2626" : ""))"></span></div><span class="small @(ok ? "text-success" : "text-warning-emphasis")">@r.WeightSum.ToString("0.##") / 100</span></div> }</td>
                     <td>@(r.Blueprint == null ? "—" : r.MarksheetCount.ToString())</td>
                     <td class="text-end">
-                        @if (r.Blueprint != null) { <a class="btn btn-sm btn-outline-primary" asp-action="Blueprint" asp-route-id="@r.Blueprint.Id"><i class="bi bi-pencil-square me-1"></i>@T("Open", "فتح")</a> }
+                        @if (r.Blueprint != null) { <a class="btn btn-sm btn-outline-primary" asp-action="Blueprint" asp-route-id="@r.Blueprint.Id"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Open", "فتح")</a> }
                         else if (r.Offering.IsAssessable && Model.Scales.Count > 0)
                         {
-                            <form method="post" asp-action="CreateBlueprint" asp-route-year="@yid" asp-route-profile="@pid" asp-route-term="@tid" class="d-inline-flex gap-1 align-items-center"><input type="hidden" name="offeringId" value="@r.Offering.Id" /><select name="scaleId" class="form-select form-select-sm" style="width:11rem">@foreach (var s in Model.Scales) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)@(s.IsLocked ? " 🔒" : "")</option> }</select><label class="small text-nowrap"><input type="checkbox" name="redistribute" value="true" class="form-check-input" /> @T("redistribute", "إعادة توزيع")</label><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg"></i></button></form>
+                            <form method="post" asp-action="CreateBlueprint" asp-route-year="@yid" asp-route-profile="@pid" asp-route-term="@tid" class="d-inline-flex gap-1 align-items-center"><input type="hidden" name="offeringId" value="@r.Offering.Id" /><select name="scaleId" class="form-select form-select-sm" style="width:11rem">@foreach (var s in Model.Scales) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)@(s.IsLocked ? " 🔒" : "")</option> }</select><label class="small text-nowrap"><input type="checkbox" name="redistribute" value="true" class="form-check-input" /> @T("redistribute", "إعادة توزيع")</label><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Create blueprint", "إنشاء مخطط")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form>
                         }
                     </td>
                 </tr>

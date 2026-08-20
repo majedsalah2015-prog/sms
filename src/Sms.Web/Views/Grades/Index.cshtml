@@ -37,14 +37,15 @@
             <div class="sms-card mb-3">
                 <div class="p-3 border-bottom d-flex align-items-center gap-2"><span class="badge text-bg-light border">@s.Stage.SequenceOrder</span><h2 class="h6 mb-0">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</h2><span class="small text-muted">· @Gender(s.Stage.DefaultGenderPolicy)</span>
                     <span class="ms-auto d-flex gap-1">
-                        <a class="btn btn-sm btn-outline-primary" asp-action="EditStage" asp-route-id="@s.Stage.Id" asp-route-year="@yid" title="@T("Edit stage", "تعديل المرحلة")"><i class="bi bi-pencil"></i> @T("Edit", "تعديل")</a>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditStage" asp-route-id="@s.Stage.Id" asp-route-year="@yid" title="@T("Edit stage", "تعديل المرحلة")"><i class="bi bi-pencil" aria-hidden="true"></i> @T("Edit", "تعديل")</a>
                         <form method="post" asp-action="DeleteStage" asp-route-id="@s.Stage.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this stage?", "حذف هذه المرحلة؟")');">
-                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(s.Grades.Count > 0 ? T("Remove its grades first", "احذف صفوفها أولاً") : T("Remove stage", "حذف المرحلة"))" disabled="@(s.Grades.Count > 0)"><i class="bi bi-trash"></i> @T("Delete", "حذف")</button>
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(s.Grades.Count > 0 ? T("Remove its grades first", "احذف صفوفها أولاً") : T("Remove stage", "حذف المرحلة"))" disabled="@(s.Grades.Count > 0)"><i class="bi bi-trash" aria-hidden="true"></i> @T("Delete", "حذف")</button>
                         </form>
                     </span>
                 </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">
-                    <thead><tr><th>#</th><th>@T("Grade", "الصف")</th><th>@T("Promotes to", "يرفَّع إلى")</th><th>@T("Profile", "الملف السنوي") (@(Model.Year == null ? "—" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)))</th><th>@T("Capacity", "السعة")</th><th></th></tr></thead>
+                    <caption class="visually-hidden">@T("Grades:", "صفوف:") @(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</caption>
+                    <thead><tr><th scope="col">#</th><th scope="col">@T("Grade", "الصف")</th><th scope="col">@T("Promotes to", "يرفَّع إلى")</th><th scope="col">@T("Profile", "الملف السنوي") (@(Model.Year == null ? "—" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)))</th><th scope="col">@T("Capacity", "السعة")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
                     <tbody>
                     @foreach (var g in s.Grades)
                     {
@@ -57,23 +58,23 @@
                                 <form method="post" asp-action="SetPath" asp-route-id="@g.Grade.Id" asp-route-year="@yid" class="d-flex gap-1 align-items-center">
                                     <select name="target" class="form-select form-select-sm" style="width:11rem"><option value="">—</option>@foreach (var o in Model.AllGrades.Where(x => x.Id != g.Grade.Id)) { <option value="@o.Id" selected="@(o.Id == g.Grade.PromotionTargetGradeLevelId)">@o.Code @(isRtl ? o.Name.NameAr : o.Name.NameEn)</option> }</select>
                                     <label class="small text-nowrap"><input type="checkbox" name="graduating" value="true" class="form-check-input" @(g.Grade.IsGraduating ? "checked" : "") /> @T("graduating", "تخرج")</label>
-                                    <button class="btn btn-sm btn-outline-secondary" type="submit" title="@T("Save path", "حفظ المسار")"><i class="bi bi-arrow-right-short @(isRtl ? "sms-flip" : "")"></i></button>
+                                    <button class="btn btn-sm btn-outline-secondary" type="submit" title="@T("Save path", "حفظ المسار")" aria-label="@T("Save path", "حفظ المسار")"><i class="bi bi-arrow-right-short @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i></button>
                                 </form>
-                                @if (!g.Grade.IsGraduating && g.PromotionTarget == null) { <span class="small text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>@T("no target (blocks activation, BR-AYR-004)", "بلا هدف (يمنع التفعيل، BR-AYR-004)")</span> }
+                                @if (!g.Grade.IsGraduating && g.PromotionTarget == null) { <span class="small text-warning-emphasis"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("no target (blocks activation, BR-AYR-004)", "بلا هدف (يمنع التفعيل، BR-AYR-004)")</span> }
                             </td>
-                            <td class="small">@if (g.Profile == null) { <span class="text-muted">@T("not defined", "غير معرَّف")</span> } else { <text>@Gender(g.Profile.GenderPolicy) · @g.Profile.TargetSections × @g.Profile.TargetSectionSize@if (g.Profile.MinAgeAtCutoff != null || g.Profile.MaxAgeAtCutoff != null) { <text> · @T("age", "العمر") @g.Profile.MinAgeAtCutoff–@g.Profile.MaxAgeAtCutoff</text> }</text> }</td>
-                            <td style="min-width:9rem">@if (g.Profile != null) { <div class="small">@g.Enrolled / @planned · @g.Sections @T("sec.", "شعب")</div><div class="sms-progress"><span style="width:@(pct)%;@(pct >= 100 ? "background:#dc2626" : "")"></span></div> }</td>
+                            <td class="small">@if (g.Profile == null) { <span class="text-muted">@T("not defined", "غير معرَّف")</span> } else { <text>@Gender(g.Profile.GenderPolicy) · @g.Profile.TargetSections × @g.Profile.TargetSectionSize@if (g.Profile.MinAgeAtCutoff != null || g.Profile.MaxAgeAtCutoff != null) { <text> · @T("age", "العمر") <bdi dir="ltr">@g.Profile.MinAgeAtCutoff–@g.Profile.MaxAgeAtCutoff</bdi></text> }</text> }</td>
+                            <td style="min-width:9rem">@if (g.Profile != null) { <div class="small">@g.Enrolled / @planned · @g.Sections @T("sec.", "شعب")</div><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Capacity", "السعة")"><span style="width:@(pct)%;@(pct >= 100 ? "background:#dc2626" : "")"></span></div> }</td>
                             <td class="text-end text-nowrap">
                                 <a class="btn btn-sm btn-outline-primary" href="#profile" onclick="document.getElementById('ProfileGradeId').value='@g.Grade.Id'" title="@T("Define / edit the grade-year profile", "تعريف / تعديل الملف السنوي")">@T("Profile", "الملف")</a>
                                 @if (g.Profile != null)
                                 {
                                     <form method="post" asp-action="DeleteProfile" asp-route-id="@g.Profile.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this grade-year profile?", "حذف ملف الصف السنوي؟")');">
-                                        <button class="btn btn-sm btn-outline-warning" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Profile has sections/enrollments", "للملف شعب أو تسجيلات") : T("Remove profile", "حذف الملف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-x-circle"></i></button>
+                                        <button class="btn btn-sm btn-outline-warning" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Profile has sections/enrollments", "للملف شعب أو تسجيلات") : T("Remove profile", "حذف الملف"))" aria-label="@(g.Enrolled > 0 || g.Sections > 0 ? T("Profile has sections/enrollments", "للملف شعب أو تسجيلات") : T("Remove profile", "حذف الملف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-x-circle" aria-hidden="true"></i></button>
                                     </form>
                                 }
-                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditGrade" asp-route-id="@g.Grade.Id" asp-route-year="@yid" title="@T("Edit grade", "تعديل الصف")"><i class="bi bi-pencil"></i></a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="EditGrade" asp-route-id="@g.Grade.Id" asp-route-year="@yid" title="@T("Edit grade", "تعديل الصف")" aria-label="@T("Edit grade", "تعديل الصف")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                                 <form method="post" asp-action="DeleteGrade" asp-route-id="@g.Grade.Id" asp-route-year="@yid" class="d-inline" onsubmit="return confirm('@T("Remove this grade?", "حذف هذا الصف؟")');">
-                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Grade has sections/enrollments", "للصف شعب أو تسجيلات") : T("Remove grade", "حذف الصف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-trash"></i></button>
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="@(g.Enrolled > 0 || g.Sections > 0 ? T("Grade has sections/enrollments", "للصف شعب أو تسجيلات") : T("Remove grade", "حذف الصف"))" aria-label="@(g.Enrolled > 0 || g.Sections > 0 ? T("Grade has sections/enrollments", "للصف شعب أو تسجيلات") : T("Remove grade", "حذف الصف"))" disabled="@(g.Enrolled > 0 || g.Sections > 0)"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                 </form>
                             </td>
                         </tr>

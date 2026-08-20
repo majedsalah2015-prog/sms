@@ -12,11 +12,12 @@ else
 {
     <div class="sms-card">
         <div class="table-responsive"><table class="table table-sm table-bordered sms-table mb-0 align-top text-center" style="table-layout:fixed">
-            <thead><tr><th style="width:3rem">#</th>@foreach (var d in Model.Days) { <th>@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@TimetableLabels.Day(d, !isRtl)</div></th> }</tr></thead>
+            <caption class="visually-hidden">@T("Weekly timetable", "الجدول الأسبوعي")</caption>
+            <thead><tr><th scope="col" style="width:3rem">#</th>@foreach (var d in Model.Days) { <th scope="col">@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@TimetableLabels.Day(d, !isRtl)</div></th> }</tr></thead>
             <tbody>
             @foreach (var seq in Model.Sequences)
             {
-                <tr><th class="text-muted small">@seq</th>
+                <tr><th scope="row" class="text-muted small">@seq</th>
                 @foreach (var d in Model.Days)
                 {
                     var slot = Model.Slots.GetValueOrDefault((d, seq));
@@ -27,7 +28,7 @@ else
                         continue;
                     }
                     <td class="@(slot.IsBreak ? "table-light" : "") p-1 small">
-                        <div class="text-muted" style="font-size:.75rem">@TimetableLabels.Span(slot)</div>
+                        <div class="text-muted" style="font-size:.75rem"><bdi dir="ltr">@TimetableLabels.Span(slot)</bdi></div>
                         @if (slot.IsBreak && cells.Count == 0) { <div class="fst-italic text-muted">@T("break", "فسحة")</div> }
                         @foreach (var c in cells)
                         {
@@ -37,8 +38,8 @@ else
                             <div class="mb-1 @(s?.Status == SessionStatus.Cancelled ? "text-decoration-line-through text-muted" : "")">
                                 <div class="fw-semibold">@(Model.Kind == "section" ? TimetableLabels.SubjectName(c.Subject, isRtl) : TimetableLabels.SectionName(c.Section, isRtl))</div>
                                 @if (Model.Kind == "section") { <div>@(isRtl ? c.Subject.Name.NameEn : c.Subject.Name.NameAr)</div> }
-                                @if (Model.Kind != "teacher") { <div>@(sub != null ? Teacher(sub) + " ↔ " : "")@Teacher(c.Teacher)</div> } else if (sub != null) { <div class="text-warning">↔ @Teacher(sub)</div> }
-                                @if (Model.Kind != "room") { <div class="text-muted">@(room?.Code ?? "—")@(s?.Status == SessionStatus.RoomChanged ? " ⚠" : "")</div> } else { <div class="text-muted"><code>@c.Subject.Code</code></div> }
+                                @if (Model.Kind != "teacher") { <div>@if (sub != null) { <text>@Teacher(sub) <span aria-hidden="true">↔</span><span class="visually-hidden">@T("substituted", "تعويض")</span> </text> }@Teacher(c.Teacher)</div> } else if (sub != null) { <div class="sms-amber"><span aria-hidden="true">↔</span><span class="visually-hidden">@T("substituted", "تعويض")</span> @Teacher(sub)</div> }
+                                @if (Model.Kind != "room") { <div class="text-muted">@(room?.Code ?? "—")@if (s?.Status == SessionStatus.RoomChanged) { <text> <span aria-hidden="true">⚠</span><span class="visually-hidden">@T("room changed", "قاعة مغيّرة")</span></text> }</div> } else { <div class="text-muted"><code>@c.Subject.Code</code></div> }
                                 @if (s != null && s.Status != SessionStatus.Held) { <span class="badge @TimetableLabels.SessionBadge(s.Status)" style="font-size:.65rem">@TimetableLabels.SessionStatus(s.Status, isRtl) · @s.Date.ToString("MM-dd")</span> }
                             </div>
                         }

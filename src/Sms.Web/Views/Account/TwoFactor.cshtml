@@ -18,7 +18,7 @@
         <input asp-for="Code" class="form-control form-control-lg text-center" inputmode="numeric" autocomplete="one-time-code" autofocus dir="ltr" maxlength="8" />
         <span asp-validation-for="Code" class="text-danger small"></span>
     </div>
-    <button type="submit" class="btn btn-primary w-100 sms-auth__submit"><i class="bi bi-shield-check"></i> @T("Verify", "تحقق")</button>
+    <button type="submit" class="btn btn-primary w-100 sms-auth__submit"><i class="bi bi-shield-check" aria-hidden="true"></i> @T("Verify", "تحقق")</button>
 </form>
 <div class="text-center mt-3"><a asp-action="Login" class="small">@T("Back to sign in", "العودة لتسجيل الدخول")</a></div>
 

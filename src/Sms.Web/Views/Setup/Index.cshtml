@@ -30,13 +30,13 @@
                 </div>
                 @if (Model.IsComplete)
                 {
-                    <span class="badge text-bg-success"><i class="bi bi-check2-circle me-1"></i>@T("Setup complete", "الإعداد مكتمل") · @Model.CompletedAtUtc?.ToString("yyyy-MM-dd")</span>
+                    <span class="badge text-bg-success"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Setup complete", "الإعداد مكتمل") · <bdi>@Model.CompletedAtUtc?.ToString("yyyy-MM-dd")</bdi></span>
                 }
                 else
                 {
                     <form asp-action="Complete" method="post">
                         <button type="submit" class="btn btn-primary" @(Model.CanDeclareComplete ? "" : "disabled")>
-                            <i class="bi bi-flag-fill me-1"></i>@T("Declare setup complete", "إعلان اكتمال الإعداد")
+                            <i class="bi bi-flag-fill me-1" aria-hidden="true"></i>@T("Declare setup complete", "إعلان اكتمال الإعداد")
                         </button>
                     </form>
                 }
@@ -57,7 +57,7 @@
                                     @if (!s.Step.IsMandatory) { <text> · @T("optional", "اختيارية")</text> }
                                 </span>
                             </span>
-                            <i class="bi bi-chevron-right text-muted @(isRtl ? "sms-flip" : "")"></i>
+                            <i class="bi bi-chevron-right text-muted @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>
                         </a>
                     </li>
                 }

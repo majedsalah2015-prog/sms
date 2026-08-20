@@ -27,23 +27,23 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Absent teacher → affected sessions → substitute suggestions → one-click assign.", "معلم غائب → حصص متأثرة → اقتراحات بديل → تعيين بنقرة.")</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2 align-items-center">
-            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(-1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id"><i class="bi @(isRtl ? "bi-chevron-right" : "bi-chevron-left")"></i></a>
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(-1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id" aria-label="@T("Previous day", "اليوم السابق")"><i class="bi @(isRtl ? "bi-chevron-right" : "bi-chevron-left")" aria-hidden="true"></i></a>
             <input type="date" name="date" class="form-control form-control-sm" value="@d" onchange="this.form.submit()" />
-            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id"><i class="bi @(isRtl ? "bi-chevron-left" : "bi-chevron-right")"></i></a>
+            <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@Model.Date.AddDays(1).ToString("yyyy-MM-dd")" asp-route-teacher="@Model.AbsentTeacher?.Profile.Id" aria-label="@T("Next day", "اليوم التالي")"><i class="bi @(isRtl ? "bi-chevron-left" : "bi-chevron-right")" aria-hidden="true"></i></a>
             <input type="hidden" name="teacher" value="@Model.AbsentTeacher?.Profile.Id" />
         </form>
-        <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@d" asp-route-print="true" target="_blank"><i class="bi bi-printer me-1"></i>@T("Cover summary", "ملخص التغطية")</a>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Cover" asp-route-date="@d" asp-route-print="true" target="_blank"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Cover summary", "ملخص التغطية")</a>
         <partial name="_HelpModal" model="help" /></div></div>
 <partial name="_TimetableNav" />
 
-@if (!Model.IsWorkingDay) { <div class="alert alert-secondary py-2 small"><i class="bi bi-moon me-1"></i>@T("Not a working day per the calendar.", "ليس يوم عمل وفق التقويم.")</div> }
+@if (!Model.IsWorkingDay) { <div class="alert alert-secondary py-2 small"><i class="bi bi-moon me-1" aria-hidden="true"></i>@T("Not a working day per the calendar.", "ليس يوم عمل وفق التقويم.")</div> }
 @if (Model.TotalSessions == 0) { <div class="alert alert-info">@T("No dated sessions on this day — publish a timetable version covering it (BR-TTB-006).", "لا حصص مؤرخة في هذا اليوم — انشر إصدار جدول يغطيه (BR-TTB-006).") <a asp-action="Publish">@T("Publication console", "وحدة النشر")</a></div> }
 else
 {
     <div class="row g-3 mb-3">
         <div class="col-xl-3">
             <div class="sms-card p-3">
-                <h2 class="h6 mb-2"><i class="bi bi-person-fill-exclamation me-1"></i>@T("Absent teacher", "المعلم الغائب")</h2>
+                <h2 class="h6 mb-2"><i class="bi bi-person-fill-exclamation me-1" aria-hidden="true"></i>@T("Absent teacher", "المعلم الغائب")</h2>
                 <form method="get"><input type="hidden" name="date" value="@d" />
                     <select name="teacher" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">@T("choose…", "اختر…")</option>
@@ -61,7 +61,8 @@ else
                 <div class="sms-card">
                     <div class="p-3 border-bottom"><h2 class="h6 mb-0">@Teacher(Model.AbsentTeacher.Employee) — @Model.Affected.Count @T("session(s) on", "حصة في") @d</h2></div>
                     <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                        <thead><tr><th>@T("Slot", "الحصة")</th><th>@T("Section · subject", "الشعبة · المادة")</th><th>@T("Room", "القاعة")</th><th>@T("Status", "الحالة")</th><th style="min-width:22rem">@T("Cover", "التغطية")</th></tr></thead>
+                        <caption class="visually-hidden">@T("Affected sessions of the absent teacher", "الحصص المتأثرة للمعلم الغائب")</caption>
+                        <thead><tr><th scope="col">@T("Slot", "الحصة")</th><th scope="col">@T("Section · subject", "الشعبة · المادة")</th><th scope="col">@T("Room", "القاعة")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col" style="min-width:22rem">@T("Cover", "التغطية")</th></tr></thead>
                         <tbody>
                         @foreach (var s in Model.Affected)
                         {
@@ -86,8 +87,8 @@ else
                                             </div>
                                         </form>
                                         <details class="mt-1"><summary class="small text-muted">@T("room change / cancel", "تغيير قاعة / إلغاء")</summary>
-                                            <form method="post" asp-action="ChangeRoom" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1"><select name="roomId" class="form-select form-select-sm">@foreach (var r in Model.Rooms) { <option value="@r.Id">@r.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit"><i class="bi bi-door-open"></i></button></form>
-                                            <form method="post" asp-action="CancelSession" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1" onsubmit="return confirm('@T("Cancel this session?", "إلغاء هذه الحصة؟")');"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle"></i></button></form>
+                                            <form method="post" asp-action="ChangeRoom" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1"><select name="roomId" class="form-select form-select-sm">@foreach (var r in Model.Rooms) { <option value="@r.Id">@r.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit" aria-label="@T("Change room", "تغيير القاعة")"><i class="bi bi-door-open" aria-hidden="true"></i></button></form>
+                                            <form method="post" asp-action="CancelSession" asp-route-id="@s.Session.Id" asp-route-date="@d" asp-route-teacher="@Model.AbsentTeacher.Profile.Id" class="d-flex gap-1 mt-1" onsubmit="return confirm('@T("Cancel this session?", "إلغاء هذه الحصة؟")');"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="@T("Cancel session", "إلغاء الحصة")"><i class="bi bi-x-circle" aria-hidden="true"></i></button></form>
                                         </details>
                                     }
                                     else { <span class="small text-muted">—</span> }
@@ -106,9 +107,10 @@ else
 }
 
 <div class="sms-card @(Model.Print ? "border-0 shadow-none" : "")">
-    <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-printer me-1"></i>@T("Cover summary", "ملخص التغطية") — @d @if (Model.Print) { <span class="text-muted small">· @T("staff room", "غرفة المعلمين")</span> }</h2>@if (Model.Print) { <button class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer"></i></button> }</div>
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Cover summary", "ملخص التغطية") — @d @if (Model.Print) { <span class="text-muted small">· @T("staff room", "غرفة المعلمين")</span> }</h2>@if (Model.Print) { <button class="btn btn-sm btn-outline-secondary d-print-none" onclick="window.print()" aria-label="@T("Print", "طباعة")"><i class="bi bi-printer" aria-hidden="true"></i></button> }</div>
     <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-        <thead><tr><th>@T("Slot", "الحصة")</th><th>@T("Section", "الشعبة")</th><th>@T("Subject", "المادة")</th><th>@T("Teacher", "المعلم")</th><th>@T("Status", "الحالة")</th><th>@T("Substitute / room", "البديل / القاعة")</th><th>@T("Reason", "السبب")</th></tr></thead>
+        <caption class="visually-hidden">@T("Daily cover summary", "ملخص التغطية اليومية")</caption>
+        <thead><tr><th scope="col">@T("Slot", "الحصة")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Subject", "المادة")</th><th scope="col">@T("Teacher", "المعلم")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Substitute / room", "البديل / القاعة")</th><th scope="col">@T("Reason", "السبب")</th></tr></thead>
         <tbody>
         @foreach (var s in Model.Summary)
         {

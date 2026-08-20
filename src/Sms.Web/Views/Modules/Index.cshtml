@@ -11,7 +11,7 @@
 
 <div class="sms-page-head">
     <div class="d-flex align-items-center gap-3">
-        <span class="sms-module-hero__icon"><i class="bi @Model.Icon"></i></span>
+        <span class="sms-module-hero__icon"><i class="bi @Model.Icon" aria-hidden="true"></i></span>
         <div>
             <div class="text-muted small">@T("Module", "الوحدة") @Model.Number</div>
             <h1 class="sms-page-title mb-0">@title</h1>
@@ -43,7 +43,7 @@
             <div class="d-flex flex-column gap-1">
                 @foreach (var m in ModuleCatalog.Modules.Where(x => x.Group == Model.Group && x.Code != Model.Code))
                 {
-                    <a class="sms-inline-link" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code"><i class="bi @m.Icon me-2"></i>@(isRtl ? m.TitleAr : m.TitleEn)</a>
+                    <a class="sms-inline-link" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code"><i class="bi @m.Icon me-2" aria-hidden="true"></i>@(isRtl ? m.TitleAr : m.TitleEn)</a>
                 }
             </div>
         </div>

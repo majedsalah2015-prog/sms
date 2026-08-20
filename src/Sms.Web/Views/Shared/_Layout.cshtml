@@ -2,6 +2,7 @@
 @using Sms.Web.Navigation
 @using Sms.Application.Setup
 @inject ISystemSetupAdmin SetupAdmin
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     var culture = CultureInfo.CurrentUICulture;
     var isRtl = culture.TextInfo.IsRightToLeft;
@@ -13,6 +14,9 @@
     // BR-SET-006: modules whose feature toggle is off vanish from the menu.
     var featureStates = await SetupAdmin.GetFeatureStatesAsync();
     var sidebar = ModuleCatalog.BuildSidebar(m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code]);
+    // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
+    var erpUrl = Configuration["ExternalApps:ErpUrl"];
+    var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";
 }
 <!DOCTYPE html>
 <html lang="@lang" dir="@dir">
@@ -42,7 +46,7 @@
         <aside class="sms-sidebar" id="sms-sidebar">
             <div class="sms-sidebar__brand">
                 <a asp-controller="Home" asp-action="Index" class="sms-brand">
-                    <span class="sms-brand__mark"><i class="bi bi-mortarboard-fill"></i></span>
+                    <span class="sms-brand__mark"><i class="bi bi-mortarboard-fill" aria-hidden="true"></i></span>
                     <span class="sms-brand__text">
                         <span class="sms-brand__name">SMS</span>
                         <span class="sms-brand__sub">@productName</span>
@@ -52,7 +56,7 @@
             <partial name="_Sidebar" model="sidebar" />
             <div class="sms-sidebar__foot">
                 <button type="button" class="sms-nav-link sms-collapse-btn" id="sms-collapse-btn" aria-label="@(isRtl ? "طيّ القائمة" : "Collapse menu")">
-                    <i class="sms-nav-icon bi bi-chevron-double-left"></i>
+                    <i class="sms-nav-icon bi bi-chevron-double-left" aria-hidden="true"></i>
                     <span class="sms-nav-label">@(isRtl ? "طيّ القائمة" : "Collapse")</span>
                 </button>
             </div>
@@ -61,7 +65,7 @@
 
         <div class="sms-content">
             <header class="sms-topbar">
-                <button type="button" class="btn sms-icon-btn d-lg-none" id="sms-menu-btn" aria-label="Menu"><i class="bi bi-list"></i></button>
+                <button type="button" class="btn sms-icon-btn d-lg-none" id="sms-menu-btn" aria-controls="sms-sidebar" aria-label="@(isRtl ? "القائمة" : "Menu")"><i class="bi bi-list" aria-hidden="true"></i></button>
                 <div class="sms-topbar__title">
                     @if (ViewData["Breadcrumb"] is string crumb)
                     {
@@ -73,20 +77,24 @@
                         <input type="hidden" name="returnUrl" value="@returnUrl" />
                         <input type="hidden" name="culture" value="@(isRtl ? "en" : "ar")" />
                         <button type="submit" class="btn btn-sm btn-outline-secondary sms-lang-btn" title="@(isRtl ? "English" : "العربية")">
-                            <i class="bi bi-translate"></i> <span>@(isRtl ? "English" : "العربية")</span>
+                            <i class="bi bi-translate" aria-hidden="true"></i> <span lang="@(isRtl ? "en" : "ar")" dir="@(isRtl ? "ltr" : "rtl")">@(isRtl ? "English" : "العربية")</span>
                         </button>
                     </form>
-                    <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="Jobs"><i class="bi bi-activity"></i></a>
+                    @if (!string.IsNullOrWhiteSpace(erpUrl))
+                    {
+                        <a class="btn btn-sm sms-icon-btn" href="@erpUrl" target="_blank" rel="noopener" title="@erpTitle" aria-label="@erpTitle"><i class="bi bi-building"></i></a>
+                    }
+                    <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="@(isRtl ? "المهام الخلفية" : "Background jobs")" aria-label="@(isRtl ? "المهام الخلفية" : "Background jobs")"><i class="bi bi-activity" aria-hidden="true"></i></a>
                     <div class="dropdown">
-                        <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-person-circle"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span>
+                        <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@(isRtl ? "حساب المستخدم" : "User menu")">
+                            <i class="bi bi-person-circle" aria-hidden="true"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key me-2"></i>@(isRtl ? "تغيير كلمة المرور" : "Change password")</a></li>
+                            <li><a class="dropdown-item" asp-controller="Account" asp-action="ChangePassword"><i class="bi bi-key me-2" aria-hidden="true"></i>@(isRtl ? "تغيير كلمة المرور" : "Change password")</a></li>
                             <li><hr class="dropdown-divider" /></li>
                             <li>
                                 <form asp-controller="Account" asp-action="Logout" method="post">
-                                    <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2"></i>@(isRtl ? "تسجيل الخروج" : "Sign out")</button>
+                                    <button type="submit" class="dropdown-item"><i class="bi bi-box-arrow-right me-2 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@(isRtl ? "تسجيل الخروج" : "Sign out")</button>
                                 </form>
                             </li>
                         </ul>
@@ -96,11 +104,11 @@
             <main id="sms-main" class="sms-main" role="main">
                 @if (TempData["Flash"] is string flash)
                 {
-                    <div class="alert alert-success py-2" role="alert"><i class="bi bi-check-circle me-1"></i>@flash</div>
+                    <div class="alert alert-success py-2" role="alert"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>@flash</div>
                 }
                 @if (TempData["Error"] is string error)
                 {
-                    <div class="alert alert-danger py-2" role="alert"><i class="bi bi-exclamation-triangle me-1"></i>@error</div>
+                    <div class="alert alert-danger py-2" role="alert"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@error</div>
                 }
                 @RenderBody()
             </main>

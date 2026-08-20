@@ -16,10 +16,10 @@
 
 <div class="sms-page-head d-print-none"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Numbered receipt (RCP) with its automatic oldest-first allocation.", "سند مرقّم (RCP) مع تخصيصه التلقائي للأقدم أولاً.")</p></div>
     <div class="d-flex gap-2 align-items-center">
-        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1"></i>@T("Print", "طباعة")</button>
-        <a class="btn btn-outline-success btn-sm" asp-action="Index" asp-route-payerId="@r.PayerId"><i class="bi bi-cash-coin me-1"></i>@T("Another payment", "دفعة أخرى")</a>
-        <a class="btn btn-outline-secondary btn-sm" asp-controller="Fees" asp-action="Position" asp-route-payerId="@r.PayerId"><i class="bi bi-journal-text me-1"></i>@T("Statement", "كشف الحساب")</a>
-        <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")"></i>@T("Cashier", "الصندوق")</a>
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-success btn-sm" asp-action="Index" asp-route-payerId="@r.PayerId"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Another payment", "دفعة أخرى")</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-controller="Fees" asp-action="Position" asp-route-payerId="@r.PayerId"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Statement", "كشف الحساب")</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Cashier", "الصندوق")</a>
     </div></div>
 <partial name="_FinanceNav" />
 
@@ -35,7 +35,8 @@
     </div>
     <div class="text-center my-3"><span class="text-muted small">Amount received / المبلغ المستلم</span><div class="fs-2 fw-bold">@r.Amount.ToString("N2")</div></div>
     <table class="rc-table w-100 mb-2">
-        <thead><tr><th>Invoice / الفاتورة</th><th>Student / الطالب</th><th>Category / الفئة</th><th class="text-end">Allocated / المخصّص</th></tr></thead>
+        <caption class="visually-hidden">@T("Receipt allocation", "تخصيص السند")</caption>
+        <thead><tr><th scope="col">Invoice / الفاتورة</th><th scope="col">Student / الطالب</th><th scope="col">Category / الفئة</th><th scope="col" class="text-end">Allocated / المخصّص</th></tr></thead>
         <tbody>
         @foreach (var (a, c, cat, s) in Model.Allocations) { <tr><td><a asp-controller="Fees" asp-action="Charge" asp-route-id="@c.Id"><code>@c.ChargeNo</code></a></td><td>@s.StudentNo · @FinanceLabels.StudentName(s, isRtl)</td><td>@(isRtl ? cat.NameAr : cat.NameEn)</td><td class="text-end">@a.AllocatedAmount.ToString("N2")</td></tr> }
         @if (Model.Allocations.Count == 0) { <tr><td colspan="4" class="text-center text-muted">No open invoices — held as advance / لا فواتير مفتوحة — مقدّم</td></tr> }
@@ -43,7 +44,7 @@
         <tfoot>
             <tr><th colspan="3" class="text-end">Allocated / المخصّص</th><th class="text-end">@Model.Allocated.ToString("N2")</th></tr>
             @if (Model.Unallocated > 0) { <tr><th colspan="3" class="text-end">To advance balance / إلى الرصيد المقدّم</th><th class="text-end">@Model.Unallocated.ToString("N2")</th></tr> }
-            <tr><th colspan="3" class="text-end">Payer position after / موقف الدافع بعد السند</th><th class="text-end @(Model.PositionAfter > 0 ? "text-danger" : "text-success")">@Model.PositionAfter.ToString("N2")</th></tr>
+            <tr><th colspan="3" class="text-end">Payer position after / موقف الدافع بعد السند</th><th class="text-end @(Model.PositionAfter > 0 ? "text-danger" : "text-success")">@Model.PositionAfter.ToString("N2") <span class="visually-hidden">@(Model.PositionAfter > 0 ? T("due", "مستحق") : Model.PositionAfter < 0 ? T("credit", "دائن") : T("settled", "مسدّد"))</span></th></tr>
         </tfoot>
     </table>
     <div class="small text-muted">@(r.Status == Sms.Domain.Payments.ReceiptStatus.Void ? "VOID / ملغى" : "") Thank you / شكراً لكم</div>

@@ -27,7 +27,7 @@ else
                 <div class="d-flex flex-wrap gap-2 align-items-center small text-muted mb-3">
                     @foreach (var s in new[] { SchoolStatus.Setup, SchoolStatus.Active, SchoolStatus.Suspended, SchoolStatus.Closed })
                     {
-                        <span class="badge @(s == Model.School.Status ? Badge(s) : "text-bg-light border")">@Name(s)</span>@if (s != SchoolStatus.Closed) { <i class="bi bi-arrow-right @(isRtl ? "sms-flip" : "")"></i> }
+                        <span class="badge @(s == Model.School.Status ? Badge(s) : "text-bg-light border")">@Name(s)</span>@if (s != SchoolStatus.Closed) { <i class="bi bi-arrow-right @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i> }
                     }
                 </div>
                 <form method="post" asp-action="Status" novalidate>
@@ -38,7 +38,7 @@ else
                             @foreach (var t in Model.AllowedTargets) { <option value="@t">@Name(t)</option> }
                         </select></div>
                     <div class="mb-3"><label class="form-label">@T("Reason (mandatory)", "السبب (إلزامي)")</label><input asp-for="Reason" class="form-control" /></div>
-                    <button class="btn btn-primary" type="submit" @(Model.AllowedTargets.Count == 0 ? "disabled" : "")><i class="bi bi-arrow-repeat me-1"></i>@T("Change status", "تغيير الحالة")</button>
+                    <button class="btn btn-primary" type="submit" @(Model.AllowedTargets.Count == 0 ? "disabled" : "")><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Change status", "تغيير الحالة")</button>
                 </form>
             </div>
         </div>

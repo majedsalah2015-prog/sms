@@ -35,7 +35,7 @@ else if (Model.Stage.Shape == null)
 {
     <div class="sms-card p-4 text-center">
         <p class="mb-3">@T("No timetable shape for", "لا شكل جدول لـ") <strong>@(isRtl ? Model.Stage.Stage.Name.NameAr : Model.Stage.Stage.Name.NameEn)</strong> · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</p>
-        <form method="post" asp-action="DefineShape" asp-route-year="@yid"><input type="hidden" name="stageId" value="@sid" /><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create shape (BR-TTB-001)", "إنشاء الشكل (BR-TTB-001)")</button></form>
+        <form method="post" asp-action="DefineShape" asp-route-year="@yid"><input type="hidden" name="stageId" value="@sid" /><button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create shape (BR-TTB-001)", "إنشاء الشكل (BR-TTB-001)")</button></form>
     </div>
 }
 else
@@ -48,17 +48,18 @@ else
                     <form method="post" asp-action="CopyDay" asp-route-shapeId="@Model.Stage.Shape.Id" asp-route-year="@yid" asp-route-stage="@sid" class="d-flex gap-1 align-items-center">
                         <span class="small text-muted">@T("Copy day", "نسخ يوم")</span>
                         <select name="fromDay" class="form-select form-select-sm" style="width:8rem">@foreach (var d in Model.Days) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
-                        <i class="bi @(isRtl ? "bi-arrow-left" : "bi-arrow-right")"></i>
+                        <i class="bi @(isRtl ? "bi-arrow-left" : "bi-arrow-right")" aria-hidden="true"></i>
                         <select name="toDay" class="form-select form-select-sm" style="width:8rem">@foreach (var d in Enum.GetValues<DayOfWeek>()) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
-                        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-files"></i></button>
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="@T("Copy day", "نسخ اليوم")"><i class="bi bi-files" aria-hidden="true"></i></button>
                     </form>
                 </div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle text-center">
-                    <thead><tr><th style="width:4rem">#</th>@foreach (var d in Model.Days) { <th class="@(Model.WorkingDays.Contains(d) ? "" : "text-muted")">@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@Model.SequencesFor(d) @T("slots", "حصة")</div></th> }</tr></thead>
+                    <caption class="visually-hidden">@T("Timetable shape: period slots by day", "شكل الجدول: الحصص حسب اليوم")</caption>
+                    <thead><tr><th scope="col" style="width:4rem">#</th>@foreach (var d in Model.Days) { <th scope="col" class="@(Model.WorkingDays.Contains(d) ? "" : "text-muted")">@TimetableLabels.Day(d, isRtl)<div class="small fw-normal text-muted">@Model.SequencesFor(d) @T("slots", "حصة")</div></th> }</tr></thead>
                     <tbody>
                     @foreach (var seq in Model.Sequences)
                     {
-                        <tr><th class="text-muted">@seq</th>
+                        <tr><th scope="row" class="text-muted">@seq</th>
                         @foreach (var d in Model.Days)
                         {
                             var s = Model.Slot(d, seq);
@@ -68,8 +69,8 @@ else
                                 {
                                     var locked = Model.SlotsInUse.Contains(s.Id);
                                     <div class="small @(s.IsBreak ? "text-muted fst-italic" : "")">@TimetableLabels.Span(s)@if (s.IsBreak) { <span> · @T("break", "فسحة")</span> }</div>
-                                    @if (locked) { <span class="small text-muted" title="@T("referenced by placements", "تشير إليها مواضع")">🔒</span> }
-                                    else { <form method="post" asp-action="RemoveSlot" asp-route-slotId="@s.Id" asp-route-year="@yid" asp-route-stage="@sid" class="d-inline"><button class="btn btn-link btn-sm p-0 text-danger" type="submit" title="@T("Remove slot", "حذف الحصة")"><i class="bi bi-x"></i></button></form> }
+                                    @if (locked) { <span class="small text-muted" title="@T("referenced by placements", "تشير إليها مواضع")"><span aria-hidden="true">🔒</span><span class="visually-hidden">@T("locked", "مقفلة")</span></span> }
+                                    else { <form method="post" asp-action="RemoveSlot" asp-route-slotId="@s.Id" asp-route-year="@yid" asp-route-stage="@sid" class="d-inline"><button class="btn btn-link btn-sm p-0 text-danger" type="submit" title="@T("Remove slot", "حذف الحصة")" aria-label="@T("Remove slot", "حذف الحصة")"><i class="bi bi-x" aria-hidden="true"></i></button></form> }
                                 }
                             </td>
                         }
@@ -82,7 +83,7 @@ else
         </div>
         <div class="col-xl-3">
             <div class="sms-card p-3">
-                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("Add period slot", "إضافة حصة")</h2>
+                <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Add period slot", "إضافة حصة")</h2>
                 <form method="post" asp-action="AddSlot" asp-route-shapeId="@Model.Stage.Shape.Id" asp-route-year="@yid" asp-route-stage="@sid">
                     <div class="mb-2"><label class="form-label small">@T("Day", "اليوم")</label><select name="day" class="form-select form-select-sm">@foreach (var d in Model.Days) { <option value="@d">@TimetableLabels.Day(d, isRtl)</option> }</select>
                         <div class="form-check mt-1"><input class="form-check-input" type="checkbox" name="allWorkingDays" value="true" id="awd" /><label class="form-check-label small" for="awd">@T("all working days", "كل أيام العمل")</label></div></div>

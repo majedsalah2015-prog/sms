@@ -14,14 +14,17 @@
         ("Analytics", "Analytics", "التحليلات", "bi-graph-up", false),
     };
 }
+<nav aria-label="@(isRtl ? "الحضور" : "Attendance")">
 <ul class="nav nav-pills sms-subnav mb-4">
     @foreach (var t in tabs)
     {
+        var isActive = string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase);
         <li class="nav-item">
-            <a class="nav-link @(string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) ? "active" : "")"
+            <a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)"
                asp-controller="Attendance" asp-action="@t.Action" asp-route-year="@navYear" asp-route-date="@(t.Dated ? navDate : null)">
-                <i class="bi @t.Icon me-1"></i>@(isRtl ? t.Ar : t.En)
+                <i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)
             </a>
         </li>
     }
 </ul>
+</nav>

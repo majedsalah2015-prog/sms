@@ -9,12 +9,13 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Values.Count(v => v.IsActive) @T("active", "فعّالة") · @Model.Values.Count(v => !v.IsActive) @T("inactive", "معطَّلة")</p></div>
-    <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="#nat-add"><i class="bi bi-plus-lg me-1"></i>@T("Add nationality", "إضافة جنسية")</a><partial name="_HelpModal" model="help" /></div></div>
+    <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-secondary" href="#nat-add"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add nationality", "إضافة جنسية")</a><partial name="_HelpModal" model="help" /></div></div>
 <partial name="_SetupNav" />
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
-        <thead><tr><th style="width:5rem">#</th><th style="width:7rem">@T("Code", "الرمز")</th><th>@T("Arabic name", "الاسم بالعربية")</th><th>@T("English name", "الاسم بالإنجليزية")</th><th style="width:6rem">@T("Active", "فعّال")</th><th class="text-end" style="width:14rem"></th></tr></thead>
+        <caption class="visually-hidden">@T("Nationalities", "الجنسيات")</caption>
+        <thead><tr><th scope="col" style="width:5rem">#</th><th scope="col" style="width:7rem">@T("Code", "الرمز")</th><th scope="col">@T("Arabic name", "الاسم بالعربية")</th><th scope="col">@T("English name", "الاسم بالإنجليزية")</th><th scope="col" style="width:6rem">@T("Active", "فعّال")</th><th scope="col" class="text-end" style="width:14rem"></th></tr></thead>
         <tbody>
         @foreach (var v in Model.Values)
         {
@@ -26,14 +27,14 @@
                 <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@v.Name.NameEn" required /></td>
                 <td>@if (v.IsActive) { <span class="badge text-bg-success">@T("Yes", "نعم")</span> } else { <span class="badge text-bg-secondary">@T("No", "لا")</span> }</td>
                 <td class="text-end text-nowrap">
-                    <form id="@fid" method="post" asp-action="SaveNationality" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save changes", "حفظ التعديلات")"><i class="bi bi-check-lg me-1"></i>@T("Save", "حفظ")</button></form>
+                    <form id="@fid" method="post" asp-action="SaveNationality" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save changes", "حفظ التعديلات")"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></form>
                     @if (v.IsActive)
                     {
-                        <form method="post" asp-action="DeactivateNationality" asp-route-id="@v.Id" class="d-inline" onsubmit="return confirm('@T("Deactivate this nationality? It stays on historical records.", "إلغاء تفعيل هذه الجنسية؟ ستبقى في السجلات التاريخية.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Deactivate", "إلغاء التفعيل")"><i class="bi bi-slash-circle"></i></button></form>
+                        <form method="post" asp-action="DeactivateNationality" asp-route-id="@v.Id" class="d-inline" onsubmit="return confirm('@T("Deactivate this nationality? It stays on historical records.", "إلغاء تفعيل هذه الجنسية؟ ستبقى في السجلات التاريخية.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Deactivate", "إلغاء التفعيل")" aria-label="@T("Deactivate", "إلغاء التفعيل")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button></form>
                     }
                     else
                     {
-                        <form method="post" asp-action="ActivateNationality" asp-route-id="@v.Id" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise"></i></button></form>
+                        <form method="post" asp-action="ActivateNationality" asp-route-id="@v.Id" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")" aria-label="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button></form>
                     }
                 </td>
             </tr>
@@ -42,13 +43,13 @@
         </tbody>
     </table></div>
     <form id="nat-add" method="post" asp-action="SaveNationality" class="p-3 border-top">
-        <div class="small fw-semibold mb-2"><i class="bi bi-plus-lg me-1"></i>@T("Add nationality", "إضافة جنسية")</div>
+        <div class="small fw-semibold mb-2"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add nationality", "إضافة جنسية")</div>
         <div class="row g-2 align-items-end">
             <div class="col-md-2"><label class="form-label small">@T("Code", "الرمز")</label><input name="code" class="form-control form-control-sm" dir="ltr" placeholder="SA" maxlength="10" required /></div>
             <div class="col-md-4"><label class="form-label small">@T("Arabic name", "الاسم بالعربية")</label><input id="NewNatAr" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="سعودي" required /></div>
             <div class="col-md-3"><label class="form-label small">@T("English name", "الاسم بالإنجليزية")</label><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Saudi" data-translit-from="#NewNatAr" required /></div>
             <div class="col-md-1"><label class="form-label small">#</label><input name="sortOrder" class="form-control form-control-sm" type="number" value="@Model.NextSortOrder" /></div>
-            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button></div>
+            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button></div>
         </div>
     </form>
 </div>

@@ -38,12 +38,13 @@
                     <span class="small text-muted ms-auto">@Model.Subjects.Count @T("subjects", "مادة")</span>
                 </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">
-                    <thead><tr><th>@T("Code", "الرمز")</th><th>@T("Subject", "المادة")</th><th>@T("Category", "الفئة")</th><th>@T("Department", "القسم")</th><th>@T("Offerings", "في الخطط")</th><th>@T("Qualified teachers", "المعلمون المؤهلون")</th><th></th></tr></thead>
+                    <caption class="visually-hidden">@T("Subject catalog", "دليل المواد")</caption>
+                    <thead><tr><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Subject", "المادة")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col">@T("Department", "القسم")</th><th scope="col">@T("Offerings", "في الخطط")</th><th scope="col">@T("Qualified teachers", "المعلمون المؤهلون")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
                     <tbody>@foreach (var r in Model.Subjects) { <tr><td><code>@r.Subject.Code</code></td><td class="fw-semibold">@(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</td><td>@SubjectCatalogViewModel.CategoryLabel(r.Subject.Category, isRtl)</td><td>@(r.Department == null ? "—" : (isRtl ? r.Department.Name.NameAr : r.Department.Name.NameEn))</td><td><span class="badge text-bg-light border">@r.Offerings</span></td><td>@if (r.QualifiedTeachers == 0) { <span class="badge text-bg-warning">0 · @T("gap", "فجوة")</span> } else { <span class="badge text-bg-light border">@r.QualifiedTeachers</span> }</td>
                         <td class="text-end text-nowrap">
-                            <a class="btn btn-sm btn-outline-primary" asp-action="EditSubject" asp-route-id="@r.Subject.Id" title="@T("Edit subject", "تعديل المادة")"><i class="bi bi-pencil"></i></a>
+                            <a class="btn btn-sm btn-outline-primary" asp-action="EditSubject" asp-route-id="@r.Subject.Id" title="@T("Edit subject", "تعديل المادة")" aria-label="@T("Edit subject", "تعديل المادة")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                             <form method="post" asp-action="DeleteSubject" asp-route-id="@r.Subject.Id" class="d-inline" onsubmit="return confirm('@T("Remove this subject from the catalog?", "حذف هذه المادة من الدليل؟")');">
-                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@(r.Offerings > 0 ? T("In current plans — end-date the offerings first", "في خطط حالية — أنهِ العروض أولاً") : T("Remove subject", "حذف المادة"))" disabled="@(r.Offerings > 0)"><i class="bi bi-trash"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@(r.Offerings > 0 ? T("In current plans — end-date the offerings first", "في خطط حالية — أنهِ العروض أولاً") : T("Remove subject", "حذف المادة"))" aria-label="@(r.Offerings > 0 ? T("In current plans — end-date the offerings first", "في خطط حالية — أنهِ العروض أولاً") : T("Remove subject", "حذف المادة"))" disabled="@(r.Offerings > 0)"><i class="bi bi-trash" aria-hidden="true"></i></button>
                             </form>
                         </td></tr> }
                     @if (Model.Subjects.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No subjects yet.", "لا مواد بعد.")</td></tr> }</tbody>
@@ -72,9 +73,9 @@ else if (Model.ActiveTab == "departments")
                 var deptSubjects = subjectsAll.Count(s => s.DepartmentId == d.Id);
                 <div class="sms-card mb-3"><div class="p-3 border-bottom d-flex gap-2 align-items-center"><h2 class="h6 mb-0">@(isRtl ? d.Name.NameAr : d.Name.NameEn)</h2><span class="small text-muted">@T("Head:", "الرئيس:") @(d.HeadTeacherUserId == null ? "—" : TeacherName(d.HeadTeacherUserId.Value))</span>
                     <span class="ms-auto d-flex gap-1">
-                        <a class="btn btn-sm btn-outline-primary" asp-action="EditDepartment" asp-route-id="@d.Id" title="@T("Edit department", "تعديل القسم")"><i class="bi bi-pencil"></i> @T("Edit", "تعديل")</a>
+                        <a class="btn btn-sm btn-outline-primary" asp-action="EditDepartment" asp-route-id="@d.Id" title="@T("Edit department", "تعديل القسم")"><i class="bi bi-pencil" aria-hidden="true"></i> @T("Edit", "تعديل")</a>
                         <form method="post" asp-action="DeleteDepartment" asp-route-id="@d.Id" class="d-inline" onsubmit="return confirm('@T("Remove this department?", "حذف هذا القسم؟")');">
-                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(deptSubjects > 0 ? T("Move its subjects first", "انقل مواده أولاً") : T("Remove department", "حذف القسم"))" disabled="@(deptSubjects > 0)"><i class="bi bi-trash"></i> @T("Delete", "حذف")</button>
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@(deptSubjects > 0 ? T("Move its subjects first", "انقل مواده أولاً") : T("Remove department", "حذف القسم"))" disabled="@(deptSubjects > 0)"><i class="bi bi-trash" aria-hidden="true"></i> @T("Delete", "حذف")</button>
                         </form>
                     </span></div>
                     <div class="p-3 d-flex flex-wrap gap-2">@foreach (var s in subjectsAll.Where(s => s.DepartmentId == d.Id)) { <span class="badge text-bg-light border">@s.Code · @(isRtl ? s.Name.NameAr : s.Name.NameEn)</span> }@if (!subjectsAll.Any(s => s.DepartmentId == d.Id)) { <span class="small text-muted">@T("No subjects assigned.", "لا مواد مسندة.")</span> }</div></div>
@@ -99,11 +100,12 @@ else
             <div class="sms-card">
                 <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Teacher × subject", "معلم × مادة")</h2><div class="small text-muted">@T("Cells list stage restrictions; empty = not qualified. Columns with no qualified teacher are gaps.", "الخلايا تعرض قيود المرحلة؛ الفارغة = غير مؤهل. الأعمدة بلا معلم مؤهل فجوات.")</div></div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0">
-                    <thead><tr><th>@T("Teacher", "المعلم")</th>@foreach (var s in subjectsAll) { var gap = !Model.Matrix.Values.Any(m => m.ContainsKey(s.Id)); <th class="@(gap ? "text-warning-emphasis" : "")" title="@(isRtl ? s.Name.NameAr : s.Name.NameEn)">@s.Code@if (gap) { <i class="bi bi-exclamation-triangle ms-1"></i> }</th> }</tr></thead>
+                    <caption class="visually-hidden">@T("Qualification matrix", "مصفوفة التأهيل")</caption>
+                    <thead><tr><th scope="col">@T("Teacher", "المعلم")</th>@foreach (var s in subjectsAll) { var gap = !Model.Matrix.Values.Any(m => m.ContainsKey(s.Id)); <th scope="col" class="@(gap ? "text-warning-emphasis" : "")" title="@(isRtl ? s.Name.NameAr : s.Name.NameEn)"><abbr title="@(isRtl ? s.Name.NameAr : s.Name.NameEn)">@s.Code</abbr>@if (gap) { <i class="bi bi-exclamation-triangle ms-1" aria-hidden="true"></i> }</th> }</tr></thead>
                     <tbody>@foreach (var t in Model.Teachers.Where(t => t.UserAccountId != null))
                     {
                         Model.Matrix.TryGetValue(t.UserAccountId!.Value, out var row);
-                        <tr><td class="fw-semibold">@(isRtl ? t.NameAr : t.NameEn)</td>@foreach (var s in subjectsAll) { <td>@if (row != null && row.TryGetValue(s.Id, out var stages)) { <span class="badge text-bg-success" title="@string.Join(", ", stages)">✓ <span class="fw-normal">@string.Join(", ", stages)</span></span> }</td> }</tr>
+                        <tr><th scope="row" class="fw-semibold">@(isRtl ? t.NameAr : t.NameEn)</th>@foreach (var s in subjectsAll) { <td>@if (row != null && row.TryGetValue(s.Id, out var stages)) { <span class="badge text-bg-success" title="@string.Join(", ", stages)">✓ <span class="fw-normal">@string.Join(", ", stages)</span></span> } else { <span class="visually-hidden">@T("not qualified", "غير مؤهل")</span> }</td> }</tr>
                     }
                     @if (!Model.Teachers.Any(t => t.UserAccountId != null)) { <tr><td colspan="@(subjectsAll.Count + 1)" class="text-center text-muted py-3">@T("No teachers with user accounts yet.", "لا معلمون بحسابات مستخدم بعد.")</td></tr> }</tbody>
                 </table></div>

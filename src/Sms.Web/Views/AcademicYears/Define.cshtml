@@ -21,7 +21,7 @@
             <div class="col-md-4"><label class="form-label">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="٢٠٢٧-٢٠٢٨" /></div>
             <div class="col-md-4"><label class="form-label">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
         </div>
-        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Create year", "إنشاء العام")</button>
+        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create year", "إنشاء العام")</button>
         <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>
     </form>
 </div>

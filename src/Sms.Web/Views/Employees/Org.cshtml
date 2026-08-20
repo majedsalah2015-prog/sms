@@ -24,7 +24,8 @@
     <div class="col-lg-8">
         <div class="sms-card">
             <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Unit", "الوحدة")</th><th>@T("Parent", "الوحدة الأم")</th><th>@T("Head-count", "العدد")</th><th>@T("Current staff", "الكادر الحالي")</th><th></th></tr></thead>
+                <caption class="visually-hidden">@T("Org units", "الوحدات التنظيمية")</caption>
+                <thead><tr><th scope="col">@T("Unit", "الوحدة")</th><th scope="col">@T("Parent", "الوحدة الأم")</th><th scope="col">@T("Head-count", "العدد")</th><th scope="col">@T("Current staff", "الكادر الحالي")</th><th scope="col"></th></tr></thead>
                 <tbody>
                 @foreach (var n in Model.Nodes)
                 {
@@ -35,7 +36,7 @@
                         <td><select form="@fid" name="parentId" class="form-select form-select-sm" style="width:12rem"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All.Where(u => u.Id != n.Unit.Id)) { <option value="@u.Id" selected="@(u.Id == n.Unit.ParentOrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></td>
                         <td>@n.HeadCount</td>
                         <td class="small">@string.Join(" · ", n.Current.Take(6).Select(c => $"{(isRtl ? $"{c.Employee.FirstNameAr} {c.Employee.FamilyNameAr}" : $"{c.Employee.FirstNameEn} {c.Employee.FamilyNameEn}")}{(c.Position == null ? "" : $" ({c.Position})")}"))@(n.Current.Count > 6 ? $" +{n.Current.Count - 6}" : "")</td>
-                        <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")"><i class="bi bi-check-lg"></i></button></form> <form method="post" asp-action="DeleteOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline" onsubmit="return confirm('@T("Delete this unit?", "حذف هذه الوحدة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" @(deletable ? "" : "disabled") title="@(deletable ? T("Delete", "حذف") : T("Has child units or assignment history", "لها وحدات فرعية أو سجل إسناد"))"><i class="bi bi-trash"></i></button></form></td>
+                        <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form> <form method="post" asp-action="DeleteOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline" onsubmit="return confirm('@T("Delete this unit?", "حذف هذه الوحدة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" @(deletable ? "" : "disabled") title="@(deletable ? T("Delete", "حذف") : T("Has child units or assignment history", "لها وحدات فرعية أو سجل إسناد"))" aria-label="@T("Delete unit", "حذف الوحدة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form></td>
                     </tr>
                 }
                 @if (Model.Nodes.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-4">@T("No org units yet — add the first root unit on the right.", "لا وحدات بعد — أضف الوحدة الجذرية الأولى من اليمين.")</td></tr> }
@@ -45,11 +46,11 @@
     </div>
     <div class="col-lg-4">
         <div class="sms-card p-3">
-            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1"></i>@T("New unit", "وحدة جديدة")</h2>
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New unit", "وحدة جديدة")</h2>
             <form method="post" asp-action="CreateOrgUnit" class="d-grid gap-2">
                 <input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الشؤون الأكاديمية" required /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Academic Affairs" required />
                 <select name="parentId" class="form-select form-select-sm"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All) { <option value="@u.Id">@(isRtl ? u.NameAr : u.NameEn)</option> }</select>
-                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
             </form>
         </div>
     </div>

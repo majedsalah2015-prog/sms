@@ -19,7 +19,7 @@
             <div class="list-group list-group-flush">
                 @foreach (var c in Model.Categories)
                 {
-                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(c.Id == Model.Selected?.Id ? "active" : "")" asp-action="Lookups" asp-route-category="@c.Code">
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(c.Id == Model.Selected?.Id ? "active" : "")" aria-current="@(c.Id == Model.Selected?.Id ? "true" : null)" asp-action="Lookups" asp-route-category="@c.Code">
                         <span>@(isRtl ? c.Name.NameAr : c.Name.NameEn)<br /><code class="small">@c.Code</code></span>
                         <span class="badge rounded-pill @(c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-light border" : "text-bg-primary")" title="@c.Tier">@(c.Tier == LookupCategoryTier.ProductSeeded ? T("product", "منتج") : T("school", "مدرسة"))</span>
                     </a>
@@ -40,11 +40,12 @@
             <div class="sms-card">
                 <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
                     <h2 class="h6 mb-0">@(isRtl ? Model.Selected.Name.NameAr : Model.Selected.Name.NameEn) <code class="small text-muted">@Model.Selected.Code</code></h2>
-                    @if (readOnly && Model.Selected.Code == "Nationality") { <a class="btn btn-sm btn-outline-primary" asp-action="Nationalities"><i class="bi bi-pencil me-1"></i>@T("Edit on the Nationalities screen", "التعديل من شاشة الجنسيات")</a> }
-                    else if (readOnly) { <span class="badge text-bg-light border"><i class="bi bi-lock me-1"></i>@T("Product-seeded — read only", "مزوَّدة من المنتج — للقراءة فقط")</span> }
+                    @if (readOnly && Model.Selected.Code == "Nationality") { <a class="btn btn-sm btn-outline-primary" asp-action="Nationalities"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Edit on the Nationalities screen", "التعديل من شاشة الجنسيات")</a> }
+                    else if (readOnly) { <span class="badge text-bg-light border"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("Product-seeded — read only", "مزوَّدة من المنتج — للقراءة فقط")</span> }
                 </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">
-                    <thead><tr><th>#</th><th>@T("Code", "الرمز")</th><th>@T("Arabic", "عربي")</th><th>@T("English", "إنجليزي")</th><th>@T("Active", "فعّال")</th><th></th></tr></thead>
+                    <caption class="visually-hidden">@T("Lookup values", "قيم القائمة")</caption>
+                    <thead><tr><th scope="col">#</th><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Arabic", "عربي")</th><th scope="col">@T("English", "إنجليزي")</th><th scope="col">@T("Active", "فعّال")</th><th scope="col"></th></tr></thead>
                     <tbody>
                     @foreach (var v in Model.Values)
                     {
@@ -72,7 +73,7 @@
                             <div class="col-md-4"><label class="form-label small">@T("Arabic name", "الاسم بالعربية")</label><input name="NameAr" class="form-control form-control-sm" dir="rtl" /></div>
                             <div class="col-md-3"><label class="form-label small">@T("English name", "الاسم بالإنجليزية")</label><input name="NameEn" class="form-control form-control-sm" dir="ltr" /></div>
                             <div class="col-md-1"><label class="form-label small">#</label><input name="SortOrder" class="form-control form-control-sm" type="number" value="@Model.SortOrder" /></div>
-                            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("Add", "إضافة")</button></div>
+                            <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button></div>
                         </div>
                     </form>
                 }

@@ -16,13 +16,14 @@
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
-        <thead><tr><th>@T("Teacher", "المعلم")</th><th style="min-width:14rem">@T("Load", "النصاب")</th><th>@T("Assignments (subject · section · periods)", "الإسنادات (المادة · الشعبة · الحصص)")</th></tr></thead>
+        <caption class="visually-hidden">@T("Load board", "لوحة النصاب")</caption>
+        <thead><tr><th scope="col">@T("Teacher", "المعلم")</th><th scope="col" style="min-width:14rem">@T("Load", "النصاب")</th><th scope="col">@T("Assignments (subject · section · periods)", "الإسنادات (المادة · الشعبة · الحصص)")</th></tr></thead>
         <tbody>@foreach (var r in Model.Rows)
         {
             var e = r.Employee; var max = r.Profile.MaxWeeklyPeriods; var pct = max == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * r.Load / max));
             <tr class="@(r.Load > max ? "table-danger" : r.Load < max / 2 ? "table-warning" : "")">
                 <td class="fw-semibold"><a asp-controller="Employees" asp-action="File" asp-route-id="@e.Id" asp-route-tab="teaching"><code>@e.EmployeeNo</code> @(isRtl ? $"{e.FirstNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FamilyNameEn}")</a></td>
-                <td><div class="d-flex align-items-center gap-2"><div class="sms-progress flex-grow-1"><span style="width:@(pct)%;@(r.Load > max ? "background:#dc2626" : r.Load < max / 2 ? "background:#f59e0b" : "")"></span></div><span class="small text-nowrap @(r.Load > max ? "text-danger fw-semibold" : "")">@r.Load / @max</span></div></td>
+                <td><div class="d-flex align-items-center gap-2"><div class="sms-progress flex-grow-1" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Load", "النصاب")"><span style="width:@(pct)%;@(r.Load > max ? "background:#dc2626" : r.Load < max / 2 ? "background:#f59e0b" : "")"></span></div><span class="small text-nowrap @(r.Load > max ? "text-danger fw-semibold" : "")">@r.Load / @max</span></div></td>
                 <td class="small">@if (r.Assignments.Count == 0) { <span class="text-muted">—</span> } else { foreach (var a in r.Assignments) { <span class="badge text-bg-light border me-1 mb-1">@(isRtl ? a.Subject.Name.NameAr : a.Subject.Name.NameEn) · @(isRtl ? a.Section.NameAr : a.Section.NameEn) · @a.Periods@(a.Role == Sms.Domain.Teachers.TeacherRole.CoTeacher ? " (" + T("co", "مساعد") + ")" : "")</span> } }</td>
             </tr>
         }

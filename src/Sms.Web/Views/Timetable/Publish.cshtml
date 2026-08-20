@@ -28,7 +28,7 @@
         <form method="get" class="d-flex gap-2">
             <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
         </form>
-        @if (Model.Year != null) { <form method="post" asp-action="DefineVersion" asp-route-year="@yid" asp-route-returnTo="publish" class="d-flex gap-1"><select name="termId" class="form-select form-select-sm" style="width:9rem"><option value="">@T("whole year", "العام كاملاً")</option>@foreach (var t in Model.YearTerms) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-plus-lg me-1"></i>@T("New draft", "مسودة جديدة")</button></form> }
+        @if (Model.Year != null) { <form method="post" asp-action="DefineVersion" asp-route-year="@yid" asp-route-returnTo="publish" class="d-flex gap-1"><select name="termId" class="form-select form-select-sm" style="width:9rem"><option value="">@T("whole year", "العام كاملاً")</option>@foreach (var t in Model.YearTerms) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><button class="btn btn-sm btn-outline-primary text-nowrap" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("New draft", "مسودة جديدة")</button></form> }
         <partial name="_HelpModal" model="help" /></div></div>
 <partial name="_TimetableNav" />
 
@@ -40,7 +40,8 @@ else
             <div class="sms-card">
                 <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Versions", "الإصدارات") · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</h2></div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                    <thead><tr><th>@T("Version", "الإصدار")</th><th>@T("Status", "الحالة")</th><th class="text-end">@T("Placements", "المواضع")</th><th class="text-end">@T("Sessions", "الحصص")</th><th>@T("Published", "نُشر")</th></tr></thead>
+                    <caption class="visually-hidden">@T("Timetable versions", "إصدارات الجدول")</caption>
+                    <thead><tr><th scope="col">@T("Version", "الإصدار")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col" class="text-end">@T("Placements", "المواضع")</th><th scope="col" class="text-end">@T("Sessions", "الحصص")</th><th scope="col">@T("Published", "نُشر")</th></tr></thead>
                     <tbody>
                     @foreach (var r in Model.Rows)
                     {
@@ -67,7 +68,7 @@ else
                         @foreach (var c in Model.Checklist) { <li class="d-flex gap-2 small mb-1"><span class="@(c.Ok ? "text-success" : "text-warning")">@(c.Ok ? "✓" : "○")</span><span>@c.Label @if (c.Detail != null) { <span class="text-muted">— @c.Detail</span> }</span></li> }
                     </ul>
                     <div class="d-flex flex-wrap gap-2 align-items-center">
-                        <a class="btn btn-sm btn-outline-secondary" asp-action="Validation" asp-route-year="@yid" asp-route-version="@vid"><i class="bi bi-clipboard-check me-1"></i>@T("Validation board", "لوحة التحقق")</a>
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Validation" asp-route-year="@yid" asp-route-version="@vid"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>@T("Validation board", "لوحة التحقق")</a>
                         @if (Model.Version.Status == TimetableVersionStatus.Draft) { <form method="post" asp-action="ValidateVersion" asp-route-id="@vid" asp-route-year="@yid" asp-route-returnTo="publish"><button class="btn btn-sm btn-primary" type="submit">@T("Validate (WF-12)", "تحقق (WF-12)")</button></form> }
                         @if (Model.Version.Status == TimetableVersionStatus.Validated) { <form method="post" asp-action="ReopenVersion" asp-route-id="@vid" asp-route-year="@yid" asp-route-returnTo="publish"><button class="btn btn-sm btn-outline-secondary" type="submit">@T("Reopen", "إعادة فتح")</button></form> }
                     </div>
@@ -76,7 +77,7 @@ else
                 @if (Model.CanPublish)
                 {
                     <div class="sms-card p-3 mb-3 border-success">
-                        <h2 class="h6 mb-2"><i class="bi bi-send-check me-1"></i>@T("Publish & generate sessions (BR-TTB-006)", "نشر وتوليد الحصص (BR-TTB-006)")</h2>
+                        <h2 class="h6 mb-2"><i class="bi bi-send-check me-1" aria-hidden="true"></i>@T("Publish & generate sessions (BR-TTB-006)", "نشر وتوليد الحصص (BR-TTB-006)")</h2>
                         <form method="post" asp-action="PublishVersion" asp-route-id="@vid" asp-route-year="@yid" onsubmit="return confirm('@T("Publish this version? Views switch immediately.", "نشر هذا الإصدار؟ تتحول العروض فوراً.")');">
                             <div class="row g-2 align-items-end">
                                 <div class="col-sm-4"><label class="form-label small">@T("From", "من")</label><input name="rangeStart" type="date" class="form-control form-control-sm" value="@Model.RangeStart.ToString("yyyy-MM-dd")" /></div>
@@ -101,7 +102,8 @@ else
                     else
                     {
                         <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle small">
-                            <thead><tr><th></th><th>@T("Section", "الشعبة")</th><th>@T("Slot", "الحصة")</th><th>@T("Before", "قبل")</th><th>@T("After", "بعد")</th></tr></thead>
+                            <caption class="visually-hidden">@T("Differences versus the operational version", "الفروق مقابل الإصدار المُشغَّل")</caption>
+                            <thead><tr><th scope="col"><span class="visually-hidden">@T("Change", "التغيير")</span></th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Slot", "الحصة")</th><th scope="col">@T("Before", "قبل")</th><th scope="col">@T("After", "بعد")</th></tr></thead>
                             <tbody>
                             @foreach (var d in Model.Diff)
                             {

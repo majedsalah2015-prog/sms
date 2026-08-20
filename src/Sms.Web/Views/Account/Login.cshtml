@@ -16,7 +16,7 @@
     <div class="mb-3">
         <label asp-for="UserName" class="form-label">@T("Username", "اسم المستخدم")</label>
         <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-person"></i></span>
+            <span class="input-group-text"><i class="bi bi-person" aria-hidden="true"></i></span>
             <input asp-for="UserName" class="form-control" autocomplete="username" autofocus dir="ltr" />
         </div>
         <span asp-validation-for="UserName" class="text-danger small"></span>
@@ -25,9 +25,9 @@
     <div class="mb-3">
         <label asp-for="Password" class="form-label">@T("Password", "كلمة المرور")</label>
         <div class="input-group">
-            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+            <span class="input-group-text"><i class="bi bi-lock" aria-hidden="true"></i></span>
             <input asp-for="Password" class="form-control" autocomplete="current-password" dir="ltr" />
-            <button class="btn btn-outline-secondary" type="button" data-password-toggle="Password" aria-label="@T("Show password", "إظهار كلمة المرور")"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-outline-secondary" type="button" data-password-toggle="Password" aria-label="@T("Show password", "إظهار كلمة المرور")"><i class="bi bi-eye" aria-hidden="true"></i></button>
         </div>
         <span asp-validation-for="Password" class="text-danger small"></span>
     </div>
@@ -40,7 +40,7 @@
         <span class="small text-muted" title="@T("Contact your system administrator to reset your password (BR-SEC-005).", "تواصل مع مسؤول النظام لإعادة تعيين كلمة المرور.")">@T("Forgot password?", "نسيت كلمة المرور؟")</span>
     </div>
 
-    <button type="submit" class="btn btn-primary w-100 sms-auth__submit"><i class="bi bi-box-arrow-in-right"></i> @T("Sign in", "تسجيل الدخول")</button>
+    <button type="submit" class="btn btn-primary w-100 sms-auth__submit"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> @T("Sign in", "تسجيل الدخول")</button>
 </form>
 
 @section Scripts {

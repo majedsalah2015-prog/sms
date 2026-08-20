@@ -25,9 +25,10 @@
 <div class="row g-3">
     <div class="col-lg-8">
         <div class="sms-card mb-3">
-            <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-unlock me-1"></i>@T("Open sessions", "الجلسات المفتوحة") <span class="badge text-bg-success ms-1">@Model.Open.Count</span></h2></div>
+            <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Open sessions", "الجلسات المفتوحة") <span class="badge text-bg-success ms-1">@Model.Open.Count</span></h2></div>
             <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Till", "الصندوق")</th><th>@T("Cashier", "الأمين")</th><th>@T("Opened", "فُتحت")</th><th class="text-end">@T("Float", "العهدة")</th><th class="text-end">@T("Receipts", "السندات")</th>@foreach (var mth in Enum.GetValues<PaymentMethod>().Where(x => x != PaymentMethod.Pdc)) { <th class="text-end">@FinanceLabels.Method(mth, isRtl)</th> }<th class="text-end">@T("Expected cash", "النقد المتوقع")</th><th></th></tr></thead>
+                <caption class="visually-hidden">@T("Open till sessions", "جلسات الصندوق المفتوحة")</caption>
+                <thead><tr><th scope="col">@T("Till", "الصندوق")</th><th scope="col">@T("Cashier", "الأمين")</th><th scope="col">@T("Opened", "فُتحت")</th><th scope="col" class="text-end">@T("Float", "العهدة")</th><th scope="col" class="text-end">@T("Receipts", "السندات")</th>@foreach (var mth in Enum.GetValues<PaymentMethod>().Where(x => x != PaymentMethod.Pdc)) { <th scope="col" class="text-end">@FinanceLabels.Method(mth, isRtl)</th> }<th scope="col" class="text-end">@T("Expected cash", "النقد المتوقع")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
                 <tbody>
                 @foreach (var o in Model.Open)
                 {
@@ -37,7 +38,7 @@
                         <td class="text-end">@s.FloatAmount.ToString("N2")</td><td class="text-end">@o.ReceiptCount · @o.Total.ToString("N2")</td>
                         @foreach (var mth in Enum.GetValues<PaymentMethod>().Where(x => x != PaymentMethod.Pdc)) { <td class="text-end">@o.ByMethod.GetValueOrDefault(mth).ToString("N2")</td> }
                         <td class="text-end fw-semibold">@((s.FloatAmount + o.ByMethod.GetValueOrDefault(PaymentMethod.Cash)).ToString("N2"))</td>
-                        <td class="text-end"><a class="btn btn-sm btn-outline-dark" asp-action="Till" asp-route-close="@s.Id"><i class="bi bi-lock me-1"></i>@T("Close", "إغلاق")</a></td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-dark" asp-action="Till" asp-route-close="@s.Id"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("Close", "إغلاق")</a></td>
                     </tr>
                 }
                 @if (Model.Open.Count == 0) { <tr><td colspan="11" class="text-center text-muted py-3">@T("No open sessions.", "لا جلسات مفتوحة.")</td></tr> }
@@ -46,14 +47,15 @@
         </div>
 
         <div class="sms-card">
-            <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-clock-history me-1"></i>@T("Closed sessions", "الجلسات المغلقة")</h2></div>
+            <div class="p-3 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>@T("Closed sessions", "الجلسات المغلقة")</h2></div>
             <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Till", "الصندوق")</th><th>@T("Cashier", "الأمين")</th><th>@T("Opened", "فُتحت")</th><th>@T("Closed", "أُغلقت")</th><th class="text-end">@T("Float", "العهدة")</th><th class="text-end">@T("System", "النظام")</th><th class="text-end">@T("Counted", "المعدود")</th><th class="text-end">@T("Variance", "الفرق")</th><th>@T("Reason", "السبب")</th></tr></thead>
+                <caption class="visually-hidden">@T("Closed till sessions", "جلسات الصندوق المغلقة")</caption>
+                <thead><tr><th scope="col">@T("Till", "الصندوق")</th><th scope="col">@T("Cashier", "الأمين")</th><th scope="col">@T("Opened", "فُتحت")</th><th scope="col">@T("Closed", "أُغلقت")</th><th scope="col" class="text-end">@T("Float", "العهدة")</th><th scope="col" class="text-end">@T("System", "النظام")</th><th scope="col" class="text-end">@T("Counted", "المعدود")</th><th scope="col" class="text-end">@T("Variance", "الفرق")</th><th scope="col">@T("Reason", "السبب")</th></tr></thead>
                 <tbody>
                 @foreach (var o in Model.Closed)
                 {
                     var s = o.Session; var variance = (s.CountedTotal ?? 0m) - (s.SystemTotal ?? 0m);
-                    <tr><td>@s.TillCode</td><td>#@s.CashierUserId</td><td class="text-nowrap">@s.OpenedAtUtc.ToString("yyyy-MM-dd HH:mm")</td><td class="text-nowrap">@s.ClosedAtUtc?.ToString("yyyy-MM-dd HH:mm")</td><td class="text-end">@s.FloatAmount.ToString("N2")</td><td class="text-end">@s.SystemTotal?.ToString("N2")</td><td class="text-end">@s.CountedTotal?.ToString("N2")</td><td class="text-end @(variance == 0 ? "text-success" : "text-danger fw-semibold")">@variance.ToString("+#,0.00;-#,0.00;0.00")</td><td class="small text-muted">@s.VarianceReason</td></tr>
+                    <tr><td>@s.TillCode</td><td>#@s.CashierUserId</td><td class="text-nowrap">@s.OpenedAtUtc.ToString("yyyy-MM-dd HH:mm")</td><td class="text-nowrap">@s.ClosedAtUtc?.ToString("yyyy-MM-dd HH:mm")</td><td class="text-end">@s.FloatAmount.ToString("N2")</td><td class="text-end">@s.SystemTotal?.ToString("N2")</td><td class="text-end">@s.CountedTotal?.ToString("N2")</td><td class="text-end @(variance == 0 ? "text-success" : "text-danger fw-semibold")"><bdi dir="ltr">@variance.ToString("+#,0.00;-#,0.00;0.00")</bdi>@if (variance != 0) { <span class="visually-hidden"> @(variance > 0 ? T("over", "زيادة") : T("short", "عجز"))</span> }</td><td class="small text-muted">@s.VarianceReason</td></tr>
                 }
                 @if (Model.Closed.Count == 0) { <tr><td colspan="9" class="text-center text-muted py-3">—</td></tr> }
                 </tbody>
@@ -65,7 +67,7 @@
         {
             var c = Model.Closing; var expectedCash = c.Session.FloatAmount + c.ByMethod.GetValueOrDefault(PaymentMethod.Cash);
             <div class="sms-card p-3 mb-3 border-dark">
-                <h2 class="h6 mb-2"><i class="bi bi-lock me-1"></i>@T("Close session", "إغلاق الجلسة") · @c.Session.TillCode</h2>
+                <h2 class="h6 mb-2"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("Close session", "إغلاق الجلسة") · @c.Session.TillCode</h2>
                 <dl class="row small mb-2">
                     <dt class="col-7">@T("Float", "العهدة")</dt><dd class="col-5 text-end">@c.Session.FloatAmount.ToString("N2")</dd>
                     <dt class="col-7">@T("Receipts (system total)", "السندات (إجمالي النظام)")</dt><dd class="col-5 text-end">@c.Total.ToString("N2")</dd>
@@ -76,19 +78,19 @@
                     <div class="input-group input-group-sm"><span class="input-group-text">@T("Counted receipts total", "إجمالي السندات المعدود")</span><input name="countedTotal" type="number" step="0.01" min="0" class="form-control text-end" value="@c.Total.ToString("0.##", CultureInfo.InvariantCulture)" required /></div>
                     <div class="small text-muted">@T("Enter the receipts you physically reconcile (all methods); a difference from the system total needs a reason.", "أدخل السندات التي طابقتها فعلياً (كل الطرق)؛ أي اختلاف عن إجمالي النظام يتطلب سبباً.")</div>
                     <input name="varianceReason" class="form-control form-control-sm" placeholder="@T("Variance reason (if any)", "سبب الفرق (إن وجد)")" />
-                    <div class="d-flex gap-2"><button class="btn btn-dark btn-sm" type="submit" onclick="return confirm('@T("Close this session? It cannot be reopened.", "إغلاق الجلسة؟ لا يمكن إعادة فتحها.")');"><i class="bi bi-lock-fill me-1"></i>@T("Close", "إغلاق")</button><a class="btn btn-outline-secondary btn-sm" asp-action="Till">@T("Cancel", "إلغاء")</a></div>
+                    <div class="d-flex gap-2"><button class="btn btn-dark btn-sm" type="submit" onclick="return confirm('@T("Close this session? It cannot be reopened.", "إغلاق الجلسة؟ لا يمكن إعادة فتحها.")');"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("Close", "إغلاق")</button><a class="btn btn-outline-secondary btn-sm" asp-action="Till">@T("Cancel", "إلغاء")</a></div>
                 </form>
             </div>
         }
         <div class="sms-card p-3">
-            <h2 class="h6 mb-2"><i class="bi bi-unlock me-1"></i>@T("Open a session", "فتح جلسة")</h2>
+            <h2 class="h6 mb-2"><i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Open a session", "فتح جلسة")</h2>
             @if (mine != null) { <div class="alert alert-success small mb-0">@T("You already have session", "لديك جلسة مفتوحة على") <strong>@mine.Session.TillCode</strong> @T("open — close it before opening another.", "— أغلقها قبل فتح أخرى.")</div> }
             else
             {
                 <form method="post" asp-action="OpenTill" class="d-grid gap-2">
                     <input name="tillCode" class="form-control form-control-sm" placeholder="@T("Till code (e.g. TILL-1)", "رمز الصندوق (مثل TILL-1)")" required />
                     <div class="input-group input-group-sm"><span class="input-group-text">@T("Float", "العهدة")</span><input name="floatAmount" type="number" step="0.01" min="0" class="form-control text-end" value="0" /></div>
-                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-unlock me-1"></i>@T("Open", "فتح")</button>
+                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Open", "فتح")</button>
                 </form>
             }
         </div>

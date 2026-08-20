@@ -21,7 +21,7 @@
         <form method="get" class="d-flex gap-2 align-items-center">
             <input type="date" name="from" class="form-control form-control-sm" value="@from" />
             <select name="days" class="form-select form-select-sm" style="width:7rem">@foreach (var n in new[] { 7, 14, 30, 60, 120 }) { <option value="@n" selected="@(n == Model.Days)">@n @T("days", "يوماً")</option> }</select>
-            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-search"></i></button>
+            <button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button>
         </form>
         <partial name="_HelpModal" model="help" /></div></div>
 <partial name="_TimetableNav" />
@@ -29,7 +29,8 @@
 <div class="sms-card">
     <div class="p-3 border-bottom d-flex justify-content-between"><h2 class="h6 mb-0">@Model.Rows.Count @T("conflict(s)", "تعارضاً") · @from → @Model.From.AddDays(Model.Days).ToString("yyyy-MM-dd")</h2></div>
     <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-        <thead><tr><th>@T("Date", "التاريخ")</th><th>@T("Slot", "الحصة")</th><th>@T("Section · subject · teacher", "الشعبة · المادة · المعلم")</th><th>@T("Conflict", "التعارض")</th><th style="min-width:20rem">@T("Resolve", "الحل")</th></tr></thead>
+        <caption class="visually-hidden">@T("Session conflicts", "تعارضات الحصص")</caption>
+        <thead><tr><th scope="col">@T("Date", "التاريخ")</th><th scope="col">@T("Slot", "الحصة")</th><th scope="col">@T("Section · subject · teacher", "الشعبة · المادة · المعلم")</th><th scope="col">@T("Conflict", "التعارض")</th><th scope="col" style="min-width:20rem">@T("Resolve", "الحل")</th></tr></thead>
         <tbody>
         @foreach (var r in Model.Rows)
         {
@@ -39,8 +40,8 @@
                 <td><strong>@TimetableLabels.SectionName(r.Cell.Section, isRtl)</strong> · <code>@r.Cell.Subject.Code</code><br /><span class="small">@Teacher(r.Cell.Teacher) · <span class="badge @TimetableLabels.SessionBadge(r.Session.Status)">@TimetableLabels.SessionStatus(r.Session.Status, isRtl)</span></span></td>
                 <td class="small"><span class="badge @(r.Kind == "calendar" ? "text-bg-secondary" : "text-bg-warning") me-1">@(r.Kind == "calendar" ? T("calendar", "تقويم") : T("room", "قاعة"))</span>@r.Detail</td>
                 <td>
-                    @if (r.Kind == "room") { <form method="post" asp-action="ChangeRoom" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1 mb-1"><select name="roomId" class="form-select form-select-sm">@foreach (var room in Model.Rooms) { <option value="@room.Id">@room.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit" title="@T("Move room (BR-TTB-008)", "نقل القاعة (BR-TTB-008)")"><i class="bi bi-door-open"></i></button></form> }
-                    <form method="post" asp-action="CancelSession" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Cancel session", "إلغاء الحصة")"><i class="bi bi-x-circle"></i></button></form>
+                    @if (r.Kind == "room") { <form method="post" asp-action="ChangeRoom" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1 mb-1"><select name="roomId" class="form-select form-select-sm">@foreach (var room in Model.Rooms) { <option value="@room.Id">@room.Code</option> }</select><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" required /><button class="btn btn-sm btn-outline-info" type="submit" title="@T("Move room (BR-TTB-008)", "نقل القاعة (BR-TTB-008)")" aria-label="@T("Move room (BR-TTB-008)", "نقل القاعة (BR-TTB-008)")"><i class="bi bi-door-open" aria-hidden="true"></i></button></form> }
+                    <form method="post" asp-action="CancelSession" asp-route-id="@r.Session.Id" asp-route-returnTo="conflicts" asp-route-date="@from" asp-route-days="@Model.Days" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("cancel reason", "سبب الإلغاء")" required /><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Cancel session", "إلغاء الحصة")" aria-label="@T("Cancel session", "إلغاء الحصة")"><i class="bi bi-x-circle" aria-hidden="true"></i></button></form>
                 </td>
             </tr>
         }

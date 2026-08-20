@@ -31,7 +31,8 @@
     <div class="col-lg-8">
         <div class="sms-card">
             <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
-                <thead><tr><th>@T("Cheque", "الشيك")</th><th>@T("Bank", "البنك")</th><th>@T("Payer", "الدافع")</th><th>@T("Cheque date", "تاريخ الشيك")</th><th class="text-end">@T("Amount", "المبلغ")</th><th>@T("Status", "الحالة")</th><th>@T("Actions", "الإجراءات")</th></tr></thead>
+                <caption class="visually-hidden">@T("Post-dated cheques", "الشيكات الآجلة")</caption>
+                <thead><tr><th scope="col">@T("Cheque", "الشيك")</th><th scope="col">@T("Bank", "البنك")</th><th scope="col">@T("Payer", "الدافع")</th><th scope="col">@T("Cheque date", "تاريخ الشيك")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th></tr></thead>
                 <tbody>
                 @foreach (var r in Model.Rows)
                 {
@@ -56,14 +57,14 @@
     </div>
     <div class="col-lg-4">
         <div class="sms-card p-3">
-            <h2 class="h6 mb-2"><i class="bi bi-plus-circle me-1"></i>@T("Lodge a cheque", "تسجيل شيك")</h2>
+            <h2 class="h6 mb-2"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Lodge a cheque", "تسجيل شيك")</h2>
             <form method="post" asp-action="LodgePdc" class="d-grid gap-2">
                 <select name="payerId" class="form-select form-select-sm" required><option value="">@T("Payer", "الدافع")</option>@foreach (var p in Model.Payers) { <option value="@p.Payer.Id">@FinanceLabels.ParentName(p.Parent, isRtl) · @p.Parent?.ParentFileNo</option> }</select>
                 <input name="bankName" class="form-control form-control-sm" placeholder="@T("Bank", "البنك")" required />
                 <input name="chequeNo" class="form-control form-control-sm" placeholder="@T("Cheque no.", "رقم الشيك")" required />
                 <input name="chequeDate" type="date" class="form-control form-control-sm" value="@Model.Today.ToString("yyyy-MM-dd")" required />
                 <div class="input-group input-group-sm"><span class="input-group-text">@T("Amount", "المبلغ")</span><input name="amount" type="number" step="0.01" min="0.01" class="form-control text-end" required /></div>
-                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-calendar-plus me-1"></i>@T("Lodge", "تسجيل")</button>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>@T("Lodge", "تسجيل")</button>
             </form>
             <div class="small text-muted mt-2">@T("Lodging a PDC does not reduce the payer's balance — the receipt is issued on clearance.", "تسجيل الشيك لا يخفّض رصيد الدافع — يصدر السند عند التحصيل.")</div>
         </div>
