@@ -106,6 +106,7 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, Ksa01ContentPackSeedContributor>();
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
+            services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
             services.AddScoped<SeedRunner>();
 
             using var provider = services.BuildServiceProvider();
