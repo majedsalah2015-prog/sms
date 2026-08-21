@@ -111,6 +111,7 @@ namespace Sms.Seeder
             services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
             services.AddScoped<IFeeAdmin, FeeAdmin>();
 
+            services.AddScoped<ISeedContributor, JobDefinitionSeedContributor>();
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
             services.AddScoped<ISeedContributor, GeographySeedContributor>();
             services.AddScoped<ISeedContributor, RoleTemplateSeedContributor>();

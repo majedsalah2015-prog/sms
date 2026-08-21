@@ -92,6 +92,103 @@ namespace Sms.Infrastructure.Tests
         private JobRunner CreateRunner(AppDbContext db, params IJobHandler[] handlers)
             => new(db, _clock, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), handlers);
 
+        /// <summary>Counts how many times it was entered, so a second concurrent run is visible rather than inferred.</summary>
+        private sealed class CountingHandler : IJobHandler
+        {
+            public int Entered;
+
+            public string JobCode => "Counting";
+
+            public Task RunAsync(CancellationToken cancellationToken = default)
+            {
+                Interlocked.Increment(ref Entered);
+                return Task.CompletedTask;
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-090")]
+        public async Task A_second_run_of_a_job_already_in_flight_does_not_start()
+        {
+            using (var db = CreateContext())
+            {
+                db.JobDefinitions.Add(new JobDefinition { Code = "Counting", CronExpression = "* * * * *" });
+                await db.SaveChangesAsync();
+            }
+
+            var handler = new CountingHandler();
+
+            // The first run's Running row is still open, which is exactly the state Hangfire leaves
+            // when it enqueues one job per occurrence missed during downtime and several workers
+            // pick them up together.
+            int definitionId;
+            using (var db = CreateContext())
+            {
+                definitionId = (await db.JobDefinitions.SingleAsync(j => j.Code == "Counting")).Id;
+                db.JobRuns.Add(new JobRun
+                {
+                    JobDefinitionId = definitionId,
+                    Status = JobStatus.Running,
+                    TriggerType = JobTriggerType.Scheduled,
+                    StartedAtUtc = _clock.UtcNow,
+                });
+                await db.SaveChangesAsync();
+            }
+
+            using (var db = CreateContext())
+            {
+                var run = await CreateRunner(db, handler).RunAsync("Counting", JobTriggerType.Scheduled);
+
+                // It reports the run that is already going rather than starting a second one. Two
+                // notification dispatches at once would read the same queued rows and send them twice.
+                Assert.Equal(JobStatus.Running, run.Status);
+            }
+
+            Assert.Equal(0, handler.Entered);
+            using (var db = CreateContext())
+            {
+                Assert.Equal(1, await db.JobRuns.CountAsync(r => r.JobDefinitionId == definitionId));
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-090")]
+        public async Task A_run_abandoned_by_a_crash_stops_blocking_the_job()
+        {
+            using (var db = CreateContext())
+            {
+                db.JobDefinitions.Add(new JobDefinition { Code = "Counting", CronExpression = "* * * * *" });
+                await db.SaveChangesAsync();
+                var definitionId = (await db.JobDefinitions.SingleAsync(j => j.Code == "Counting")).Id;
+
+                // Killed mid-job seven hours ago: nothing ever wrote its outcome. Without the reaper
+                // the in-flight index would refuse every successor from here to the end of time.
+                db.JobRuns.Add(new JobRun
+                {
+                    JobDefinitionId = definitionId,
+                    Status = JobStatus.Running,
+                    TriggerType = JobTriggerType.Scheduled,
+                    StartedAtUtc = _clock.UtcNow.AddHours(-7),
+                });
+                await db.SaveChangesAsync();
+            }
+
+            var handler = new CountingHandler();
+            using (var db = CreateContext())
+            {
+                var run = await CreateRunner(db, handler).RunAsync("Counting", JobTriggerType.Scheduled);
+                Assert.Equal(JobStatus.Succeeded, run.Status);
+            }
+
+            Assert.Equal(1, handler.Entered);
+            using (var db = CreateContext())
+            {
+                var abandoned = await db.JobRuns.SingleAsync(r => r.StartedAtUtc < _clock.UtcNow.AddHours(-1));
+                Assert.Equal(JobStatus.Failed, abandoned.Status);
+                Assert.Contains("Abandoned", abandoned.ErrorMessage);
+            }
+        }
+
         [Fact]
         public async Task Running_an_unknown_job_code_throws()
         {

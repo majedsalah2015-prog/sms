@@ -807,33 +807,34 @@ namespace Sms.Web
             // every other admin screen (doc 06 permission-gating).
             app.UseHangfireDashboard();
 
-            // Recurring jobs call through IJobRunner by code — see doc comments
-            // on JobRunner/JobDefinitionAdmin. The cron schedules mirror the
-            // JobDefinition rows a real deployment seeds via IJobDefinitionAdmin;
-            // duplicated here as the literal source Hangfire's scheduler reads.
-            RecurringJob.AddOrUpdate<IJobRunner>(
-                "AuditIntegrityCheckpoint",
-                runner => runner.RunAsync("AuditIntegrityCheckpoint", JobTriggerType.Scheduled, default),
-                "0 2 * * *"); // daily 02:00 UTC — matches IntegrityCheckpointService's one-day default period
+            // The registry the runner resolves each job against. Written here rather than left to
+            // the seeder because a missing row does not degrade a job, it fails it: JobRunner looks
+            // the code up first and throws UnknownJobException when it finds nothing. Every one of
+            // these five failed on every fire until this call existed.
+            using (var scope = app.ApplicationServices.CreateScope())
+            {
+                Sms.Infrastructure.Jobs.JobDefinitionRegistrar
+                    .EnsureAsync(scope.ServiceProvider.GetRequiredService<Sms.Infrastructure.Persistence.AppDbContext>())
+                    .GetAwaiter().GetResult();
+            }
 
-            RecurringJob.AddOrUpdate<IJobRunner>(
-                "NotificationDispatch",
-                runner => runner.RunAsync("NotificationDispatch", JobTriggerType.Scheduled, default),
-                "*/5 * * * *"); // every 5 minutes
-
-            // S8/E-802 — DB/04 §4 snapshot refreshes ("Snapshots refresh via ops.JobDefinition schedules").
-            RecurringJob.AddOrUpdate<IJobRunner>(
-                SnapshotJobCodes.AgedReceivables,
-                runner => runner.RunAsync(SnapshotJobCodes.AgedReceivables, JobTriggerType.Scheduled, default),
-                "30 2 * * *"); // daily 02:30 UTC — D refresh class (RPT-FEE-004, finance donut)
-            RecurringJob.AddOrUpdate<IJobRunner>(
-                SnapshotJobCodes.DailyAttendanceSummary,
-                runner => runner.RunAsync(SnapshotJobCodes.DailyAttendanceSummary, JobTriggerType.Scheduled, default),
-                "*/15 4-12 * * *"); // C15 refresh class during the KSA school day (UTC)
-            RecurringJob.AddOrUpdate<IJobRunner>(
-                SnapshotJobCodes.CollectionCalendar,
-                runner => runner.RunAsync(SnapshotJobCodes.CollectionCalendar, JobTriggerType.Scheduled, default),
-                "45 2 * * *"); // daily 02:45 UTC — RPT-INS-001 cashflow forecast
+            // Recurring jobs call through IJobRunner by code. Both the schedule below and the
+            // JobDefinition row above come from JobCatalog, so the scheduler and the registry cannot
+            // disagree about when a job runs — which they could while the crons were literals here.
+            //
+            // Hangfire 1.7 enqueues every occurrence missed while the host was down — fifty minutes
+            // of downtime produced ten notification dispatches in the same tenth of a second on the
+            // first run after this registry landed. Relaxed misfire handling would suppress that but
+            // arrived in 1.8; until then the burst is absorbed by JobRunner, which refuses to start a
+            // scheduled run of a job that already has one in flight.
+            foreach (var job in Sms.Application.Jobs.JobCatalog.Jobs)
+            {
+                var code = job.Code;
+                RecurringJob.AddOrUpdate<IJobRunner>(
+                    code,
+                    runner => runner.RunAsync(code, JobTriggerType.Scheduled, default),
+                    job.CronExpression);
+            }
         }
     }
 }

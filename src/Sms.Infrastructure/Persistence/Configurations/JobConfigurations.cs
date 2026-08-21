@@ -31,6 +31,16 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.ErrorMessage).HasMaxLength(2000);
             builder.HasOne<JobDefinition>().WithMany().HasForeignKey(x => x.JobDefinitionId);
             builder.HasIndex(x => new { x.JobDefinitionId, x.StartedAtUtc });
+
+            // At most one run of a job in flight at a time, enforced by the database rather than by
+            // a read-then-write in the runner. Hangfire enqueues every occurrence missed while the
+            // host was down, and ten dispatch runs starting inside the same tenth of a second would
+            // all read the same queued notifications and all send them. A check in code cannot stop
+            // that; ten readers see "nothing running" before any of them writes.
+            builder.HasIndex(x => x.JobDefinitionId)
+                .IsUnique()
+                .HasFilter("[Status] = 1")
+                .HasDatabaseName("UX_JobRun_InFlight");
         }
     }
 }

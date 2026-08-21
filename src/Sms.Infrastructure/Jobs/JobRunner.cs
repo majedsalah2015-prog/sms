@@ -38,6 +38,8 @@ namespace Sms.Infrastructure.Jobs
                 throw new UnknownJobException(jobCode);
             }
 
+            await ReapAbandonedRunsAsync(definition.Id, cancellationToken);
+
             var run = new JobRun
             {
                 JobDefinitionId = definition.Id,
@@ -46,9 +48,25 @@ namespace Sms.Infrastructure.Jobs
                 StartedAtUtc = _clock.UtcNow,
             };
             _db.JobRuns.Add(run);
-            // Persisted before the handler runs, so a hard crash mid-job still
-            // leaves a visible "stuck at Running" row instead of nothing at all.
-            await _db.SaveChangesAsync(cancellationToken);
+
+            try
+            {
+                // Persisted before the handler runs, so a hard crash mid-job still
+                // leaves a visible "stuck at Running" row instead of nothing at all.
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException)
+            {
+                // UX_JobRun_InFlight refused it: another run of this job is already going. Report
+                // that run rather than starting a second one. This is the ordinary case after
+                // downtime, when Hangfire enqueues one job per occurrence it missed — and running
+                // two dispatches at once would send every queued notification twice.
+                _db.Entry(run).State = EntityState.Detached;
+                return await _db.JobRuns.AsNoTracking()
+                    .Where(r => r.JobDefinitionId == definition.Id && r.Status == JobStatus.Running)
+                    .OrderByDescending(r => r.Id)
+                    .FirstAsync(cancellationToken);
+            }
 
             if (!definition.IsEnabled)
             {
@@ -75,6 +93,36 @@ namespace Sms.Infrastructure.Jobs
             }
 
             return run;
+        }
+
+        /// <summary>
+        /// How long a run may sit at Running before it is presumed dead. Longer than any job here
+        /// takes and short enough that a crash does not block the schedule for a working day —
+        /// without this, one hard kill mid-job would stop that job forever, since the in-flight
+        /// index would keep refusing every successor.
+        /// </summary>
+        private static readonly TimeSpan AbandonedAfter = TimeSpan.FromHours(6);
+
+        private async Task ReapAbandonedRunsAsync(int jobDefinitionId, CancellationToken cancellationToken)
+        {
+            var cutoff = _clock.UtcNow - AbandonedAfter;
+            var abandoned = await _db.JobRuns
+                .Where(r => r.JobDefinitionId == jobDefinitionId && r.Status == JobStatus.Running && r.StartedAtUtc < cutoff)
+                .ToListAsync(cancellationToken);
+
+            if (abandoned.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var run in abandoned)
+            {
+                run.Status = JobStatus.Failed;
+                run.ErrorMessage = "Abandoned: the run never reported an outcome, most likely a host restart mid-job.";
+                run.CompletedAtUtc = _clock.UtcNow;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         private async Task CompleteAsync(JobRun run, JobStatus status, string? errorMessage, CancellationToken cancellationToken)
