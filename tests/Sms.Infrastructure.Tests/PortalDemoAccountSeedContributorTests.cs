@@ -5,8 +5,10 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Security;
+using Sms.Domain.Common;
 using Sms.Domain.Parents;
 using Sms.Domain.Security;
+using Sms.Domain.Students;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Security;
@@ -103,6 +105,50 @@ namespace Sms.Infrastructure.Tests
             await CreateContributor(db).SeedAsync();
 
             Assert.Equal(1, await db.UserAccounts.CountAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-011")]
+        public async Task Bridges_the_portal_visible_child_to_a_student_account()
+        {
+            using var db = CreateContext();
+            var parent = DemoParent();
+            db.Parents.Add(parent);
+            var student = new Student
+            {
+                StudentNo = "STU-000001",
+                FirstNameAr = "طالب", FatherNameAr = "أب", GrandfatherNameAr = "جد", FamilyNameAr = "عائلة",
+                FirstNameEn = "Student", FatherNameEn = "Father", GrandfatherNameEn = "Grandfather", FamilyNameEn = "Family",
+                Gender = Gender.Male, DateOfBirth = new DateTime(2018, 1, 1), NationalityLookupId = 1,
+            };
+            db.Students.Add(student);
+            await db.SaveChangesAsync();
+            db.StudentGuardianLinks.Add(new StudentGuardianLink
+            {
+                StudentId = student.Id, ParentId = parent.Id, RelationshipLookupId = 1,
+                IsPrimaryContact = true, IsFinanciallyResponsible = true, IsPickupAuthorized = true, IsPortalVisible = true,
+                EffectiveFromUtc = new DateTime(2026, 9, 1),
+            });
+            await db.SaveChangesAsync();
+
+            await CreateContributor(db).SeedAsync();
+
+            var account = await db.UserAccounts.SingleAsync(u => u.UserName == PortalDemoAccountSeedContributor.StudentUserName);
+            Assert.Equal(AccountType.Student, account.AccountType);
+            Assert.Equal(account.Id, (await db.Students.SingleAsync(s => s.Id == student.Id)).UserAccountId);
+        }
+
+        [Fact]
+        public async Task Skips_the_student_account_when_no_portal_visible_link_exists()
+        {
+            using var db = CreateContext();
+            db.Parents.Add(DemoParent());
+            await db.SaveChangesAsync();
+
+            await CreateContributor(db).SeedAsync();
+
+            Assert.True(await db.UserAccounts.AnyAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName));
+            Assert.False(await db.UserAccounts.AnyAsync(u => u.UserName == PortalDemoAccountSeedContributor.StudentUserName));
         }
 
         [Fact]

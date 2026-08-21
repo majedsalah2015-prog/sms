@@ -29,6 +29,11 @@ namespace Sms.Infrastructure.Seeding
         /// <summary>One-time password (meets PasswordPolicy.ProductMinimum); rotated at first login by BR-SEC-005.</summary>
         public const string TemporaryPassword = "Parent@2026!";
 
+        /// <summary>Self-access demo account (PortalAccessEvaluator's Student.UserAccountId path) — bridged to the demo parent's portal-visible child.</summary>
+        public const string StudentUserName = "student";
+
+        public const string StudentTemporaryPassword = "Student@2026!";
+
         /// <summary>The demo parent's mobile as registered by DemoSeedContributor — the stable lookup key.</summary>
         public const string DemoParentMobile = "0500000001";
 
@@ -48,13 +53,8 @@ namespace Sms.Infrastructure.Seeding
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)
         {
-            if (await _db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.UserName == UserName, cancellationToken))
-            {
-                return;
-            }
-
             var parent = await _db.Parents
-                .Where(p => p.PrimaryMobile == DemoParentMobile && p.UserAccountId == null)
+                .Where(p => p.PrimaryMobile == DemoParentMobile)
                 .OrderBy(p => p.Id)
                 .FirstOrDefaultAsync(cancellationToken);
             if (parent == null)
@@ -62,14 +62,42 @@ namespace Sms.Infrastructure.Seeding
                 return; // demo tenant not seeded — nothing to bridge
             }
 
-            var account = new UserAccount { UserName = UserName, AccountType = AccountType.Parent };
-            _db.UserAccounts.Add(account);
-            await _db.SaveChangesAsync(cancellationToken);
+            if (parent.UserAccountId == null
+                && !await _db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.UserName == UserName, cancellationToken))
+            {
+                var account = new UserAccount { UserName = UserName, AccountType = AccountType.Parent };
+                _db.UserAccounts.Add(account);
+                await _db.SaveChangesAsync(cancellationToken);
 
-            parent.UserAccountId = account.Id;
-            await _db.SaveChangesAsync(cancellationToken);
+                parent.UserAccountId = account.Id;
+                await _db.SaveChangesAsync(cancellationToken);
 
-            await _auth.SetTemporaryPasswordAsync(account.Id, TemporaryPassword, cancellationToken);
+                await _auth.SetTemporaryPasswordAsync(account.Id, TemporaryPassword, cancellationToken);
+            }
+
+            // Student self-access half: bridge the demo parent's portal-visible child the same way.
+            if (!await _db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.UserName == StudentUserName, cancellationToken))
+            {
+                var childId = await _db.StudentGuardianLinks
+                    .Where(l => l.ParentId == parent.Id && l.EffectiveToUtc == null && l.IsPortalVisible)
+                    .OrderBy(l => l.StudentId)
+                    .Select(l => (int?)l.StudentId)
+                    .FirstOrDefaultAsync(cancellationToken);
+                var child = childId == null
+                    ? null
+                    : await _db.Students.Where(s => s.Id == childId.Value && s.UserAccountId == null).FirstOrDefaultAsync(cancellationToken);
+                if (child != null)
+                {
+                    var account = new UserAccount { UserName = StudentUserName, AccountType = AccountType.Student };
+                    _db.UserAccounts.Add(account);
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    child.UserAccountId = account.Id;
+                    await _db.SaveChangesAsync(cancellationToken);
+
+                    await _auth.SetTemporaryPasswordAsync(account.Id, StudentTemporaryPassword, cancellationToken);
+                }
+            }
         }
     }
 }
