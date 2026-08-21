@@ -18,6 +18,7 @@ using Sms.Domain.Employees;
 using Sms.Domain.Examinations;
 using Sms.Domain.Fees;
 using Sms.Domain.GlExport;
+using Sms.Domain.Geography;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
 using Sms.Domain.Health;
@@ -183,6 +184,13 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<TeacherSubjectQualification> TeacherSubjectQualifications => Set<TeacherSubjectQualification>();
 
         public DbSet<Student> Students => Set<Student>();
+
+        // core.Governorate -> ResidenceArea -> Neighbourhood: the residence hierarchy a student address names.
+        public DbSet<Governorate> Governorates => Set<Governorate>();
+
+        public DbSet<ResidenceArea> ResidenceAreas => Set<ResidenceArea>();
+
+        public DbSet<Neighbourhood> Neighbourhoods => Set<Neighbourhood>();
 
         public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 

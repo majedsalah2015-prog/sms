@@ -70,5 +70,67 @@ namespace Sms.Domain.Students
         public StudentStatus Status { get; set; } = StudentStatus.Enrolled;
 
         public bool IsActive { get; set; } = true;
+
+        // ---------------------------------------------------------------- mother's particulars
+        //
+        // On the student, not on Parent, by owner decision (2026-08-21). The school records these for
+        // every student whether or not the mother holds a guardian account, and many do not — putting
+        // them on Parent would leave the commonest case with nowhere to write them.
+        //
+        // The cost is real and worth stating: siblings each carry their own copy, so a change to the
+        // mother's mobile has to be made on each. If that becomes the daily complaint, the answer is to
+        // promote her to a Parent row and point the siblings at it — not to sync copies.
+
+        [RequiresAuditReason]
+        public string? MotherName { get; set; }
+
+        [RequiresAuditReason]
+        public string? MotherNationalId { get; set; }
+
+        public string? MotherOccupation { get; set; }
+
+        /// <summary>References core.LookupValue, category "EducationLevel".</summary>
+        public int? MotherEducationLookupId { get; set; }
+
+        public string? MotherMobile { get; set; }
+
+        // ---------------------------------------------------------------- social profile
+        //
+        // Every field below feeds a decision the school has to defend — a fee discount, a ministry
+        // return, a religious-education stream — so all of them are T1-audited with a reason, like the
+        // identity fields above and for the same purpose: someone will be asked why this changed.
+
+        [RequiresAuditReason]
+        public ParentLifeStatus? FatherStatus { get; set; }
+
+        [RequiresAuditReason]
+        public ParentLifeStatus? MotherStatus { get; set; }
+
+        [RequiresAuditReason]
+        public Religion? Religion { get; set; }
+
+        [RequiresAuditReason]
+        public ResidencyStatus? ResidencyStatus { get; set; }
+
+        [RequiresAuditReason]
+        public FinancialStatus? FinancialStatus { get; set; }
+
+        /// <summary>رقم بطاقة التموين — a ration entitlement, so it is corroborating evidence for the means assessment above and audited with it.</summary>
+        [RequiresAuditReason]
+        public string? RationCardNo { get; set; }
+
+        public string? PlaceOfBirth { get; set; }
+
+        /// <summary>عدد أفراد الأسرة — household size, the denominator behind sibling and hardship rules (Module 22).</summary>
+        public int? FamilySize { get; set; }
+
+        /// <summary>ترتيب الطالب بين الأبناء, 1 = eldest.</summary>
+        public int? BirthOrder { get; set; }
+
+        /// <summary>
+        /// حي السكن — the neighbourhood only. Its area and governorate are reached
+        /// by walking up <c>Geography</c>, so the three can never disagree.
+        /// </summary>
+        public int? NeighbourhoodId { get; set; }
     }
 }

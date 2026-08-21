@@ -26,6 +26,19 @@ namespace Sms.Infrastructure.Persistence.Configurations
             }
 
             builder.Property(x => x.PrimaryIdNo).HasMaxLength(30);
+
+            builder.Property(x => x.MotherName).HasMaxLength(120);
+            builder.Property(x => x.MotherNationalId).HasMaxLength(30);
+            builder.Property(x => x.MotherOccupation).HasMaxLength(100);
+            builder.Property(x => x.MotherMobile).HasMaxLength(20);
+            builder.Property(x => x.PlaceOfBirth).HasMaxLength(100);
+            builder.Property(x => x.RationCardNo).HasMaxLength(30);
+
+            // No FK to the neighbourhood, matching how the lookup references on this entity are already
+            // handled: reference data is soft-deactivated rather than deleted, and a hard FK would turn
+            // retiring a neighbourhood into a delete that a live student row refuses.
+            builder.HasIndex(x => x.NeighbourhoodId).HasDatabaseName("IX_Student_Neighbourhood")
+                .HasFilter("[NeighbourhoodId] IS NOT NULL");
             // BR-GLB-003: unique per (school, id type, id number) when a primary ID is recorded.
             builder.HasIndex(x => new { x.SchoolId, x.PrimaryIdTypeLookupId, x.PrimaryIdNo })
                 .HasDatabaseName("IX_Student_PrimaryId")
