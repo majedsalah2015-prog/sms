@@ -1,0 +1,133 @@
+@using System.Globalization
+@model GlMappingsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Account mapping", "ربط الحسابات");
+    ViewData["Breadcrumb"] = T("Accounting / GL export / Account mapping", "المحاسبة / الترحيل إلى الأستاذ العام / ربط الحسابات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "map-help", Title = T("Account mapping — help", "ربط الحسابات — مساعدة"),
+        Intro = T("Each journal key is one role the school's money plays: what payers owe, VAT collected, cash in each tender, revenue per fee category. This table says which ledger account each role posts to.", "كل مفتاح قيد يمثّل دوراً واحداً لمال المدرسة: ما على أولياء الأمور، والضريبة المحصّلة، والنقد بكل وسيلة، والإيراد بكل فئة رسوم. ويحدّد هذا الجدول الحساب الذي يُرحَّل إليه كل دور."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Revenue:N", "Revenue:N"), T("One key per fee category. The category's GL code, when it has one, replaces the key outright — so an account already agreed with the accountant is used as-is.", "مفتاح لكل فئة رسوم. ورمز الحساب المحدَّد في الفئة — إن وُجد — يحلّ محل المفتاح كلياً، فيُستخدم الحساب المتفق عليه مع المحاسب كما هو.")),
+            new HelpPanelViewModel.Item(T("Cash:Method", "Cash:Method"), T("One key per payment method: cash, card, transfer, cheque, PDC. Cheques and post-dated cheques may point at the same account — the difference between them is a date, not an accounting one.", "مفتاح لكل وسيلة دفع: نقد، بطاقة، حوالة، شيك، شيك آجل. وقد يشير الشيك والشيك الآجل إلى الحساب نفسه — فالفرق بينهما تاريخ لا معالجة محاسبية.")),
+            new HelpPanelViewModel.Item(T("Changing a code", "تغيير رمز"), T("Re-saving a key replaces its account. Posted batches keep the code they posted with — a mapping change never rewrites history.", "إعادة حفظ المفتاح تستبدل حسابه. وتحتفظ الدفعات المرحّلة بالرمز الذي رُحّلت به — فتغيير الربط لا يعيد كتابة الماضي.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Which ledger account each journal key posts to.", "الحساب الذي يُرحَّل إليه كل مفتاح قيد.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_GlExportNav" />
+
+@if (Model.UnmappedKeys.Count > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>@T("Unmapped keys", "مفاتيح بلا ربط")</strong>
+        <p class="small mb-2">@T("A period touching any of these refuses to generate. Map each one below.", "أي فترة تمسّ واحداً منها ترفض التوليد. اربط كلاً منها أدناه.")</p>
+        <div class="d-flex flex-wrap gap-1">
+            @foreach (var k in Model.UnmappedKeys)
+            {
+                <button type="button" class="btn btn-sm btn-outline-dark js-fill-key" data-key="@k"><bdi dir="ltr">@k</bdi></button>
+            }
+        </div>
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Mapped keys", "المفاتيح المربوطة")</h2>
+            @if (Model.Rows.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("Nothing mapped yet.", "لا يوجد ربط بعد.")</p>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Account mappings", "ربط الحسابات")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Key", "المفتاح")</th>
+                        <th scope="col">@T("Account", "الحساب")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col"></th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        <tr>
+                            <td class="text-nowrap"><bdi dir="ltr">@r.Key</bdi></td>
+                            <td class="text-nowrap font-monospace"><bdi dir="ltr">@r.AccountCode</bdi></td>
+                            <td class="small">@(isRtl ? r.AccountNameAr : r.AccountNameEn)</td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-outline-secondary btn-sm js-fill-row"
+                                        data-key="@r.Key" data-code="@r.AccountCode" data-ar="@r.AccountNameAr" data-en="@r.AccountNameEn"
+                                        title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Define a mapping", "تعريف ربط")</h2>
+            <form method="post" asp-action="SaveMapping" id="map-form">
+                @Html.AntiForgeryToken()
+                <div class="mb-2">
+                    <label for="map-key" class="form-label small text-muted">@T("Journal key", "مفتاح القيد")</label>
+                    <input id="map-key" name="key" class="form-control form-control-sm" dir="ltr" required maxlength="100" />
+                </div>
+                <div class="mb-2">
+                    <label for="map-code" class="form-label small text-muted">@T("Ledger account code", "رمز الحساب في الأستاذ")</label>
+                    <input id="map-code" name="accountCode" class="form-control form-control-sm font-monospace" dir="ltr" required maxlength="40" />
+                </div>
+                <div class="mb-2">
+                    <label for="map-ar" class="form-label small text-muted">@T("Account name (Arabic)", "اسم الحساب (عربي)")</label>
+                    <input id="map-ar" name="accountNameAr" class="form-control form-control-sm" maxlength="200" />
+                </div>
+                <div class="mb-3">
+                    <label for="map-en" class="form-label small text-muted">@T("Account name (English)", "اسم الحساب (إنجليزي)")</label>
+                    <input id="map-en" name="accountNameEn" class="form-control form-control-sm" dir="ltr" maxlength="200" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Save mapping", "حفظ الربط")</button>
+            </form>
+            <p class="small text-muted mt-3 mb-0">
+                @T("Re-saving an existing key replaces its account. Posted batches are unaffected — a line keeps the code it posted with.", "إعادة حفظ مفتاح قائم تستبدل حسابه. ولا تتأثر الدفعات المرحّلة — إذ يحتفظ السطر بالرمز الذي رُحّل به.")
+            </p>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Clicking an unmapped key or an edit pencil loads the form rather than making the operator
+    // retype a key like "Cash:BankTransfer" exactly — a typo there defines a second, dead mapping.
+    (function () {
+        var f = { key: document.getElementById('map-key'), code: document.getElementById('map-code'), ar: document.getElementById('map-ar'), en: document.getElementById('map-en') };
+        function fill(key, code, ar, en) {
+            f.key.value = key || '';
+            f.code.value = code || '';
+            f.ar.value = ar || '';
+            f.en.value = en || '';
+            (code ? f.ar : f.code).focus();
+        }
+        document.querySelectorAll('.js-fill-key').forEach(function (b) {
+            b.addEventListener('click', function () { fill(b.dataset.key, '', '', ''); });
+        });
+        document.querySelectorAll('.js-fill-row').forEach(function (b) {
+            b.addEventListener('click', function () { fill(b.dataset.key, b.dataset.code, b.dataset.ar, b.dataset.en); });
+        });
+    })();
+</script>
+}

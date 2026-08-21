@@ -1,0 +1,20 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Action, string En, string Ar, string Icon, string[] Also)[]
+    {
+        ("Index", "Batches", "الدفعات", "bi-journal-text", new[] { "Details" }),
+        ("Mappings", "Account mapping", "ربط الحسابات", "bi-diagram-3", System.Array.Empty<string>()),
+    };
+    bool Active(string a, string[] also) => string.Equals(a, action, System.StringComparison.OrdinalIgnoreCase) || also.Any(x => string.Equals(x, action, System.StringComparison.OrdinalIgnoreCase));
+}
+<nav aria-label="@(isRtl ? "الترحيل المحاسبي" : "GL export")">
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        var isActive = Active(t.Action, t.Also);
+        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="GlExport" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>
+</nav>

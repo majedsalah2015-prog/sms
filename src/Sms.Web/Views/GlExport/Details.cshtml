@@ -1,0 +1,130 @@
+@using System.Globalization
+@using Sms.Domain.GlExport
+@model GlExportBatchViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var b = Model.Batch;
+    ViewData["Title"] = T($"Batch {b.BatchNo}", $"الدفعة {b.BatchNo}");
+    ViewData["Breadcrumb"] = T("Accounting / GL export / Batch", "المحاسبة / الترحيل إلى الأستاذ العام / دفعة");
+    var voided = b.Status == GlExportBatchStatus.Voided;
+    string Name(string code) => Model.AccountNames.TryGetValue(code, out var n) && !string.IsNullOrWhiteSpace(n) ? n : "—";
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title"><bdi dir="ltr">@b.BatchNo</bdi> @if (voided) { <span class="badge bg-secondary align-middle">@T("Voided", "ملغاة")</span> }</h1>
+        <p class="text-muted mb-0">
+            <bdi dir="ltr">@b.PeriodFromUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) → @b.PeriodToUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi>
+            · @T($"{b.SourceDocumentCount} source document(s)", $"{b.SourceDocumentCount} مستنداً مصدرياً")
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Csv" asp-route-id="@b.Id"><i class="bi bi-download me-1" aria-hidden="true"></i>CSV</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back", "رجوع")</a>
+    </div>
+</div>
+<partial name="_GlExportNav" />
+
+<div class="row g-3 mb-3">
+    <div class="col-md-4">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Debit / Credit", "مدين / دائن")</div>
+            <div class="fs-5"><bdi dir="ltr">@b.TotalDebit.ToString("N2", CultureInfo.InvariantCulture) / @b.TotalCredit.ToString("N2", CultureInfo.InvariantCulture)</bdi></div>
+            @if (b.TotalDebit == b.TotalCredit)
+            {
+                <div class="small text-success"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>@T("Balanced", "متوازنة")</div>
+            }
+            else
+            {
+                <div class="small text-danger"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Not balanced", "غير متوازنة")</div>
+            }
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Ledger entry", "قيد الأستاذ العام")</div>
+            <div class="fs-6">@if (b.PostedJournalNo == null) { <span class="text-muted">@T("Not posted", "غير مرحّلة")</span> } else { <bdi dir="ltr">@b.PostedJournalNo</bdi> }</div>
+            @if (b.ReversalJournalNo != null)
+            {
+                <div class="small text-muted">@T("Reversed by", "عُكست بالقيد") <bdi dir="ltr">@b.ReversalJournalNo</bdi></div>
+            }
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Content hash (SHA-256)", "بصمة المحتوى (SHA-256)")</div>
+            <div class="font-monospace small text-break" dir="ltr">@b.ContentHash</div>
+            <div class="small text-muted">@T("A re-rendered CSV hashing to this is byte-for-byte what accounting received.", "ملف CSV مُعاد التوليد ببصمة مطابقة هو ذاته ما استلمته المحاسبة حرفياً.")</div>
+        </div>
+    </div>
+</div>
+
+<div class="sms-card mb-3">
+    <h2 class="h6 mb-3">@T("Journal lines", "سطور القيد")</h2>
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Journal lines", "سطور القيد")</caption>
+        <thead><tr>
+            <th scope="col">#</th>
+            <th scope="col">@T("Account", "الحساب")</th>
+            <th scope="col">@T("Key", "المفتاح")</th>
+            <th scope="col">@T("Description", "البيان")</th>
+            <th scope="col" class="text-end">@T("Debit", "مدين")</th>
+            <th scope="col" class="text-end">@T("Credit", "دائن")</th>
+            <th scope="col" class="text-end">@T("Docs", "مستندات")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var l in Model.Lines)
+        {
+            <tr>
+                <td class="text-muted">@l.SequenceNumber.ToString(CultureInfo.InvariantCulture)</td>
+                <td class="text-nowrap"><bdi dir="ltr">@l.AccountCode</bdi> <span class="text-muted small">@Name(l.AccountCode)</span></td>
+                <td class="small text-muted"><bdi dir="ltr">@l.AccountKey</bdi></td>
+                <td class="small">@l.Description</td>
+                <td class="text-end text-nowrap">@if (l.Debit == 0m) { <span class="text-muted">—</span> } else { <bdi dir="ltr">@l.Debit.ToString("N2", CultureInfo.InvariantCulture)</bdi> }</td>
+                <td class="text-end text-nowrap">@if (l.Credit == 0m) { <span class="text-muted">—</span> } else { <bdi dir="ltr">@l.Credit.ToString("N2", CultureInfo.InvariantCulture)</bdi> }</td>
+                <td class="text-end text-muted small">@l.SourceDocumentCount.ToString(CultureInfo.InvariantCulture)</td>
+            </tr>
+        }
+        </tbody>
+        <tfoot><tr class="fw-semibold">
+            <th colspan="4" class="text-end">@T("Total", "الإجمالي")</th>
+            <th class="text-end"><bdi dir="ltr">@b.TotalDebit.ToString("N2", CultureInfo.InvariantCulture)</bdi></th>
+            <th class="text-end"><bdi dir="ltr">@b.TotalCredit.ToString("N2", CultureInfo.InvariantCulture)</bdi></th>
+            <th></th>
+        </tr></tfoot>
+    </table></div>
+</div>
+
+@if (!voided)
+{
+    <div class="sms-card border-danger-subtle">
+        <h2 class="h6 mb-2">@T("Void this batch", "إلغاء هذه الدفعة")</h2>
+        <p class="small text-muted">
+            @if (b.PostedJournalNo == null)
+            {
+                @T("The period becomes available to generate again.", "تعود الفترة قابلة للتوليد من جديد.")
+            }
+            else
+            {
+                @T("A reversing entry is written in the ledger and the period becomes available again. The original entry stays — it is not edited or deleted.", "يُكتب قيد عكس في الأستاذ العام وتعود الفترة قابلة للتوليد. ويبقى القيد الأصلي كما هو — لا يُعدَّل ولا يُحذف.")
+            }
+        </p>
+        <form method="post" asp-action="Void" asp-route-id="@b.Id" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-8">
+                <label for="void-reason" class="form-label small text-muted">@T("Reason (mandatory)", "السبب (إلزامي)")</label>
+                <input id="void-reason" name="reason" class="form-control form-control-sm" required maxlength="500" />
+            </div>
+            <div class="col-md-4">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                    <i class="bi bi-x-octagon me-1" aria-hidden="true"></i>@T("Void batch", "إلغاء الدفعة")
+                </button>
+            </div>
+        </form>
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(b.VoidReason))
+{
+    <div class="sms-card"><span class="text-muted small">@T("Void reason:", "سبب الإلغاء:")</span> @b.VoidReason</div>
+}

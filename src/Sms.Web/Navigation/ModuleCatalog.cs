@@ -133,6 +133,9 @@ namespace Sms.Web.Navigation
         {
             var group = new NavItem("accounting", "Accounting", "المحاسبة", "bi-calculator");
 
+            // This system's own screen, not an ERP area: it is the seam where the school's
+            // documents become one journal entry, so it sits first in the accounting group.
+            group.Items.Add(new NavItem("acc-glexport", "GL export", "الترحيل المحاسبي", "bi-arrow-left-right", "GlExport", "Index"));
             group.Items.Add(new NavItem("acc-accounts", "Chart of accounts", "دليل الحسابات", "bi-diagram-3", "Accounts", "Index", new { area = "Accounting" }));
             group.Items.Add(new NavItem("acc-journal", "Journal entries", "القيود اليومية", "bi-journal-text", "JournalEntries", "Index", new { area = "Accounting" }));
             group.Items.Add(new NavItem("acc-vouchers", "Manual vouchers", "السندات اليدوية", "bi-receipt", "ManualVouchers", "Index", new { area = "Accounting" }));

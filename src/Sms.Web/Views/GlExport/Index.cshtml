@@ -1,0 +1,126 @@
+@using System.Globalization
+@using Sms.Domain.GlExport
+@model GlExportIndexViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("GL export", "الترحيل إلى الأستاذ العام");
+    ViewData["Breadcrumb"] = T("Accounting / GL export", "المحاسبة / الترحيل إلى الأستاذ العام");
+    var help = new HelpPanelViewModel
+    {
+        Id = "glx-help", Title = T("GL export — help", "الترحيل المحاسبي — مساعدة"),
+        Intro = T("A batch folds every charge, credit note, discount, receipt and refund of one period into balanced summary lines and hands them to the ledger as a single journal entry. The per-student detail stays here — statements, ageing and dunning are this system's job, not the ledger's.", "تجمع الدفعة كل رسم وإشعار دائن وخصم وسند قبض واسترداد في فترة واحدة ضمن سطور ملخّصة متوازنة، وتُسلّمها للأستاذ العام كقيد واحد. أما التفصيل لكل طالب فيبقى هنا — كشوف الحساب والأعمار والتحصيل من عمل هذا النظام لا الأستاذ."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Periods never overlap", "الفترات لا تتداخل"), T("A period covered by a live batch cannot be generated again. Void the existing batch first — the same documents must never reach the ledger twice.", "لا تُولَّد فترة تغطيها دفعة قائمة. ألغِ الدفعة أولاً — يجب ألا تصل المستندات نفسها إلى الأستاذ مرتين.")),
+            new HelpPanelViewModel.Item(T("Every key needs an account", "كل مفتاح يحتاج حساباً"), T("Generation refuses while any key the period touches is unmapped, and names the missing ones. The mapping table is one click away.", "يرفض التوليد ما دام أي مفتاح تمسّه الفترة بلا ربط، ويسمّي الناقص منها. وجدول الربط على بعد نقرة واحدة.")),
+            new HelpPanelViewModel.Item(T("Voiding reverses, never deletes", "الإلغاء يعكس ولا يحذف"), T("Voiding a posted batch writes a reversing entry in the ledger. The pair stays visible, because a correction that hides its own history is not auditable.", "إلغاء دفعة مرحّلة يكتب قيد عكس في الأستاذ. ويبقى القيدان ظاهرين، لأن تصحيحاً يُخفي تاريخه لا يقبل التدقيق.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Summarize a period's finance documents into one balanced journal entry.", "تلخيص مستندات فترة مالية في قيد واحد متوازن.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_GlExportNav" />
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Generate a batch", "توليد دفعة")</h2>
+
+            @if (Model.LedgerAttached)
+            {
+                <p class="small text-success mb-3"><i class="bi bi-plug-fill me-1" aria-hidden="true"></i>@T("A ledger is attached — generating also posts the entry.", "الأستاذ العام موصول — التوليد يُرحّل القيد أيضاً.")</p>
+            }
+            else
+            {
+                <p class="small text-muted mb-3"><i class="bi bi-file-earmark-spreadsheet me-1" aria-hidden="true"></i>@T("No ledger attached: batches are generated and downloadable as CSV.", "لا يوجد أستاذ عام موصول: تُولَّد الدفعات وتُنزَّل كملف CSV.")</p>
+            }
+
+            @if (Model.UnmappedKeyCount > 0)
+            {
+                <div class="alert alert-warning py-2 small" role="alert">
+                    @T($"{Model.UnmappedKeyCount} journal key(s) have no account yet — generation will refuse until they are mapped.", $"{Model.UnmappedKeyCount} من المفاتيح بلا حساب — سيرفض التوليد حتى تُربط.")
+                    <a class="alert-link" asp-action="Mappings">@T("Map them", "اربطها")</a>
+                </div>
+            }
+
+            <form method="post" asp-action="Generate">
+                @Html.AntiForgeryToken()
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label for="period-from" class="form-label small text-muted">@T("From", "من")</label>
+                        <input type="date" id="period-from" name="periodFrom" class="form-control form-control-sm" required
+                               value="@Model.PeriodFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    </div>
+                    <div class="col-6">
+                        <label for="period-to" class="form-label small text-muted">@T("To (inclusive)", "إلى (شاملاً)")</label>
+                        <input type="date" id="period-to" name="periodTo" class="form-control form-control-sm" required
+                               value="@Model.PeriodTo.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm mt-3">
+                    <i class="bi bi-journal-plus me-1" aria-hidden="true"></i>@T("Generate", "توليد")
+                </button>
+            </form>
+
+            <hr />
+            <p class="small text-muted mb-0">
+                @T($"{Model.MappedKeyCount} key(s) mapped.", $"{Model.MappedKeyCount} مفتاحاً مربوطاً.")
+                <a asp-action="Mappings">@T("Mapping table", "جدول الربط")</a>
+            </p>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Batches", "الدفعات")</h2>
+            @if (Model.Batches.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("No batch has been generated yet.", "لم تُولَّد أي دفعة بعد.")</p>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("GL export batches", "دفعات الترحيل المحاسبي")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Batch", "الدفعة")</th>
+                        <th scope="col">@T("Period", "الفترة")</th>
+                        <th scope="col" class="text-end">@T("Total", "الإجمالي")</th>
+                        <th scope="col" class="text-end">@T("Docs", "المستندات")</th>
+                        <th scope="col">@T("Ledger entry", "قيد الأستاذ")</th>
+                        <th scope="col"></th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var b in Model.Batches)
+                    {
+                        var voided = b.Status == GlExportBatchStatus.Voided;
+                        <tr class="@(voided ? "text-muted" : "")">
+                            <td class="text-nowrap">
+                                <a asp-action="Details" asp-route-id="@b.Id"><bdi dir="ltr">@b.BatchNo</bdi></a>
+                                @if (voided) { <span class="badge bg-secondary ms-1">@T("Voided", "ملغاة")</span> }
+                            </td>
+                            <td class="text-nowrap small"><bdi dir="ltr">@b.PeriodFromUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) → @b.PeriodToUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi></td>
+                            <td class="text-end text-nowrap"><bdi dir="ltr">@b.TotalDebit.ToString("N2", CultureInfo.InvariantCulture)</bdi></td>
+                            <td class="text-end">@b.SourceDocumentCount.ToString(CultureInfo.InvariantCulture)</td>
+                            <td class="small text-nowrap">
+                                @if (b.PostedJournalNo == null) { <span class="text-muted">—</span> }
+                                else { <bdi dir="ltr">@b.PostedJournalNo</bdi> }
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-outline-secondary btn-sm" asp-action="Csv" asp-route-id="@b.Id" title="@T("Download CSV", "تنزيل CSV")" aria-label="@T("Download CSV", "تنزيل CSV")"><i class="bi bi-download" aria-hidden="true"></i></a>
+                                <a class="btn btn-outline-secondary btn-sm" asp-action="Details" asp-route-id="@b.Id" title="@T("Details", "التفاصيل")" aria-label="@T("Details", "التفاصيل")"><i class="bi bi-eye" aria-hidden="true"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+</div>
