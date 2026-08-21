@@ -387,7 +387,12 @@ namespace Sms.Infrastructure.Discounts
 
             var firstDoc = await _db.DiscountDocuments.Where(d => d.DiscountGrantId == grant.Id).OrderBy(d => d.Id).FirstAsync(cancellationToken);
             var charge = await _db.Charges.SingleAsync(c => c.Id == firstDoc.ChargeId, cancellationToken);
-            await _feeAdmin.PostManualChargeAsync(grant.StudentId, charge.PayerId, charge.FeeCategoryId, amount, cancellationToken);
+            // The clawed-back figure is gross — DiscountAmountCalculator works off GrossAmount — so it is posted
+            // gross at the discounted charge's own snapshot rate. Passing it as a net amount charged the family VAT
+            // on VAT (S8 gap G-12), and re-reading the category's current rate would recover tax at a rate that was
+            // never granted.
+            await _feeAdmin.PostManualGrossChargeAsync(
+                grant.StudentId, charge.PayerId, charge.FeeCategoryId, amount, charge.VatRateSnapshot, cancellationToken);
         }
 
         // ------------------------------------------------------------------ waivers

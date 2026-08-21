@@ -65,6 +65,9 @@ namespace Sms.Application.GlExport
         /// <summary>Cafeteria sales revenue.</summary>
         CafeteriaRevenue = 7,
 
+        /// <summary>School-store sales revenue (Module 28) — uniforms, books, stationery. Its own account, not the cafeteria's: the two are separate trades and the owner reads their margins separately.</summary>
+        StoreRevenue = 8,
+
         CashOnHand = 10,
 
         /// <summary>Card takings awaiting settlement from the acquirer — not yet in the bank.</summary>

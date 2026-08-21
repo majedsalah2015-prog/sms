@@ -30,19 +30,24 @@ namespace Sms.Application.Tests.GlExport
             var journal = JournalSummaryBuilder.Build(
                 Array.Empty<JournalSummaryBuilder.ChargeDoc>(),
                 new[] { new JournalSummaryBuilder.CreditNoteDoc(1, "4100", 115m, 0.15m) },
-                new[] { new JournalSummaryBuilder.DiscountDoc(50m) },
+                new[] { new JournalSummaryBuilder.DiscountDoc(115m, 0.15m) },
                 new[] { new JournalSummaryBuilder.ReceiptDoc("Cash", 500m, 400m) },
                 new[] { new JournalSummaryBuilder.RefundDoc("BankTransfer", 30m) });
 
             Assert.True(journal.IsBalanced);
             Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == "4100").Debit);
-            Assert.Equal(15m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.VatOutput).Debit);
-            Assert.Equal(50m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Discounts).Debit);
+
+            // G-11: the discount splits its VAT back out exactly as the credit note does, so both
+            // debits land on VatOutput — 15 from each. Before the fix the discount's 15 stayed in
+            // VatOutput as tax on revenue that never happened.
+            Assert.Equal(30m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.VatOutput).Sum(l => l.Debit));
+            Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Discounts).Debit);
             Assert.Equal(500m, journal.Lines.Single(l => l.AccountKey == "Cash:Cash").Debit);
             Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Credit > 0).Credit);
             Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Debit > 0).Debit);
             Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == "Cash:BankTransfer").Credit);
-            Assert.Equal(565m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Credit));
+            // Receivables is credited the gross of each: 115 credit note + 115 discount + 400 allocated.
+            Assert.Equal(630m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Credit));
             Assert.Equal(4, journal.SourceDocumentCount);
         }
 

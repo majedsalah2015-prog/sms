@@ -416,6 +416,30 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(100m, clawback.GrossAmount);
         }
 
+        [Fact]
+        [BusinessRule("BR-DIS-008")]
+        public async Task Claw_back_of_a_taxed_charge_recovers_the_discount_gross_without_taxing_it_twice()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m, categoryId: _tuitionId);          // 1000 net + 150 VAT = 1150 gross
+            var type = await admin.DefineTypeAsync("Neg", "Neg", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 10m, "negotiated", 1);
+            await admin.ApproveGrantAsync(grant.Id, 2);
+            Assert.Equal(115m, db.DiscountGrants.Single().AppliedAmount);  // 10% of gross - a VAT-inclusive figure
+
+            _clock.UtcNow = new DateTime(2027, 3, 23, 8, 0, 0, DateTimeKind.Utc);
+            await admin.RevokeGrantAsync(grant.Id, new DateTime(2027, 3, 23), "employment ended", clawBack: true);
+
+            // Forward fraction 100/303 of 115.00 = 37.95 gross. The family owes back exactly what was
+            // forgiven - not 37.95 + 15% (S8 gap G-12), and the tax inside it is the tax that was granted.
+            var clawback = db.Charges.OrderByDescending(c => c.Id).First();
+            Assert.Equal(37.95m, clawback.GrossAmount);
+            Assert.Equal(4.95m, clawback.VatAmount);
+            Assert.Equal(33.00m, clawback.NetAmount);
+            Assert.Equal(0.15m, clawback.VatRateSnapshot);
+        }
+
         // --- BR-DIS-006 waivers -----------------------------------------------------------------------
 
         [Fact]

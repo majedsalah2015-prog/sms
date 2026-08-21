@@ -11,7 +11,7 @@ namespace Sms.Erp.Bridge.GlPosting
     /// <para>
     /// Two kinds of answer. Most roles are already in the ERP's seeded chart and
     /// are simply named here — cash, bank, card clearing, cheques, customer
-    /// advances, discount allowed. Only the four the chart has no equivalent for
+    /// advances, discount allowed. The handful the chart has no equivalent for
     /// are created, as children of the appropriate group through
     /// <see cref="IChartOfAccountsProvisioning"/>, which is Accounting's own
     /// sanctioned write path and enforces every chart invariant on the way in.
@@ -70,6 +70,7 @@ namespace Sms.Erp.Bridge.GlPosting
                 GlAccountRole.StudentReceivables => (CurrentAssetsGroup, "ذمم الطلبة"),
                 GlAccountRole.OutputVat => (CurrentLiabilitiesGroup, "ضريبة القيمة المضافة - المخرجات"),
                 GlAccountRole.CafeteriaRevenue => (OperatingRevenueGroup, "إيرادات المقصف"),
+                GlAccountRole.StoreRevenue => (OperatingRevenueGroup, "إيرادات المتجر المدرسي"),
                 GlAccountRole.FeeRevenue => (OperatingRevenueGroup, "إيرادات الرسوم الدراسية"),
                 _ => (null, null),
             };

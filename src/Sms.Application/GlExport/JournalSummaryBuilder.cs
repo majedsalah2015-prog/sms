@@ -19,6 +19,9 @@ namespace Sms.Application.GlExport
 
         public const string CafeteriaRevenue = "CafeteriaRevenue";
 
+        /// <summary>Store sales tendered from the wallet — the cafeteria's counterpart for Module 28 (gap G-1).</summary>
+        public const string StoreRevenue = "StoreRevenue";
+
         public static string Cash(string paymentMethod) => $"Cash:{paymentMethod}";
 
         public static string Revenue(int feeCategoryId, string? glExportCode) => string.IsNullOrWhiteSpace(glExportCode) ? $"Revenue:{feeCategoryId}" : glExportCode!;
@@ -30,7 +33,8 @@ namespace Sms.Application.GlExport
     /// lines. Postings:
     ///   Charge         Dr Receivables (gross)   / Cr Revenue[category] (net), Cr VatOutput (vat)
     ///   Credit note    Dr Revenue[category] (net part), Dr VatOutput (vat part) / Cr Receivables (gross)
-    ///   Discount doc   Dr Discounts (contra revenue, gross) / Cr Receivables
+    ///   Discount doc   Dr Discounts (net part), Dr VatOutput (vat part) / Cr Receivables (gross)
+    ///   Store sale     Dr WalletLiability / Cr StoreRevenue   (wallet-tendered only)
     ///   Receipt        Dr Cash[method] (amount) / Cr Receivables (allocated), Cr AdvancesReceived (unallocated)
     ///   Refund paid    Dr AdvancesReceived / Cr Cash[method]
     /// Balanced by construction; the builder asserts it anyway.
@@ -41,7 +45,22 @@ namespace Sms.Application.GlExport
 
         public sealed record CreditNoteDoc(int FeeCategoryId, string? GlExportCode, decimal Amount, decimal VatRate);
 
-        public sealed record DiscountDoc(decimal Amount);
+        /// <summary>
+        /// A discount document. <paramref name="Amount"/> is gross — VAT-inclusive,
+        /// as <c>DiscountAmountCalculator</c> produces it — and
+        /// <paramref name="VatRate"/> is the rate its charge froze at posting, so
+        /// the two halves can be separated again.
+        /// <para>
+        /// Carrying the rate is the fix for gap G-11. A discount reduces a
+        /// receivable that included VAT, so the VAT credited when the charge was
+        /// posted has to come back with it. Posting the whole gross figure to
+        /// Discounts left <c>VatOutput</c> holding tax on revenue that never
+        /// happened — and credit notes, which do exactly the same thing to a
+        /// charge, split it correctly. The asymmetry was undocumented, which is how
+        /// it survived.
+        /// </para>
+        /// </summary>
+        public sealed record DiscountDoc(decimal Amount, decimal VatRate);
 
         public sealed record ReceiptDoc(string PaymentMethod, decimal Amount, decimal AllocatedAmount);
 
@@ -52,6 +71,19 @@ namespace Sms.Application.GlExport
 
         /// <summary>E-605 BR-CAF-007: a cafeteria sale — wallet-tendered (Dr WalletLiability / Cr CafeteriaRevenue) or cash (Dr Cash:Cash / Cr CafeteriaRevenue). Meal-plan redemptions are not journaled (revenue was recognized on the plan charge).</summary>
         public sealed record CafeteriaSaleDoc(bool IsWalletTender, decimal Amount);
+
+        /// <summary>
+        /// A wallet-tendered store sale (Dr WalletLiability / Cr StoreRevenue).
+        /// <para>
+        /// Only the wallet ones. A store sale paid in cash, by card, or put on the
+        /// family account already reaches the ledger as a Charge and a Receipt —
+        /// those are real documents and journal themselves. A wallet sale creates
+        /// neither: it debits the wallet and stops, so before this it moved money
+        /// nowhere the ledger could see. The wallet liability grew and never came
+        /// down, and store revenue was never recognised at all.
+        /// </para>
+        /// </summary>
+        public sealed record StoreWalletSaleDoc(decimal Amount);
 
         public sealed record JournalLine(string AccountKey, string Description, decimal Debit, decimal Credit, int SourceDocumentCount);
 
@@ -71,12 +103,19 @@ namespace Sms.Application.GlExport
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds)
-            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>());
+            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>(), Array.Empty<StoreWalletSaleDoc>());
 
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
             IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales)
+            => Build(charges, creditNotes, discounts, receipts, refunds, walletTopUps, cafeteriaSales, Array.Empty<StoreWalletSaleDoc>());
+
+        public static Journal Build(
+            IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
+            IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
+            IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales,
+            IReadOnlyCollection<StoreWalletSaleDoc> storeWalletSales)
         {
             var acc = new Accumulator();
 
@@ -100,6 +139,12 @@ namespace Sms.Application.GlExport
                 acc.Credit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales", s.Amount);
             }
 
+            foreach (var s in storeWalletSales)
+            {
+                acc.Debit(GlAccountKeys.WalletLiability, "Store sales (wallet)", s.Amount);
+                acc.Credit(GlAccountKeys.StoreRevenue, "Store sales", s.Amount);
+            }
+
             foreach (var c in charges)
             {
                 acc.Debit(GlAccountKeys.Receivables, "Charges posted", c.GrossAmount);
@@ -118,7 +163,12 @@ namespace Sms.Application.GlExport
 
             foreach (var d in discounts)
             {
-                acc.Debit(GlAccountKeys.Discounts, "Discounts granted", d.Amount);
+                // Same split, same rounding, same direction as a credit note above — because a discount
+                // does the same thing to the same charge, and two answers to one question is the defect.
+                var net = Math.Round(d.Amount / (1m + d.VatRate), 2, MidpointRounding.AwayFromZero);
+                var vat = d.Amount - net;
+                acc.Debit(GlAccountKeys.Discounts, "Discounts granted", net);
+                acc.Debit(GlAccountKeys.VatOutput, "VAT on discounts", vat);
                 acc.Credit(GlAccountKeys.Receivables, "Discounts granted", d.Amount);
             }
 
@@ -138,7 +188,7 @@ namespace Sms.Application.GlExport
             var journal = new Journal
             {
                 Lines = acc.ToLines(),
-                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count + walletTopUps.Count + cafeteriaSales.Count,
+                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count + walletTopUps.Count + cafeteriaSales.Count + storeWalletSales.Count,
             };
             if (!journal.IsBalanced)
             {

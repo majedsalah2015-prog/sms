@@ -225,6 +225,22 @@ namespace Sms.Infrastructure.Fees
             return await PostChargeInternalAsync(studentId, payerId, academicYearId, feeCategoryId, category.VatRate, amount, ChargeSourceType.Manual, cancellationToken);
         }
 
+        public async Task<Charge> PostManualGrossChargeAsync(
+            int studentId, int payerId, int feeCategoryId, decimal grossAmount, decimal? vatRate, CancellationToken cancellationToken = default)
+        {
+            var academicYearId = await _db.Enrollments
+                .Where(e => e.StudentId == studentId)
+                .OrderByDescending(e => e.Id)
+                .Select(e => e.AcademicYearId)
+                .FirstAsync(cancellationToken);
+
+            var (vatAmount, netAmount) = VatCalculator.CalculateFromGross(grossAmount, vatRate);
+            var charge = await BuildChargeAsync(studentId, payerId, academicYearId, feeCategoryId, vatRate, netAmount, vatAmount,
+                ChargeSourceType.Manual, sourceAcademicYearId: null, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return charge;
+        }
+
         public async Task<Charge> PostOpeningBalanceAsync(
             int studentId, int payerId, int targetAcademicYearId, int sourceAcademicYearId, int feeCategoryId, decimal amount,
             CancellationToken cancellationToken = default)
@@ -235,7 +251,7 @@ namespace Sms.Infrastructure.Fees
             }
 
             // Ambient: no VAT, no save — the caller commits it with its carry-forward credit notes (BR-AYR-009 hard check).
-            return await BuildChargeAsync(studentId, payerId, targetAcademicYearId, feeCategoryId, vatRate: null, amount,
+            return await BuildChargeAsync(studentId, payerId, targetAcademicYearId, feeCategoryId, vatRate: null, amount, vatAmount: 0m,
                 ChargeSourceType.OpeningBalance, sourceAcademicYearId, cancellationToken);
         }
 
@@ -243,16 +259,17 @@ namespace Sms.Infrastructure.Fees
             int studentId, int payerId, int academicYearId, int feeCategoryId, decimal? vatRate, decimal netAmount,
             ChargeSourceType sourceType, CancellationToken cancellationToken)
         {
-            var charge = await BuildChargeAsync(studentId, payerId, academicYearId, feeCategoryId, vatRate, netAmount, sourceType, sourceAcademicYearId: null, cancellationToken);
+            var (vatAmount, _) = VatCalculator.Calculate(netAmount, vatRate);
+            var charge = await BuildChargeAsync(studentId, payerId, academicYearId, feeCategoryId, vatRate, netAmount, vatAmount, sourceType, sourceAcademicYearId: null, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
             return charge;
         }
 
         private async Task<Charge> BuildChargeAsync(
-            int studentId, int payerId, int academicYearId, int feeCategoryId, decimal? vatRate, decimal netAmount,
+            int studentId, int payerId, int academicYearId, int feeCategoryId, decimal? vatRate, decimal netAmount, decimal vatAmount,
             ChargeSourceType sourceType, int? sourceAcademicYearId, CancellationToken cancellationToken)
         {
-            var (vatAmount, grossAmount) = VatCalculator.Calculate(netAmount, vatRate);
+            var grossAmount = netAmount + vatAmount;
             var chargeNo = await _numberIssuer.IssueAsync("INV", cancellationToken);
             var previousHash = await _db.Charges.OrderByDescending(c => c.Id).Select(c => c.InvoiceHash).FirstOrDefaultAsync(cancellationToken);
 

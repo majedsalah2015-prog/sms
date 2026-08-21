@@ -75,6 +75,7 @@ namespace Sms.Infrastructure.Seeding
             [GlAccountKeys.AdvancesReceived] = GlAccountRole.AdvancesFromPayers,
             [GlAccountKeys.WalletLiability] = GlAccountRole.WalletLiability,
             [GlAccountKeys.CafeteriaRevenue] = GlAccountRole.CafeteriaRevenue,
+            [GlAccountKeys.StoreRevenue] = GlAccountRole.StoreRevenue,
         };
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)

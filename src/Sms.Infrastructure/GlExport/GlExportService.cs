@@ -72,9 +72,16 @@ namespace Sms.Infrastructure.GlExport
                 throw new GlPeriodOverlapException(overlap);
             }
 
-            // Active categories only (ISoftActiveFiltered) - a deactivated category's charges fall back to the "Revenue:{id}" key,
-            // which the mapping table can still name explicitly.
-            var categories = await _db.FeeCategories.ToDictionaryAsync(c => c.Id, c => c.GlExportCode, cancellationToken);
+            // IgnoreQueryFilters, and it is the whole fix for a period that could not be exported at all.
+            // FeeCategory is soft-active filtered, so a deactivated category dropped out of this
+            // dictionary and its charges fell back to the "Revenue:{id}" key — while the mapping table
+            // held the category's own GlExportCode. The keys no longer matched, GenerateAsync refused
+            // the whole period, and the only cause was that somebody deactivated a category months
+            // after its charges were posted. A category is deactivated to stop new charges, never to
+            // strand the ones already in the ledger.
+            var categories = await _db.FeeCategories.IgnoreQueryFilters()
+                .Where(c => c.SchoolId == _db.CurrentSchoolId)
+                .ToDictionaryAsync(c => c.Id, c => c.GlExportCode, cancellationToken);
 
             // S8/E-801 BR-AYR-009: opening-balance charges and their carry-forward credit notes are a receivable→receivable
             // transfer (Dr/Cr Receivables, nil) — journaling them as revenue + VAT would misstate both, so both halves are skipped.
@@ -87,9 +94,13 @@ namespace Sms.Infrastructure.GlExport
                 join c in _db.Charges on n.ChargeId equals c.Id
                 where !n.IsCarryForward && n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc
                 select new { c.FeeCategoryId, n.Amount, VatRate = c.VatRateSnapshot ?? 0m }).ToListAsync(cancellationToken);
-            var discounts = await _db.DiscountDocuments
-                .Where(d => d.IssuedAtUtc >= periodFromUtc && d.IssuedAtUtc <= periodToUtc)
-                .Select(d => d.Amount).ToListAsync(cancellationToken);
+            // G-11: joined to the charge for the rate it froze at posting, exactly as credit notes are.
+            // A discount reduces a receivable that included VAT, so the VAT has to come back with it.
+            var discounts = await (
+                from d in _db.DiscountDocuments
+                join c in _db.Charges on d.ChargeId equals c.Id
+                where d.IssuedAtUtc >= periodFromUtc && d.IssuedAtUtc <= periodToUtc
+                select new { d.Amount, VatRate = c.VatRateSnapshot ?? 0m }).ToListAsync(cancellationToken);
             var receipts = await _db.Receipts
                 .Where(r => r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc)
                 .Select(r => new { r.Id, r.Method, r.Amount }).ToListAsync(cancellationToken);
@@ -111,6 +122,14 @@ namespace Sms.Infrastructure.GlExport
                 where e.Kind == Sms.Domain.Cafeteria.WalletLedgerKind.Refund && v.Status == RefundVoucherStatus.Paid
                       && (v.ModifiedAtUtc ?? v.CreatedAtUtc) >= periodFromUtc && (v.ModifiedAtUtc ?? v.CreatedAtUtc) <= periodToUtc
                 select new { v.Method, e.Amount }).ToListAsync(cancellationToken);
+            // G-1: wallet-tendered store sales, which reached the ledger nowhere before this. Cash, card
+            // and account-charge sales are excluded because they already produce a Charge and a Receipt
+            // and would otherwise be counted twice; a wallet sale produces neither.
+            var storeWalletSales = await _db.StoreSales
+                .Where(s => s.Status == Sms.Domain.Store.StoreSaleStatus.Posted && s.Tender == Sms.Domain.Store.StoreTender.Wallet
+                    && s.AtUtc >= periodFromUtc && s.AtUtc <= periodToUtc)
+                .Select(s => s.Total).ToListAsync(cancellationToken);
+
             var cafeteriaSales = await _db.Sales
                 .Where(s => s.Status == Sms.Domain.Cafeteria.SaleStatus.Posted && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan && s.AtUtc >= periodFromUtc && s.AtUtc <= periodToUtc)
                 .Select(s => new { s.Tender, s.Total }).ToListAsync(cancellationToken);
@@ -118,12 +137,13 @@ namespace Sms.Infrastructure.GlExport
             var journal = JournalSummaryBuilder.Build(
                 charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
                 creditNotes.Select(n => new JournalSummaryBuilder.CreditNoteDoc(n.FeeCategoryId, categories.TryGetValue(n.FeeCategoryId, out var code) ? code : null, n.Amount, n.VatRate)).ToList(),
-                discounts.Select(d => new JournalSummaryBuilder.DiscountDoc(d)).ToList(),
+                discounts.Select(d => new JournalSummaryBuilder.DiscountDoc(d.Amount, d.VatRate)).ToList(),
                 receipts.Select(r => new JournalSummaryBuilder.ReceiptDoc(r.Method.ToString(), r.Amount, allocatedByReceipt.TryGetValue(r.Id, out var a) ? a : 0m)).ToList(),
                 refunds.Select(f => new JournalSummaryBuilder.RefundDoc(f.Method.ToString(), f.Amount)).ToList(),
                 walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
                     .Concat(walletRefunds.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))).ToList(),
-                cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList());
+                cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
+                storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList());
 
             var keys = journal.Lines.Select(l => l.AccountKey).Distinct().ToList();
             var mappings = await _db.GlAccountMappings.Where(m => keys.Contains(m.Key)).ToDictionaryAsync(m => m.Key, m => m.AccountCode, cancellationToken);

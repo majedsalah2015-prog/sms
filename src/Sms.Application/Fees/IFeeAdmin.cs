@@ -59,6 +59,15 @@ namespace Sms.Application.Fees
             int studentId, int payerId, int feeCategoryId, decimal amount, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// The same charge from the other side of the VAT line: <paramref name="grossAmount"/> already includes tax at
+        /// <paramref name="vatRate"/>, so the rate is split back out instead of being added on. A discount claw-back
+        /// (BR-DIS-008) is the case that needs it — the figure being recovered is gross, and the rate that produced it
+        /// is the discounted charge's snapshot, which is not necessarily the category's rate today.
+        /// </summary>
+        Task<Charge> PostManualGrossChargeAsync(
+            int studentId, int payerId, int feeCategoryId, decimal grossAmount, decimal? vatRate, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// BR-FEE-009 / BR-AYR-009 (S8/E-801): posts an OpeningBalance charge into <paramref name="targetAcademicYearId"/>
         /// referencing <paramref name="sourceAcademicYearId"/>. No VAT — a receivable transfer is not a supply.
         /// Ambient (does NOT save): the rollover commits it together with the carry-forward credit notes it mirrors,
