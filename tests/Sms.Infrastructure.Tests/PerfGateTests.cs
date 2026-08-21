@@ -213,7 +213,7 @@ namespace Sms.Infrastructure.Tests
             var dailyGate = new PerfGate("snap_DailyAttendanceSummary refresh", TimeSpan.FromSeconds(10));
             using (var db = CreateContext())
             {
-                var refresher = new SnapshotRefreshService(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db)));
+                var refresher = new SnapshotRefreshService(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db), new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock)));
                 await agedGate.SampleAsync(3, async _ => { await refresher.RefreshAgedReceivablesAsync(); db.ChangeTracker.Clear(); });
                 await dailyGate.SampleAsync(3, async _ => { await refresher.RefreshDailyAttendanceSummaryAsync(new DateTime(2027, 3, 10)); db.ChangeTracker.Clear(); });
                 // every student owes (1150, or 750 after the sampled 400 receipt) except the fixture's fully-credited student[1]

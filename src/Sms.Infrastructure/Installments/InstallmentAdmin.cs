@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Fees;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Common.Exceptions;
@@ -36,14 +37,16 @@ namespace Sms.Infrastructure.Installments
         private readonly IAuditContext _audit;
         private readonly IWorkingYearContext _workingYear;
         private readonly INotificationPublisher _notifications;
+        private readonly IFeeAdmin _fees;
 
-        public InstallmentAdmin(AppDbContext db, IClock clock, IAuditContext audit, IWorkingYearContext workingYear, INotificationPublisher notifications)
+        public InstallmentAdmin(AppDbContext db, IClock clock, IAuditContext audit, IWorkingYearContext workingYear, INotificationPublisher notifications, IFeeAdmin fees)
         {
             _db = db;
             _clock = clock;
             _audit = audit;
             _workingYear = workingYear;
             _notifications = notifications;
+            _fees = fees;
         }
 
         // ------------------------------------------------------------------ templates
@@ -607,10 +610,84 @@ namespace Sms.Infrastructure.Installments
                 throw new InstallmentNotOpenException(installmentId);
             }
 
+            // What is actually being given up: the scheduled amount less whatever has already been
+            // collected against it. Read before the flag flips, because flipping it removes this
+            // installment from the collectible set the waterfall pays down.
+            var schedule = await LoadScheduleAsync(row.PlanAssignmentId, cancellationToken);
+            var unpaid = schedule.Installments
+                .Where(i => i.Row.Id == installmentId)
+                .Select(i => i.Row.Amount - i.Paid)
+                .Single();
+
             _audit.Reason = reason;
             row.IsWrittenOff = true;
             row.WriteOffReason = reason;
+
+            // Gap G-6: the flag alone left the receivable on the balance sheet for ever. The charges
+            // this installment scheduled are the receivable, so they are what has to be relieved —
+            // as write-off credit notes, which every remainder calculation in the system already
+            // subtracts, and which the ledger books against bad debt rather than against revenue.
+            await RelieveWrittenOffChargesAsync(installmentId, unpaid, reason, cancellationToken);
+
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Spreads <paramref name="unpaid"/> across the charges this installment scheduled, in charge
+        /// order, never taking more from a charge than is still open on it. A schedule can span
+        /// several charges and a charge can be paid from outside the schedule, so the line amount is
+        /// a ceiling rather than the answer.
+        /// </summary>
+        private async Task RelieveWrittenOffChargesAsync(int installmentId, decimal unpaid, string reason, CancellationToken cancellationToken)
+        {
+            if (unpaid <= 0m)
+            {
+                return;
+            }
+
+            var lines = await _db.InstallmentChargeLines
+                .Where(l => l.InstallmentId == installmentId)
+                .OrderBy(l => l.ChargeId)
+                .Select(l => new { l.ChargeId, l.Amount })
+                .ToListAsync(cancellationToken);
+            if (lines.Count == 0)
+            {
+                return;
+            }
+
+            var chargeIds = lines.Select(l => l.ChargeId).Distinct().ToList();
+            var charges = await _db.Charges.Where(c => chargeIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, cancellationToken);
+
+            // EF Core's Sqlite provider can't translate Sum() over decimal - materialize then sum.
+            var credited = (await _db.CreditNotes.Where(n => chargeIds.Contains(n.ChargeId)).Select(n => new { n.ChargeId, n.Amount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            var discounted = (await _db.DiscountDocuments.Where(d => chargeIds.Contains(d.ChargeId)).Select(d => new { d.ChargeId, d.Amount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            var allocated = (await _db.PaymentAllocations.Where(a => chargeIds.Contains(a.ChargeId)).Select(a => new { a.ChargeId, a.AllocatedAmount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
+
+            decimal Open(int chargeId) => charges[chargeId].GrossAmount
+                - (credited.TryGetValue(chargeId, out var cr) ? cr : 0m)
+                - (discounted.TryGetValue(chargeId, out var ds) ? ds : 0m)
+                - (allocated.TryGetValue(chargeId, out var al) ? al : 0m);
+
+            var left = unpaid;
+            foreach (var line in lines)
+            {
+                if (left <= 0m)
+                {
+                    break;
+                }
+
+                var take = Math.Min(Math.Min(line.Amount, Open(line.ChargeId)), left);
+                if (take <= 0m)
+                {
+                    continue;
+                }
+
+                await _fees.IssueWriteOffCreditNoteAsync(line.ChargeId, take, reason, cancellationToken);
+                left -= take;
+            }
         }
 
         // ------------------------------------------------------------------ BR-INS-008 dunning

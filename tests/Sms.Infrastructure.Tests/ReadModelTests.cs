@@ -18,6 +18,8 @@ using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
 using Sms.Infrastructure.Notifications;
+using Sms.Infrastructure.Fees;
+using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.ReadModels;
 using Sms.TestSupport;
@@ -71,7 +73,7 @@ namespace Sms.Infrastructure.Tests
         }
 
         private SnapshotRefreshService CreateRefresher(AppDbContext db)
-            => new(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db)));
+            => new(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db), new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock)));
 
         // ---------------------------------------------------------------- views
 

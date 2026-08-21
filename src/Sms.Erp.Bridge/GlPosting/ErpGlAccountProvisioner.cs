@@ -29,6 +29,7 @@ namespace Sms.Erp.Bridge.GlPosting
         private const string CurrentAssetsGroup = "11";
         private const string CurrentLiabilitiesGroup = "21";
         private const string OperatingRevenueGroup = "41";
+        private const string OperatingExpenseGroup = "52";
 
         /// <summary>
         /// Roles the ERP's default chart already answers. Codes from
@@ -43,6 +44,7 @@ namespace Sms.Erp.Bridge.GlPosting
             [GlAccountRole.AdvancesFromPayers] = "210601", // دفعات مقدمة من العملاء
             [GlAccountRole.WalletLiability] = "210602",    // أمانات وتأمينات الغير
             [GlAccountRole.DiscountsAllowed] = "4104",     // الخصم المسموح به — contra-revenue, debit in use
+            [GlAccountRole.BadDebtExpense] = "5404",       // ديون معدومة ومشكوك في تحصيلها
         };
 
         private readonly IChartOfAccountsProvisioning _provisioning;
@@ -54,7 +56,7 @@ namespace Sms.Erp.Bridge.GlPosting
             _directory = directory;
         }
 
-        public async Task<string?> ResolveAsync(GlAccountRole role, string? name = null, CancellationToken cancellationToken = default)
+        public async Task<GlAccountRef?> ResolveAsync(GlAccountRole role, string? name = null, CancellationToken cancellationToken = default)
         {
             if (Standard.TryGetValue(role, out var code))
             {
@@ -62,7 +64,7 @@ namespace Sms.Erp.Bridge.GlPosting
                 // has been deactivated or turned into a group must not be handed out as a mapping that
                 // will only fail at the first posting.
                 var account = await _directory.FindPostableByCodeAsync(code, cancellationToken);
-                return account?.Code;
+                return account == null ? null : new GlAccountRef(account.Code, account.Name);
             }
 
             var (parent, defaultName) = role switch
@@ -72,6 +74,8 @@ namespace Sms.Erp.Bridge.GlPosting
                 GlAccountRole.CafeteriaRevenue => (OperatingRevenueGroup, "إيرادات المقصف"),
                 GlAccountRole.StoreRevenue => (OperatingRevenueGroup, "إيرادات المتجر المدرسي"),
                 GlAccountRole.FeeRevenue => (OperatingRevenueGroup, "إيرادات الرسوم الدراسية"),
+                GlAccountRole.CashOverShort => (OperatingExpenseGroup, "فروق الصندوق"),
+                GlAccountRole.WalletAdjustments => (OperatingExpenseGroup, "تسويات محافظ المقصف"),
                 _ => (null, null),
             };
 
@@ -83,7 +87,7 @@ namespace Sms.Erp.Bridge.GlPosting
             // Idempotent by (parent, name) on the ERP's side, so re-seeding returns the same account
             // rather than allocating another code beneath the group.
             var created = await _provisioning.CreateChildAsync(parent, name ?? defaultName!, cancellationToken);
-            return created.IsSuccess ? created.Value.Code : null;
+            return created.IsSuccess ? new GlAccountRef(created.Value.Code, created.Value.Name) : null;
         }
     }
 }

@@ -165,7 +165,7 @@ namespace Sms.Infrastructure.Tests
 
         private PaymentAdmin CreatePaymentAdmin(AppDbContext db) => new(db, Issuer(db), _clock);
 
-        private InstallmentAdmin CreateInstallmentAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db));
+        private InstallmentAdmin CreateInstallmentAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db), CreateFeeAdmin(db));
 
         private DiscountAdmin CreateAdmin(AppDbContext db) => new(db, Issuer(db), _clock, _audit, _tenant, CreateFeeAdmin(db), CreateInstallmentAdmin(db));
 

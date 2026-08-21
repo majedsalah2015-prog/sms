@@ -142,7 +142,7 @@ namespace Sms.Infrastructure.Tests
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
         }
 
-        private InstallmentAdmin CreateAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db));
+        private InstallmentAdmin CreateAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db), CreateFeeAdmin(db));
 
         private PaymentAdmin CreatePaymentAdmin(AppDbContext db) => new(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock);
 
@@ -643,6 +643,49 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(InstallmentStatus.WrittenOff, (await admin.GetScheduleAsync(assignment.Id))[3].Status);
             var audit = db.AuditEntries.Single(e => e.EntityType == nameof(Installment) && e.FieldName == nameof(Installment.IsWrittenOff));
             Assert.Equal("uncollectable - family left the country", audit.Reason);
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-010")]
+        public async Task A_write_off_relieves_the_charge_rather_than_only_flagging_the_installment()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);
+            var last = (await admin.GetScheduleAsync(assignment.Id))[3];
+
+            var before = await CreateFeeAdmin(db).ComputeStudentPositionAsync(_studentId);
+            Assert.True(before > 0m);
+
+            await admin.WriteOffAsync(last.InstallmentId, "uncollectable");
+
+            // Gap G-6: the flag alone left the receivable standing for ever. What the school gave up
+            // has to leave the balance sheet, and it leaves it as a credit note marked as a write-off.
+            var note = db.CreditNotes.Single(n => n.IsWriteOff);
+            Assert.Equal(last.Amount, note.Amount);
+            Assert.Equal("uncollectable", note.Reason);
+            Assert.Equal(before - last.Amount, await CreateFeeAdmin(db).ComputeStudentPositionAsync(_studentId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-010")]
+        public async Task A_write_off_gives_up_only_what_is_still_unpaid()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);
+            var first = (await admin.GetScheduleAsync(assignment.Id))[0];
+
+            // Half of the first installment is already in the drawer. Writing it off gives up the
+            // other half — treating the whole scheduled amount as a loss would credit the family
+            // money they had already handed over.
+            var half = Math.Round(first.Amount / 2m, 2, MidpointRounding.AwayFromZero);
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, half);
+
+            await admin.WriteOffAsync(first.InstallmentId, "settled short");
+
+            var note = db.CreditNotes.Single(n => n.IsWriteOff);
+            Assert.Equal(first.Amount - half, note.Amount);
         }
 
         [Fact]

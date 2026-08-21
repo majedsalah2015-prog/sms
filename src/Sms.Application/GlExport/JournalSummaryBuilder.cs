@@ -22,6 +22,32 @@ namespace Sms.Application.GlExport
         /// <summary>Store sales tendered from the wallet — the cafeteria's counterpart for Module 28 (gap G-1).</summary>
         public const string StoreRevenue = "StoreRevenue";
 
+        /// <summary>
+        /// The difference between what a till session counted and what its receipts
+        /// say it should hold (BR-PAY-001, gap G-5). An expense account that takes
+        /// credits too: a drawer can come up over as easily as short, and netting
+        /// the two into one figure is the point — a month of small overs and shorts
+        /// that cancel is a different story from a month with one large short.
+        /// </summary>
+        public const string CashOverShort = "CashOverShort";
+
+        /// <summary>
+        /// Receivables given up as uncollectible (BR-INS-010, gap G-6). Not the
+        /// same account as <see cref="Discounts"/> and not a revenue reversal: a
+        /// discount is a price the school chose, a write-off is a price it charged
+        /// and did not collect, and a reader who cannot tell them apart cannot tell
+        /// a generous year from a badly collected one.
+        /// </summary>
+        public const string BadDebt = "BadDebt";
+
+        /// <summary>
+        /// Corrections made directly to a wallet balance (BR-CAF-009, gap G-3).
+        /// No money moves and the liability changes anyway, so something has to
+        /// take the other side — and it has to be an account somebody reviews,
+        /// because every entry in it is a balance that was adjusted by hand.
+        /// </summary>
+        public const string WalletAdjustments = "WalletAdjustments";
+
         public static string Cash(string paymentMethod) => $"Cash:{paymentMethod}";
 
         public static string Revenue(int feeCategoryId, string? glExportCode) => string.IsNullOrWhiteSpace(glExportCode) ? $"Revenue:{feeCategoryId}" : glExportCode!;
@@ -37,6 +63,9 @@ namespace Sms.Application.GlExport
     ///   Store sale     Dr WalletLiability / Cr StoreRevenue   (wallet-tendered only)
     ///   Receipt        Dr Cash[method] (amount) / Cr Receivables (allocated), Cr AdvancesReceived (unallocated)
     ///   Refund paid    Dr AdvancesReceived / Cr Cash[method]
+    ///   Till variance  Dr Cash:Cash / Cr CashOverShort   (over; reversed when short)
+    ///   Write-off      Dr BadDebt (gross) / Cr Receivables
+    ///   Wallet adj.    Dr WalletAdjustments / Cr WalletLiability   (credit; reversed when debited)
     /// Balanced by construction; the builder asserts it anyway.
     /// </summary>
     public static class JournalSummaryBuilder
@@ -85,6 +114,20 @@ namespace Sms.Application.GlExport
         /// </summary>
         public sealed record StoreWalletSaleDoc(decimal Amount);
 
+        /// <summary>
+        /// A closed till session's variance: counted minus system, so positive is
+        /// over and negative is short. Posted against cash on hand because a till
+        /// count is a count of the drawer — the session records one variance rather
+        /// than one per tender, so there is nowhere else honest to put it.
+        /// </summary>
+        public sealed record TillVarianceDoc(decimal Variance);
+
+        /// <summary>A write-off credit note: Dr BadDebt / Cr Receivables, at gross. The VAT is not backed out — the supply happened and the tax on it is still owed.</summary>
+        public sealed record WriteOffDoc(decimal Amount);
+
+        /// <summary>A wallet correction, signed as the ledger stores it: positive credits the family's wallet (the school owes more), negative takes value back.</summary>
+        public sealed record WalletAdjustmentDoc(decimal SignedAmount);
+
         public sealed record JournalLine(string AccountKey, string Description, decimal Debit, decimal Credit, int SourceDocumentCount);
 
         public sealed class Journal
@@ -103,19 +146,22 @@ namespace Sms.Application.GlExport
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds)
-            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>(), Array.Empty<StoreWalletSaleDoc>());
+            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>(), Array.Empty<StoreWalletSaleDoc>(), Array.Empty<TillVarianceDoc>(), Array.Empty<WriteOffDoc>(), Array.Empty<WalletAdjustmentDoc>());
 
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
             IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales)
-            => Build(charges, creditNotes, discounts, receipts, refunds, walletTopUps, cafeteriaSales, Array.Empty<StoreWalletSaleDoc>());
+            => Build(charges, creditNotes, discounts, receipts, refunds, walletTopUps, cafeteriaSales, Array.Empty<StoreWalletSaleDoc>(), Array.Empty<TillVarianceDoc>(), Array.Empty<WriteOffDoc>(), Array.Empty<WalletAdjustmentDoc>());
 
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
             IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales,
-            IReadOnlyCollection<StoreWalletSaleDoc> storeWalletSales)
+            IReadOnlyCollection<StoreWalletSaleDoc> storeWalletSales,
+            IReadOnlyCollection<TillVarianceDoc> tillVariances,
+            IReadOnlyCollection<WriteOffDoc> writeOffs,
+            IReadOnlyCollection<WalletAdjustmentDoc> walletAdjustments)
         {
             var acc = new Accumulator();
 
@@ -185,10 +231,47 @@ namespace Sms.Application.GlExport
                 acc.Credit(GlAccountKeys.Cash(f.PaymentMethod), $"Refunds paid ({f.PaymentMethod})", f.Amount);
             }
 
+            foreach (var a in walletAdjustments)
+            {
+                if (a.SignedAmount > 0m)
+                {
+                    acc.Debit(GlAccountKeys.WalletAdjustments, "Wallet adjustments (credited)", a.SignedAmount);
+                    acc.Credit(GlAccountKeys.WalletLiability, "Wallet adjustments (credited)", a.SignedAmount);
+                }
+                else
+                {
+                    acc.Debit(GlAccountKeys.WalletLiability, "Wallet adjustments (debited)", -a.SignedAmount);
+                    acc.Credit(GlAccountKeys.WalletAdjustments, "Wallet adjustments (debited)", -a.SignedAmount);
+                }
+            }
+
+            foreach (var w in writeOffs)
+            {
+                acc.Debit(GlAccountKeys.BadDebt, "Written off", w.Amount);
+                acc.Credit(GlAccountKeys.Receivables, "Written off", w.Amount);
+            }
+
+            foreach (var t in tillVariances)
+            {
+                if (t.Variance > 0m)
+                {
+                    // The drawer holds more than the receipts explain: the asset is really there.
+                    acc.Debit(GlAccountKeys.Cash("Cash"), "Till overage", t.Variance);
+                    acc.Credit(GlAccountKeys.CashOverShort, "Till overage", t.Variance);
+                }
+                else
+                {
+                    acc.Debit(GlAccountKeys.CashOverShort, "Till shortage", -t.Variance);
+                    acc.Credit(GlAccountKeys.Cash("Cash"), "Till shortage", -t.Variance);
+                }
+            }
+
             var journal = new Journal
             {
                 Lines = acc.ToLines(),
-                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count + walletTopUps.Count + cafeteriaSales.Count + storeWalletSales.Count,
+                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count
+                    + walletTopUps.Count + cafeteriaSales.Count + storeWalletSales.Count + tillVariances.Count + writeOffs.Count
+                    + walletAdjustments.Count,
             };
             if (!journal.IsBalanced)
             {

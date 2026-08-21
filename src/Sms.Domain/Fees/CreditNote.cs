@@ -35,5 +35,23 @@ namespace Sms.Domain.Fees
         /// misstate both.
         /// </summary>
         public bool IsCarryForward { get; set; }
+
+        /// <summary>
+        /// BR-INS-010 (gap G-6): true when this note relieves a receivable the
+        /// school has given up collecting, rather than one it is reversing.
+        /// <para>
+        /// The distinction is the whole entry. An ordinary credit note says the
+        /// charge was wrong, so revenue and its VAT come back out. A write-off
+        /// says the charge was right and the money is not coming — revenue stays
+        /// recognised and the loss is a bad-debt expense. Same document, opposite
+        /// stories, and posting one as the other overstates or understates revenue
+        /// every time it happens.
+        /// </para>
+        /// <para>
+        /// Position readers treat it like any other credit note: the receivable is
+        /// gone either way, and a family should not be chased for it.
+        /// </para>
+        /// </summary>
+        public bool IsWriteOff { get; set; }
     }
 }

@@ -25,8 +25,8 @@ namespace Sms.Application.GlExport
     public interface IGlAccountProvisioner
     {
         /// <summary>
-        /// The account code for <paramref name="role"/>, or <c>null</c> when the
-        /// ledger cannot supply one.
+        /// The account for <paramref name="role"/>, or <c>null</c> when the ledger
+        /// cannot supply one.
         /// <para>
         /// <paramref name="name"/> distinguishes the instances of a repeatable
         /// role — one revenue account per fee category — and is ignored for roles
@@ -34,8 +34,16 @@ namespace Sms.Application.GlExport
         /// (role, name): seeding twice must not leave two accounts behind.
         /// </para>
         /// </summary>
-        Task<string?> ResolveAsync(GlAccountRole role, string? name = null, CancellationToken cancellationToken = default);
+        Task<GlAccountRef?> ResolveAsync(GlAccountRole role, string? name = null, CancellationToken cancellationToken = default);
     }
+
+    /// <summary>
+    /// A ledger account as the ledger itself describes it. The name comes back
+    /// with the code because the mapping table shows it to an operator, and a
+    /// finance screen labelling account 5404 "BadDebtExpense" in an Arabic UI is
+    /// telling them the name of an enum member, not the name of their account.
+    /// </summary>
+    public sealed record GlAccountRef(string Code, string Name);
 
     /// <summary>
     /// The accounts a school fee cycle posts to, named by what they are for
@@ -67,6 +75,16 @@ namespace Sms.Application.GlExport
 
         /// <summary>School-store sales revenue (Module 28) — uniforms, books, stationery. Its own account, not the cafeteria's: the two are separate trades and the owner reads their margins separately.</summary>
         StoreRevenue = 8,
+
+        /// <summary>Till counting differences, over and short netted into one account (BR-PAY-001). An expense by nature; the account takes both sides.</summary>
+        CashOverShort = 9,
+
+        /// <summary>Receivables the school has given up collecting (BR-INS-010). An expense — the revenue was earned, the money is not coming.</summary>
+        BadDebtExpense = 14,
+
+        /// <summary>Hand corrections to wallet balances (BR-CAF-009). Its own account so the corrections can be reviewed as a group rather than buried in sundries.</summary>
+        WalletAdjustments = 15,
+
 
         CashOnHand = 10,
 

@@ -81,6 +81,18 @@ namespace Sms.Application.Fees
         Task<CreditNote> IssueCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// BR-INS-010 (gap G-6): relieves a receivable the school has given up
+        /// collecting. Ambient — does NOT save, so the caller commits it with the
+        /// write-off that caused it and the two cannot come apart.
+        /// <para>
+        /// The note carries <see cref="CreditNote.IsWriteOff"/>, which is what
+        /// makes the ledger book it as bad-debt expense rather than as the revenue
+        /// reversal an ordinary credit note is.
+        /// </para>
+        /// </summary>
+        Task<CreditNote> IssueWriteOffCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Voids an untouched posted charge (screens' "delete"). Allowed only while nothing references the document —
         /// no allocated payments, credit notes or discounts (throws <see cref="Common.Exceptions.ChargeHasActivityException"/>);
         /// otherwise the credit-note path is the only correction (BR-GLB-062). The row itself is kept (numbered tax

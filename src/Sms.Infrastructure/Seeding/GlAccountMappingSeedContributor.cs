@@ -76,6 +76,9 @@ namespace Sms.Infrastructure.Seeding
             [GlAccountKeys.WalletLiability] = GlAccountRole.WalletLiability,
             [GlAccountKeys.CafeteriaRevenue] = GlAccountRole.CafeteriaRevenue,
             [GlAccountKeys.StoreRevenue] = GlAccountRole.StoreRevenue,
+            [GlAccountKeys.CashOverShort] = GlAccountRole.CashOverShort,
+            [GlAccountKeys.BadDebt] = GlAccountRole.BadDebtExpense,
+            [GlAccountKeys.WalletAdjustments] = GlAccountRole.WalletAdjustments,
         };
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)
@@ -121,8 +124,8 @@ namespace Sms.Infrastructure.Seeding
                 return;
             }
 
-            var code = await _provisioner!.ResolveAsync(role, name, cancellationToken);
-            if (code == null)
+            var account = await _provisioner!.ResolveAsync(role, name, cancellationToken);
+            if (account == null)
             {
                 // The ledger has no account for this role. Left unmapped on purpose: GenerateAsync then
                 // names the missing key, which is a far better diagnosis than a mapping quietly pointing
@@ -130,8 +133,9 @@ namespace Sms.Infrastructure.Seeding
                 return;
             }
 
-            var label = name ?? role.ToString();
-            await _glExport.DefineMappingAsync(key, code, label, role.ToString(), cancellationToken);
+            // The ledger's own name in the Arabic column, because that is the name an operator
+            // recognises; the role in the English one, because that is what this system calls it.
+            await _glExport.DefineMappingAsync(key, account.Code, account.Name, role.ToString(), cancellationToken);
             existing.Add(key);
         }
     }

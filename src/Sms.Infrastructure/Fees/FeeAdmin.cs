@@ -300,6 +300,13 @@ namespace Sms.Infrastructure.Fees
             return charge;
         }
 
+        public async Task<CreditNote> IssueWriteOffCreditNoteAsync(int chargeId, decimal amount, string reason, CancellationToken cancellationToken = default)
+        {
+            var note = await BuildCreditNoteAsync(chargeId, amount, reason, cancellationToken);
+            note.IsWriteOff = true;
+            return note;
+        }
+
         public async Task<CreditNote> IssueCarryForwardCreditNoteAsync(int chargeId, decimal amount, CancellationToken cancellationToken = default)
         {
             var note = await BuildCreditNoteAsync(chargeId, amount, CarryForwardReason, cancellationToken);

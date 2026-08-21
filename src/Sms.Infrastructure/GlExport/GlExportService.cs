@@ -92,7 +92,7 @@ namespace Sms.Infrastructure.GlExport
             var creditNotes = await (
                 from n in _db.CreditNotes
                 join c in _db.Charges on n.ChargeId equals c.Id
-                where !n.IsCarryForward && n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc
+                where !n.IsCarryForward && !n.IsWriteOff && n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc
                 select new { c.FeeCategoryId, n.Amount, VatRate = c.VatRateSnapshot ?? 0m }).ToListAsync(cancellationToken);
             // G-11: joined to the charge for the rate it froze at posting, exactly as credit notes are.
             // A discount reduces a receivable that included VAT, so the VAT has to come back with it.
@@ -134,6 +134,35 @@ namespace Sms.Infrastructure.GlExport
                 .Where(s => s.Status == Sms.Domain.Cafeteria.SaleStatus.Posted && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan && s.AtUtc >= periodFromUtc && s.AtUtc <= periodToUtc)
                 .Select(s => new { s.Tender, s.Total }).ToListAsync(cancellationToken);
 
+            // Closed sessions only, and dated by the close rather than the open: the variance does
+            // not exist until the drawer is counted, so a session opened in September and closed in
+            // October belongs to October (gap G-5).
+            var tillVariances = await _db.TillSessions
+                .Where(t => t.Status == Sms.Domain.Payments.TillSessionStatus.Closed
+                    && t.ClosedAtUtc >= periodFromUtc && t.ClosedAtUtc <= periodToUtc
+                    && t.CountedTotal != null && t.SystemTotal != null
+                    && t.CountedTotal != t.SystemTotal)
+                .Select(t => t.CountedTotal!.Value - t.SystemTotal!.Value)
+                .ToListAsync(cancellationToken);
+
+            // G-6: the same document, booked the other way. A write-off says the charge was right
+            // and the money is not coming, so revenue stays where it is and the loss lands on bad
+            // debt — while an ordinary credit note above says the charge was wrong and takes the
+            // revenue and its VAT back out.
+            var writeOffs = await _db.CreditNotes
+                .Where(n => n.IsWriteOff && n.IssuedAtUtc >= periodFromUtc && n.IssuedAtUtc <= periodToUtc)
+                .Select(n => n.Amount)
+                .ToListAsync(cancellationToken);
+
+            // G-3: a correction with a mandatory reason that moved a liability and produced no
+            // entry. No cash changes hands, so the other side is an adjustments account — and one
+            // somebody reads, since every row in it is a balance changed by hand.
+            var walletAdjustments = await _db.WalletLedgerEntries
+                .Where(e => e.Kind == Sms.Domain.Cafeteria.WalletLedgerKind.Adjustment
+                    && e.AtUtc >= periodFromUtc && e.AtUtc <= periodToUtc && e.Amount != 0m)
+                .Select(e => e.Amount)
+                .ToListAsync(cancellationToken);
+
             var journal = JournalSummaryBuilder.Build(
                 charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
                 creditNotes.Select(n => new JournalSummaryBuilder.CreditNoteDoc(n.FeeCategoryId, categories.TryGetValue(n.FeeCategoryId, out var code) ? code : null, n.Amount, n.VatRate)).ToList(),
@@ -143,7 +172,10 @@ namespace Sms.Infrastructure.GlExport
                 walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
                     .Concat(walletRefunds.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))).ToList(),
                 cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
-                storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList());
+                storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList(),
+                tillVariances.Select(v => new JournalSummaryBuilder.TillVarianceDoc(v)).ToList(),
+                writeOffs.Select(a => new JournalSummaryBuilder.WriteOffDoc(a)).ToList(),
+                walletAdjustments.Select(a => new JournalSummaryBuilder.WalletAdjustmentDoc(a)).ToList());
 
             var keys = journal.Lines.Select(l => l.AccountKey).Distinct().ToList();
             var mappings = await _db.GlAccountMappings.Where(m => keys.Contains(m.Key)).ToDictionaryAsync(m => m.Key, m => m.AccountCode, cancellationToken);

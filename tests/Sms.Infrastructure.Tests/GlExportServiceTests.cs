@@ -158,6 +158,74 @@ namespace Sms.Infrastructure.Tests
         }
 
         [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_closed_till_variance_and_a_wallet_correction_both_reach_the_batch()
+        {
+            using var db = CreateContext();
+            var service = CreateService(db);
+            await SeedMappingsAsync(service);
+            await service.DefineMappingAsync(GlAccountKeys.CashOverShort, "5225", "فروق الصندوق", "Cash over and short");
+            await service.DefineMappingAsync(GlAccountKeys.WalletAdjustments, "5226", "تسويات المحافظ", "Wallet adjustments");
+            await service.DefineMappingAsync(GlAccountKeys.WalletLiability, "2106", "أمانات", "Wallet liability");
+
+            // A drawer that came up ten short, and a wallet credited by hand. Neither moves a charge
+            // or a receipt, so before gaps G-5 and G-3 neither existed as far as the ledger knew.
+            db.TillSessions.Add(new Sms.Domain.Payments.TillSession
+            {
+                CashierUserId = 1, TillCode = "TILL-1", FloatAmount = 0m,
+                OpenedAtUtc = new DateTime(2026, 9, 10, 6, 0, 0, DateTimeKind.Utc),
+                ClosedAtUtc = new DateTime(2026, 9, 10, 15, 0, 0, DateTimeKind.Utc),
+                SystemTotal = 5000m, CountedTotal = 4990m,
+                Status = Sms.Domain.Payments.TillSessionStatus.Closed,
+            });
+            var wallet = new Sms.Domain.Cafeteria.Wallet { HolderKind = Sms.Domain.Cafeteria.WalletHolderKind.Student, HolderId = _studentId };
+            db.Wallets.Add(wallet);
+            await db.SaveChangesAsync();
+            db.WalletLedgerEntries.Add(new Sms.Domain.Cafeteria.WalletLedgerEntry
+            {
+                WalletId = wallet.Id, Kind = Sms.Domain.Cafeteria.WalletLedgerKind.Adjustment,
+                Amount = 25m, Reason = "goodwill", AtUtc = new DateTime(2026, 9, 12, 9, 0, 0, DateTimeKind.Utc),
+            });
+            await db.SaveChangesAsync();
+
+            var batch = await service.GenerateAsync(new DateTime(2026, 9, 1), new DateTime(2026, 9, 30, 23, 59, 59), generatedByUserId: 1);
+
+            Assert.Equal(batch.TotalDebit, batch.TotalCredit);
+            var lines = db.GlJournalLines.Where(l => l.GlExportBatchId == batch.Id).ToList();
+            Assert.Equal(10m, lines.Single(l => l.AccountKey == GlAccountKeys.CashOverShort).Debit);
+            Assert.Equal(10m, lines.Single(l => l.AccountKey == "Cash:Cash").Credit);
+            Assert.Equal(25m, lines.Single(l => l.AccountKey == GlAccountKeys.WalletAdjustments).Debit);
+            Assert.Equal(25m, lines.Single(l => l.AccountKey == GlAccountKeys.WalletLiability).Credit);
+            Assert.Equal(2, batch.SourceDocumentCount);
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_till_that_balanced_produces_no_line_at_all()
+        {
+            using var db = CreateContext();
+            var service = CreateService(db);
+            await SeedMappingsAsync(service);
+
+            db.TillSessions.Add(new Sms.Domain.Payments.TillSession
+            {
+                CashierUserId = 1, TillCode = "TILL-2", FloatAmount = 0m,
+                OpenedAtUtc = new DateTime(2026, 9, 10, 6, 0, 0, DateTimeKind.Utc),
+                ClosedAtUtc = new DateTime(2026, 9, 10, 15, 0, 0, DateTimeKind.Utc),
+                SystemTotal = 5000m, CountedTotal = 5000m,
+                Status = Sms.Domain.Payments.TillSessionStatus.Closed,
+            });
+            await db.SaveChangesAsync();
+
+            // No variance, no document — and crucially no unmapped-key failure either. A school whose
+            // tills always balance must never need a CashOverShort mapping to close its month.
+            var batch = await service.GenerateAsync(new DateTime(2026, 9, 1), new DateTime(2026, 9, 30, 23, 59, 59), generatedByUserId: 1);
+
+            Assert.Equal(0, batch.SourceDocumentCount);
+            Assert.Empty(db.GlJournalLines.Where(l => l.GlExportBatchId == batch.Id && l.AccountKey == GlAccountKeys.CashOverShort));
+        }
+
+        [Fact]
         [BusinessRule("BR-FEE-001")]
         public async Task Missing_mappings_block_generation_and_name_every_missing_key()
         {
