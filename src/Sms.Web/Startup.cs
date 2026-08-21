@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using Hangfire;
@@ -733,10 +734,39 @@ namespace Sms.Web
 
             // doc/DesignSystem/01: default en-US, Arabic (ar-SA) via the shell's
             // language toggle (culture cookie); one set of views flips direction.
+            //
+            // ar-SA's default calendar is Umm al-Qura, so DateTime.ToString("yyyy-MM-dd") returns a
+            // Hijri date under it — 2026-10-01 renders as 1448-04-20. That breaks ADR-4 twice over.
+            // It makes Hijri automatic on language rather than on the school's Hijri setting, which is
+            // what the ADR says decides it. And it corrupts machine formats: <input type="date"> only
+            // accepts an ISO-8601 Gregorian value, so every date field's value/min/max silently became
+            // invalid whenever the UI was Arabic.
+            //
+            // Pinning the formatting calendar to Gregorian fixes both at the source rather than in the
+            // 47 views that format a date. Hijri display stays a real feature, reached deliberately
+            // through the Hijri conversion service where a screen and the school's setting call for
+            // it — never as a side effect of the language toggle.
             app.UseRequestLocalization(new RequestLocalizationOptions()
                 .SetDefaultCulture("en-US")
                 .AddSupportedCultures("en-US", "ar-SA")
                 .AddSupportedUICultures("en-US", "ar-SA"));
+
+            // Applied after the localization middleware rather than by handing it a customised
+            // CultureInfo: it resolves cultures by name through CultureInfo's own cache, which returns
+            // a read-only instance and would drop the change. A writable clone per request is cheap and
+            // cannot be defeated that way.
+            app.Use(async (context, next) =>
+            {
+                var current = CultureInfo.CurrentCulture;
+                if (current.DateTimeFormat.Calendar is not GregorianCalendar)
+                {
+                    var gregorian = (CultureInfo)current.Clone();
+                    gregorian.DateTimeFormat.Calendar = new GregorianCalendar();
+                    CultureInfo.CurrentCulture = gregorian;
+                }
+
+                await next();
+            });
 
             // Stamp per-request audit metadata (doc 07 §4). IP capture for
             // portal users pends the country-pack privacy check (doc 07 Q2).
