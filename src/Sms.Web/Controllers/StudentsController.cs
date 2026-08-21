@@ -73,7 +73,7 @@ namespace Sms.Web.Controllers
             var ids = students.Select(s => s.Id).ToList();
             var enrollments = await _db.Enrollments.AsNoTracking().Where(e => ids.Contains(e.StudentId) && e.ExitDate == null).ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => enrollments.Select(e => e.GradeYearProfileId).Contains(p.Id)).ToListAsync();
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var memberships = await _db.SectionMemberships.AsNoTracking().Where(m => enrollments.Select(e => e.Id).Contains(m.EnrollmentId) && m.EffectiveToUtc == null).ToListAsync();
             var sections = await _db.Sections.AsNoTracking().Where(s => memberships.Select(m => m.SectionId).Contains(s.Id)).ToListAsync();
             var links = await _db.StudentGuardianLinks.AsNoTracking().Where(l => ids.Contains(l.StudentId) && l.EffectiveToUtc == null && l.IsPrimaryContact).ToListAsync();
@@ -335,7 +335,7 @@ namespace Sms.Web.Controllers
             var enrollments = await _db.Enrollments.AsNoTracking().Where(e => e.StudentId == id).OrderByDescending(e => e.EnrollmentDate).ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => enrollments.Select(e => e.GradeYearProfileId).Contains(p.Id)).ToListAsync();
             var years = await _db.AcademicYears.AsNoTracking().ToListAsync();
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var memberships = await _db.SectionMemberships.AsNoTracking().Where(m => enrollments.Select(e => e.Id).Contains(m.EnrollmentId) && m.EffectiveToUtc == null).ToListAsync();
             var sections = await _db.Sections.AsNoTracking().Where(x => memberships.Select(m => m.SectionId).Contains(x.Id)).ToListAsync();
             var audit = await _db.AuditEntries.AsNoTracking().Where(e => e.EntityType == nameof(Student) && e.EntityId == id).OrderByDescending(e => e.OccurredAtUtc).Take(100).ToListAsync();
@@ -413,7 +413,7 @@ namespace Sms.Web.Controllers
 
         private async Task<StudentFormViewModel> BuildFormAsync(Student? s)
         {
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var years = await _db.AcademicYears.AsNoTracking().ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().ToListAsync();
             var m = new StudentFormViewModel

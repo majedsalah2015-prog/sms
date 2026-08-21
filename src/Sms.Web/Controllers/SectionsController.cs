@@ -59,7 +59,7 @@ namespace Sms.Web.Controllers
             if (selected != null)
             {
                 var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == selected.Id).ToListAsync();
-                var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+                var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
                 var sections = await _db.Sections.AsNoTracking().Where(s => s.AcademicYearId == selected.Id).OrderBy(s => s.NameEn).ToListAsync();
                 var members = await _db.SectionMemberships.AsNoTracking().Where(m => m.AcademicYearId == selected.Id && m.EffectiveToUtc == null).GroupBy(m => m.SectionId).Select(g => new { g.Key, N = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.N);
                 var homerooms = await _db.HomeroomAssignments.AsNoTracking().Where(h => h.AcademicYearId == selected.Id && h.EffectiveToUtc == null).ToListAsync();

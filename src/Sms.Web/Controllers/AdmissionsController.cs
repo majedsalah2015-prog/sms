@@ -68,7 +68,7 @@ namespace Sms.Web.Controllers
             var m = new CampaignListViewModel { Years = years, Year = selected, OpenDate = _clock.UtcNow.Date, CloseDate = _clock.UtcNow.Date.AddMonths(3) };
             if (selected != null)
             {
-                var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+                var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
                 var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == selected.Id).ToListAsync();
                 var campaigns = await _db.AdmissionCampaigns.AsNoTracking().Where(c => c.AcademicYearId == selected.Id).OrderBy(c => c.OpenDate).ToListAsync();
                 var apps = await _db.Applications.AsNoTracking().Where(a => a.AcademicYearId == selected.Id).ToListAsync();
@@ -411,7 +411,7 @@ namespace Sms.Web.Controllers
         [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.View)]
         public async Task<IActionResult> WaitingList(int? profile = null)
         {
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var years = await _db.AcademicYears.AsNoTracking().ToListAsync();
             var profileIds = await _db.WaitingListEntries.AsNoTracking().Select(w => w.GradeYearProfileId).Distinct().ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => profileIds.Contains(p.Id)).ToListAsync();
@@ -482,7 +482,7 @@ namespace Sms.Web.Controllers
         {
             var list = campaigns.ToList();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => list.Select(c => c.GradeYearProfileId).Contains(p.Id)).ToListAsync();
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var years = await _db.AcademicYears.AsNoTracking().ToListAsync();
             return list.ToDictionary(c => c.Id, c =>
             {

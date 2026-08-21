@@ -111,7 +111,13 @@ namespace Sms.Web.Models
 
     public sealed class CurriculumPlanViewModel
     {
-        public sealed record OfferingRow(CurriculumOffering Offering, Subject Subject);
+        /// <summary>
+        /// <paramref name="SubjectIsRetired"/> marks an offering whose subject has since been
+        /// deactivated. The offering is still real and still counts toward the week — deactivating a
+        /// subject stops new offerings, it does not erase the ones already made — so the row is shown
+        /// and labelled rather than hidden or, as it was, thrown over.
+        /// </summary>
+        public sealed record OfferingRow(CurriculumOffering Offering, Subject Subject, bool SubjectIsRetired = false);
 
         public sealed record ProfileOption(int ProfileId, GradeLevel Grade);
 
@@ -125,6 +131,7 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<OfferingRow> Offerings { get; set; } = Array.Empty<OfferingRow>();
 
+        /// <summary>Active subjects only: this is what the "add an offering" picker offers, and a retired subject is not something to start offering.</summary>
         public IReadOnlyList<Subject> Subjects { get; set; } = Array.Empty<Subject>();
 
         public int TotalPeriods { get; set; }

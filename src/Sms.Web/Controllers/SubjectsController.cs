@@ -294,14 +294,31 @@ namespace Sms.Web.Controllers
             var m = new CurriculumPlanViewModel { Years = years, Year = year, AvailableSlots = slots ?? 35, Subjects = await _db.Subjects.AsNoTracking().OrderBy(s => s.Code).ToListAsync() };
             if (year == null) return m;
 
-            var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
+            // IgnoreQueryFilters on both lookups below. A grade level and a subject are soft-active
+            // master data, but a profile and an offering outlive their deactivation — so joining the
+            // filtered query with First() threw "Sequence contains no matching element" and took the
+            // whole screen down the first time anybody retired a subject. Same shape as the fee
+            // category that made a GL period unexportable (gap G-14): the filter is there to stop new
+            // records being made against a retired row, not to pretend the old ones never happened.
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking()
+                .Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == year.Id).ToListAsync();
-            m.Profiles = profiles.Select(p => new CurriculumPlanViewModel.ProfileOption(p.Id, grades.First(g => g.Id == p.GradeLevelId))).OrderBy(p => p.Grade.SequenceOrder).ToList();
+            m.Profiles = profiles
+                .Where(p => grades.Any(g => g.Id == p.GradeLevelId))
+                .Select(p => new CurriculumPlanViewModel.ProfileOption(p.Id, grades.First(g => g.Id == p.GradeLevelId)))
+                .OrderBy(p => p.Grade.SequenceOrder).ToList();
             m.Profile = m.Profiles.FirstOrDefault(p => p.ProfileId == profileId) ?? m.Profiles.FirstOrDefault();
             if (m.Profile == null) return m;
 
             var offerings = await _db.CurriculumOfferings.AsNoTracking().Where(o => o.GradeYearProfileId == m.Profile.ProfileId).OrderBy(o => o.EffectiveToUtc != null).ThenBy(o => o.SubjectId).ToListAsync();
-            m.Offerings = offerings.Select(o => new CurriculumPlanViewModel.OfferingRow(o, m.Subjects.First(s => s.Id == o.SubjectId))).ToList();
+            var offeredSubjectIds = offerings.Select(o => o.SubjectId).Distinct().ToList();
+            var allSubjects = await _db.Subjects.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId && offeredSubjectIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id);
+            m.Offerings = offerings
+                .Where(o => allSubjects.ContainsKey(o.SubjectId))
+                .Select(o => new CurriculumPlanViewModel.OfferingRow(o, allSubjects[o.SubjectId], !allSubjects[o.SubjectId].IsActive))
+                .ToList();
             m.TotalPeriods = CurriculumPlanValidator.TotalWeeklyPeriods(offerings.Where(o => o.EffectiveToUtc == null).Select(o => o.WeeklyPeriods));
 
             // Copy-from-previous-year: the same grade's profile in the year that ends right before this one.
