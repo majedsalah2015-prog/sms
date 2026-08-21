@@ -47,6 +47,7 @@ using Sms.Application.Calendar;
 using Sms.Application.Certificates;
 using Sms.Application.Classrooms;
 using Sms.Application.Dashboards;
+using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
 using Sms.Application.Examinations;
@@ -397,6 +398,9 @@ namespace Sms.Web
             // fees (Module 19 policy), service-suspension list (Q2, legal),
             // Hangfire scheduling of RunDunningAsync, portal screens.
             services.AddScoped<IInstallmentAdmin, InstallmentAdmin>();
+            // The usage guard for a plan template: what would break if it went away. Registered beside the
+            // admin it guards, and asked by the screen before a destructive action is offered, not after.
+            services.AddScoped<IUsageInspector<Sms.Domain.Installments.PlanTemplate>, PlanTemplateUsageInspector>();
 
             // S5/E-502 (Discounts + statements, doc/Modules/22, BR-DIS-001..010).
             // Discount documents are a distinct document type (numbered "DSC")

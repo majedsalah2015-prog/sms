@@ -1,0 +1,172 @@
+@using System.Globalization
+@using Sms.Domain.Installments
+@model TemplateDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var name = isRtl ? Model.Template.NameAr : Model.Template.NameEn;
+    ViewData["Title"] = name;
+    ViewData["Breadcrumb"] = T("Installment plans / Template", "خطط التقسيط / القالب");
+    var isDraft = Model.Template.Status == PlanTemplateStatus.Draft;
+    var help = new HelpPanelViewModel
+    {
+        Id = "td-help", Title = T("Template — help", "القالب — مساعدة"),
+        Intro = T("A template is a splitting rule. The money column below is an illustration against a round figure — the real amounts come from each student's own posted charges when the plan is assigned (BR-INS-002).", "القالب قاعدة تقسيم. وعمود المبالغ أدناه توضيحي على مبلغ مستدير — أما المبالغ الحقيقية فتأتي من رسوم كل طالب المرحّلة عند إسناد الخطة (BR-INS-002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Date vs offset", "تاريخ مقابل إزاحة"), T("A split dated absolutely falls on that day every year it is used. One given an offset counts that many days from the year's start, so a single template serves several years.", "الشريحة ذات التاريخ المطلق تقع في ذلك اليوم كلما استُخدمت. أما ذات الإزاحة فتُحسب من بداية العام، فيخدم القالب الواحد أعواماً عدة.")),
+            new HelpPanelViewModel.Item(T("Assigned plans do not follow the template", "الخطط المُسنَدة لا تتبع القالب"), T("A schedule is generated once, at assignment. Editing or replacing a template later never moves a schedule already given to a family.", "يُولَّد الجدول مرة واحدة عند الإسناد. وتعديل القالب أو استبداله لاحقاً لا يحرّك جدولاً سُلّم لأسرة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@name</h1>
+        <p class="text-muted mb-0">
+            @(isRtl ? Model.Template.NameEn : Model.Template.NameAr)
+            @if (Model.Year != null) { <text> · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</text> }
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_InstallmentsNav" />
+
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Template.AcademicYearId"><i class="bi bi-arrow-@(isRtl ? "right" : "left")" aria-hidden="true"></i> @T("Back to templates", "رجوع للقوالب")</a>
+    @if (isDraft)
+    {
+        <form method="post" asp-action="ApproveTemplate" asp-route-id="@Model.Template.Id" asp-route-year="@Model.Template.AcademicYearId">
+            <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> @T("Approve for assignment", "اعتماد للإسناد")</button>
+        </form>
+    }
+    else
+    {
+        <a class="btn btn-sm btn-primary" asp-action="Assign" asp-route-year="@Model.Template.AcademicYearId"><i class="bi bi-person-check" aria-hidden="true"></i> @T("Assign to a student", "إسناد لطالب")</a>
+    }
+    <span class="ms-auto badge @(isDraft ? "text-bg-warning" : "text-bg-success") fs-6">@InstallmentLabels.TemplateStatus(Model.Template.Status, isRtl)</span>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("Definition", "التعريف")</h2>
+            <dl class="row mb-0 small">
+                <dt class="col-6 text-muted fw-normal">@T("Fee category", "فئة الرسوم")</dt>
+                <dd class="col-6">@(Model.Category == null ? T("All charges", "كل الرسوم") : (isRtl ? Model.Category.NameAr : Model.Category.NameEn))</dd>
+
+                <dt class="col-6 text-muted fw-normal">@T("Splits", "الشرائح")</dt>
+                <dd class="col-6">@Model.Splits.Count</dd>
+
+                <dt class="col-6 text-muted fw-normal">@T("Down payment", "الدفعة المقدمة")</dt>
+                <dd class="col-6">@(Model.Template.DownPaymentPercent > 0 ? Model.Template.DownPaymentPercent.ToString("0.##") + "%" : "—")</dd>
+
+                <dt class="col-6 text-muted fw-normal">@T("Grace days", "أيام السماح")</dt>
+                <dd class="col-6">@(Model.Template.GraceDays > 0 ? Model.Template.GraceDays.ToString(CultureInfo.InvariantCulture) : "—")</dd>
+
+                <dt class="col-6 text-muted fw-normal">@T("Assigned plans", "الخطط المُسنَدة")</dt>
+                <dd class="col-6">@Model.Usage.Count</dd>
+            </dl>
+            @if (Model.Template.GraceDays > 0)
+            {
+                <p class="small text-muted mt-2 mb-0">@T($"An installment is not overdue until {Model.Template.GraceDays} day(s) after its due date.", $"لا يُعدّ القسط متأخراً إلا بعد {Model.Template.GraceDays} يوم من تاريخ استحقاقه.")</p>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="p-3 pb-0 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("Split rules", "قواعد التقسيم")</h2>
+                <span class="small text-muted">@T("Illustrated on", "موضّح على") @Model.PreviewBase.ToString("N0")</span>
+            </div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Template split rules", "قواعد تقسيم القالب")</caption>
+                <thead><tr>
+                    <th scope="col" class="text-center">#</th>
+                    <th scope="col" class="text-end">@T("Share", "الحصة")</th>
+                    <th scope="col">@T("Due-date rule", "قاعدة الاستحقاق")</th>
+                    <th scope="col">@T("Falls on", "تقع في")</th>
+                    <th scope="col" class="text-end">@T("On", "على") @Model.PreviewBase.ToString("N0")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Splits)
+                {
+                    <tr>
+                        <td class="text-center">@r.Split.SequenceNumber</td>
+                        <td class="text-end">@r.Split.SplitPercent.ToString("0.##")%</td>
+                        <td class="small">
+                            @if (r.Split.DueDate != null)
+                            {
+                                <span class="badge text-bg-light border"><i class="bi bi-calendar-event" aria-hidden="true"></i> @T("Fixed date", "تاريخ ثابت")</span>
+                            }
+                            else if (r.Split.OffsetDaysFromYearStart != null)
+                            {
+                                <span class="badge text-bg-light border"><i class="bi bi-arrow-right-short" aria-hidden="true"></i> @T($"+{r.Split.OffsetDaysFromYearStart} days from year start", $"+{r.Split.OffsetDaysFromYearStart} يوماً من بداية العام")</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            @if (r.ResolvedDueDate is DateTime d)
+                            {
+                                @d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                            }
+                            else
+                            {
+                                <span class="text-muted small">@T("needs a year to resolve", "يحتاج عاماً ليُحسب")</span>
+                            }
+                        </td>
+                        <td class="text-end">@((Model.PreviewBase * r.Split.SplitPercent / 100m).ToString("N2"))</td>
+                    </tr>
+                }
+                </tbody>
+                <tfoot><tr class="fw-semibold">
+                    <td colspan="1"></td>
+                    <td class="text-end">@Model.Splits.Sum(r => r.Split.SplitPercent).ToString("0.##")%</td>
+                    <td colspan="2"></td>
+                    <td class="text-end">@((Model.PreviewBase * Model.Splits.Sum(r => r.Split.SplitPercent) / 100m).ToString("N2"))</td>
+                </tr></tfoot>
+            </table></div>
+        </div>
+    </div>
+</div>
+
+<div class="sms-card mt-3">
+    <div class="p-3 pb-0"><h2 class="h6 mb-0">@T("Families on this template", "الأسر على هذا القالب")</h2></div>
+    @if (Model.Usage.Count == 0)
+    {
+        <p class="p-3 mb-0 text-muted small">@T("Not assigned to anyone yet.", "غير مُسنَد لأحد بعد.")</p>
+    }
+    else
+    {
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+            <caption class="visually-hidden">@T("Assignments using this template", "الإسنادات التي تستخدم هذا القالب")</caption>
+            <thead><tr>
+                <th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Payer", "الدافع")</th>
+                <th scope="col" class="text-center">@T("Installments", "الأقساط")</th>
+                <th scope="col">@T("Notes", "ملاحظات")</th><th scope="col">@T("Actions", "الإجراءات")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var u in Model.Usage)
+            {
+                <tr>
+                    <td>@FinanceLabels.StudentName(u.Student, isRtl)</td>
+                    <td class="small text-muted">@(u.Payer?.Label(isRtl) ?? "—")</td>
+                    <td class="text-center">@u.InstallmentCount</td>
+                    <td class="small">
+                        @if (u.Assignment.IsException)
+                        {
+                            <span class="badge text-bg-warning" title="@u.Assignment.ExceptionReason">@T("Exception", "استثناء")</span>
+                            <span class="text-muted">@u.Assignment.ExceptionReason</span>
+                        }
+                        @if (u.Assignment.RescheduleCount > 0)
+                        {
+                            <span class="badge text-bg-info">@T("Rescheduled", "أُعيدت جدولته") ×@u.Assignment.RescheduleCount</span>
+                        }
+                    </td>
+                    <td><a class="btn btn-sm btn-outline-secondary" asp-action="Schedule" asp-route-id="@u.Assignment.Id">@T("Open schedule", "فتح الجدول")</a></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    }
+</div>

@@ -8,6 +8,7 @@ using Sms.Domain.Parents;
 using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Students;
+using Sms.Application.Common.Guards;
 using Sms.Application.Installments;
 
 namespace Sms.Web.Models
@@ -88,11 +89,46 @@ namespace Sms.Web.Models
 
     public sealed class TemplatesViewModel : InstallmentsPageViewModel
     {
-        public sealed record Row(PlanTemplate Template, FeeCategory? Category, int AssignmentCount);
+        public sealed record Row(PlanTemplate Template, FeeCategory? Category, int AssignmentCount, UsageReport Usage)
+        {
+            /// <summary>Draft only: an approved template may already have produced schedules, and a schedule is a copy of the shape taken at assignment.</summary>
+            public bool CanEdit => Template.Status == PlanTemplateStatus.Draft;
+
+            /// <summary>Nothing may have been assigned from it. Asked before the button is drawn, so a delete that cannot work is never offered.</summary>
+            public bool CanDelete => !Usage.IsInUse;
+        }
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
 
         public IReadOnlyList<FeeCategory> Categories { get; set; } = Array.Empty<FeeCategory>();
+    }
+
+    // ---- §8.1 drill-down: one template in full ----
+
+    public sealed class TemplateDetailViewModel
+    {
+        public PlanTemplate Template { get; set; } = null!;
+
+        public AcademicYear? Year { get; set; }
+
+        public FeeCategory? Category { get; set; }
+
+        /// <summary>
+        /// One split, with the date its rule resolves to for this year. An offset
+        /// rule is meaningless on its own — "+120 days" says nothing until it is
+        /// counted from the year's start — so the screen resolves it rather than
+        /// leaving the reader to.
+        /// </summary>
+        public sealed record SplitRow(TemplateInstallment Split, DateTime? ResolvedDueDate);
+
+        public IReadOnlyList<SplitRow> Splits { get; set; } = Array.Empty<SplitRow>();
+
+        public sealed record UsageRow(PlanAssignment Assignment, Student Student, PayerCard? Payer, int InstallmentCount);
+
+        public IReadOnlyList<UsageRow> Usage { get; set; } = Array.Empty<UsageRow>();
+
+        /// <summary>What a plan of this shape looks like against a round number, so the percentages read as money.</summary>
+        public decimal PreviewBase { get; set; } = 10000m;
     }
 
     // ---- §8.2 Assignment console ----

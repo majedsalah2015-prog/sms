@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Installments;
 using Sms.Application.Setup;
@@ -47,14 +48,16 @@ namespace Sms.Web.Controllers
         private readonly IWorkingYearContext _workingYear;
         private readonly ICurrentUser _user;
         private readonly ISystemSetupAdmin _setup;
+        private readonly IUsageInspector<PlanTemplate> _templateUsage;
 
-        public InstallmentsController(IInstallmentAdmin installments, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, ISystemSetupAdmin setup)
+        public InstallmentsController(IInstallmentAdmin installments, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, ISystemSetupAdmin setup, IUsageInspector<PlanTemplate> templateUsage)
         {
             _installments = installments;
             _db = db;
             _workingYear = workingYear;
             _user = user;
             _setup = setup;
+            _templateUsage = templateUsage;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -85,10 +88,19 @@ namespace Sms.Web.Controllers
                 .Select(g => new { TemplateId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.TemplateId, x => x.Count);
 
-            m.Rows = templates.Select(t => new TemplatesViewModel.Row(
-                t,
-                t.FeeCategoryId == null ? null : m.Categories.FirstOrDefault(c => c.Id == t.FeeCategoryId),
-                counts.TryGetValue(t.Id, out var c) ? c : 0)).ToList();
+            // The guard is asked per template, not inferred from the assignment count above: the count is
+            // scoped to this year, while what blocks a delete is any assignment at all.
+            var rows = new List<TemplatesViewModel.Row>();
+            foreach (var t in templates)
+            {
+                rows.Add(new TemplatesViewModel.Row(
+                    t,
+                    t.FeeCategoryId == null ? null : m.Categories.FirstOrDefault(c => c.Id == t.FeeCategoryId),
+                    counts.TryGetValue(t.Id, out var c) ? c : 0,
+                    await _templateUsage.InspectAsync(t.Id, HttpContext.RequestAborted)));
+            }
+
+            m.Rows = rows;
 
             return View(m);
         }
@@ -100,55 +112,17 @@ namespace Sms.Web.Controllers
             decimal downPaymentPercent, int graceDays,
             string[] percents, string[] dueDates, string[] offsets)
         {
-            // Bound as strings, not as decimal[]/DateTime?[]/int?[], and that is not a style choice.
-            // Model binding drops an entry it cannot convert, so a row that fills only its date and a
-            // row that fills only its offset collapse into shorter arrays — and the second row's offset
-            // silently lands on the first row. The three arrays have to stay index-aligned with each
-            // other, which only holds if every posted field survives binding, empty ones included.
-            var splits = new List<TemplateSplit>();
-            var rowCount = percents?.Length ?? 0;
-            for (var i = 0; i < rowCount; i++)
+            var parsed = ParseSplits(percents, dueDates, offsets, academicYearId);
+            if (parsed.Failure != null)
             {
-                if (!decimal.TryParse(At(percents, i), NumberStyles.Number, CultureInfo.InvariantCulture, out var percent) || percent <= 0m)
-                {
-                    // A blank percentage means a spare row the operator never filled, not an error: the
-                    // designer always offers one more than is in use.
-                    continue;
-                }
-
-                var due = DateTime.TryParse(At(dueDates, i), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null;
-                var offset = int.TryParse(At(offsets, i), NumberStyles.Integer, CultureInfo.InvariantCulture, out var o) ? o : (int?)null;
-
-                if (due == null && offset == null)
-                {
-                    TempData["Error"] = T(
-                        $"Split #{splits.Count + 1} has no due-date rule: give it either a date or an offset in days from the start of the year (BR-INS-001).",
-                        $"الشريحة رقم {splits.Count + 1} بلا قاعدة استحقاق: امنحها تاريخاً أو عدد أيام من بداية العام (BR-INS-001).");
-                    return RedirectToAction(nameof(Index), new { year = academicYearId });
-                }
-
-                splits.Add(new TemplateSplit(percent, due, offset));
+                return parsed.Failure;
             }
 
-            if (splits.Count == 0)
-            {
-                TempData["Error"] = T("Add at least one split before saving.", "أضف شريحة واحدة على الأقل قبل الحفظ.");
-                return RedirectToAction(nameof(Index), new { year = academicYearId });
-            }
-
-            var total = splits.Sum(s => s.Percent);
-            if (Math.Abs(total - 100m) > 0.005m)
-            {
-                TempData["Error"] = T(
-                    $"The splits total {total:0.##}%, not 100% (BR-INS-001).",
-                    $"مجموع الشرائح {total:0.##}% لا 100% (BR-INS-001).");
-                return RedirectToAction(nameof(Index), new { year = academicYearId });
-            }
 
             try
             {
                 await _installments.DefineTemplateAsync(
-                    academicYearId, nameAr?.Trim() ?? string.Empty, nameEn?.Trim() ?? string.Empty, splits,
+                    academicYearId, nameAr?.Trim() ?? string.Empty, nameEn?.Trim() ?? string.Empty, parsed.Splits,
                     feeCategoryId, downPaymentPercent, graceDays, HttpContext.RequestAborted);
                 TempData["Flash"] = T("Plan template saved as a draft.", "حُفظ قالب الخطة كمسودة.");
             }
@@ -169,12 +143,184 @@ namespace Sms.Web.Controllers
         private static string? At(string[]? values, int index)
             => values != null && index < values.Length ? values[index] : null;
 
+        /// <summary>
+        /// Turns the designer's three posted columns into splits, or a redirect
+        /// carrying the reason. Shared by create and edit so the two cannot drift
+        /// into disagreeing about what a valid template is.
+        /// <para>
+        /// The columns are bound as <c>string[]</c>, not as
+        /// <c>decimal[]</c>/<c>DateTime?[]</c>/<c>int?[]</c>, and that is not a style
+        /// choice. Model binding drops an entry it cannot convert, so a row filling
+        /// only its date and a row filling only its offset collapse into shorter
+        /// arrays — and the second row's offset silently lands on the first. The
+        /// three stay index-aligned only if every posted field survives binding,
+        /// empty ones included.
+        /// </para>
+        /// </summary>
+        private (List<TemplateSplit> Splits, IActionResult? Failure) ParseSplits(
+            string[] percents, string[] dueDates, string[] offsets, int academicYearId)
+        {
+            var splits = new List<TemplateSplit>();
+            var rowCount = percents?.Length ?? 0;
+            for (var i = 0; i < rowCount; i++)
+            {
+                if (!decimal.TryParse(At(percents, i), NumberStyles.Number, CultureInfo.InvariantCulture, out var percent) || percent <= 0m)
+                {
+                    // A blank percentage means a spare row the operator never filled, not an error.
+                    continue;
+                }
+
+                var due = DateTime.TryParse(At(dueDates, i), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null;
+                var offset = int.TryParse(At(offsets, i), NumberStyles.Integer, CultureInfo.InvariantCulture, out var o) ? o : (int?)null;
+
+                if (due == null && offset == null)
+                {
+                    return (splits, Refuse(academicYearId, T(
+                        $"Split #{splits.Count + 1} has no due-date rule: give it either a date or an offset in days from the start of the year (BR-INS-001).",
+                        $"الشريحة رقم {splits.Count + 1} بلا قاعدة استحقاق: امنحها تاريخاً أو عدد أيام من بداية العام (BR-INS-001).")));
+                }
+
+                splits.Add(new TemplateSplit(percent, due, offset));
+            }
+
+            if (splits.Count == 0)
+            {
+                return (splits, Refuse(academicYearId, T("Add at least one split before saving.", "أضف شريحة واحدة على الأقل قبل الحفظ.")));
+            }
+
+            var total = splits.Sum(s => s.Percent);
+            if (Math.Abs(total - 100m) > 0.005m)
+            {
+                return (splits, Refuse(academicYearId, T(
+                    $"The splits total {total:0.##}%, not 100% (BR-INS-001).",
+                    $"مجموع الشرائح {total:0.##}% لا 100% (BR-INS-001).")));
+            }
+
+            return (splits, null);
+        }
+
+        private IActionResult Refuse(int academicYearId, string message)
+        {
+            TempData["Error"] = message;
+            return RedirectToAction(nameof(Index), new { year = academicYearId });
+        }
+
+        [HttpGet("templates/{id:int}")]
+        public async Task<IActionResult> TemplateDetails(int id)
+        {
+            var template = await _db.PlanTemplates.IgnoreQueryFilters().AsNoTracking()
+                .Include(t => t.Installments)
+                .SingleOrDefaultAsync(t => t.Id == id && t.SchoolId == _db.CurrentSchoolId);
+            if (template == null)
+            {
+                return NotFound();
+            }
+
+            var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == template.AcademicYearId);
+
+            var m = new TemplateDetailViewModel
+            {
+                Template = template,
+                Year = year,
+                Category = template.FeeCategoryId == null
+                    ? null
+                    : await _db.FeeCategories.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(c => c.Id == template.FeeCategoryId),
+            };
+
+            // An offset counts from the year's start, so a template with no year to count from can only
+            // show the rule itself. That is a real state — a template outlives the picker that made it.
+            m.Splits = template.Installments.OrderBy(s => s.SequenceNumber)
+                .Select(s => new TemplateDetailViewModel.SplitRow(
+                    s,
+                    s.DueDate ?? (s.OffsetDaysFromYearStart is int off && year != null ? year.StartDate.AddDays(off) : null)))
+                .ToList();
+
+            var assignments = await _db.PlanAssignments.AsNoTracking().Where(a => a.PlanTemplateId == id).ToListAsync();
+            if (assignments.Count > 0)
+            {
+                var studentIds = assignments.Select(a => a.StudentId).Distinct().ToList();
+                var students = await _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => studentIds.Contains(s.Id)).ToListAsync();
+                var payerCards = await PayerCardsAsync(assignments.Select(a => a.PayerId));
+                var assignmentIds = assignments.Select(a => a.Id).ToList();
+                var counts = await _db.Installments.AsNoTracking()
+                    .Where(i => assignmentIds.Contains(i.PlanAssignmentId) && !i.IsSuperseded)
+                    .GroupBy(i => i.PlanAssignmentId)
+                    .Select(g => new { Id = g.Key, Count = g.Count() })
+                    .ToDictionaryAsync(x => x.Id, x => x.Count);
+
+                m.Usage = assignments.Select(a => new TemplateDetailViewModel.UsageRow(
+                    a,
+                    students.First(s => s.Id == a.StudentId),
+                    payerCards.FirstOrDefault(p => p.Payer.Id == a.PayerId),
+                    counts.TryGetValue(a.Id, out var c) ? c : 0)).ToList();
+            }
+
+            return View(m);
+        }
+
         [HttpPost("templates/{id:int}/approve")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApproveTemplate(int id, int? year)
         {
             await _installments.ApproveTemplateAsync(id, HttpContext.RequestAborted);
             TempData["Flash"] = T("Template approved; it can now be assigned.", "اعتُمد القالب؛ صار قابلاً للإسناد.");
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
+        [HttpPost("templates/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EditTemplate(
+            int id, int academicYearId, string nameAr, string nameEn, int? feeCategoryId,
+            decimal downPaymentPercent, int graceDays,
+            string[] percents, string[] dueDates, string[] offsets)
+        {
+            var parsed = ParseSplits(percents, dueDates, offsets, academicYearId);
+            if (parsed.Failure != null)
+            {
+                return parsed.Failure;
+            }
+
+            try
+            {
+                await _installments.UpdateTemplateAsync(
+                    id, nameAr?.Trim() ?? string.Empty, nameEn?.Trim() ?? string.Empty, parsed.Splits,
+                    feeCategoryId, downPaymentPercent, graceDays, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Template updated.", "تم تحديث القالب.");
+            }
+            catch (PlanTemplateNotDraftException)
+            {
+                TempData["Error"] = T(
+                    "An approved template cannot be edited — schedules were already generated from it. Create a new template instead.",
+                    "لا يُعدَّل قالب معتمد — فقد وُلِّدت منه جداول بالفعل. أنشئ قالباً جديداً بدلاً من ذلك.");
+            }
+            catch (InvalidTemplateSplitException)
+            {
+                TempData["Error"] = T(
+                    "The splits were refused: they must total 100% and each needs a due-date rule (BR-INS-001).",
+                    "رُفضت الشرائح: يجب أن يبلغ مجموعها 100% وأن تحمل كل شريحة قاعدة استحقاق (BR-INS-001).");
+            }
+
+            return RedirectToAction(nameof(TemplateDetails), new { id });
+        }
+
+        [HttpPost("templates/{id:int}/delete")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteTemplate(int id, int? year)
+        {
+            try
+            {
+                await _installments.DeleteTemplateAsync(id, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Template deleted.", "حُذف القالب.");
+            }
+            catch (RecordInUseException ex)
+            {
+                // The screen hides the button when the guard says no, so arriving here means either a
+                // stale page or a hand-made request. Either way the answer names what is in the way.
+                TempData["Error"] = T(
+                    $"This template cannot be deleted: {ex.Usage.Describe(arabic: false)}.",
+                    $"لا يمكن حذف هذا القالب: {ex.Usage.Describe(arabic: true)}.");
+            }
+
             return RedirectToAction(nameof(Index), new { year });
         }
 

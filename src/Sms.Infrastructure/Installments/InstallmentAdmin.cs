@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Installments;
 using Sms.Application.Notifications;
@@ -78,6 +79,75 @@ namespace Sms.Infrastructure.Installments
             _db.PlanTemplates.Add(template);
             await _db.SaveChangesAsync(cancellationToken);
             return template;
+        }
+
+        public async Task<PlanTemplate> UpdateTemplateAsync(
+            int planTemplateId, string nameAr, string nameEn, IReadOnlyList<TemplateSplit> splits,
+            int? feeCategoryId = null, decimal downPaymentPercent = 0m, int graceDays = 0, CancellationToken cancellationToken = default)
+        {
+            var template = await _db.PlanTemplates.Include(t => t.Installments)
+                .SingleAsync(t => t.Id == planTemplateId, cancellationToken);
+
+            if (template.Status != PlanTemplateStatus.Draft)
+            {
+                throw new PlanTemplateNotDraftException(planTemplateId);
+            }
+
+            ValidateSplits(splits);
+
+            template.NameAr = nameAr;
+            template.NameEn = nameEn;
+            template.FeeCategoryId = feeCategoryId;
+            template.DownPaymentPercent = downPaymentPercent;
+            template.GraceDays = graceDays;
+
+            // The splits are replaced wholesale rather than diffed. Sequence numbers are positional and
+            // carry no identity — nothing references a TemplateInstallment, because a schedule copies the
+            // shape at assignment rather than pointing back at it — so matching them up would be work in
+            // service of a relationship that does not exist.
+            _db.TemplateInstallments.RemoveRange(template.Installments);
+            template.Installments.Clear();
+            for (var i = 0; i < splits.Count; i++)
+            {
+                template.Installments.Add(new TemplateInstallment
+                {
+                    SequenceNumber = i + 1, SplitPercent = splits[i].Percent, DueDate = splits[i].DueDate?.Date,
+                    OffsetDaysFromYearStart = splits[i].OffsetDaysFromYearStart,
+                });
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return template;
+        }
+
+        public async Task DeleteTemplateAsync(int planTemplateId, CancellationToken cancellationToken = default)
+        {
+            var template = await _db.PlanTemplates.Include(t => t.Installments)
+                .SingleAsync(t => t.Id == planTemplateId, cancellationToken);
+
+            var assignments = await _db.PlanAssignments.CountAsync(a => a.PlanTemplateId == planTemplateId, cancellationToken);
+            if (assignments > 0)
+            {
+                throw new RecordInUseException(UsageReport.From(
+                    new UsageReference("assigned plan(s)", "خطة مُسنَدة", assignments)));
+            }
+
+            _db.TemplateInstallments.RemoveRange(template.Installments);
+            _db.PlanTemplates.Remove(template);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        private static void ValidateSplits(IReadOnlyList<TemplateSplit> splits)
+        {
+            if (splits.Count == 0 || !InstallmentScheduleBuilder.SplitsSumToHundred(splits.Select(s => s.Percent).ToList()))
+            {
+                throw new InvalidTemplateSplitException("splits must sum to 100%");
+            }
+
+            if (splits.Any(s => s.DueDate == null && s.OffsetDaysFromYearStart == null))
+            {
+                throw new InvalidTemplateSplitException("every split needs a due date or an offset from year start");
+            }
         }
 
         public async Task ApproveTemplateAsync(int planTemplateId, CancellationToken cancellationToken = default)

@@ -100,4 +100,18 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// BR-INS-001: only a draft template may be rewritten. An approved one may already
+    /// have produced schedules, and a schedule is a copy of the shape taken at
+    /// assignment — editing the template would leave new families on one shape and
+    /// existing ones on another under a single name.
+    /// </summary>
+    public class PlanTemplateNotDraftException : InvalidOperationException
+    {
+        public PlanTemplateNotDraftException(int planTemplateId)
+            : base($"Plan template {planTemplateId} is approved and can no longer be edited.")
+        {
+        }
+    }
 }

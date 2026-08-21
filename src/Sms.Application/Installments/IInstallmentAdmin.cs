@@ -33,6 +33,36 @@ namespace Sms.Application.Installments
         Task ApproveTemplateAsync(int planTemplateId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Rewrites a <b>draft</b> template's definition and splits, under the same
+        /// BR-INS-001 rules <see cref="DefineTemplateAsync"/> applies.
+        /// <para>
+        /// Draft only, and that is the whole guarantee: an approved template may
+        /// already have generated schedules, and a schedule is materialised once at
+        /// assignment and never re-derived. Editing an approved template would
+        /// therefore change what new families get while leaving existing ones on the
+        /// old shape — two meanings for one name. Approve is the point of no return;
+        /// after it, a different plan is a different template.
+        /// </para>
+        /// </summary>
+        Task<PlanTemplate> UpdateTemplateAsync(
+            int planTemplateId, string nameAr, string nameEn, IReadOnlyList<TemplateSplit> splits,
+            int? feeCategoryId = null, decimal downPaymentPercent = 0m, int graceDays = 0, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Deletes a template nothing has been assigned from. Throws
+        /// <see cref="Common.Guards.RecordInUseException"/> otherwise, carrying what
+        /// is in the way.
+        /// <para>
+        /// A hard delete, deliberately, against this system's usual soft-delete
+        /// stance (ADR-7): that rule protects <i>transacted</i> data, and a template
+        /// nothing was ever assigned from has transacted nothing. Keeping such rows
+        /// forever would leave the designer full of abandoned drafts with no way to
+        /// clear them.
+        /// </para>
+        /// </summary>
+        Task DeleteTemplateAsync(int planTemplateId, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// BR-INS-002/004: generates the schedule against the student's posted charges (net of credit notes) in the working
         /// year, rounding into the last installment, shifting due dates off non-working days. Throws
         /// <see cref="Common.Exceptions.PlanTemplateNotApprovedException"/>, <see cref="Common.Exceptions.NoChargesToScheduleException"/>,

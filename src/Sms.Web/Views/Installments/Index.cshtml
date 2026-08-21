@@ -54,23 +54,33 @@
                 @foreach (var r in Model.Rows)
                 {
                     <tr>
-                        <td>@(isRtl ? r.Template.NameAr : r.Template.NameEn)</td>
+                        <td><a asp-action="TemplateDetails" asp-route-id="@r.Template.Id">@(isRtl ? r.Template.NameAr : r.Template.NameEn)</a></td>
                         <td class="small text-muted">@(r.Category == null ? T("All charges", "كل الرسوم") : (isRtl ? r.Category.NameAr : r.Category.NameEn))</td>
                         <td class="text-center">@r.Template.Installments.Count</td>
                         <td class="text-end">@(r.Template.DownPaymentPercent > 0 ? r.Template.DownPaymentPercent.ToString("0.##") + "%" : "—")</td>
                         <td class="text-center">@(r.Template.GraceDays > 0 ? r.Template.GraceDays + " " + T("d", "ي") : "—")</td>
                         <td class="text-center">@r.AssignmentCount</td>
                         <td><span class="badge @(r.Template.Status == PlanTemplateStatus.Approved ? "text-bg-success" : "text-bg-warning")">@InstallmentLabels.TemplateStatus(r.Template.Status, isRtl)</span></td>
-                        <td>
-                            @if (r.Template.Status == PlanTemplateStatus.Draft)
+                        <td class="text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="TemplateDetails" asp-route-id="@r.Template.Id" title="@T("View details", "عرض التفاصيل")" aria-label="@T("View details", "عرض التفاصيل")"><i class="bi bi-eye" aria-hidden="true"></i></a>
+
+                            @if (r.CanEdit)
                             {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="TemplateDetails" asp-route-id="@r.Template.Id" asp-fragment="edit" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
                                 <form method="post" asp-action="ApproveTemplate" asp-route-id="@r.Template.Id" asp-route-year="@yid" class="d-inline">
-                                    <button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")"><i class="bi bi-check2" aria-hidden="true"></i> @T("Approve", "اعتماد")</button>
+                                    <button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")" aria-label="@T("Approve", "اعتماد")"><i class="bi bi-check2" aria-hidden="true"></i></button>
                                 </form>
+                            }
+
+                            @* Not disabled — absent. A control that cannot work is noise, and the reason
+                               sits on the row's own "assigned" count where it can be acted on. *@
+                            @if (r.CanDelete)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#del-@r.Template.Id" title="@T("Delete", "حذف")" aria-label="@T("Delete", "حذف")"><i class="bi bi-trash" aria-hidden="true"></i></button>
                             }
                             else
                             {
-                                <span class="text-muted small">—</span>
+                                <span class="text-muted small ms-1" title="@T($"In use by {r.Usage.Describe(false)}", $"مستخدَم بواسطة {r.Usage.Describe(true)}")"><i class="bi bi-lock" aria-hidden="true"></i></span>
                             }
                         </td>
                     </tr>
@@ -92,6 +102,22 @@
             </table></div>
         </div>
     </div>
+
+    @foreach (var r in Model.Rows.Where(x => x.CanDelete))
+    {
+        <div class="modal fade" id="del-@r.Template.Id" tabindex="-1" aria-labelledby="dl-@r.Template.Id" aria-hidden="true">
+            <div class="modal-dialog"><div class="modal-content">
+                <form method="post" asp-action="DeleteTemplate" asp-route-id="@r.Template.Id" asp-route-year="@yid">
+                    <div class="modal-header"><h3 class="modal-title h6" id="dl-@r.Template.Id">@T("Delete template", "حذف القالب")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                    <div class="modal-body">
+                        <p class="mb-1">@(isRtl ? r.Template.NameAr : r.Template.NameEn)</p>
+                        <p class="small text-muted mb-0">@T("Nothing has been assigned from this template, so deleting it removes only the splitting rule. This cannot be undone.", "لم يُسنَد من هذا القالب شيء، فحذفه يزيل قاعدة التقسيم وحدها. ولا يمكن التراجع عن ذلك.")</p>
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-sm btn-danger" type="submit">@T("Delete", "حذف")</button></div>
+                </form>
+            </div></div>
+        </div>
+    }
 
     <div class="col-lg-5">
         <div class="sms-card p-3">
