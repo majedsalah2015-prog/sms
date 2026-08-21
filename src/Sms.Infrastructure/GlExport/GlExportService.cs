@@ -172,6 +172,34 @@ namespace Sms.Infrastructure.GlExport
                 .Select(e => e.Amount)
                 .ToListAsync(cancellationToken);
 
+            // G-4: voided after its own period was already exported. The batch that carried the
+            // original is posted and immutable, so without these the receivable or the revenue it
+            // created would stand for ever. Scoped to originals posted BEFORE this period — one
+            // posted and voided inside it never reached a batch, and reversing it would invent a
+            // correction for an event that cost nothing.
+            var voidedCharges = await _db.Charges.IgnoreQueryFilters()
+                .Where(c => c.SchoolId == _db.CurrentSchoolId && c.Status == ChargeStatus.Void
+                    && c.PostedAtUtc < periodFromUtc
+                    && c.VoidedAtUtc >= periodFromUtc && c.VoidedAtUtc <= periodToUtc)
+                .Select(c => new { c.FeeCategoryId, c.NetAmount, c.VatAmount, c.GrossAmount })
+                .ToListAsync(cancellationToken);
+
+            var voidedCafeteriaSales = await _db.Sales
+                .Where(s => s.Status == Sms.Domain.Cafeteria.SaleStatus.Voided
+                    && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan
+                    && s.AtUtc < periodFromUtc
+                    && s.VoidedAtUtc >= periodFromUtc && s.VoidedAtUtc <= periodToUtc)
+                .Select(s => new { s.Tender, s.Total })
+                .ToListAsync(cancellationToken);
+
+            var voidedStoreWalletSales = await _db.StoreSales
+                .Where(s => s.Status == Sms.Domain.Store.StoreSaleStatus.Voided
+                    && s.Tender == Sms.Domain.Store.StoreTender.Wallet
+                    && s.AtUtc < periodFromUtc
+                    && s.VoidedAtUtc >= periodFromUtc && s.VoidedAtUtc <= periodToUtc)
+                .Select(s => s.Total)
+                .ToListAsync(cancellationToken);
+
             var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
             {
                 Charges = charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
@@ -187,6 +215,11 @@ namespace Sms.Infrastructure.GlExport
                 StoreWalletSales = storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList(),
                 TillVariances = tillVariances.Select(v => new JournalSummaryBuilder.TillVarianceDoc(v)).ToList(),
                 WriteOffs = writeOffs.Select(a => new JournalSummaryBuilder.WriteOffDoc(a)).ToList(),
+                VoidedCharges = voidedCharges.Select(c => new JournalSummaryBuilder.VoidedChargeDoc(
+                    c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var voidCode) ? voidCode : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
+                VoidedCafeteriaSales = voidedCafeteriaSales.Select(s => new JournalSummaryBuilder.VoidedCafeteriaSaleDoc(
+                    s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
+                VoidedStoreWalletSales = voidedStoreWalletSales.Select(t => new JournalSummaryBuilder.VoidedStoreWalletSaleDoc(t)).ToList(),
             });
 
             var keys = journal.Lines.Select(l => l.AccountKey).Distinct().ToList();

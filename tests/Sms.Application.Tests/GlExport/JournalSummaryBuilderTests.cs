@@ -146,6 +146,65 @@ namespace Sms.Application.Tests.GlExport
         }
 
         [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public void A_charge_voided_after_its_period_shipped_is_reversed_in_the_period_of_the_void()
+        {
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                VoidedCharges = new[] { new JournalSummaryBuilder.VoidedChargeDoc(1, "4100", 1000m, 150m, 1150m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+
+            // Exactly the charge entry, the other way round. Not a credit note — nothing was
+            // corrected about the amount; the document should never have existed.
+            Assert.Equal(1000m, journal.Lines.Single(l => l.AccountKey == "4100").Debit);
+            Assert.Equal(150m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.VatOutput).Debit);
+            Assert.Equal(1150m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Receivables).Credit);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public void A_charge_posted_and_voided_in_one_period_nets_to_nothing()
+        {
+            // Both sides in the same batch: the service does not put such a charge in either stream,
+            // and if it did the journal would still come out flat. This pins the arithmetic that
+            // makes the service's scoping safe rather than merely conventional.
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                Charges = new[] { new JournalSummaryBuilder.ChargeDoc(1, "4100", 1000m, 150m, 1150m) },
+                VoidedCharges = new[] { new JournalSummaryBuilder.VoidedChargeDoc(1, "4100", 1000m, 150m, 1150m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(
+                journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Debit),
+                journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Credit));
+            Assert.Equal(
+                journal.Lines.Where(l => l.AccountKey == "4100").Sum(l => l.Credit),
+                journal.Lines.Where(l => l.AccountKey == "4100").Sum(l => l.Debit));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAF-007")]
+        public void A_late_voided_sale_gives_the_wallet_its_money_back_in_the_ledger_too()
+        {
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                VoidedCafeteriaSales = new[] { new JournalSummaryBuilder.VoidedCafeteriaSaleDoc(true, 30m) },
+                VoidedStoreWalletSales = new[] { new JournalSummaryBuilder.VoidedStoreWalletSaleDoc(45m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.CafeteriaRevenue).Debit);
+            Assert.Equal(45m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.StoreRevenue).Debit);
+
+            // The wallet was credited back when the sale was voided, so the liability has to come
+            // back with it — otherwise the school holds money the ledger says it does not.
+            Assert.Equal(75m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.WalletLiability).Sum(l => l.Credit));
+        }
+
+        [Fact]
         [BusinessRule("BR-FEE-001")]
         public void Unmapped_categories_fall_back_to_a_revenue_key_per_category()
         {

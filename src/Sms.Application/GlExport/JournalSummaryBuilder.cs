@@ -67,6 +67,7 @@ namespace Sms.Application.GlExport
     ///   Till variance  Dr Cash:Cash / Cr CashOverShort   (over; reversed when short)
     ///   Write-off      Dr BadDebt (gross) / Cr Receivables
     ///   Wallet adj.    Dr WalletAdjustments / Cr WalletLiability   (credit; reversed when debited)
+    ///   Late void      the original entry, reversed, in the period of the void
     /// Balanced by construction; the builder asserts it anyway.
     /// </summary>
     public static class JournalSummaryBuilder
@@ -146,6 +147,32 @@ namespace Sms.Application.GlExport
         /// <summary>A wallet correction, signed as the ledger stores it: positive credits the family's wallet (the school owes more), negative takes value back.</summary>
         public sealed record WalletAdjustmentDoc(decimal SignedAmount);
 
+        /// <summary>
+        /// A document voided in this period whose original reached the ledger in
+        /// an earlier one (gap G-4).
+        /// <para>
+        /// The void makes it vanish from every forward-looking query, which is
+        /// right — but the batch that carried it is posted and immutable, so
+        /// without an entry here the receivable or the revenue it created stays on
+        /// the ledger for ever. Reversed in the period of the void, never by
+        /// editing the period of the original: a posted entry is not something to
+        /// go back and change, and the pair has to stay visible for the correction
+        /// to be auditable at all.
+        /// </para>
+        /// <para>
+        /// A document posted and voided inside the same period is not here. It
+        /// never reached a batch, so there is nothing to reverse — and reversing
+        /// it would invent a loss out of an event that cost nothing.
+        /// </para>
+        /// </summary>
+        public sealed record VoidedChargeDoc(int FeeCategoryId, string? GlExportCode, decimal NetAmount, decimal VatAmount, decimal GrossAmount);
+
+        /// <summary>A cafeteria sale voided after its period was exported — the reverse of <see cref="CafeteriaSaleDoc"/>.</summary>
+        public sealed record VoidedCafeteriaSaleDoc(bool IsWalletTender, decimal Amount);
+
+        /// <summary>A wallet-tendered store sale voided after its period was exported — the reverse of <see cref="StoreWalletSaleDoc"/>.</summary>
+        public sealed record VoidedStoreWalletSaleDoc(decimal Amount);
+
         public sealed record JournalLine(string AccountKey, string Description, decimal Debit, decimal Credit, int SourceDocumentCount);
 
         public sealed class Journal
@@ -194,9 +221,16 @@ namespace Sms.Application.GlExport
 
             public IReadOnlyCollection<WriteOffDoc> WriteOffs { get; init; } = Array.Empty<WriteOffDoc>();
 
+            public IReadOnlyCollection<VoidedChargeDoc> VoidedCharges { get; init; } = Array.Empty<VoidedChargeDoc>();
+
+            public IReadOnlyCollection<VoidedCafeteriaSaleDoc> VoidedCafeteriaSales { get; init; } = Array.Empty<VoidedCafeteriaSaleDoc>();
+
+            public IReadOnlyCollection<VoidedStoreWalletSaleDoc> VoidedStoreWalletSales { get; init; } = Array.Empty<VoidedStoreWalletSaleDoc>();
+
             public int Count => Charges.Count + CreditNotes.Count + Discounts.Count + Receipts.Count + Allocations.Count
                 + Refunds.Count + WalletTopUps.Count + WalletAdjustments.Count + CafeteriaSales.Count
-                + StoreWalletSales.Count + TillVariances.Count + WriteOffs.Count;
+                + StoreWalletSales.Count + TillVariances.Count + WriteOffs.Count
+                + VoidedCharges.Count + VoidedCafeteriaSales.Count + VoidedStoreWalletSales.Count;
         }
 
         /// <summary>The five documents a fee cycle cannot do without — a convenience for callers that touch nothing else.</summary>
@@ -215,6 +249,7 @@ namespace Sms.Application.GlExport
             var (walletTopUps, walletAdjustments) = (documents.WalletTopUps, documents.WalletAdjustments);
             var (cafeteriaSales, storeWalletSales) = (documents.CafeteriaSales, documents.StoreWalletSales);
             var (tillVariances, writeOffs) = (documents.TillVariances, documents.WriteOffs);
+            var voidedCharges = documents.VoidedCharges;
 
             var acc = new Accumulator();
 
@@ -249,6 +284,25 @@ namespace Sms.Application.GlExport
                 acc.Debit(GlAccountKeys.Receivables, "Charges posted", c.GrossAmount);
                 acc.Credit(GlAccountKeys.Revenue(c.FeeCategoryId, c.GlExportCode), "Fee revenue", c.NetAmount);
                 acc.Credit(GlAccountKeys.VatOutput, "VAT on charges", c.VatAmount);
+            }
+
+            foreach (var c in voidedCharges)
+            {
+                acc.Debit(GlAccountKeys.Revenue(c.FeeCategoryId, c.GlExportCode), "Charges voided", c.NetAmount);
+                acc.Debit(GlAccountKeys.VatOutput, "VAT on voided charges", c.VatAmount);
+                acc.Credit(GlAccountKeys.Receivables, "Charges voided", c.GrossAmount);
+            }
+
+            foreach (var s in documents.VoidedCafeteriaSales)
+            {
+                acc.Debit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales voided", s.Amount);
+                acc.Credit(s.IsWalletTender ? GlAccountKeys.WalletLiability : GlAccountKeys.Cash("Cash"), "Cafeteria sales voided", s.Amount);
+            }
+
+            foreach (var s in documents.VoidedStoreWalletSales)
+            {
+                acc.Debit(GlAccountKeys.StoreRevenue, "Store sales voided", s.Amount);
+                acc.Credit(GlAccountKeys.WalletLiability, "Store sales voided", s.Amount);
             }
 
             foreach (var n in creditNotes)

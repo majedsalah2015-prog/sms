@@ -299,6 +299,7 @@ namespace Sms.Infrastructure.Cafeteria
             sale.Status = SaleStatus.Voided;
             sale.VoidReason = reason;
             var now = _clock.UtcNow;
+            sale.VoidedAtUtc = now;
             foreach (var line in sale.Lines)
             {
                 _db.StockMovements.Add(new StockMovement { CafeteriaItemId = line.CafeteriaItemId, Kind = StockMovementKind.Receive, Quantity = line.Quantity, Reason = $"void of sale {saleId}", AtUtc = now });

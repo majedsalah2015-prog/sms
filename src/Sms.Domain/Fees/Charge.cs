@@ -45,6 +45,15 @@ namespace Sms.Domain.Fees
 
         public ChargeStatus Status { get; set; } = ChargeStatus.Posted;
 
+        /// <summary>
+        /// When the document was voided, or null while it stands (gap G-4). Kept
+        /// as its own column rather than read off ModifiedAtUtc: that stamp moves
+        /// for any change at all, and the ledger needs the date the reversal
+        /// belongs to, not the date somebody last touched the row.
+        /// </summary>
+        public DateTime? VoidedAtUtc { get; set; }
+
+
         public DateTime PostedAtUtc { get; set; }
 
         public Guid InvoiceUuid { get; set; }

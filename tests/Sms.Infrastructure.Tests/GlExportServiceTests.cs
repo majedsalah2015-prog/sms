@@ -206,6 +206,38 @@ namespace Sms.Infrastructure.Tests
         }
 
         [Fact]
+        [BusinessRule("BR-GLB-062")]
+        public async Task A_charge_voided_after_its_batch_shipped_is_reversed_and_one_voided_in_period_is_not()
+        {
+            using var db = CreateContext();
+            var service = CreateService(db);
+            await SeedMappingsAsync(service);
+            var fees = new FeeAdmin(db, Issuer(db), _clock);
+
+            // Posted in September, exported in September, voided in October: September's batch is
+            // posted and immutable, so October is where the reversal belongs (gap G-4).
+            _clock.UtcNow = new DateTime(2026, 9, 15, 10, 0, 0, DateTimeKind.Utc);
+            var september = await fees.PostManualChargeAsync(_studentId, _payerId, _tuitionId, 1000m);
+
+            _clock.UtcNow = new DateTime(2026, 10, 5, 10, 0, 0, DateTimeKind.Utc);
+            var october = await fees.PostManualChargeAsync(_studentId, _payerId, _tuitionId, 200m);
+            await fees.VoidChargeAsync(september.Id);
+            await fees.VoidChargeAsync(october.Id);
+
+            var batch = await service.GenerateAsync(new DateTime(2026, 10, 1), new DateTime(2026, 10, 31, 23, 59, 59), generatedByUserId: 1);
+
+            Assert.Equal(batch.TotalDebit, batch.TotalCredit);
+            var lines = db.GlJournalLines.Where(l => l.GlExportBatchId == batch.Id).ToList();
+
+            // Only September's. October's charge was posted and voided inside this same period, so it
+            // never reached a batch and there is nothing to reverse — reversing it would invent a
+            // correction for an event that cost nothing.
+            Assert.Equal(1150m, lines.Single(l => l.AccountKey == GlAccountKeys.Receivables && l.Credit > 0).Credit);
+            Assert.Equal(1000m, lines.Single(l => l.AccountKey == "4100" && l.Debit > 0).Debit);
+            Assert.DoesNotContain(lines, l => l.AccountKey == GlAccountKeys.Receivables && l.Debit > 0);
+        }
+
+        [Fact]
         [BusinessRule("BR-PAY-001")]
         public async Task A_till_that_balanced_produces_no_line_at_all()
         {

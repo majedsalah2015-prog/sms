@@ -240,6 +240,14 @@ namespace Sms.Domain.Store
 
         public StoreSaleStatus Status { get; set; } = StoreSaleStatus.Posted;
 
+        /// <summary>
+        /// When the document was voided, or null while it stands (gap G-4). Kept
+        /// as its own column rather than read off ModifiedAtUtc: that stamp moves
+        /// for any change at all, and the ledger needs the date the reversal
+        /// belongs to, not the date somebody last touched the row.
+        /// </summary>
+        public DateTime? VoidedAtUtc { get; set; }
+
         [RequiresAuditReason]
         public string? VoidReason { get; set; }
 

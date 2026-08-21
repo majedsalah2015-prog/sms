@@ -408,6 +408,7 @@ namespace Sms.Infrastructure.Fees
             }
 
             charge.Status = ChargeStatus.Void;
+            charge.VoidedAtUtc = _clock.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
         }
 

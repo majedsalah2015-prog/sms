@@ -252,6 +252,7 @@ namespace Sms.Infrastructure.Store
             _audit.Reason = reason;
             sale.Status = StoreSaleStatus.Voided;
             sale.VoidReason = reason;
+            sale.VoidedAtUtc = _clock.UtcNow;
             foreach (var line in sale.Lines)
             {
                 _db.StoreStockMovements.Add(new StoreStockMovement { StoreVariantId = line.StoreVariantId, Kind = StoreStockKind.ReturnIn, Quantity = line.Quantity, Reason = $"void of sale {storeSaleId}", AtUtc = _clock.UtcNow });
