@@ -438,3 +438,14 @@ $RECYCLE.BIN/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+##
+## Manual smoke-test artefacts (cookie jars, session tokens, saved pages)
+## Kept out of history deliberately: token.txt/etoken.txt carried live session
+## tokens, and a saved page is never a source artefact.
+##
+/*.html
+/token.txt
+/etoken.txt
+/cj.txt
+/ecj.txt
