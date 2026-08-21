@@ -1,0 +1,166 @@
+@using System.Globalization
+@using Sms.Domain.Reports
+@model ReportLogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Execution log", "سجل التشغيل");
+    ViewData["Breadcrumb"] = T("Reports / Execution log", "التقارير / سجل التشغيل");
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var help = new HelpPanelViewModel
+    {
+        Id = "log-help", Title = T("Execution log — help", "سجل التشغيل — مساعدة"),
+        Intro = T("Every run — manual or scheduled — writes one row here with its parameters, format, size and duration. For personal-data and restricted reports this row IS the T0 audit record BR-SEC-021 asks for; there is no second log.", "كل تشغيل — يدوي أو مجدول — يكتب صفاً هنا بمعاملاته وصيغته وحجمه ومدّته. ولتقارير البيانات الشخصية والمقيَّدة، هذا الصف هو سجل التدقيق T0 الذي يطلبه BR-SEC-021؛ ولا يوجد سجل ثانٍ."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Queued runs", "تشغيلات الطابور"), T("A run at or above the heavy threshold is recorded immediately with no row count and no completion time; the queue worker fills those in when it finishes. Until that worker exists, close one here by hand.", "التشغيل عند الحدّ الثقيل أو فوقه يُسجَّل فوراً دون عدد صفوف ولا وقت إنجاز؛ ويملؤهما عامل الطابور عند انتهائه. وحتى يوجد ذلك العامل، أغلقه هنا يدوياً.")),
+            new HelpPanelViewModel.Item(T("Duration", "المدة"), T("A duration is recorded only where something measured it — today that is the queue completion. NF-P5's ≤10 s target applies to interactive runs, and a recorded duration above it is flagged in red.", "لا تُسجَّل المدة إلا حيث قاسها شيء — وذلك اليوم هو إغلاق الطابور. وهدف NF-P5 البالغ 10 ثوانٍ أو أقل يخص التشغيل التفاعلي، وأي مدة مسجَّلة تتجاوزه تُعلَّم بالأحمر.")),
+            new HelpPanelViewModel.Item(T("Exports", "التصديرات"), T("The export filter answers the question an auditor actually asks: which personal data left the building, in what shape, at whose request.", "مرشّح التصدير يجيب السؤال الذي يطرحه المدقق فعلاً: أي بيانات شخصية خرجت، وبأي شكل، وبطلب من.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Who ran what, with which parameters, and what it cost.", "من شغّل ماذا، وبأي معاملات، وبأي كلفة.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_ReportsNav" />
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-list-ul" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.Rows.Count</span><span class="sms-tile__label">@T("runs listed", "تشغيل معروض")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-info"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.QueuedCount</span><span class="sms-tile__label">@T("still queued", "ما يزال في الطابور")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-download" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.ExportCount</span><span class="sms-tile__label">@T("file exports", "تصدير ملفات")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-warning"><i class="bi bi-shield-lock" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.SensitiveCount</span><span class="sms-tile__label">@T("personal-data / restricted runs", "تشغيل بيانات شخصية / مقيَّد")</span></div></div>
+</div>
+
+<div class="sms-card">
+    <form method="get" class="d-flex flex-wrap gap-2 align-items-end p-3 pb-2">
+        <div>
+            <label class="form-label small mb-0" for="l-report">@T("Report", "التقرير")</label>
+            <select class="form-select form-select-sm" id="l-report" name="reportId">
+                <option value="">@T("All reports", "كل التقارير")</option>
+                @foreach (var d in Model.Definitions)
+                {
+                    <option value="@d.Id" selected="@(d.Id == Model.ReportDefinitionId)">@d.Code — @(isRtl ? d.TitleAr : d.TitleEn)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-0" for="l-status">@T("Status", "الحالة")</label>
+            <select class="form-select form-select-sm" id="l-status" name="status">
+                <option value="">@T("Any", "الكل")</option>
+                @foreach (var s in new[] { ReportExecutionStatus.Completed, ReportExecutionStatus.Queued, ReportExecutionStatus.Failed })
+                {
+                    <option value="@((short)s)" selected="@(Model.Status == s)">@ReportLabels.ExecutionStatus(s, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-0" for="l-user">@T("Run by", "المشغِّل")</label>
+            <select class="form-select form-select-sm" id="l-user" name="userId">
+                <option value="">@T("Anyone", "الجميع")</option>
+                @foreach (var u in Model.Users)
+                {
+                    <option value="@u.Id" selected="@(u.Id == Model.UserId)">@(u.DisplayName ?? u.UserName)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="form-label small mb-0" for="l-from">@T("From", "من")</label>
+            <input type="date" class="form-control form-control-sm" id="l-from" name="from" value="@Model.From?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div>
+            <label class="form-label small mb-0" for="l-to">@T("To", "إلى")</label>
+            <input type="date" class="form-control form-control-sm" id="l-to" name="to" value="@Model.To?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" id="l-exports" name="exportsOnly" value="true" checked="@Model.ExportsOnly" />
+            <label class="form-check-label small" for="l-exports">@T("Exports only", "التصديرات فقط")</label>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> @T("Filter", "تصفية")</button>
+        <a class="btn btn-sm btn-link" asp-action="Log">@T("Clear", "مسح")</a>
+    </form>
+
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Report execution log", "سجل تشغيل التقارير")</caption>
+        <thead><tr>
+            <th scope="col">@T("Executed (UTC)", "وقت التشغيل (UTC)")</th>
+            <th scope="col">@T("Report", "التقرير")</th>
+            <th scope="col">@T("Run by", "المشغِّل")</th>
+            <th scope="col">@T("Output", "الإخراج")</th>
+            <th scope="col">@T("Parameters", "المعاملات")</th>
+            <th scope="col">@T("Status", "الحالة")</th>
+            <th scope="col" class="text-end">@T("Rows", "الصفوف")</th>
+            <th scope="col" class="text-end">@T("Duration", "المدة")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="8" class="text-center text-muted py-4">@T("No runs match these filters.", "لا تشغيلات مطابقة لهذه المرشّحات.")</td></tr>
+        }
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td class="text-nowrap small">@r.Execution.ExecutedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>
+                    @if (r.Definition == null)
+                    {
+                        <span class="text-muted">#@r.Execution.ReportDefinitionId</span>
+                    }
+                    else
+                    {
+                        <a asp-action="Run" asp-route-id="@r.Definition.Id">@(isRtl ? r.Definition.TitleAr : r.Definition.TitleEn)</a>
+                        <span class="d-block small text-muted">
+                            <code dir="ltr">@r.Definition.Code</code>
+                            @if (r.Definition.Sensitivity != ReportSensitivity.Normal)
+                            {
+                                <span class="badge @ReportLabels.SensitivityBadge(r.Definition.Sensitivity) ms-1">@ReportLabels.Sensitivity(r.Definition.Sensitivity, isRtl)</span>
+                            }
+                        </span>
+                    }
+                </td>
+                <td class="small">@r.RunBy</td>
+                <td class="small">
+                    <span class="badge text-bg-light border">@ReportLabels.Format(r.Execution.Format, isRtl)</span>
+                    @if (r.Execution.WasExport)
+                    {
+                        <span class="badge text-bg-secondary ms-1"><i class="bi bi-download" aria-hidden="true"></i> @T("export", "تصدير")</span>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-light border ms-1"><i class="bi bi-eye" aria-hidden="true"></i> @T("view", "عرض")</span>
+                    }
+                </td>
+                <td class="small">
+                    @{ var pairs = ReportParameters.Parse(r.Execution.ParametersJson); }
+                    @if (pairs.Count == 0)
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                    else
+                    {
+                        @foreach (var p in pairs)
+                        {
+                            <span class="badge text-bg-light border me-1" dir="ltr">@p.Key=@p.Value</span>
+                        }
+                    }
+                </td>
+                <td><span class="badge @ReportLabels.ExecutionStatusBadge(r.Execution.Status)">@ReportLabels.ExecutionStatus(r.Execution.Status, isRtl)</span></td>
+                <td class="text-end small">@(r.Execution.RowCount?.ToString("N0") ?? "—")</td>
+                <td class="text-end small @(r.Execution.DurationMs is int ms && ms > 10_000 ? "text-danger fw-semibold" : "")">
+                    @(r.Execution.DurationMs == null ? "—" : r.Execution.DurationMs.Value.ToString("N0") + " " + T("ms", "مللي ث"))
+                </td>
+            </tr>
+            @if (r.Execution.Status == ReportExecutionStatus.Queued)
+            {
+                <tr><td colspan="8" class="small">
+                    <form method="post" asp-action="CompleteRun" asp-route-id="@r.Execution.Id" class="d-flex flex-wrap gap-1 align-items-center">
+                        <input type="hidden" name="returnUrl" value="@returnUrl" />
+                        <span class="text-muted"><i class="bi bi-cpu me-1" aria-hidden="true"></i>@T("Stand in for the queue worker — mark ready:", "نيابةً عن عامل الطابور — وسم بالجاهزية:")</span>
+                        <input type="number" min="0" class="form-control form-control-sm" style="width:8rem" name="rowCount" value="0" aria-label="@T("Row count", "عدد الصفوف")" placeholder="@T("rows", "صفوف")" />
+                        <input type="number" min="0" class="form-control form-control-sm" style="width:8rem" name="durationMs" value="0" aria-label="@T("Duration in milliseconds", "المدة بالمللي ثانية")" placeholder="@T("ms", "مللي ثانية")" />
+                        <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> @T("Complete", "إكمال")</button>
+                    </form>
+                </td></tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>

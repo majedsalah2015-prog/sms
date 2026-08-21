@@ -1,0 +1,247 @@
+@using System.Globalization
+@using Sms.Domain.Reports
+@model ReportSubscriptionsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Subscriptions", "الاشتراكات");
+    ViewData["Breadcrumb"] = T("Reports / Subscriptions", "التقارير / الاشتراكات");
+    var selected = Model.Selected;
+    var access = Model.SelectedAccess;
+    var help = new HelpPanelViewModel
+    {
+        Id = "sub-help", Title = T("Subscriptions — help", "الاشتراكات — مساعدة"),
+        Intro = T("A subscription schedules a report for one recipient at one frequency, with its parameters and format fixed at save. Every scheduled run logs exactly like a manual one (BR-RPT-006).", "الاشتراك يجدول تقريراً لمستفيد واحد بوتيرة واحدة، بمعاملاته وصيغته المثبّتة عند الحفظ. وكل تشغيل مجدول يُسجَّل تماماً كالتشغيل اليدوي (BR-RPT-006)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("No permission laundering", "لا التفاف على الصلاحيات"), T("Only users who already hold the report's View permission can be subscribed — a subscription can never deliver a report to someone who could not run it themselves (BR-RPT-006). The picker offers only those users.", "لا يُشترك إلا من يملك أصلاً صلاحية العرض للتقرير — فلا يوصل الاشتراك تقريراً إلى من لا يستطيع تشغيله بنفسه (BR-RPT-006). والقائمة لا تعرض سواهم.")),
+            new HelpPanelViewModel.Item(T("Restricted means portal", "المقيَّد يعني البوابة"), T("A restricted report is never scheduled to email; it is delivered to the portal, where the recipient is authenticated at the moment of reading (BR-RPT-003).", "التقرير المقيَّد لا يُجدوَل إلى البريد إطلاقاً؛ بل يُسلَّم عبر البوابة حيث يُتحقق من هوية المستفيد لحظة الاطلاع (BR-RPT-003).")),
+            new HelpPanelViewModel.Item(T("Revocation", "سحب الصلاحية"), T("Recipients are verified at save and again at each send. The send-side job does not exist yet, so this list flags any live subscription whose recipient has since lost the permission — act on those by hand.", "يُتحقق من المستفيدين عند الحفظ ومع كل إرسال. ووظيفة الإرسال غير قائمة بعد، فتُعلّم هذه القائمة كل اشتراك فعّال فقد صاحبه الصلاحية لاحقاً — عالِجها يدوياً.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Who receives which report, how often, and by which channel.", "من يستلم أي تقرير، وكم مرة، وعبر أي قناة.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_ReportsNav" />
+
+@if (Model.RevokedCount > 0)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>
+        @T($"{Model.RevokedCount} active subscription(s) belong to a recipient who no longer holds the report's View permission. BR-RPT-006 verifies recipients at each send; cancel or re-grant these.",
+           $"{Model.RevokedCount} اشتراك فعّال يعود لمستفيد لم يعد يملك صلاحية عرض التقرير. وBR-RPT-006 يتحقق من المستفيدين مع كل إرسال؛ فألغِها أو أعد منح الصلاحية.")
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        <div class="sms-card">
+            <div class="p-3 pb-2 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("Subscription inventory", "جرد الاشتراكات")</h2>
+                <form method="get" class="d-flex gap-2 align-items-center">
+                    <input type="hidden" name="reportId" value="@selected?.Id" />
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showCancelled" name="showCancelled" value="true" checked="@Model.ShowCancelled" onchange="this.form.submit()" />
+                        <label class="form-check-label small" for="showCancelled">@T("Include cancelled", "تضمين الملغاة")</label>
+                    </div>
+                </form>
+            </div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Report subscriptions", "اشتراكات التقارير")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Report", "التقرير")</th>
+                    <th scope="col">@T("Recipient", "المستفيد")</th>
+                    <th scope="col">@T("Frequency", "الوتيرة")</th>
+                    <th scope="col">@T("Delivery", "التسليم")</th>
+                    <th scope="col">@T("Parameters", "المعاملات")</th>
+                    <th scope="col">@T("Actions", "الإجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">@T("No subscriptions yet.", "لا اشتراكات بعد.")</td></tr>
+                }
+                @foreach (var r in Model.Rows)
+                {
+                    <tr class="@(r.Subscription.IsActive ? "" : "text-muted")">
+                        <td>
+                            @if (r.Definition == null)
+                            {
+                                <span class="text-muted">@T("(deleted definition)", "(تعريف محذوف)")</span>
+                            }
+                            else
+                            {
+                                <a asp-action="Run" asp-route-id="@r.Definition.Id">@(isRtl ? r.Definition.TitleAr : r.Definition.TitleEn)</a>
+                                <span class="d-block small text-muted"><code dir="ltr">@r.Definition.Code</code> · <span class="badge @ReportLabels.SensitivityBadge(r.Definition.Sensitivity)">@ReportLabels.Sensitivity(r.Definition.Sensitivity, isRtl)</span></span>
+                            }
+                        </td>
+                        <td>
+                            @r.SubscriberName
+                            @if (r.Subscription.IsActive && !r.SubscriberStillAuthorized)
+                            {
+                                <span class="badge text-bg-danger d-block mt-1" title="@T("This recipient no longer holds the report's View permission (BR-RPT-006).", "لم يعد هذا المستفيد يملك صلاحية عرض التقرير (BR-RPT-006).")"><i class="bi bi-shield-x" aria-hidden="true"></i> @T("permission revoked", "سُحبت الصلاحية")</span>
+                            }
+                        </td>
+                        <td class="small">@ReportLabels.Frequency(r.Subscription.Frequency, isRtl)</td>
+                        <td class="small">
+                            <span class="badge text-bg-light border">@ReportLabels.Channel(r.Subscription.DeliveryChannel, isRtl)</span>
+                            <span class="badge text-bg-light border">@ReportLabels.Format(r.Subscription.Format, isRtl)</span>
+                        </td>
+                        <td class="small">
+                            @{ var pairs = ReportParameters.Parse(r.Subscription.ParametersJson); }
+                            @if (pairs.Count == 0)
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                            else
+                            {
+                                @foreach (var p in pairs)
+                                {
+                                    <span class="badge text-bg-light border me-1" dir="ltr">@p.Key=@p.Value</span>
+                                }
+                            }
+                        </td>
+                        <td>
+                            @if (r.Subscription.IsActive)
+                            {
+                                <form method="post" asp-action="CancelSubscription" asp-route-id="@r.Subscription.Id">
+                                    <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle" aria-hidden="true"></i> @T("Cancel", "إلغاء")</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">@T("cancelled", "ملغى")</span>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("New subscription", "اشتراك جديد")</h2>
+
+            <form method="get" class="mb-3">
+                <label class="form-label small mb-0" for="reportPick">@T("Report", "التقرير")</label>
+                <select class="form-select form-select-sm" id="reportPick" name="reportId" onchange="this.form.submit()">
+                    <option value="">@T("— pick a report —", "— اختر تقريراً —")</option>
+                    @foreach (var def in Model.Definitions)
+                    {
+                        <option value="@def.Id" selected="@(def.Id == selected?.Id)">@def.Code — @(isRtl ? def.TitleAr : def.TitleEn)</option>
+                    }
+                </select>
+                <input type="hidden" name="showCancelled" value="@Model.ShowCancelled.ToString().ToLowerInvariant()" />
+            </form>
+
+            @if (selected == null || access == null)
+            {
+                <p class="small text-muted mb-0">@T("Pick a report to see who may receive it and how it may be delivered.", "اختر تقريراً لترى من يحق له استلامه وكيف يمكن تسليمه.")</p>
+            }
+            else if (access.PermissionMissing)
+            {
+                <div class="alert alert-danger mb-0">@T("This report is gated on a permission that no longer exists, so no recipient can be verified against it.", "هذا التقرير محكوم بصلاحية لم تعد موجودة، فلا يمكن التحقق من أي مستفيد بها.")</div>
+            }
+            else if (Model.AuthorizedSubscribers.Count == 0)
+            {
+                <div class="alert alert-warning mb-0">
+                    @T($"Nobody holds the View permission this report is gated on, so nobody may subscribe to it (BR-RPT-006). {Model.UnauthorizedCount} active user(s) were considered.",
+                       $"لا أحد يملك صلاحية العرض التي يُحكم بها هذا التقرير، فلا يمكن لأحد الاشتراك فيه (BR-RPT-006). فُحص {Model.UnauthorizedCount} مستخدم فعّال.")
+                </div>
+            }
+            else
+            {
+                <form method="post" asp-action="Subscribe">
+                    <input type="hidden" name="reportDefinitionId" value="@selected.Id" />
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small mb-0" for="s-user">@T("Recipient", "المستفيد")</label>
+                            <select class="form-select form-select-sm" id="s-user" name="subscriberUserId" required>
+                                @foreach (var u in Model.AuthorizedSubscribers)
+                                {
+                                    <option value="@u.Id">@(u.DisplayName ?? u.UserName)</option>
+                                }
+                            </select>
+                            <div class="form-text">
+                                @T($"{Model.AuthorizedSubscribers.Count} of {Model.AuthorizedSubscribers.Count + Model.UnauthorizedCount} active users hold this report's View permission; the rest are not offered (BR-RPT-006).",
+                                   $"{Model.AuthorizedSubscribers.Count} من {Model.AuthorizedSubscribers.Count + Model.UnauthorizedCount} مستخدم فعّال يملكون صلاحية عرض هذا التقرير؛ وسواهم غير معروض (BR-RPT-006).")
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small mb-0" for="s-freq">@T("Frequency", "الوتيرة")</label>
+                            <select class="form-select form-select-sm" id="s-freq" name="frequency" required>
+                                @foreach (var f in new[] { SubscriptionFrequency.Daily, SubscriptionFrequency.Weekly, SubscriptionFrequency.Monthly })
+                                {
+                                    <option value="@((short)f)" selected="@(f == SubscriptionFrequency.Monthly)">@ReportLabels.Frequency(f, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Format", "الصيغة")</legend>
+                                @foreach (var f in ReportLabels.SplitFormats(selected.SupportedFormats))
+                                {
+                                    var rid = "s-fmt-" + (short)f;
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="radio" id="@rid" name="format" value="@((short)f)" checked="@(f == ReportLabels.SplitFormats(selected.SupportedFormats).First())" />
+                                        <label class="form-check-label small" for="@rid">@ReportLabels.Format(f, isRtl)</label>
+                                    </div>
+                                }
+                            </fieldset>
+                        </div>
+
+                        <div class="col-12">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Delivery channel", "قناة التسليم")</legend>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" id="s-ch-portal" name="deliveryChannel" value="@((short)DeliveryChannel.Portal)" checked />
+                                    <label class="form-check-label small" for="s-ch-portal">@ReportLabels.Channel(DeliveryChannel.Portal, isRtl)</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" id="s-ch-email" name="deliveryChannel" value="@((short)DeliveryChannel.Email)" disabled="@(!access.EmailDeliveryAllowed)" />
+                                    <label class="form-check-label small @(access.EmailDeliveryAllowed ? "" : "text-muted")" for="s-ch-email">@ReportLabels.Channel(DeliveryChannel.Email, isRtl)</label>
+                                </div>
+                                @if (!access.EmailDeliveryAllowed)
+                                {
+                                    <p class="small text-warning mb-0 mt-1">
+                                        <i class="bi bi-envelope-slash" aria-hidden="true"></i>
+                                        @T("This report is restricted: it is delivered to the portal only and never scheduled to email (BR-RPT-003).", "هذا التقرير مقيَّد: يُسلَّم عبر البوابة فقط ولا يُجدوَل إلى البريد إطلاقاً (BR-RPT-003).")
+                                    </p>
+                                }
+                            </fieldset>
+                        </div>
+
+                        <div class="col-12">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Parameters", "المعاملات")</legend>
+                                @if (Model.SelectedRequiredKeys.Count == 0)
+                                {
+                                    <p class="small text-muted mb-0">@T("This report requires no parameters.", "لا يتطلب هذا التقرير معاملات.")</p>
+                                }
+                                @foreach (var key in Model.SelectedRequiredKeys)
+                                {
+                                    var kid = "s-p-" + key;
+                                    <label class="form-label small mb-0" for="@kid"><code dir="ltr">@key</code> <span class="text-danger">*</span></label>
+                                    <input type="hidden" name="paramKeys" value="@key" />
+                                    <input type="text" class="form-control form-control-sm mb-2" id="@kid" name="paramValues" dir="auto" required />
+                                }
+                                @if (Model.SelectedRequiredKeys.Count > 0)
+                                {
+                                    <div class="form-text">@T("Required parameters are enforced when a run happens (doc §9), not when the subscription is saved — a scheduled run missing one would simply fail, so they are collected here.", "تُفرض المعاملات المطلوبة عند التشغيل (البند 9) لا عند حفظ الاشتراك — ولأن التشغيل المجدول الناقص سيفشل، تُجمع هنا.")</div>
+                                }
+                            </fieldset>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-grid">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> @T("Save subscription", "حفظ الاشتراك")</button>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+</div>

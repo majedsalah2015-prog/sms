@@ -1,0 +1,24 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Index", "Report center", "مركز التقارير", "bi-collection"),
+        ("Subscriptions", "Subscriptions", "الاشتراكات", "bi-envelope-paper"),
+        ("Log", "Execution log", "سجل التشغيل", "bi-clock-history"),
+    };
+    // Run is a drill-down of the catalogue; keeping that tab lit stops the subnav from going blank
+    // the moment a report is opened.
+    bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
+        || (a == "Index" && action is "Run");
+}
+<nav aria-label="@(isRtl ? "التقارير" : "Reports")">
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        var isActive = Active(t.Action);
+        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="Reports" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
+    }
+</ul>
+</nav>

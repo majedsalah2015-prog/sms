@@ -67,8 +67,8 @@ namespace Sms.Web.Navigation
             M("ACT", "29", "Activities", "الأنشطة", "bi-trophy", "services", "E-607", "29-Activities.md"),
 
             // Platform
-            M("RPT", "30", "Reports", "التقارير", "bi-file-earmark-bar-graph", "platform", "E-701", "30-Reports.md"),
-            M("DSH", "31", "Dashboards", "لوحات المعلومات", "bi-speedometer2", "platform", "E-702", "31-Dashboards.md"),
+            M("RPT", "30", "Reports", "التقارير", "bi-file-earmark-bar-graph", "platform", "E-701", "30-Reports.md", "Reports", "Index"),
+            M("DSH", "31", "Dashboards", "لوحات المعلومات", "bi-speedometer2", "platform", "E-702", "31-Dashboards.md", "Dashboards", "Index"),
             M("MSG", "32", "Messaging", "المراسلات", "bi-chat-dots", "platform", "E-703", "32-Messaging.md"),
             M("NTF", "33", "Notifications", "الإشعارات", "bi-bell", "platform", "E-703", "33-Notifications.md"),
             M("AUD", "34", "Audit", "التدقيق", "bi-clipboard-data", "platform", "E-704", "34-Audit.md"),

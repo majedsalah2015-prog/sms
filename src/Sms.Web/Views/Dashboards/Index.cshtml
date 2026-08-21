@@ -1,0 +1,450 @@
+@using System.Globalization
+@model DashboardOverviewViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Dashboard", "لوحة المعلومات");
+    ViewData["Breadcrumb"] = T("Dashboards / Overview", "لوحات المعلومات / النظرة العامة");
+    var yid = Model.Year?.Id;
+    var day = Model.Date.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dsh-help", Title = T("Dashboard — help", "لوحة المعلومات — مساعدة"),
+        Intro = T("What needs attention this morning, in one screen. Every number is read from a precomputed snapshot or read model — the same figure its drill-through screen shows for the same scope and moment (BR-DSH-002) — and carries the time it was computed.", "ما يحتاج انتباهك هذا الصباح، في شاشة واحدة. كل رقم مقروء من لقطة محسوبة مسبقاً أو من نموذج قراءة — وهو الرقم نفسه الذي تعرضه الشاشة التي يفتح عليها للنطاق واللحظة ذاتها (BR-DSH-002) — ويحمل وقت احتسابه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("As of", "حتى"), T("Cached panels show when their snapshot was last computed. Refresh recomputes all three snapshot tables now; in a running deployment the scheduled jobs do it (attendance every 15 minutes during the school day, finance nightly).", "اللوحات المخزَّنة تعرض آخر وقت احتُسبت فيه لقطتها. زر التحديث يعيد احتساب جداول اللقطات الثلاثة فوراً؛ وفي التشغيل الفعلي تتولى ذلك المهام المجدولة (الحضور كل 15 دقيقة خلال اليوم الدراسي، والمالية ليلاً).")),
+            new HelpPanelViewModel.Item(T("Personalize", "التخصيص"), T("Reorder or switch off any panel that has been registered as a widget. Your choices sit on top of your role's layout template; reset always returns you to that default (BR-DSH-003).", "أعد ترتيب أي لوحة مسجَّلة كعنصر أو أطفئها. اختياراتك تعلو قالب تخطيط دورك؛ وزر الاستعادة يعيدك دائماً إلى ذلك الافتراضي (BR-DSH-003).")),
+            new HelpPanelViewModel.Item(T("Restricted categories", "الفئات المقيَّدة"), T("Medical and discipline counts are masked while they are below the anonymity threshold: a school-wide count of one would name the child it is about (BR-DSH-007).", "تُخفى أعداد الحالات الطبية والسلوكية ما دامت دون حدّ إخفاء الهوية: فعدد كالواحد على مستوى المدرسة يكشف صاحبه (BR-DSH-007).")),
+            new HelpPanelViewModel.Item(T("Missing panels", "اللوحات الغائبة"), T("A panel registered as a widget renders only for users who hold that widget's permission (BR-DSH-001). Unregistered panels show for everyone — the registry is opt-in.", "اللوحة المسجَّلة كعنصر تظهر فقط لمن يملك صلاحية ذلك العنصر (BR-DSH-001). أما غير المسجَّلة فتظهر للجميع — فالسجل اختياري.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Attendance, money, queues and capacity — as they stand this morning.", "الحضور، والمال، وقوائم الانتظار، والسعة — كما هي هذا الصباح.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DashboardsNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div>
+    return;
+}
+
+<div class="sms-card p-3 mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
+        <form method="get" class="d-flex flex-wrap gap-2 align-items-end">
+            <div>
+                <label class="form-label small mb-1" for="dsh-year">@T("Working year", "العام العامل")</label>
+                <select id="dsh-year" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                    @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="dsh-date">@T("Attendance day", "يوم الحضور")</label>
+                <input id="dsh-date" name="date" type="date" value="@day" class="form-control form-control-sm" style="width:auto" />
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="dsh-threshold">@T("Anonymity threshold", "حدّ إخفاء الهوية")</label>
+                <input id="dsh-threshold" name="threshold" type="number" min="1" max="50" value="@Model.AnonymityThreshold" class="form-control form-control-sm" style="width:6rem" />
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Apply", "تطبيق")</button>
+        </form>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <a class="btn btn-sm @(Model.PersonalizeMode ? "btn-primary" : "btn-outline-primary")" asp-action="Index" asp-route-year="@yid" asp-route-date="@day" asp-route-personalize="@(!Model.PersonalizeMode)">
+                <i class="bi bi-sliders me-1" aria-hidden="true"></i>@T("Personalize", "تخصيص")
+            </a>
+            <form method="post" asp-action="RefreshSnapshots" asp-route-year="@yid" asp-route-date="@day">
+                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-database-up me-1" aria-hidden="true"></i>@T("Refresh snapshots", "تحديث اللقطات")</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.SnapshotsNeverRefreshed)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-database-exclamation me-1" aria-hidden="true"></i>
+        @T("No snapshot has been computed yet, so the cached panels are empty. Refresh once to fill them.", "لم تُحتسب أي لقطة بعد، لذا اللوحات المخزَّنة فارغة. حدِّث مرة واحدة لملئها.")
+    </div>
+}
+
+@if (Model.PersonalizeMode)
+{
+    <div class="sms-card p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+            <div>
+                <h2 class="h6 mb-1"><i class="bi bi-sliders me-1" aria-hidden="true"></i>@T("Your dashboard", "لوحتك")</h2>
+                <p class="small text-muted mb-0">
+                    @if (Model.TemplateRole != null)
+                    {
+                        @string.Format(T("Defaults come from the {0} layout template.", "الافتراضيات مأخوذة من قالب تخطيط {0}."), DashboardLabels.RoleName(Model.TemplateRole, isRtl))
+                    }
+                    else
+                    {
+                        @T("No role layout template applies to you, so the built-in order is the default.", "لا ينطبق عليك قالب تخطيط دور، لذا الترتيب المدمج هو الافتراضي.")
+                    }
+                </p>
+            </div>
+            <form method="post" asp-action="ResetLayout" asp-route-year="@yid" asp-route-date="@day">
+                <button class="btn btn-sm btn-outline-warning" type="submit"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>@T("Reset to role default", "استعادة افتراضي الدور")</button>
+            </form>
+        </div>
+
+        <form method="post" asp-action="Personalize" asp-route-year="@yid" asp-route-date="@day">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Dashboard panels and their order", "لوحات المعلومات وترتيبها")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Panel", "اللوحة")</th>
+                    <th scope="col">@T("Registry code", "رمز السجل")</th>
+                    <th scope="col">@T("Order", "الترتيب")</th>
+                    <th scope="col">@T("Shown", "معروضة")</th>
+                    <th scope="col">@T("Source", "المصدر")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var state in Model.Panels.OrderBy(p => p.SortOrder))
+                {
+                    // Only a registered widget the user may actually see is posted back: PersonalizeAsync
+                    // refuses the rest server-side (doc §9), so offering the control would only invite a refusal.
+                    var definition = state.IsPermitted ? state.Definition : null;
+                    <tr class="@(state.IsPermitted ? "" : "text-muted")">
+                        <td><i class="bi @state.Panel.Icon me-1" aria-hidden="true"></i>@state.Panel.Title(isRtl)</td>
+                        <td><code>@state.Panel.Code</code></td>
+                        <td style="width:7rem">
+                            @if (definition != null)
+                            {
+                                <input type="hidden" name="widgetIds" value="@definition.Id" />
+                                <input type="number" name="sortOrders" value="@state.SortOrder" min="0" max="9999" class="form-control form-control-sm" aria-label="@string.Format(T("Order of {0}", "ترتيب {0}"), state.Panel.Title(isRtl))" />
+                            }
+                            else
+                            {
+                                <span class="small">@state.SortOrder</span>
+                            }
+                        </td>
+                        <td>
+                            @if (definition != null)
+                            {
+                                <input type="checkbox" name="visibleIds" value="@definition.Id" class="form-check-input" checked="@state.IsVisible" aria-label="@string.Format(T("Show {0}", "عرض {0}"), state.Panel.Title(isRtl))" />
+                            }
+                            else if (state.Definition != null)
+                            {
+                                <span class="badge text-bg-secondary">@T("not permitted", "غير مصرَّح")</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-light border">@T("always", "دائماً")</span>
+                            }
+                        </td>
+                        <td class="small text-muted">@(state.Source == PanelSource.Personal ? T("your choice", "اختيارك") : state.Source == PanelSource.RoleTemplate ? T("role template", "قالب الدور") : T("built-in", "مدمج"))</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <div class="pt-3 d-flex flex-wrap gap-2 align-items-center">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save my layout", "حفظ ترتيبي")</button>
+                <span class="small text-muted">@T("Only panels registered in the widget registry can be reordered or switched off.", "يمكن إعادة ترتيب أو إطفاء اللوحات المسجَّلة في سجل العناصر فقط.")</span>
+                <a class="small" asp-action="Widgets">@T("Open the registry", "فتح السجل")</a>
+            </div>
+        </form>
+    </div>
+}
+
+<div class="row g-3">
+@foreach (var state in Model.Rendered)
+{
+    var panel = state.Panel;
+    <div class="@panel.ColumnClass">
+        <div class="sms-card h-100 d-flex flex-column">
+            <div class="d-flex align-items-start justify-content-between gap-2 p-3 pb-1">
+                <h2 class="h6 mb-0"><i class="bi @panel.Icon me-1" aria-hidden="true"></i>@panel.Title(isRtl)</h2>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    @if (panel.IsRestrictedCategory)
+                    {
+                        <span class="badge text-bg-dark" title="@T("Restricted category: aggregate counts only, masked below the anonymity threshold (BR-DSH-007).", "فئة مقيَّدة: أعداد إجمالية فقط، تُخفى دون حدّ إخفاء الهوية (BR-DSH-007).")"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i>@T("restricted", "مقيَّد")</span>
+                    }
+                    <span class="badge @DashboardLabels.RefreshBadge(panel.RefreshClass)">@DashboardLabels.RefreshClass(panel.RefreshClass, isRtl)</span>
+                    @if (panel.DrillController != null)
+                    {
+                        <a class="small text-nowrap" asp-controller="@panel.DrillController" asp-action="@panel.DrillAction" asp-route-year="@yid">@T("Open", "فتح") <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
+                    }
+                </div>
+            </div>
+
+            @if (panel.Code == DashboardPanels.Attendance && Model.Attendance != null)
+            {
+                var a = Model.Attendance;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="sms-tile__value"><bdi dir="ltr">@a.PresentPercent.ToString("0.#")%</bdi></span>
+                        <span class="text-muted small">@T("present", "حضور") · @Model.Date.ToString("yyyy-MM-dd")</span>
+                    </div>
+                    <p class="small text-muted mb-2">@DashboardLabels.AsOf(a.AsOfUtc, isRtl)</p>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4"><div class="border rounded p-2 text-center"><span class="d-block fw-bold text-danger">@a.Absent.ToString("N0")</span><span class="small text-muted">@T("absent", "غياب")</span></div></div>
+                        <div class="col-4"><div class="border rounded p-2 text-center"><span class="d-block fw-bold text-warning">@a.Late.ToString("N0")</span><span class="small text-muted">@T("late", "تأخر")</span></div></div>
+                        <div class="col-4"><div class="border rounded p-2 text-center"><span class="d-block fw-bold @(a.Uncaptured > 0 ? "text-danger" : "")"><bdi dir="ltr">@a.SectionsCaptured / @a.SectionsExpected</bdi></span><span class="small text-muted">@T("sections captured", "شعبة مرصودة")</span></div></div>
+                    </div>
+                    @if (a.Stages.Count > 0)
+                    {
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-2 align-middle">
+                            <caption class="visually-hidden">@T("Attendance by stage", "الحضور حسب المرحلة")</caption>
+                            <thead><tr><th scope="col">@T("Stage", "المرحلة")</th><th scope="col" class="text-end">@T("Scheduled", "المقرَّر")</th><th scope="col" class="text-end">@T("Absent", "غياب")</th><th scope="col" class="text-end">@T("Present %", "نسبة الحضور")</th></tr></thead>
+                            <tbody>
+                            @foreach (var s in a.Stages)
+                            {
+                                <tr>
+                                    <td>@(s.Stage == null ? "—" : (isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn))</td>
+                                    <td class="text-end">@s.Scheduled.ToString("N0")</td>
+                                    <td class="text-end @(s.Absent > 0 ? "text-danger" : "")">@s.Absent.ToString("N0")</td>
+                                    <td class="text-end"><bdi dir="ltr">@s.PresentPercent.ToString("0.#")%</bdi></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    }
+                    @if (a.Worst.Count > 0)
+                    {
+                        <p class="small text-muted mb-1">@T("Lowest sections today", "أدنى الشعب اليوم")</p>
+                        <ul class="list-group list-group-flush small">
+                            @foreach (var w in a.Worst)
+                            {
+                                <li class="list-group-item px-0 py-1 d-flex justify-content-between">
+                                    <span>@(w.Grade == null ? "" : (isRtl ? w.Grade.Name.NameAr : w.Grade.Name.NameEn)) @(w.Section == null ? "—" : (isRtl ? w.Section.NameAr : w.Section.NameEn))</span>
+                                    <span class="text-danger"><bdi dir="ltr">@w.PresentPercent.ToString("0.#")%</bdi> · @w.Absent @T("absent", "غياب")</span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                    else if (a.SectionsCaptured == 0)
+                    {
+                        <p class="small text-muted mb-0">@T("Nothing captured for this day yet.", "لم يُرصد شيء لهذا اليوم بعد.")</p>
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.Certificates && Model.Certificates != null)
+            {
+                var c = Model.Certificates;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="sms-tile__value @(c.Pending > 0 ? "text-warning" : "")">@c.Pending.ToString("N0")</span>
+                        <span class="text-muted small">@T("requests awaiting issue", "طلباً بانتظار الإصدار")</span>
+                    </div>
+                    <p class="small text-muted mb-2">@T("Live count — action widgets never show a cached figure (BR-DSH-004).", "عدّ لحظي — عناصر الإجراء لا تعرض رقماً مخزَّناً أبداً (BR-DSH-004).")</p>
+                    @if (c.Oldest.Count == 0)
+                    {
+                        <p class="small text-muted mb-0">@T("The queue is empty.", "قائمة الانتظار فارغة.")</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush small">
+                            @foreach (var r in c.Oldest)
+                            {
+                                <li class="list-group-item px-0 py-1">
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <span class="fw-semibold">@(r.Student == null ? "—" : FinanceLabels.StudentName(r.Student, isRtl))</span>
+                                        <span class="badge @(r.AgeDays >= 7 ? "text-bg-danger" : "text-bg-light border")">@string.Format(T("{0}d", "{0} يوم"), r.AgeDays)</span>
+                                    </div>
+                                    <span class="text-muted">@(r.Type == null ? "—" : (isRtl ? r.Type.NameAr : r.Type.NameEn)) · @DashboardLabels.CertificateStatus(r.Request.Status, isRtl)</span>
+                                </li>
+                            }
+                        </ul>
+                        <p class="small text-muted mb-0 mt-2">@T("Module 18 has no screen yet, so this queue does not click through.", "الوحدة 18 بلا شاشة بعد، لذا لا تفتح هذه القائمة على شاشة.")</p>
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.Receivables && Model.Receivables != null)
+            {
+                var f = Model.Receivables;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                        <span class="sms-tile__value"><bdi dir="ltr">@((f.LiveTotal ?? f.Total).ToString("N2"))</bdi></span>
+                        <span class="text-muted small">@T("outstanding", "مستحق")</span>
+                        @if (f.LiveTotal != null) { <span class="badge text-bg-success">@T("live", "لحظي")</span> }
+                    </div>
+                    <p class="small text-muted mb-2">
+                        @DashboardLabels.AsOf(f.AsOfUtc, isRtl)
+                        @if (f.AsOfUtc != null) { <text> · @string.Format(T("{0} payers, {1} students", "{0} دافع، و{1} طالب"), f.PayerCount, f.StudentCount)</text> }
+                    </p>
+                    @if (f.AsOfUtc == null)
+                    {
+                        <p class="small text-muted mb-0">@T("Read live from the fees engine because the aged snapshot has never run — refresh to get the ageing breakdown.", "مقروء لحظياً من محرك الرسوم لأن لقطة الأعمار لم تُشغَّل قط — حدِّث للحصول على توزيع الأعمار.")</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-2 align-middle">
+                            <caption class="visually-hidden">@T("Receivables by age", "الذمم حسب العمر")</caption>
+                            <thead><tr>
+                                <th scope="col">@DashboardLabels.Bucket(Sms.Application.ReadModels.AgingBucket.Current, isRtl)</th>
+                                <th scope="col">@DashboardLabels.Bucket(Sms.Application.ReadModels.AgingBucket.Days1To30, isRtl)</th>
+                                <th scope="col">@DashboardLabels.Bucket(Sms.Application.ReadModels.AgingBucket.Days31To60, isRtl)</th>
+                                <th scope="col">@DashboardLabels.Bucket(Sms.Application.ReadModels.AgingBucket.Days61To90, isRtl)</th>
+                                <th scope="col">@DashboardLabels.Bucket(Sms.Application.ReadModels.AgingBucket.Over90, isRtl)</th>
+                            </tr></thead>
+                            <tbody><tr>
+                                <td><bdi dir="ltr">@f.Current.ToString("N2")</bdi></td>
+                                <td><bdi dir="ltr">@f.Days1To30.ToString("N2")</bdi></td>
+                                <td><bdi dir="ltr">@f.Days31To60.ToString("N2")</bdi></td>
+                                <td><bdi dir="ltr">@f.Days61To90.ToString("N2")</bdi></td>
+                                <td class="text-danger fw-semibold"><bdi dir="ltr">@f.Over90.ToString("N2")</bdi></td>
+                            </tr></tbody>
+                        </table></div>
+                        @if (f.ByGrade.Count > 0)
+                        {
+                            <p class="small text-muted mb-1">@T("Worst grades", "أعلى الصفوف")</p>
+                            <ul class="list-group list-group-flush small">
+                                @foreach (var g in f.ByGrade)
+                                {
+                                    <li class="list-group-item px-0 py-1 d-flex justify-content-between">
+                                        <span>@(g.Grade == null ? "—" : (isRtl ? g.Grade.Name.NameAr : g.Grade.Name.NameEn))</span>
+                                        <span><bdi dir="ltr">@g.Total.ToString("N2")</bdi> @if (g.Over90 > 0m) { <span class="text-danger">(&gt;90: <bdi dir="ltr">@g.Over90.ToString("N2")</bdi>)</span> }</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.Collections && Model.Collections != null)
+            {
+                var k = Model.Collections;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="sms-tile__value text-danger"><bdi dir="ltr">@k.OverdueOutstanding.ToString("N2")</bdi></span>
+                        <span class="text-muted small">@string.Format(T("overdue ({0} installments)", "متأخر ({0} قسط)"), k.OverdueInstallments)</span>
+                    </div>
+                    <p class="small text-muted mb-2">@DashboardLabels.AsOf(k.AsOfUtc, isRtl)</p>
+                    <p class="small mb-2">
+                        @string.Format(T("Next {0} days: ", "الأيام الـ{0} القادمة: "), k.HorizonDays)
+                        <span class="fw-semibold"><bdi dir="ltr">@k.DueSoonOutstanding.ToString("N2")</bdi></span>
+                        <span class="text-muted">@string.Format(T("across {0} installments", "على {0} قسط"), k.DueSoonInstallments)</span>
+                    </p>
+                    @if (k.Days.Count == 0)
+                    {
+                        <p class="small text-muted mb-0">@T("Nothing falls due in this window.", "لا استحقاقات في هذه المدة.")</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                            <caption class="visually-hidden">@T("Instalments falling due", "الأقساط المستحقة")</caption>
+                            <thead><tr><th scope="col">@T("Due", "الاستحقاق")</th><th scope="col" class="text-end">@T("Count", "العدد")</th><th scope="col" class="text-end">@T("Outstanding", "المتبقي")</th></tr></thead>
+                            <tbody>
+                            @foreach (var d in k.Days)
+                            {
+                                <tr>
+                                    <td class="text-nowrap">@d.DueDate.ToString("yyyy-MM-dd")</td>
+                                    <td class="text-end">@d.InstallmentCount</td>
+                                    <td class="text-end"><bdi dir="ltr">@d.Outstanding.ToString("N2")</bdi></td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.Seats && Model.Seats != null)
+            {
+                var s = Model.Seats;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="sms-tile__value @(s.FreeSeats <= 0 ? "text-danger" : "")">@s.FreeSeats.ToString("N0")</span>
+                        <span class="text-muted small">@T("free seats against the plan", "مقعد شاغر مقابل الخطة")</span>
+                    </div>
+                    <div class="row g-2 my-2">
+                        <div class="col-3"><div class="border rounded p-2 text-center"><span class="d-block fw-bold">@s.Planned.ToString("N0")</span><span class="small text-muted">@T("planned", "مخطط")</span></div></div>
+                        <div class="col-3"><div class="border rounded p-2 text-center"><span class="d-block fw-bold">@s.Capacity.ToString("N0")</span><span class="small text-muted">@T("capacity", "السعة")</span></div></div>
+                        <div class="col-3"><div class="border rounded p-2 text-center"><span class="d-block fw-bold">@s.Enrolled.ToString("N0")</span><span class="small text-muted">@T("enrolled", "مقيَّد")</span></div></div>
+                        <div class="col-3"><div class="border rounded p-2 text-center"><span class="d-block fw-bold">@s.Pipeline.ToString("N0")</span><span class="small text-muted">@T("in pipeline", "قيد القبول")</span></div></div>
+                    </div>
+                    @if (s.Tight.Count == 0)
+                    {
+                        <p class="small text-muted mb-0">@T("No grade is over its planned seats.", "لا صف يتجاوز مقاعده المخططة.")</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                            <caption class="visually-hidden">@T("Grades at or over capacity", "الصفوف عند السعة أو فوقها")</caption>
+                            <thead><tr><th scope="col">@T("Grade", "الصف")</th><th scope="col" class="text-end">@T("Enrolled", "مقيَّد")</th><th scope="col" class="text-end">@T("Planned", "مخطط")</th><th scope="col" class="text-end">@T("Pipeline", "قيد القبول")</th><th scope="col" class="text-end">@T("Free", "شاغر")</th></tr></thead>
+                            <tbody>
+                            @foreach (var g in s.Tight)
+                            {
+                                <tr>
+                                    <td>@(g.Grade == null ? "—" : (isRtl ? g.Grade.Name.NameAr : g.Grade.Name.NameEn))</td>
+                                    <td class="text-end">@g.Enrolled</td>
+                                    <td class="text-end">@g.Planned</td>
+                                    <td class="text-end">@g.Pipeline</td>
+                                    <td class="text-end @(g.FreeSeats <= 0 ? "text-danger fw-semibold" : "")">@g.FreeSeats</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table></div>
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.TeacherLoad && Model.TeacherLoad != null)
+            {
+                var t = Model.TeacherLoad;
+                <div class="px-3 pb-3">
+                    <div class="d-flex align-items-baseline gap-2">
+                        <span class="sms-tile__value @(t.Overloaded > 0 ? "text-danger" : "")">@t.Overloaded.ToString("N0")</span>
+                        <span class="text-muted small">@string.Format(T("of {0} teachers over their maximum", "من {0} معلماً فوق النصاب"), t.Profiles)</span>
+                    </div>
+                    @if (t.Worst.Count == 0)
+                    {
+                        <p class="small text-muted mb-0 mt-2">@T("Every teaching load is within its ceiling (BR-TCH-004).", "كل الأنصبة ضمن حدّها الأعلى (BR-TCH-004).")</p>
+                    }
+                    else
+                    {
+                        <ul class="list-group list-group-flush small mt-2">
+                            @foreach (var w in t.Worst)
+                            {
+                                <li class="list-group-item px-0 py-1 d-flex justify-content-between">
+                                    <span>@(w.Employee == null ? "—" : TimetableLabels.TeacherName(w.Employee, isRtl))</span>
+                                    <span class="text-danger"><bdi dir="ltr">@w.CurrentWeeklyPeriods / @w.MaxWeeklyPeriods</bdi> <span class="badge text-bg-danger"><bdi dir="ltr">+@w.Excess</bdi></span></span>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+            else if (panel.Code == DashboardPanels.Restricted && Model.Restricted != null)
+            {
+                var r = Model.Restricted;
+                <div class="px-3 pb-3">
+                    <div class="row g-2">
+                        <div class="col-md-6"><div class="border rounded p-3">
+                            <span class="d-block sms-tile__value">@DashboardLabels.Masked(r.ClinicVisitsToday, r.Threshold, isRtl)</span>
+                            <span class="small text-muted">@T("clinic visits on this day", "زيارة عيادة في هذا اليوم")</span>
+                        </div></div>
+                        <div class="col-md-6"><div class="border rounded p-3">
+                            <span class="d-block sms-tile__value">@DashboardLabels.Masked(r.OpenDisciplineCases, r.Threshold, isRtl)</span>
+                            <span class="small text-muted">@T("open discipline cases", "قضية سلوك مفتوحة")</span>
+                        </div></div>
+                    </div>
+                    <p class="small text-muted mb-0 mt-2">
+                        @string.Format(T("Counts below {0} are masked and no name is reachable from here (BR-DSH-007); the owning modules have no screens yet.", "تُخفى الأعداد دون {0} ولا يمكن الوصول إلى أي اسم من هنا (BR-DSH-007)؛ والوحدتان المالكتان بلا شاشات بعد."), r.Threshold)
+                    </p>
+                </div>
+            }
+        </div>
+    </div>
+}
+</div>
+
+@if (Model.HiddenByPermission > 0 || Model.HiddenByChoice > 0)
+{
+    <p class="small text-muted mt-3">
+        @if (Model.HiddenByPermission > 0)
+        {
+            <text>@string.Format(T("{0} panel(s) hidden: your roles do not grant the permission their widget requires (BR-DSH-001). ", "{0} لوحة مخفية: أدوارك لا تمنح الصلاحية التي يتطلبها عنصرها (BR-DSH-001). "), Model.HiddenByPermission)</text>
+        }
+        @if (Model.HiddenByChoice > 0)
+        {
+            <text>@string.Format(T("{0} panel(s) switched off by you.", "{0} لوحة أطفأتَها بنفسك."), Model.HiddenByChoice)</text>
+        }
+    </p>
+}

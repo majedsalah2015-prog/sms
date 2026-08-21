@@ -1,0 +1,197 @@
+@using System.Globalization
+@model LayoutAdminViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Role layouts", "تخطيطات الأدوار");
+    ViewData["Breadcrumb"] = T("Dashboards / Role layouts", "لوحات المعلومات / تخطيطات الأدوار");
+    var selected = Model.Selected;
+    var template = Model.Template;
+    var help = new HelpPanelViewModel
+    {
+        Id = "lay-help", Title = T("Role layouts — help", "تخطيطات الأدوار — مساعدة"),
+        Intro = T("Each role gets one layout template: the widgets its members see by default, in order. Users personalize on top of it and can always reset back to it (BR-DSH-003).", "لكل دور قالب تخطيط واحد: العناصر التي يراها أعضاؤه افتراضياً، بترتيبها. ويخصّص المستخدمون فوقه، ويمكنهم دائماً العودة إليه (BR-DSH-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Preview as role", "معاينة كدور"), T("Each row says whether this role's permissions actually grant the widget. A widget the role cannot see costs the template nothing but will silently not render for its members (doc §9).", "يبيّن كل صف ما إذا كانت صلاحيات هذا الدور تمنح العنصر فعلاً. والعنصر الذي لا يراه الدور لا يكلّف القالب شيئاً لكنه ببساطة لن يظهر لأعضائه (البند 9).")),
+            new HelpPanelViewModel.Item(T("Portal roles", "أدوار البوابة"), T("For the parent and student roles, a widget that is not portal-eligible is flagged as unreachable — no staff widget is portal-reachable, whatever the template says (BR-DSH-006).", "في دوري ولي الأمر والطالب، يُوسم العنصر غير المتاح للبوابة بأنه غير قابل للوصول — فلا عنصر موظفين يصل إلى البوابة مهما قال القالب (BR-DSH-006).")),
+            new HelpPanelViewModel.Item(T("Order", "الترتيب"), T("Lower numbers come first. Leave gaps of ten so a widget can be slipped in later without renumbering the whole template.", "الأرقام الأصغر أولاً. اترك فجوات من عشرة كي يمكن إدراج عنصر لاحقاً دون إعادة ترقيم القالب كله.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("The default dashboard each role opens on.", "لوحة المعلومات التي يفتح عليها كل دور افتراضياً.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DashboardsNav" />
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Roles and their layout templates", "الأدوار وقوالب تخطيطها")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Role", "الدور")</th>
+                    <th scope="col" class="text-end">@T("Widgets", "العناصر")</th>
+                    <th scope="col" class="text-end">@T("Members", "الأعضاء")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Roles)
+                {
+                    var active = selected?.Id == r.Role.Id;
+                    <tr class="@(active ? "table-active" : "")">
+                        <td>
+                            <a asp-action="Layouts" asp-route-roleId="@r.Role.Id">@DashboardLabels.RoleName(r.Role, isRtl)</a>
+                            @if (r.IsPortalRole) { <span class="badge text-bg-info ms-1">@T("portal", "بوابة")</span> }
+                            @if (r.Template == null) { <span class="badge text-bg-light border ms-1">@T("no template", "بلا قالب")</span> }
+                        </td>
+                        <td class="text-end">@r.WidgetCount</td>
+                        <td class="text-end">@r.MemberCount</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+    @if (selected == null)
+    {
+        <div class="sms-card p-4 text-center text-muted">@T("Choose a role to edit its default dashboard.", "اختر دوراً لتحرير لوحته الافتراضية.")</div>
+    }
+    else
+    {
+        <div class="sms-card p-3 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                <div>
+                    <h2 class="h6 mb-1">@DashboardLabels.RoleName(selected, isRtl) <code class="small">@selected.Code</code></h2>
+                    @if (Model.SelectedIsPortalRole)
+                    {
+                        <p class="small text-muted mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("A portal role: only portal-eligible widgets can reach its home page.", "دور بوابة: لا يصل إلى صفحته إلا العناصر المتاحة للبوابة.")</p>
+                    }
+                </div>
+                @if (template == null)
+                {
+                    <form method="post" asp-action="CreateTemplate">
+                        <input type="hidden" name="roleId" value="@selected.Id" />
+                        <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create layout template", "إنشاء قالب تخطيط")</button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        if (template == null)
+        {
+            <div class="alert alert-info">@T("This role has no layout template, so its members fall back to the built-in panel order.", "لا قالب تخطيط لهذا الدور، فيعود أعضاؤه إلى الترتيب المدمج للوحات.")</div>
+        }
+        else
+        {
+            if (Model.UnseeableCount > 0 || Model.PortalBlockedCount > 0)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                    @if (Model.UnseeableCount > 0)
+                    {
+                        <text>@string.Format(T("{0} widget(s) on this template are not granted to this role — its members will not see them. ", "{0} من عناصر هذا القالب غير ممنوحة لهذا الدور — ولن يراها أعضاؤه. "), Model.UnseeableCount)</text>
+                    }
+                    @if (Model.PortalBlockedCount > 0)
+                    {
+                        <text>@string.Format(T("{0} widget(s) are not portal-eligible and cannot reach a portal home.", "{0} من العناصر غير متاحة للبوابة ولا يمكن أن تصل إلى صفحتها."), Model.PortalBlockedCount)</text>
+                    }
+                </div>
+            }
+
+            <div class="sms-card mb-3">
+                <form method="post" asp-action="ArrangeTemplate" asp-route-templateId="@template.Id">
+                    <input type="hidden" name="roleId" value="@selected.Id" />
+                    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                        <caption class="visually-hidden">@T("Widgets on this role's layout template", "عناصر قالب تخطيط هذا الدور")</caption>
+                        <thead><tr>
+                            <th scope="col">@T("Order", "الترتيب")</th>
+                            <th scope="col">@T("Widget", "العنصر")</th>
+                            <th scope="col">@T("Required permission", "الصلاحية المطلوبة")</th>
+                            <th scope="col">@T("Preview as role", "معاينة كدور")</th>
+                            <th scope="col">@T("Remove", "إزالة")</th>
+                        </tr></thead>
+                        <tbody>
+                        @foreach (var e in Model.Entries)
+                        {
+                            <tr>
+                                <td style="width:7rem">
+                                    <input type="hidden" name="entryIds" value="@e.Row.Id" />
+                                    <input type="number" name="sortOrders" value="@e.Row.SortOrder" min="0" max="9999" class="form-control form-control-sm" aria-label="@string.Format(T("Order of {0}", "ترتيب {0}"), isRtl ? e.Widget.TitleAr : e.Widget.TitleEn)" />
+                                </td>
+                                <td>
+                                    <code class="small">@e.Widget.Code</code>
+                                    <span class="d-block">@(isRtl ? e.Widget.TitleAr : e.Widget.TitleEn)</span>
+                                </td>
+                                <td class="small @(e.Permission == null ? "text-danger" : "text-muted")">@DashboardLabels.PermissionLabel(e.Permission, isRtl)</td>
+                                <td class="small">
+                                    @if (!e.RoleGrantsPermission)
+                                    {
+                                        <span class="badge text-bg-warning"><i class="bi bi-eye-slash me-1" aria-hidden="true"></i>@T("not granted", "غير ممنوحة")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-success"><i class="bi bi-eye me-1" aria-hidden="true"></i>@T("visible", "ظاهر")</span>
+                                    }
+                                    @if (!e.PortalReachable)
+                                    {
+                                        <span class="badge text-bg-danger ms-1"><i class="bi bi-slash-circle me-1" aria-hidden="true"></i>@T("not portal-reachable", "لا يصل للبوابة")</span>
+                                    }
+                                </td>
+                                <td>
+                                    <input type="checkbox" name="removeIds" value="@e.Row.Id" class="form-check-input" aria-label="@string.Format(T("Remove {0}", "إزالة {0}"), isRtl ? e.Widget.TitleAr : e.Widget.TitleEn)" />
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Entries.Count == 0)
+                        {
+                            <tr><td colspan="5" class="text-center text-muted py-4">@T("This template is empty.", "هذا القالب فارغ.")</td></tr>
+                        }
+                        </tbody>
+                    </table></div>
+                    @if (Model.Entries.Count > 0)
+                    {
+                        <div class="p-2 border-top"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save order and removals", "حفظ الترتيب والإزالات")</button></div>
+                    }
+                </form>
+            </div>
+
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Add a widget", "إضافة عنصر")</h2>
+                @if (Model.Addable.Count == 0)
+                {
+                    <p class="small text-muted mb-0">
+                        @T("Every registered widget is already on this template.", "كل عنصر مسجَّل موجود في هذا القالب بالفعل.")
+                        <a asp-action="Widgets">@T("Register another", "سجّل عنصراً آخر")</a>
+                    </p>
+                }
+                else
+                {
+                    <form method="post" asp-action="AddWidget" asp-route-templateId="@template.Id" class="row g-2 align-items-end">
+                        <input type="hidden" name="roleId" value="@selected.Id" />
+                        <div class="col-md-7">
+                            <label class="form-label small mb-1" for="add-widget">@T("Widget", "العنصر")</label>
+                            <select id="add-widget" name="widgetDefinitionId" class="form-select form-select-sm" required aria-required="true">
+                                @foreach (var w in Model.Addable) { <option value="@w.Id">@w.Code — @(isRtl ? w.TitleAr : w.TitleEn)</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small mb-1" for="add-order">@T("Order", "الترتيب")</label>
+                            <input id="add-order" name="sortOrder" type="number" min="0" max="9999" value="@Model.NextSortOrder" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-sm btn-primary w-100" type="submit">@T("Add", "إضافة")</button>
+                        </div>
+                    </form>
+                }
+            </div>
+        }
+    }
+    </div>
+</div>

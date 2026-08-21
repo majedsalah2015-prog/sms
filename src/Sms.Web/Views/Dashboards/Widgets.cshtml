@@ -1,0 +1,142 @@
+@using System.Globalization
+@using Sms.Domain.Dashboards
+@model WidgetRegistryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Widget registry", "سجل العناصر");
+    ViewData["Breadcrumb"] = T("Dashboards / Widget registry", "لوحات المعلومات / سجل العناصر");
+    var hasPermissions = Model.Permissions.Count > 0;
+    var help = new HelpPanelViewModel
+    {
+        Id = "wid-help", Title = T("Widget registry — help", "سجل العناصر — مساعدة"),
+        Intro = T("A widget is a registry row, not code: a code, the module that owns it, the permission that gates it, how often it refreshes, and where its number clicks through to (BR-DSH-001). Registering a row is what makes a dashboard panel permission-gated, role-orderable and personalizable.", "العنصر صفٌّ في السجل لا شيفرة: رمز، والوحدة المالكة، والصلاحية التي تحكمه، ودورية تحديثه، والشاشة التي يفتح عليها رقمه (BR-DSH-001). وتسجيل الصف هو ما يجعل لوحة المعلومات خاضعة للصلاحية وقابلة للترتيب والتخصيص."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Deny by default", "المنع افتراضاً"), T("Once a panel is registered, only users holding its permission see it — everyone else gets a dashboard without it, not an error. Register against a permission your dashboard audience actually has.", "بمجرد تسجيل اللوحة، لا يراها إلا من يملك صلاحيتها — ويحصل الباقون على لوحة بدونها، لا على خطأ. فسجّل مقابل صلاحية يملكها جمهور اللوحة فعلاً.")),
+            new HelpPanelViewModel.Item(T("Portal eligible", "متاح للبوابة"), T("Leave this off for staff widgets: a widget that is not portal-eligible can never appear on a parent or student home, whatever a layout template says (BR-DSH-006).", "اتركه مطفأً لعناصر الموظفين: العنصر غير المتاح للبوابة لا يظهر أبداً في صفحة ولي الأمر أو الطالب مهما قال قالب التخطيط (BR-DSH-006).")),
+            new HelpPanelViewModel.Item(T("Widget content", "محتوى العنصر"), T("The registry describes widgets; it does not compute them. The overview's panels are wired to their modules' own calculators, and the consolidated widget-to-data-source catalog is a later deliverable.", "السجل يصف العناصر ولا يحتسبها. لوحات النظرة العامة موصولة بحاسبات وحداتها، وكتالوج ربط العناصر بمصادر البيانات تسليم لاحق.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Which widgets exist, what gates them, and where they drill to.", "ما العناصر الموجودة، وما يحكمها، وإلى أين تفتح.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DashboardsNav" />
+
+@if (!hasPermissions)
+{
+    <div class="alert alert-warning" role="alert">
+        <i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>
+        @T("No permission rows exist yet, so nothing can be registered — a widget must name the permission that gates it.", "لا توجد صفوف صلاحيات بعد، فلا يمكن تسجيل شيء — إذ يجب أن يسمّي العنصر الصلاحية التي تحكمه.")
+    </div>
+}
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Registered widgets", "العناصر المسجَّلة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Code", "الرمز")</th>
+                    <th scope="col">@T("Title", "العنوان")</th>
+                    <th scope="col">@T("Module", "الوحدة")</th>
+                    <th scope="col">@T("Required permission", "الصلاحية المطلوبة")</th>
+                    <th scope="col">@T("Refresh", "التحديث")</th>
+                    <th scope="col">@T("Drill target", "وجهة الفتح")</th>
+                    <th scope="col" class="text-end">@T("In use", "قيد الاستخدام")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    <tr>
+                        <td>
+                            <code>@r.Widget.Code</code>
+                            @if (r.BuiltIn != null) { <span class="badge text-bg-light border ms-1" title="@T("Drives a built-in overview panel", "تُشغّل لوحة مدمجة في النظرة العامة")"><i class="bi bi-speedometer2" aria-hidden="true"></i></span> }
+                            @if (r.Widget.IsPortalEligible) { <span class="badge text-bg-info ms-1">@T("portal", "بوابة")</span> }
+                        </td>
+                        <td>@(isRtl ? r.Widget.TitleAr : r.Widget.TitleEn)</td>
+                        <td class="small text-muted">@r.Widget.OwningModuleCode</td>
+                        <td class="small @(r.Permission == null ? "text-danger" : "")">@DashboardLabels.PermissionLabel(r.Permission, isRtl)</td>
+                        <td><span class="badge @DashboardLabels.RefreshBadge(r.Widget.RefreshClass)">@DashboardLabels.RefreshClass(r.Widget.RefreshClass, isRtl)</span></td>
+                        <td class="small text-muted">@(string.IsNullOrWhiteSpace(r.Widget.DrillTargetCode) ? "—" : r.Widget.DrillTargetCode)</td>
+                        <td class="text-end small text-nowrap">
+                            @string.Format(T("{0} templates · {1} users", "{0} قالب · {1} مستخدم"), r.TemplateCount, r.PersonalizationCount)
+                        </td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">@T("No widget is registered. The overview still works — its panels simply show for everyone.", "لا عنصر مسجَّل. والنظرة العامة تعمل رغم ذلك — لوحاتها تظهر للجميع فحسب.")</td></tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        @if (Model.Unregistered.Count > 0 && hasPermissions)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6 mb-2"><i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>@T("Register a built-in panel", "تسجيل لوحة مدمجة")</h2>
+                <p class="small text-muted">@T("Takes the panel's own code, title, module, refresh class and drill target; you only choose the permission that will gate it.", "يأخذ رمز اللوحة وعنوانها ووحدتها ودورية تحديثها ووجهة فتحها؛ ولا تختار أنت إلا الصلاحية التي ستحكمها.")</p>
+                <form method="post" asp-action="RegisterBuiltIn" class="d-grid gap-2">
+                    <select name="code" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Built-in panel", "اللوحة المدمجة")">
+                        @foreach (var p in Model.Unregistered) { <option value="@p.Code">@p.Code — @p.Title(isRtl)@(p.IsRestrictedCategory ? T(" (restricted category)", " (فئة مقيَّدة)") : "")</option> }
+                    </select>
+                    <select name="requiredPermissionId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Required permission", "الصلاحية المطلوبة")">
+                        <option value="">@T("— choose the gating permission —", "— اختر الصلاحية الحاكمة —")</option>
+                        @foreach (var p in Model.Permissions) { <option value="@p.Id">@DashboardLabels.PermissionLabel(p, isRtl)</option> }
+                    </select>
+                    <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button>
+                </form>
+            </div>
+        }
+
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-2"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Register a widget", "تسجيل عنصر")</h2>
+            <form method="post" asp-action="DefineWidget" class="d-grid gap-2">
+                <div>
+                    <label class="form-label small mb-1" for="w-code">@T("Code", "الرمز")</label>
+                    <input id="w-code" name="code" class="form-control form-control-sm" maxlength="30" required aria-required="true" placeholder="DSH-ATT-002" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-module">@T("Owning module", "الوحدة المالكة")</label>
+                    <input id="w-module" name="owningModuleCode" class="form-control form-control-sm" maxlength="20" required aria-required="true" placeholder="ATT" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-title-ar">@T("Title (Arabic)", "العنوان (بالعربية)")</label>
+                    <input id="w-title-ar" name="titleAr" class="form-control form-control-sm" maxlength="100" required aria-required="true" dir="rtl" lang="ar" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-title-en">@T("Title (English)", "العنوان (بالإنجليزية)")</label>
+                    <input id="w-title-en" name="titleEn" class="form-control form-control-sm" maxlength="100" required aria-required="true" dir="ltr" lang="en" />
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-permission">@T("Required permission", "الصلاحية المطلوبة")</label>
+                    <select id="w-permission" name="requiredPermissionId" class="form-select form-select-sm" required aria-required="true" disabled="@(!hasPermissions)">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                        @foreach (var p in Model.Permissions) { <option value="@p.Id">@DashboardLabels.PermissionLabel(p, isRtl)</option> }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-refresh">@T("Refresh class", "دورية التحديث")</label>
+                    <select id="w-refresh" name="refreshClass" class="form-select form-select-sm">
+                        @foreach (var c in Enum.GetValues<WidgetRefreshClass>()) { <option value="@c" selected="@(c == WidgetRefreshClass.Cached15Min)">@DashboardLabels.RefreshClass(c, isRtl)</option> }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="w-drill">@T("Drill target", "وجهة الفتح")</label>
+                    <input id="w-drill" name="drillTargetCode" class="form-control form-control-sm" maxlength="100" placeholder="Attendance/Index" />
+                </div>
+                <label class="small"><input type="checkbox" name="isPortalEligible" value="true" class="form-check-input" /> @T("Portal eligible (parent/student home may show it)", "متاح للبوابة (يمكن أن يظهر في صفحة ولي الأمر أو الطالب)")</label>
+                <button class="btn btn-sm btn-primary" type="submit" disabled="@(!hasPermissions)"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button>
+            </form>
+        </div>
+    </div>
+</div>

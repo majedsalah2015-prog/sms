@@ -1,0 +1,265 @@
+@using System.Globalization
+@using Sms.Domain.Reports
+@using Sms.Web.Navigation
+@model ReportCenterViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Report center", "مركز التقارير");
+    ViewData["Breadcrumb"] = T("Reports / Report center", "التقارير / مركز التقارير");
+    string ModuleName(string code) => ModuleCatalog.Find(code) is { } info ? (isRtl ? info.TitleAr : info.TitleEn) : code;
+    var help = new HelpPanelViewModel
+    {
+        Id = "rpt-help", Title = T("Report center — help", "مركز التقارير — مساعدة"),
+        Intro = T("This is the reporting platform's registry, not the reports. Every catalog report is a registered definition (BR-RPT-001) naming its owning module, output formats, sensitivity class and the permission that gates it; the 150+ reports themselves are a separate Phase 9 deliverable, which is why this list starts empty.", "هذه سجلّ منصّة التقارير، لا التقارير نفسها. كل تقرير في الفهرس تعريف مسجَّل (BR-RPT-001) يحدّد وحدته المالكة وصيغ الإخراج ودرجة الحساسية والصلاحية التي تحكمه؛ أما التقارير الـ150+ فهي مُخرَج منفصل للمرحلة التاسعة، ولهذا تبدأ القائمة فارغة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Deny by default", "المنع افتراضاً"), T("A report runs only for someone holding the View action on the permission it names (BR-RPT-002). Rows you cannot run say so here instead of failing when you open them.", "لا يُشغَّل التقرير إلا لمن يملك إجراء «عرض» على الصلاحية التي يحدّدها (BR-RPT-002). والصفوف التي لا تستطيع تشغيلها تُصرّح بذلك هنا بدل أن تفشل عند فتحها.")),
+            new HelpPanelViewModel.Item(T("Sensitivity decides more than a badge", "الحساسية أكثر من مجرد وسم"), T("Personal-data and restricted reports need the Export action for file output — viewing on screen never does (BR-RPT-003). Restricted reports additionally refuse email delivery and are portal-only.", "تقارير البيانات الشخصية والمقيَّدة تحتاج إجراء «تصدير» لإخراج ملف — أما العرض على الشاشة فلا يحتاجه أبداً (BR-RPT-003). والمقيَّدة ترفض التسليم بالبريد وتُسلَّم عبر البوابة فقط.")),
+            new HelpPanelViewModel.Item(T("Required parameters", "المعاملات المطلوبة"), T("A definition lists the parameter keys a run must supply. The runner marks them and refuses an incomplete run (doc §9).", "يُدرج التعريف مفاتيح المعاملات التي يلزم تزويدها عند التشغيل. وشاشة التشغيل تُعلّمها وترفض تشغيلاً ناقصاً (البند 9).")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("The registered report catalogue — what exists, who may run it, and what it will ask for.", "فهرس التقارير المسجَّلة — ما هو موجود، ومن يحق له تشغيله، وما الذي سيطلبه.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_ReportsNav" />
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-collection" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.Rows.Count</span><span class="sms-tile__label">@T("definitions listed", "تعريف معروض")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-success"><i class="bi bi-play-circle" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.RunnableCount</span><span class="sms-tile__label">@T("you may run", "يمكنك تشغيله")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-warning"><i class="bi bi-shield-lock" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.Rows.Count(r => r.Definition.Sensitivity != ReportSensitivity.Normal)</span><span class="sms-tile__label">@T("personal-data / restricted", "بيانات شخصية / مقيَّد")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-clock-history" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.Rows.Sum(r => r.RunCount)</span><span class="sms-tile__label">@T("recorded runs", "تشغيل مسجَّل")</span></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-8">
+        <div class="sms-card">
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-end p-3 pb-2">
+                <div>
+                    <label class="form-label small mb-0" for="f-q">@T("Search", "بحث")</label>
+                    <input class="form-control form-control-sm" id="f-q" name="q" value="@Model.Q" placeholder="@T("code or title", "الرمز أو العنوان")" />
+                </div>
+                <div>
+                    <label class="form-label small mb-0" for="f-module">@T("Owning module", "الوحدة المالكة")</label>
+                    <select class="form-select form-select-sm" id="f-module" name="module">
+                        <option value="">@T("All modules", "كل الوحدات")</option>
+                        @foreach (var code in Model.UsedModuleCodes)
+                        {
+                            <option value="@code" selected="@(string.Equals(code, Model.ModuleCode, StringComparison.OrdinalIgnoreCase))">@code — @ModuleName(code)</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-0" for="f-sens">@T("Sensitivity", "الحساسية")</label>
+                    <select class="form-select form-select-sm" id="f-sens" name="sensitivity">
+                        <option value="">@T("Any", "الكل")</option>
+                        @foreach (var s in new[] { ReportSensitivity.Normal, ReportSensitivity.PersonalData, ReportSensitivity.Restricted })
+                        {
+                            <option value="@((short)s)" selected="@(Model.Sensitivity == s)">@ReportLabels.Sensitivity(s, isRtl)</option>
+                        }
+                    </select>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> @T("Filter", "تصفية")</button>
+                <a class="btn btn-sm btn-link" asp-action="Index">@T("Clear", "مسح")</a>
+            </form>
+
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Registered report definitions", "تعريفات التقارير المسجَّلة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Code", "الرمز")</th>
+                    <th scope="col">@T("Report", "التقرير")</th>
+                    <th scope="col">@T("Sensitivity", "الحساسية")</th>
+                    <th scope="col">@T("Formats", "الصيغ")</th>
+                    <th scope="col">@T("Required parameters", "المعاملات المطلوبة")</th>
+                    <th scope="col">@T("Your access", "صلاحيتك")</th>
+                    <th scope="col" class="text-center">@T("Runs", "التشغيلات")</th>
+                    <th scope="col">@T("Actions", "الإجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">@T("No report definitions match. Register one on the right — the catalogue ships empty by design.", "لا تعريفات مطابقة. سجّل تعريفاً من اليسار — الفهرس يبدأ فارغاً بحكم التصميم.")</td></tr>
+                }
+                @foreach (var r in Model.Rows)
+                {
+                    <tr>
+                        <td class="text-nowrap"><code>@r.Definition.Code</code></td>
+                        <td>
+                            @(isRtl ? r.Definition.TitleAr : r.Definition.TitleEn)
+                            <span class="d-block small text-muted">@r.Definition.OwningModuleCode — @ModuleName(r.Definition.OwningModuleCode)</span>
+                        </td>
+                        <td>
+                            <span class="badge @ReportLabels.SensitivityBadge(r.Definition.Sensitivity)">@ReportLabels.Sensitivity(r.Definition.Sensitivity, isRtl)</span>
+                            @if (!r.Access.EmailDeliveryAllowed)
+                            {
+                                <span class="badge text-bg-light border ms-1" title="@T("Restricted: portal delivery only, never email (BR-RPT-003).", "مقيَّد: التسليم عبر البوابة فقط، ولا يُرسل بالبريد إطلاقاً (BR-RPT-003).")"><i class="bi bi-envelope-slash" aria-hidden="true"></i> @T("portal only", "البوابة فقط")</span>
+                            }
+                        </td>
+                        <td class="small">
+                            @foreach (var f in ReportLabels.SplitFormats(r.Definition.SupportedFormats))
+                            {
+                                <span class="badge text-bg-light border me-1">@ReportLabels.Format(f, isRtl)</span>
+                            }
+                        </td>
+                        <td class="small">
+                            @if (r.RequiredKeys.Count == 0)
+                            {
+                                <span class="text-muted">@T("none", "لا شيء")</span>
+                            }
+                            else
+                            {
+                                @foreach (var k in r.RequiredKeys)
+                                {
+                                    <code class="me-1" dir="ltr">@k</code>
+                                }
+                            }
+                        </td>
+                        <td class="small">
+                            @if (r.Access.PermissionMissing)
+                            {
+                                <span class="badge text-bg-danger" title="@T("The sec.Permission row this definition names no longer exists.", "صفّ الصلاحية الذي يشير إليه هذا التعريف لم يعد موجوداً.")"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> @T("permission missing", "الصلاحية مفقودة")</span>
+                            }
+                            else
+                            {
+                                <span class="d-block text-muted" dir="ltr">@r.Access.Permission!.ModuleCode · @r.Access.Permission!.ScreenCode</span>
+                                @if (r.Access.HoldsViewPermission)
+                                {
+                                    <span class="badge text-bg-success"><i class="bi bi-eye" aria-hidden="true"></i> @T("view", "عرض")</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary" title="@T("Deny by default (BR-RPT-002).", "المنع افتراضاً (BR-RPT-002).")"><i class="bi bi-eye-slash" aria-hidden="true"></i> @T("no view", "لا عرض")</span>
+                                }
+                                @if (r.Access.ExportAllowed)
+                                {
+                                    <span class="badge text-bg-success ms-1" title="@(r.Definition.Sensitivity == ReportSensitivity.Normal ? T("A normal report exports without the Export permission (BR-RPT-003).", "التقرير العادي يُصدَّر دون صلاحية التصدير (BR-RPT-003).") : T("You hold the Export permission this report needs for file output.", "تملك صلاحية التصدير التي يحتاجها هذا التقرير لإخراج ملف."))"><i class="bi bi-download" aria-hidden="true"></i> @T("export", "تصدير")</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-warning ms-1" title="@T("File output needs the Export permission; on-screen viewing does not (BR-RPT-003).", "إخراج الملف يحتاج صلاحية التصدير؛ أما العرض على الشاشة فلا (BR-RPT-003).")"><i class="bi bi-file-earmark-x" aria-hidden="true"></i> @T("view only", "عرض فقط")</span>
+                                }
+                            }
+                        </td>
+                        <td class="text-center">
+                            @r.RunCount
+                            @if (r.LastRun != null)
+                            {
+                                <span class="d-block small text-muted text-nowrap">@r.LastRun.ExecutedAtUtc.ToString("yyyy-MM-dd")</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            @if (r.Access.CanRun)
+                            {
+                                <a class="btn btn-sm btn-primary" asp-action="Run" asp-route-id="@r.Definition.Id"><i class="bi bi-play" aria-hidden="true"></i> @T("Run", "تشغيل")</a>
+                            }
+                            else
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Run" asp-route-id="@r.Definition.Id" title="@T("Open to see why this report is not available to you.", "افتحه لمعرفة سبب عدم إتاحة هذا التقرير لك.")"><i class="bi bi-info-circle" aria-hidden="true"></i> @T("Details", "التفاصيل")</a>
+                            }
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Subscriptions" asp-route-reportId="@r.Definition.Id" title="@T("Subscriptions", "الاشتراكات")" aria-label="@T("Subscriptions", "الاشتراكات")"><i class="bi bi-envelope-paper" aria-hidden="true"></i>@(r.SubscriptionCount > 0 ? " " + r.SubscriptionCount.ToString() : "")</a>
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Log" asp-route-reportId="@r.Definition.Id" title="@T("Execution log", "سجل التشغيل")" aria-label="@T("Execution log", "سجل التشغيل")"><i class="bi bi-clock-history" aria-hidden="true"></i></a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-xl-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("Register a report", "تسجيل تقرير")</h2>
+            @if (Model.Permissions.Count == 0)
+            {
+                <div class="alert alert-warning mb-0">
+                    @T("No permission rows exist yet, and every definition must name the permission that gates it (BR-RPT-001). Seed the security catalogue first — this screen deliberately does not create permissions, because inventing security-catalogue rows from a reports screen would put the permission tree in two hands.",
+                       "لا توجد صفوف صلاحيات بعد، وكل تعريف يجب أن يحدّد الصلاحية التي تحكمه (BR-RPT-001). ابدأ بتهيئة فهرس الصلاحيات — وهذه الشاشة لا تُنشئ صلاحيات عمداً، لأن استحداث صفوف من فهرس الأمن عبر شاشة تقارير يجعل شجرة الصلاحيات في يدين اثنتين.")
+                </div>
+            }
+            else
+            {
+                <form method="post" asp-action="CreateDefinition">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <label class="form-label small" for="d-code">@T("Catalog code", "رمز الفهرس")</label>
+                            <input class="form-control form-control-sm" id="d-code" name="code" maxlength="30" required dir="ltr" placeholder="RPT-FEE-001" />
+                            <div class="form-text">@T("The Phase 9 catalogue convention: RPT-&lt;MOD&gt;-###.", "اصطلاح فهرس المرحلة التاسعة: RPT-&lt;MOD&gt;-###.")</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small" for="d-module">@T("Owning module", "الوحدة المالكة")</label>
+                            <select class="form-select form-select-sm" id="d-module" name="owningModuleCode" required>
+                                @foreach (var info in ModuleCatalog.Modules)
+                                {
+                                    <option value="@info.Code" selected="@(info.Code == "RPT")">@info.Number · @info.Code — @(isRtl ? info.TitleAr : info.TitleEn)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12"><label class="form-label small" for="d-titleAr">@T("Title (Arabic)", "العنوان (عربي)")</label><input class="form-control form-control-sm" id="d-titleAr" name="titleAr" maxlength="150" required dir="rtl" /></div>
+                        <div class="col-12"><label class="form-label small" for="d-titleEn">@T("Title (English)", "العنوان (إنجليزي)")</label><input class="form-control form-control-sm" id="d-titleEn" name="titleEn" maxlength="150" required dir="ltr" /></div>
+
+                        <div class="col-12">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Output formats", "صيغ الإخراج")</legend>
+                                @foreach (var f in ReportLabels.AllFormats)
+                                {
+                                    var fid = "d-fmt-" + (short)f;
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="@fid" name="formats" value="@((short)f)" checked="@(f == OutputFormat.Html)" />
+                                        <label class="form-check-label small" for="@fid">@ReportLabels.Format(f, isRtl)</label>
+                                    </div>
+                                }
+                            </fieldset>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small" for="d-sens">@T("Sensitivity class", "درجة الحساسية")</label>
+                            <select class="form-select form-select-sm" id="d-sens" name="sensitivity" required>
+                                @foreach (var s in new[] { ReportSensitivity.Normal, ReportSensitivity.PersonalData, ReportSensitivity.Restricted })
+                                {
+                                    <option value="@((short)s)">@ReportLabels.Sensitivity(s, isRtl)</option>
+                                }
+                            </select>
+                            <div class="form-text">@T("Personal-data and restricted reports need Export permission for files; restricted ones never email.", "تقارير البيانات الشخصية والمقيَّدة تحتاج صلاحية التصدير للملفات؛ والمقيَّدة لا تُرسل بالبريد إطلاقاً.")</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label small" for="d-perm">@T("Gated by permission", "الصلاحية الحاكمة")</label>
+                            <select class="form-select form-select-sm" id="d-perm" name="permissionId" required dir="ltr">
+                                @foreach (var group in Model.Permissions.GroupBy(p => p.ModuleCode))
+                                {
+                                    <optgroup label="@group.Key">
+                                        @foreach (var p in group)
+                                        {
+                                            <option value="@p.Id">@p.ScreenCode</option>
+                                        }
+                                    </optgroup>
+                                }
+                            </select>
+                            <div class="form-text">@T("The View action on this pair gates running; the Export action on the same pair gates file output.", "إجراء «عرض» على هذا الزوج يحكم التشغيل؛ وإجراء «تصدير» على الزوج نفسه يحكم إخراج الملف.")</div>
+                        </div>
+
+                        <div class="col-12">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Required parameters", "المعاملات المطلوبة")</legend>
+                                @foreach (var f in StandardReportParameters.Fields)
+                                {
+                                    var kid = "d-key-" + f.Key;
+                                    <div class="form-check form-check-inline">
+                                        <input class="form-check-input" type="checkbox" id="@kid" name="requiredStandardKeys" value="@f.Key" />
+                                        <label class="form-check-label small" for="@kid">@f.Label(isRtl)</label>
+                                    </div>
+                                }
+                            </fieldset>
+                            <label class="form-label small mt-1" for="d-otherKeys">@T("Other keys (comma separated)", "مفاتيح أخرى (مفصولة بفواصل)")</label>
+                            <input class="form-control form-control-sm" id="d-otherKeys" name="requiredOtherKeys" dir="ltr" placeholder="payerId,asOfDate" />
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-grid">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Register report", "تسجيل التقرير")</button>
+                    </div>
+                </form>
+            }
+        </div>
+    </div>
+</div>

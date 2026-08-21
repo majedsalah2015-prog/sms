@@ -1,0 +1,319 @@
+@using System.Globalization
+@using Sms.Domain.Reports
+@using Sms.Web.Navigation
+@model ReportRunViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var d = Model.Definition;
+    var title = isRtl ? d.TitleAr : d.TitleEn;
+    ViewData["Title"] = T("Run report", "تشغيل تقرير");
+    ViewData["Breadcrumb"] = T($"Reports / {d.Code}", $"التقارير / {d.Code}");
+    var moduleName = ModuleCatalog.Find(d.OwningModuleCode) is { } info ? (isRtl ? info.TitleAr : info.TitleEn) : d.OwningModuleCode;
+    var formats = ReportLabels.SplitFormats(d.SupportedFormats);
+    var defaultFormat = formats.Contains(OutputFormat.Html) ? OutputFormat.Html : formats.FirstOrDefault();
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var help = new HelpPanelViewModel
+    {
+        Id = "run-help", Title = T("Report runner — help", "شاشة التشغيل — مساعدة"),
+        Intro = T("A run records who asked for what, under which permission, in which format and at what size. Report content itself is the Phase 9 catalogue deliverable — the rendering technology is still an open decision (doc §14), so nothing is drawn here yet; everything that governs a run is real.", "التشغيل يسجّل من طلب ماذا، وبأي صلاحية، وبأي صيغة، وبأي حجم. أما محتوى التقرير فهو مُخرَج فهرس المرحلة التاسعة — وتقنية العرض ما تزال قراراً مفتوحاً (البند 14)، فلا يُرسم شيء هنا بعد؛ لكن كل ما يحكم التشغيل حقيقي."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("View is not export", "العرض غير التصدير"), T("Format and output mode are separate questions. A personal-data report renders on screen for anyone holding View; taking the same content away as a file additionally needs the Export action (BR-RPT-003).", "الصيغة ووضع الإخراج سؤالان منفصلان. تقرير البيانات الشخصية يُعرض على الشاشة لكل من يملك «عرض»؛ أما أخذ المحتوى نفسه كملف فيحتاج إضافةً إجراء «تصدير» (BR-RPT-003).")),
+            new HelpPanelViewModel.Item(T("Inline or queued", "مباشر أم في الطابور"), T($"A run estimated at {Model.HeavyRowThreshold:N0} rows or more is queued instead of run interactively, and you are notified when it is ready; below the threshold it must return within 10 seconds (BR-RPT-005, NF-P5).", $"التشغيل المقدَّر بـ{Model.HeavyRowThreshold:N0} صف أو أكثر يُدرج في الطابور بدل تشغيله تفاعلياً، ويصلك إشعار عند جاهزيته؛ ودون الحدّ يجب أن يعود خلال 10 ثوانٍ (BR-RPT-005 وNF-P5).")),
+            new HelpPanelViewModel.Item(T("Marking a queued run ready", "وسم تشغيل الطابور بالجاهزية"), T("The queue worker that would finish a queued run is not wired yet (E-011). Until it is, the history below lets you close one by hand with its row count and duration — that is the same operation the worker will call.", "عامل الطابور الذي سينهي التشغيل المُدرَج غير موصول بعد (E-011). وحتى يُوصل، يتيح لك السجل أدناه إغلاقه يدوياً بعدد صفوفه ومدّته — وهي العملية نفسها التي سيستدعيها العامل.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@title</h1>
+        <p class="text-muted mb-0"><code dir="ltr">@d.Code</code> · @d.OwningModuleCode — @moduleName</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-@(isRtl ? "right" : "left")" aria-hidden="true"></i> @T("Report center", "مركز التقارير")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_ReportsNav" />
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        @if (Model.Access.PermissionMissing)
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
+                @T($"This definition is gated on permission #{d.PermissionId}, which no longer exists. No one can run it until the registry entry names a live permission.", $"هذا التعريف محكوم بالصلاحية رقم {d.PermissionId} ولم تعد موجودة. لا يمكن لأحد تشغيله حتى يشير التسجيل إلى صلاحية قائمة.")
+            </div>
+        }
+        else if (!Model.Access.HoldsViewPermission)
+        {
+            <div class="alert alert-danger" role="alert">
+                <i class="bi bi-shield-lock me-1" aria-hidden="true"></i>
+                @T("You do not hold the View action on this report's permission, so it will not run for you — deny by default (BR-RPT-002).", "لا تملك إجراء «عرض» على صلاحية هذا التقرير، فلن يعمل لك — المنع افتراضاً (BR-RPT-002).")
+                <span class="d-block small mt-1" dir="ltr">@Model.Access.Permission!.ModuleCode · @Model.Access.Permission!.ScreenCode</span>
+            </div>
+        }
+
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("Parameters and output", "المعاملات والإخراج")</h2>
+            <form method="post" asp-action="Execute" asp-route-id="@d.Id" id="runForm">
+                <fieldset disabled="@(!Model.Access.CanRun)">
+                    <div class="row g-2">
+                        @foreach (var f in Model.Fields)
+                        {
+                            var fid = "p-" + f.Key;
+                            var col = f.Kind == ReportParameterKind.Text ? "col-12" : "col-md-6";
+                            <div class="@col">
+                                <label class="form-label small mb-0" for="@fid">
+                                    @f.Label(isRtl)
+                                    @if (f.IsRequired)
+                                    {
+                                        <span class="text-danger" title="@T("Required by this report's definition (doc §9).", "مطلوب بحسب تعريف هذا التقرير (البند 9).")">*</span>
+                                    }
+                                    @if (f.Kind == ReportParameterKind.Text)
+                                    {
+                                        <code class="ms-1 small text-muted" dir="ltr">@f.Key</code>
+                                    }
+                                </label>
+                                <input type="hidden" name="paramKeys" value="@f.Key" />
+                                @if (f.Kind == ReportParameterKind.Year)
+                                {
+                                    <select class="form-select form-select-sm" id="@fid" name="paramValues" required="@f.IsRequired">
+                                        <option value="">@T("— any —", "— الكل —")</option>
+                                        @foreach (var y in Model.Years)
+                                        {
+                                            <option value="@y.Id" selected="@(y.Id == Model.WorkingYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option>
+                                        }
+                                    </select>
+                                }
+                                else if (f.Kind == ReportParameterKind.Grade)
+                                {
+                                    <select class="form-select form-select-sm" id="@fid" name="paramValues" required="@f.IsRequired">
+                                        <option value="">@T("— any —", "— الكل —")</option>
+                                        @foreach (var g in Model.Grades)
+                                        {
+                                            <option value="@g.Id">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                                        }
+                                    </select>
+                                }
+                                else if (f.Kind == ReportParameterKind.Section)
+                                {
+                                    <select class="form-select form-select-sm" id="@fid" name="paramValues" required="@f.IsRequired">
+                                        <option value="">@T("— any —", "— الكل —")</option>
+                                        @foreach (var s in Model.Sections)
+                                        {
+                                            var gradeName = Model.SectionGradeNames.TryGetValue(s.Id, out var gn) ? gn : string.Empty;
+                                            <option value="@s.Id">@(gradeName.Length == 0 ? "" : gradeName + " · ")@(isRtl ? s.NameAr : s.NameEn)</option>
+                                        }
+                                    </select>
+                                }
+                                else if (f.Kind == ReportParameterKind.Date)
+                                {
+                                    <input type="date" class="form-control form-control-sm" id="@fid" name="paramValues" required="@f.IsRequired" />
+                                }
+                                else
+                                {
+                                    <input type="text" class="form-control form-control-sm" id="@fid" name="paramValues" required="@f.IsRequired" dir="auto" />
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div id="extraParams" class="row g-2 mt-0"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="addParam"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Add parameter", "إضافة معامل")</button>
+
+                    <hr />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Output format", "صيغة الإخراج")</legend>
+                                @foreach (var f in formats)
+                                {
+                                    var rid = "fmt-" + (short)f;
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" id="@rid" name="format" value="@((short)f)" checked="@(f == defaultFormat)" />
+                                        <label class="form-check-label small" for="@rid">@ReportLabels.Format(f, isRtl)</label>
+                                    </div>
+                                }
+                            </fieldset>
+                        </div>
+
+                        <div class="col-md-6">
+                            <fieldset>
+                                <legend class="form-label small mb-1">@T("Output mode", "وضع الإخراج")</legend>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="mode-view" name="isExport" value="false" checked />
+                                    <label class="form-check-label small" for="mode-view">@T("View on screen", "عرض على الشاشة")</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" id="mode-export" name="isExport" value="true" disabled="@(!Model.Access.ExportAllowed)" />
+                                    <label class="form-check-label small @(Model.Access.ExportAllowed ? "" : "text-muted")" for="mode-export">@T("Export as a file", "تصدير كملف")</label>
+                                </div>
+                                @if (!Model.Access.ExportAllowed)
+                                {
+                                    <p class="small text-warning mb-0 mt-1">
+                                        <i class="bi bi-lock" aria-hidden="true"></i>
+                                        @T($"A {ReportLabels.Sensitivity(d.Sensitivity, false).ToLowerInvariant()} report needs the Export action on its permission for file output. Viewing it on screen does not (BR-RPT-003).", $"تقرير مصنّف «{ReportLabels.Sensitivity(d.Sensitivity, true)}» يحتاج إجراء «تصدير» على صلاحيته لإخراج ملف. أما عرضه على الشاشة فلا يحتاجه (BR-RPT-003).")
+                                    </p>
+                                }
+                                else if (d.Sensitivity != ReportSensitivity.Normal)
+                                {
+                                    <p class="small text-muted mb-0 mt-1">
+                                        <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+                                        @T("Exports of this report are audited with their parameters and row count (BR-SEC-021).", "تُدقَّق عمليات تصدير هذا التقرير بمعاملاتها وعدد صفوفها (BR-SEC-021).")
+                                    </p>
+                                }
+                            </fieldset>
+                        </div>
+                    </div>
+
+                    <hr />
+
+                    <div class="row g-2 align-items-end">
+                        <div class="col-sm-5">
+                            <label class="form-label small mb-0" for="estRows">@T("Estimated result size (rows)", "الحجم المقدَّر للنتيجة (صفوف)")</label>
+                            <input type="number" min="0" step="1" class="form-control form-control-sm" id="estRows" name="estimatedRowCount" value="@Model.EstimatedRowCount" data-threshold="@Model.HeavyRowThreshold" />
+                        </div>
+                        <div class="col-sm-7">
+                            <span id="queueHint" class="badge @(Model.WouldQueue ? "text-bg-info" : "text-bg-light border")">
+                                @(Model.WouldQueue
+                                    ? T($"Queued — at or above {Model.HeavyRowThreshold:N0} rows", $"يُدرج في الطابور — عند {Model.HeavyRowThreshold:N0} صف أو أكثر")
+                                    : T($"Runs inline — below {Model.HeavyRowThreshold:N0} rows", $"يعمل مباشرةً — دون {Model.HeavyRowThreshold:N0} صف"))
+                            </span>
+                            <span class="d-block small text-muted mt-1">@T("Until Phase 9 gives a definition a query to estimate from, the size is stated by the caller.", "حتى تمنح المرحلة التاسعة كل تعريف استعلاماً يُقدَّر منه، يُصرّح المستدعي بالحجم.")</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 d-grid">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-play-fill" aria-hidden="true"></i> @T("Run report", "تشغيل التقرير")</button>
+                    </div>
+                </fieldset>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-2">@T("Definition", "التعريف")</h2>
+            <dl class="row mb-0 small">
+                <dt class="col-5">@T("Sensitivity", "الحساسية")</dt>
+                <dd class="col-7">
+                    <span class="badge @ReportLabels.SensitivityBadge(d.Sensitivity)">@ReportLabels.Sensitivity(d.Sensitivity, isRtl)</span>
+                </dd>
+                <dt class="col-5">@T("Formats", "الصيغ")</dt>
+                <dd class="col-7">@foreach (var f in formats) { <span class="badge text-bg-light border me-1">@ReportLabels.Format(f, isRtl)</span> }</dd>
+                <dt class="col-5">@T("Gated by", "محكوم بـ")</dt>
+                <dd class="col-7" dir="ltr">@(Model.Access.Permission == null ? T("(missing)", "(مفقودة)") : Model.Access.Permission.ModuleCode + " · " + Model.Access.Permission.ScreenCode)</dd>
+                <dt class="col-5">@T("Required parameters", "المعاملات المطلوبة")</dt>
+                <dd class="col-7">
+                    @if (Model.RequiredKeys.Count == 0)
+                    {
+                        <span class="text-muted">@T("none", "لا شيء")</span>
+                    }
+                    else
+                    {
+                        @foreach (var k in Model.RequiredKeys) { <code class="me-1" dir="ltr">@k</code> }
+                    }
+                </dd>
+                <dt class="col-5">@T("Delivery", "التسليم")</dt>
+                <dd class="col-7">@(Model.Access.EmailDeliveryAllowed ? T("Email or portal", "بريد أو بوابة") : T("Portal only", "البوابة فقط"))</dd>
+            </dl>
+            <a class="btn btn-sm btn-outline-secondary mt-3" asp-action="Subscriptions" asp-route-reportId="@d.Id"><i class="bi bi-envelope-paper" aria-hidden="true"></i> @T("Schedule this report", "جدولة هذا التقرير")</a>
+        </div>
+
+        <div class="sms-card">
+            <div class="p-3 pb-0 d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("Recent runs", "أحدث التشغيلات")</h2>
+                <a class="small" asp-action="Log" asp-route-reportId="@d.Id">@T("full log", "السجل الكامل")</a>
+            </div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Recent executions of this report", "أحدث تشغيلات هذا التقرير")</caption>
+                <thead><tr>
+                    <th scope="col">@T("When", "التوقيت")</th>
+                    <th scope="col">@T("By", "بواسطة")</th>
+                    <th scope="col">@T("Output", "الإخراج")</th>
+                    <th scope="col">@T("Status", "الحالة")</th>
+                    <th scope="col" class="text-end">@T("Rows", "الصفوف")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.History.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">@T("This report has never been run.", "لم يُشغَّل هذا التقرير قط.")</td></tr>
+                }
+                @foreach (var h in Model.History)
+                {
+                    <tr>
+                        <td class="text-nowrap small">@h.Execution.ExecutedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td class="small">@h.RunBy</td>
+                        <td class="small">
+                            <span class="badge text-bg-light border">@ReportLabels.Format(h.Execution.Format, isRtl)</span>
+                            @if (h.Execution.WasExport)
+                            {
+                                <span class="badge text-bg-secondary ms-1" title="@T("File output", "إخراج ملف")"><i class="bi bi-download" aria-hidden="true"></i> @T("export", "تصدير")</span>
+                            }
+                        </td>
+                        <td><span class="badge @ReportLabels.ExecutionStatusBadge(h.Execution.Status)">@ReportLabels.ExecutionStatus(h.Execution.Status, isRtl)</span></td>
+                        <td class="text-end small">@(h.Execution.RowCount?.ToString("N0") ?? "—")</td>
+                    </tr>
+                    @if (h.Execution.Status == ReportExecutionStatus.Queued)
+                    {
+                        <tr><td colspan="5" class="small">
+                            <form method="post" asp-action="CompleteRun" asp-route-id="@h.Execution.Id" class="d-flex flex-wrap gap-1 align-items-center">
+                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                                <span class="text-muted">@T("Mark ready:", "وسم بالجاهزية:")</span>
+                                <input type="number" min="0" class="form-control form-control-sm" style="width:7rem" name="rowCount" value="0" aria-label="@T("Row count", "عدد الصفوف")" placeholder="@T("rows", "صفوف")" />
+                                <input type="number" min="0" class="form-control form-control-sm" style="width:7rem" name="durationMs" value="0" aria-label="@T("Duration in milliseconds", "المدة بالمللي ثانية")" placeholder="@T("ms", "مللي ثانية")" />
+                                <button class="btn btn-sm btn-outline-success" type="submit"><i class="bi bi-check2" aria-hidden="true"></i> @T("Complete", "إكمال")</button>
+                            </form>
+                        </td></tr>
+                    }
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var est = document.getElementById('estRows');
+    var hint = document.getElementById('queueHint');
+    var threshold = parseInt(est.getAttribute('data-threshold'), 10);
+    var labels = {
+        queued: @Html.Raw(Json.Serialize(T($"Queued — at or above {Model.HeavyRowThreshold:N0} rows", $"يُدرج في الطابور — عند {Model.HeavyRowThreshold:N0} صف أو أكثر"))),
+        inline: @Html.Raw(Json.Serialize(T($"Runs inline — below {Model.HeavyRowThreshold:N0} rows", $"يعمل مباشرةً — دون {Model.HeavyRowThreshold:N0} صف"))),
+        key: @Html.Raw(Json.Serialize(T("Parameter key", "مفتاح المعامل"))),
+        value: @Html.Raw(Json.Serialize(T("Value", "القيمة"))),
+        remove: @Html.Raw(Json.Serialize(T("Remove parameter", "حذف المعامل")))
+    };
+
+    // BR-RPT-005 decides the same way on the server; saying it while the number is still being typed
+    // is the difference between choosing to queue a report and discovering afterwards that it was.
+    function recalc() {
+        var queued = (parseInt(est.value, 10) || 0) >= threshold;
+        hint.textContent = queued ? labels.queued : labels.inline;
+        hint.className = 'badge ' + (queued ? 'text-bg-info' : 'text-bg-light border');
+    }
+    est.addEventListener('input', recalc);
+
+    // Ad-hoc parameters ride the same paramKeys/paramValues arrays as the standard bar; document
+    // order is what pairs them, so each row emits its key immediately before its value.
+    var extra = document.getElementById('extraParams');
+    document.getElementById('addParam').addEventListener('click', function () {
+        var row = document.createElement('div');
+        row.className = 'col-12 d-flex gap-1 align-items-center';
+        row.innerHTML =
+            '<input type="text" class="form-control form-control-sm" name="paramKeys" dir="ltr" placeholder="' + labels.key + '" aria-label="' + labels.key + '" />' +
+            '<input type="text" class="form-control form-control-sm" name="paramValues" dir="auto" placeholder="' + labels.value + '" aria-label="' + labels.value + '" />' +
+            '<button type="button" class="btn btn-sm btn-outline-danger" aria-label="' + labels.remove + '"><i class="bi bi-x-lg" aria-hidden="true"></i></button>';
+        row.querySelector('button').addEventListener('click', function () { row.remove(); });
+        extra.appendChild(row);
+        row.querySelector('input').focus();
+    });
+})();
+</script>
+}
