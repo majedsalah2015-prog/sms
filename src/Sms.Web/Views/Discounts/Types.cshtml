@@ -1,0 +1,92 @@
+@using System.Globalization
+@using Sms.Domain.Discounts
+@model TypeCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Type catalog", "فهرس أنواع الخصم");
+    ViewData["Breadcrumb"] = T("Discounts / Types", "الخصومات / الأنواع");
+    var help = new HelpPanelViewModel
+    {
+        Id = "ty-help", Title = T("Discount types — help", "أنواع الخصم — مساعدة"),
+        Intro = T("A discount type is a reusable policy: percentage or fixed amount, an optional category it applies to, whether it stacks with other discounts, and how it renews next year (BR-DIS-001).", "نوع الخصم سياسة قابلة لإعادة الاستخدام: نسبة أو مبلغ ثابت، فئة اختيارية يُطبَّق عليها، إمكانية تكديسه مع خصومات أخرى، وكيفية تجديده العام القادم (BR-DIS-001)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Automatic eligibility rules", "قواعد الاستحقاق التلقائي"), T("Sibling ladder: \"the Nth enrolled child and up gets X%\", ranked eldest-first within the family. Staff: an active employee's child gets X%. Both are evaluated on demand from the Grant desk (BR-DIS-002).", "سلّم الإخوة: \"الابن رقم N فما فوق يحصل على X%\"، مرتّبين من الأكبر سناً ضمن الأسرة. الموظفون: ابن موظف نشط يحصل على X%. يُقيَّمان عند الطلب من مكتب المنح (BR-DIS-002).")),
+            new HelpPanelViewModel.Item(T("Hardship documentation", "مستندات الضائقة"), T("If ticked, a manual grant of this type is refused unless the proposer confirms documentation is on file (BR-DIS-003) — the confirmation itself, not an attachment link, which is deferred.", "إن فُعِّلت، تُرفض المنحة اليدوية من هذا النوع ما لم يؤكد المقترِح وجود مستندات (BR-DIS-003) — التأكيد نفسه، لا رابط مرفق، وهو مؤجَّل.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Policy, stacking, and automatic-eligibility rules.", "السياسة، والتكديس، وقواعد الاستحقاق التلقائي.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_DiscountsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Discount types", "أنواع الخصم")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Basis", "الأساس")</th><th scope="col">@T("Category", "الفئة")</th>
+                    <th scope="col">@T("Eligibility", "الاستحقاق")</th><th scope="col">@T("Stacking", "التكديس")</th><th scope="col">@T("Renewal", "التجديد")</th>
+                    <th scope="col" class="text-end">@T("Grants", "المنح")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var t = r.Type;
+                    <tr class="@(t.IsActive ? "" : "text-muted")">
+                        <td>@(isRtl ? t.NameAr : t.NameEn) @if (t.RequiresHardshipDocumentation) { <i class="bi bi-file-earmark-medical text-warning ms-1" title="@T("Requires hardship documentation", "يتطلب مستندات ضائقة")" aria-hidden="true"></i><span class="visually-hidden">@T("requires hardship documentation", "يتطلب مستندات ضائقة")</span> } @if (!t.IsActive) { <span class="badge text-bg-secondary ms-1">@T("inactive", "غير مفعّل")</span> }</td>
+                        <td class="small">@DiscountLabels.Basis(t.Basis, isRtl)@(t.Basis == DiscountBasis.FixedAmount ? $" ({DiscountLabels.Stage(t.ComputationStage, isRtl)})" : "")@(t.CapAmountPerStudent != null ? $" · {T("cap", "سقف")} {t.CapAmountPerStudent:N2}" : "")</td>
+                        <td class="small">@(r.Category == null ? T("All categories", "كل الفئات") : (isRtl ? r.Category.NameAr : r.Category.NameEn))</td>
+                        <td class="small">@DiscountLabels.EligibilityMode(t.EligibilityMode, isRtl)</td>
+                        <td class="small">@(t.IsStackable ? T($"stackable, ≤{t.MaxCombinedPercent:0.##}%", $"قابل للتكديس، حتى {t.MaxCombinedPercent:0.##}%") : T("non-stackable", "غير قابل للتكديس"))</td>
+                        <td class="small">@DiscountLabels.RenewalMode(t.RenewalMode, isRtl)</td>
+                        <td class="text-end">@r.GrantCount</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No discount types yet — define the first one.", "لا أنواع خصم بعد — عرّف الأول.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New discount type", "نوع خصم جديد")</h2>
+            <form method="post" asp-action="CreateType" class="d-grid gap-2">
+                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                <div class="row g-2">
+                    <div class="col-6"><label class="small mb-0" for="ty-basis">@T("Basis", "الأساس")</label><select id="ty-basis" name="basis" class="form-select form-select-sm">@foreach (var b in Enum.GetValues<DiscountBasis>()) { <option value="@b">@DiscountLabels.Basis(b, isRtl)</option> }</select></div>
+                    <div class="col-6"><label class="small mb-0" for="ty-stage">@T("Stage (fixed amount)", "المرحلة (مبلغ ثابت)")</label><select id="ty-stage" name="stage" class="form-select form-select-sm">@foreach (var s in Enum.GetValues<DiscountComputationStage>()) { <option value="@s">@DiscountLabels.Stage(s, isRtl)</option> }</select></div>
+                </div>
+                <label class="small mb-0" for="ty-cat">@T("Applicable category", "الفئة المطبَّقة")</label>
+                <select id="ty-cat" name="feeCategoryId" class="form-select form-select-sm"><option value="">@T("All categories", "كل الفئات")</option>@foreach (var c in Model.Categories) { <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn)</option> }</select>
+                <div class="input-group input-group-sm"><span class="input-group-text" id="ty-cap-lbl">@T("Cap / student", "سقف / طالب")</span><input id="ty-cap" name="capAmountPerStudent" type="number" step="0.01" min="0" class="form-control" aria-labelledby="ty-cap-lbl" placeholder="@T("optional", "اختياري")" /></div>
+                <div class="row g-2">
+                    <div class="col-6"><label class="small mb-0" for="ty-elig">@T("Eligibility mode", "نمط الاستحقاق")</label><select id="ty-elig" name="eligibilityMode" class="form-select form-select-sm">@foreach (var e in Enum.GetValues<DiscountEligibilityMode>()) { <option value="@e">@DiscountLabels.EligibilityMode(e, isRtl)</option> }</select></div>
+                    <div class="col-6"><label class="small mb-0" for="ty-renew">@T("Renewal mode", "نمط التجديد")</label><select id="ty-renew" name="renewalMode" class="form-select form-select-sm">@foreach (var rm in Enum.GetValues<DiscountRenewalMode>()) { <option value="@rm" selected="@(rm == DiscountRenewalMode.ManualRegrant)">@DiscountLabels.RenewalMode(rm, isRtl)</option> }</select></div>
+                </div>
+                <div class="d-flex flex-wrap gap-3 small">
+                    <label><input type="checkbox" name="isStackable" value="true" class="form-check-input" checked /> @T("Stackable", "قابل للتكديس")</label>
+                    <label><input type="checkbox" name="requiresHardshipDocumentation" value="true" class="form-check-input" /> @T("Requires hardship docs", "يتطلب مستندات ضائقة")</label>
+                </div>
+                <div class="input-group input-group-sm"><span class="input-group-text" id="ty-max-lbl">@T("Max combined %", "أقصى نسبة مجمّعة")</span><input name="maxCombinedPercent" type="number" step="0.01" min="0" max="100" value="100" class="form-control" aria-labelledby="ty-max-lbl" /></div>
+
+                <fieldset class="border rounded p-2 mt-1">
+                    <legend class="small fw-semibold px-1 mb-0" style="width:auto">@T("Automatic rules (only used when eligibility = Automatic)", "قواعد تلقائية (تُستخدم فقط عند نمط الاستحقاق = تلقائي)")</legend>
+                    <div class="row g-2">
+                        <div class="col-4"><label class="small mb-0" for="ty-l2">@T("2nd child %", "الابن الثاني %")</label><input id="ty-l2" name="ladder2" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" /></div>
+                        <div class="col-4"><label class="small mb-0" for="ty-l3">@T("3rd child %", "الابن الثالث %")</label><input id="ty-l3" name="ladder3" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" /></div>
+                        <div class="col-4"><label class="small mb-0" for="ty-l4">@T("4th+ child %", "الرابع فأكثر %")</label><input id="ty-l4" name="ladder4Plus" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" /></div>
+                    </div>
+                    <label class="small mb-0 mt-2 d-block" for="ty-staff">@T("Staff child %", "ابن الموظف %")</label>
+                    <input id="ty-staff" name="staffPercent" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" />
+                </fieldset>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
+            </form>
+        </div>
+    </div>
+</div>

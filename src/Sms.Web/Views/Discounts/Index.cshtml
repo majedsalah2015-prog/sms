@@ -1,0 +1,161 @@
+@using System.Globalization
+@using Sms.Domain.Discounts
+@model GrantDeskViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Grant desk", "مكتب المنح");
+    ViewData["Breadcrumb"] = T("Discounts / Grant desk", "الخصومات / مكتب المنح");
+    var yid = Model.Year?.Id;
+    string Badge(DiscountGrantStatus s) => s switch { DiscountGrantStatus.Approved => "text-bg-success", DiscountGrantStatus.Rejected => "text-bg-secondary", DiscountGrantStatus.Revoked => "text-bg-dark", _ => "text-bg-warning" };
+    var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "gd-help", Title = T("Grant desk — help", "مكتب المنح — مساعدة"),
+        Intro = T("Every discount a student receives is a grant: proposed (manually or auto-evaluated from a type's sibling/staff rules), then approved (which issues numbered discount documents, BR-DIS-005) or rejected. Approved grants can later be revoked (BR-DIS-008).", "كل خصم يحصل عليه طالب هو منحة: تُقترح (يدوياً أو بتقييم تلقائي لقواعد الإخوة/الموظفين للنوع)، ثم تُعتمد (فتصدر مستندات خصم مرقّمة، BR-DIS-005) أو تُرفض. يمكن لاحقاً إلغاء المنح المعتمدة (BR-DIS-008)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Approval tier", "مستوى الاعتماد"), T("Recorded automatically from the percentage (≤10% Finance Manager, ≤25% Principal, otherwise Owner; scholarships always go to the Committee) — a register entry, not routed approval.", "يُسجَّل تلقائياً من النسبة (حتى 10% مدير مالي، حتى 25% مدير مدرسة، وإلا المالك؛ المنح الدراسية تذهب دائماً للجنة) — قيد سجل، لا اعتماد موجَّه.")),
+            new HelpPanelViewModel.Item(T("Revoke ↺", "إلغاء ↺"), T("Effective date must be today or later. By default past discount documents stand (the student keeps what they already got); tick claw-back to post a charge for the unconsumed (forward) fraction of the year.", "يجب أن يكون تاريخ السريان اليوم أو بعده. افتراضياً تبقى مستندات الخصم السابقة كما هي؛ فعّل الاسترجاع لترحيل فاتورة عن الجزء غير المستهلك من العام.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Propose, approve, reject, and revoke discount grants.", "اقتراح المنح واعتمادها ورفضها وإلغاؤها.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_DiscountsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<form id="batchApproveForm" method="post" asp-action="ApproveGrants" asp-route-year="@yid"></form>
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <form method="get" class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <select name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="@T("Status", "الحالة")">
+                <option value="">@T("All statuses", "كل الحالات")</option>
+                @foreach (var s in Enum.GetValues<DiscountGrantStatus>()) { <option value="@s" selected="@(Model.Status == s)">@DiscountLabels.GrantStatus(s, isRtl)</option> }
+            </select>
+            <select name="typeId" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="@T("Discount type", "نوع الخصم")">
+                <option value="">@T("All types", "كل الأنواع")</option>
+                @foreach (var t in Model.Types) { <option value="@t.Id" selected="@(Model.TypeId == t.Id)">@(isRtl ? t.NameAr : t.NameEn)</option> }
+            </select>
+            <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" style="width:12rem" placeholder="@T("Search student/type…", "بحث عن طالب/نوع…")" aria-label="@T("Search", "بحث")" />
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search" aria-hidden="true"></i></button>
+        </form>
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Discount grants", "منح الخصم")</caption>
+                <thead><tr>
+                    <th scope="col"><span class="visually-hidden">@T("Select", "تحديد")</span></th>
+                    <th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Type", "النوع")</th><th scope="col">@T("Source", "المصدر")</th>
+                    <th scope="col" class="text-end">@T("Basis", "الأساس")</th><th scope="col" class="text-end">@T("Applied", "المطبَّق")</th>
+                    <th scope="col">@T("Tier", "المستوى")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var g = r.Grant;
+                    <tr>
+                        <td>@if (g.Status == DiscountGrantStatus.Proposed) { <input type="checkbox" form="batchApproveForm" name="ids" value="@g.Id" class="form-check-input" aria-label="@T($"Select grant for {DiscountLabels.StudentName(r.Student, false)}", $"تحديد منحة {DiscountLabels.StudentName(r.Student, true)}")" /> }</td>
+                        <td>@DiscountLabels.StudentName(r.Student, isRtl) <span class="text-muted small">· @r.Student.StudentNo</span></td>
+                        <td>@(isRtl ? r.Type.NameAr : r.Type.NameEn)</td>
+                        <td class="small">@DiscountLabels.GrantSource(g.Source, isRtl)</td>
+                        <td class="text-end"><bdi dir="ltr">@(r.Type.Basis == DiscountBasis.Percentage ? $"{g.BasisValue:0.##}%" : g.BasisValue.ToString("N2"))</bdi></td>
+                        <td class="text-end"><bdi dir="ltr">@g.AppliedAmount.ToString("N2")</bdi></td>
+                        <td class="small">@DiscountLabels.Tier(g.RequiredTier, isRtl)</td>
+                        <td><span class="badge @Badge(g.Status)">@DiscountLabels.GrantStatus(g.Status, isRtl)</span></td>
+                        <td class="text-nowrap">
+                        @if (g.Status == DiscountGrantStatus.Proposed)
+                        {
+                            <form method="post" asp-action="ApproveGrant" asp-route-id="@g.Id" asp-route-year="@yid" class="d-inline-flex gap-1 align-items-center mb-1">
+                                @if (g.ScholarshipProgramId != null) { <input name="envelopeOverrideReason" class="form-control form-control-sm" style="width:8rem" placeholder="@T("override reason", "سبب التجاوز")" aria-label="@T("Envelope override reason (only if the envelope is full)", "سبب تجاوز الغلاف (فقط إن امتلأ)")" /> }
+                                <button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")" aria-label="@T("Approve grant", "اعتماد المنحة")"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                            </form>
+                            <form method="post" asp-action="RejectGrant" asp-route-id="@g.Id" asp-route-year="@yid" class="d-inline-flex gap-1 align-items-center">
+                                <input name="reason" class="form-control form-control-sm" style="width:8rem" required aria-required="true" placeholder="@T("reason", "السبب")" aria-label="@T("Rejection reason", "سبب الرفض")" />
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Reject", "رفض")" aria-label="@T("Reject grant", "رفض المنحة")"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                            </form>
+                        }
+                        else if (g.Status == DiscountGrantStatus.Approved)
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#revoke-@g.Id"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>@T("Revoke", "إلغاء")</button>
+                        }
+                        else if (!string.IsNullOrWhiteSpace(g.RevokedReason))
+                        {
+                            <span class="small text-muted" title="@g.RevokedReason">@T("revoked", "أُلغيت"): @g.RevokedEffectiveDate?.ToString("yyyy-MM-dd")</span>
+                        }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="9" class="text-center text-muted py-4">@T("No grants match these filters.", "لا منح مطابقة لهذه المرشِّحات.")</td></tr> }
+                </tbody>
+            </table></div>
+            @if (Model.Rows.Any(r => r.Grant.Status == DiscountGrantStatus.Proposed))
+            {
+                <div class="p-2 border-top"><button type="submit" form="batchApproveForm" class="btn btn-sm btn-primary"><i class="bi bi-check2-all me-1" aria-hidden="true"></i>@T("Approve selected", "اعتماد المحدَّد")</button></div>
+            }
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Propose manual grant", "اقتراح منحة يدوية")</h2>
+            <form method="post" asp-action="ProposeManualGrant" asp-route-year="@yid" class="d-grid gap-2">
+                <select name="studentId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Student", "الطالب")">
+                    <option value="">@T("— choose student —", "— اختر طالباً —")</option>
+                    @foreach (var s in Model.StudentOptions) { <option value="@s.Student.Id">@s.Label(isRtl)</option> }
+                </select>
+                <select name="discountTypeId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Discount type", "نوع الخصم")">
+                    <option value="">@T("— choose type —", "— اختر نوعاً —")</option>
+                    @foreach (var t in Model.Types) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn) (@DiscountLabels.Basis(t.Basis, isRtl))</option> }
+                </select>
+                <input name="basisValue" type="number" step="0.01" min="0.01" class="form-control form-control-sm" required aria-required="true" placeholder="@T("Basis value (% or amount)", "قيمة الأساس (% أو مبلغ)")" aria-label="@T("Basis value", "قيمة الأساس")" />
+                <input name="reason" class="form-control form-control-sm" required aria-required="true" placeholder="@T("Reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                <label class="small"><input type="checkbox" name="hasHardshipDocumentation" value="true" class="form-check-input" /> @T("Hardship documentation on file (required for hardship types)", "مستندات الضائقة مرفقة (مطلوبة للأنواع ذات الطابع الإنساني)")</label>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-send me-1" aria-hidden="true"></i>@T("Propose", "اقتراح")</button>
+            </form>
+        </div>
+        @if (Model.AutomaticTypes.Count > 0)
+        {
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-magic me-1" aria-hidden="true"></i>@T("Evaluate automatic types", "تقييم الأنواع التلقائية")</h2>
+                <p class="small text-muted">@T("Runs the type's sibling-ladder/staff rules over this year's enrolled students and proposes a grant for every newly eligible one.", "يشغّل قواعد سلّم الإخوة/الموظفين للنوع على طلاب هذا العام ويقترح منحة لكل مستحق جديد.")</p>
+                @foreach (var t in Model.AutomaticTypes)
+                {
+                    <form method="post" asp-action="ProposeAutomaticGrants" asp-route-year="@yid" class="d-flex justify-content-between align-items-center mb-1">
+                        <input type="hidden" name="discountTypeId" value="@t.Id" />
+                        <span class="small">@(isRtl ? t.NameAr : t.NameEn)</span>
+                        <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-play-fill me-1" aria-hidden="true"></i>@T("Evaluate", "تقييم")</button>
+                    </form>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@foreach (var r in Model.Rows.Where(x => x.Grant.Status == DiscountGrantStatus.Approved))
+{
+    var g = r.Grant;
+    <div class="modal fade" id="revoke-@g.Id" tabindex="-1" aria-labelledby="revoke-@(g.Id)-title" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" asp-action="RevokeGrant" asp-route-id="@g.Id" asp-route-year="@yid" class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="revoke-@(g.Id)-title">@T("Revoke grant", "إلغاء المنحة") — @DiscountLabels.StudentName(r.Student, isRtl)</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button>
+                </div>
+                <div class="modal-body d-grid gap-2">
+                    <label class="small mb-0" for="eff-@g.Id">@T("Effective date (today or later)", "تاريخ السريان (اليوم أو بعده)")</label>
+                    <input id="eff-@g.Id" name="effectiveDate" type="date" min="@today" value="@today" class="form-control form-control-sm" required aria-required="true" />
+                    <label class="small mb-0" for="rr-@g.Id">@T("Reason (mandatory)", "السبب (إلزامي)")</label>
+                    <input id="rr-@g.Id" name="reason" class="form-control form-control-sm" required aria-required="true" />
+                    <label class="small"><input type="checkbox" name="clawBack" value="true" class="form-check-input" /> @T("Claw back the unconsumed (forward) fraction of the year as a new charge", "استرجاع الجزء غير المستهلك من العام كفاتورة جديدة")</label>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">@T("Cancel", "إلغاء")</button>
+                    <button type="submit" class="btn btn-warning btn-sm">@T("Revoke", "إلغاء المنحة")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}

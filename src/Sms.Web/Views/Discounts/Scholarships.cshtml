@@ -1,0 +1,90 @@
+@using System.Globalization
+@model ScholarshipBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Scholarship board", "لوحة المنح الدراسية");
+    ViewData["Breadcrumb"] = T("Discounts / Scholarships", "الخصومات / المنح الدراسية");
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "sb-help", Title = T("Scholarships — help", "المنح الدراسية — مساعدة"),
+        Intro = T("A scholarship program is a named budget envelope — a cap on how many awards and/or how much total it can grant this year. A nomination creates a Proposed grant routed straight to the Committee tier; approving it counts against the envelope (BR-DIS-004).", "برنامج المنحة الدراسية غلاف ميزانية مُسمّى — سقف لعدد الجوائز و/أو إجمالي مبلغها هذا العام. الترشيح ينشئ منحة مقترحة تُوجَّه مباشرة إلى مستوى اللجنة؛ اعتمادها يُحتسب من الغلاف (BR-DIS-004)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Envelope exhausted?", "امتلأ الغلاف؟"), T("Approving a grant that would exceed the envelope is blocked unless the Owner enters an override reason on the Grant desk's approve action.", "اعتماد منحة تتجاوز الغلاف يُمنع ما لم يُدخل المالك سبب تجاوز عند اعتماد المنحة من مكتب المنح.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Programs, envelopes, and nominations.", "البرامج والأغلفة والترشيحات.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_DiscountsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<form method="get" class="d-flex gap-2 align-items-center mb-2"><select name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Scholarship programs", "برامج المنح الدراسية")</caption>
+                <thead><tr><th scope="col">@T("Program", "البرنامج")</th><th scope="col">@T("Type", "النوع")</th><th scope="col" class="text-end">@T("Awards", "الجوائز")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th><th scope="col" class="text-end">@T("Pending", "قيد الانتظار")</th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var p = r.Program;
+                    var awardsLabel = p.MaxAwards == null ? $"{r.ApprovedCount}" : $"{r.ApprovedCount} / {p.MaxAwards}";
+                    var amountLabel = p.MaxTotalAmount == null ? r.ApprovedAmount.ToString("N2") : $"{r.ApprovedAmount:N2} / {p.MaxTotalAmount:N2}";
+                    var full = (p.MaxAwards != null && r.ApprovedCount >= p.MaxAwards) || (p.MaxTotalAmount != null && r.ApprovedAmount >= p.MaxTotalAmount);
+                    <tr class="@(p.IsActive ? "" : "text-muted")">
+                        <td>@(isRtl ? p.NameAr : p.NameEn) @if (full) { <span class="badge text-bg-warning ms-1">@T("envelope full", "الغلاف ممتلئ")</span> }</td>
+                        <td class="small">@(isRtl ? r.Type.NameAr : r.Type.NameEn)</td>
+                        <td class="text-end small"><bdi dir="ltr">@awardsLabel</bdi></td>
+                        <td class="text-end small"><bdi dir="ltr">@amountLabel</bdi></td>
+                        <td class="text-end small">@r.PendingCount</td>
+                    </tr>
+                }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="5" class="text-center text-muted py-4">@T("No scholarship programs for this year yet.", "لا برامج منح دراسية لهذا العام بعد.")</td></tr> }
+                </tbody>
+            </table></div>
+        </div>
+        <p class="small text-muted mt-2">@T("Approve or reject nominations from the ", "اعتمد أو ارفض الترشيحات من ")<a asp-action="Index" asp-route-year="@yid">@T("Grant desk", "مكتب المنح")</a>.</p>
+    </div>
+    <div class="col-lg-5">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New program", "برنامج جديد")</h2>
+            <form method="post" asp-action="CreateScholarshipProgram" asp-route-year="@yid" class="d-grid gap-2">
+                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                <select name="discountTypeId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Discount type", "نوع الخصم")">
+                    <option value="">@T("— choose type —", "— اختر نوعاً —")</option>
+                    @foreach (var t in Model.ScholarshipTypes) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }
+                </select>
+                <div class="input-group input-group-sm"><span class="input-group-text" id="sp-awards-lbl">@T("Max awards", "أقصى عدد جوائز")</span><input name="maxAwards" type="number" min="1" class="form-control" aria-labelledby="sp-awards-lbl" placeholder="@T("optional", "اختياري")" /></div>
+                <div class="input-group input-group-sm"><span class="input-group-text" id="sp-total-lbl">@T("Max total amount", "أقصى إجمالي مبلغ")</span><input name="maxTotalAmount" type="number" step="0.01" min="0" class="form-control" aria-labelledby="sp-total-lbl" placeholder="@T("optional", "اختياري")" /></div>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Define", "تعريف")</button>
+            </form>
+        </div>
+        @if (Model.Rows.Count > 0)
+        {
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>@T("Nominate a student", "ترشيح طالب")</h2>
+                <form method="post" asp-action="Nominate" asp-route-year="@yid" class="d-grid gap-2">
+                    <select name="studentId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Student", "الطالب")">
+                        <option value="">@T("— choose student —", "— اختر طالباً —")</option>
+                        @foreach (var s in Model.StudentOptions) { <option value="@s.Student.Id">@s.Label(isRtl)</option> }
+                    </select>
+                    <select name="scholarshipProgramId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Program", "البرنامج")">
+                        <option value="">@T("— choose program —", "— اختر برنامجاً —")</option>
+                        @foreach (var r in Model.Rows.Where(x => x.Program.IsActive)) { <option value="@r.Program.Id">@(isRtl ? r.Program.NameAr : r.Program.NameEn)</option> }
+                    </select>
+                    <input name="basisValue" type="number" step="0.01" min="0.01" class="form-control form-control-sm" required aria-required="true" placeholder="@T("Basis value (% or amount)", "قيمة الأساس (% أو مبلغ)")" aria-label="@T("Basis value", "قيمة الأساس")" />
+                    <input name="reason" class="form-control form-control-sm" required aria-required="true" placeholder="@T("Reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                    <input name="sponsorNote" class="form-control form-control-sm" placeholder="@T("Sponsor note (optional)", "ملاحظة الجهة الراعية (اختياري)")" aria-label="@T("Sponsor note", "ملاحظة الجهة الراعية")" />
+                    <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-send me-1" aria-hidden="true"></i>@T("Nominate", "ترشيح")</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
