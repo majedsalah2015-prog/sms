@@ -160,6 +160,12 @@ namespace Sms.Seeder
                 return;
             }
 
+            if (args.Length > 0 && args[0].Equals("reset-password", StringComparison.OrdinalIgnoreCase))
+            {
+                await ResetPasswordAsync(scope.ServiceProvider, args);
+                return;
+            }
+
             var runner = scope.ServiceProvider.GetRequiredService<SeedRunner>();
             var ran = await runner.RunAllAsync();
 
@@ -167,6 +173,47 @@ namespace Sms.Seeder
             {
                 Console.WriteLine($"Seeded: {name}");
             }
+        }
+
+        /// <summary>
+        /// <c>reset-password &lt;userName&gt; &lt;newPassword&gt;</c> — issues a one-time
+        /// credential for an account that has lost its way in.
+        /// <para>
+        /// The escape hatch a self-hosted product needs: password reset is an
+        /// administrator screen, and an administrator locked out of the only
+        /// administrator account cannot reach it. Physical access to the database
+        /// server is the authority here, which is the same authority that could
+        /// edit <c>sec.UserAccount</c> directly — this only makes it survivable
+        /// instead of destructive.
+        /// </para>
+        /// <para>
+        /// It goes through <c>SetTemporaryPasswordAsync</c>, the same path the
+        /// bootstrap seeder uses, so the value is one-time by construction:
+        /// BR-SEC-005 forces a change before the account can do anything else.
+        /// A password handed over in the clear is only safe because of that, so
+        /// do not replace this with a plain hash write.
+        /// </para>
+        /// </summary>
+        private static async Task ResetPasswordAsync(IServiceProvider services, string[] args)
+        {
+            if (args.Length < 3)
+            {
+                Console.WriteLine("Usage: reset-password <userName> <newPassword>");
+                return;
+            }
+
+            var db = services.GetRequiredService<AppDbContext>();
+            var auth = services.GetRequiredService<IAuthenticationService>();
+
+            var account = await db.UserAccounts.IgnoreQueryFilters().SingleOrDefaultAsync(u => u.UserName == args[1]);
+            if (account == null)
+            {
+                Console.WriteLine($"No account named '{args[1]}'.");
+                return;
+            }
+
+            await auth.SetTemporaryPasswordAsync(account.Id, args[2]);
+            Console.WriteLine($"'{account.UserName}' now has a one-time password; BR-SEC-005 forces a change at the next sign-in.");
         }
 
         /// <summary>
