@@ -17,6 +17,8 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.NameEn).HasMaxLength(150).IsRequired();
             builder.Property(x => x.Category).HasMaxLength(50).IsRequired();
             builder.Property(x => x.Price).HasColumnType("decimal(9,2)");
+            // BR-GLB-061: a fraction, so four places — 0.1500 is 15%, and a half-percent regime needs the room.
+            builder.Property(x => x.VatRate).HasColumnType("decimal(5,4)");
             builder.Property(x => x.AllergenTags).HasMaxLength(300);
         }
     }
@@ -82,6 +84,7 @@ namespace Sms.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("Sale", "svc");
             builder.Property(x => x.Total).HasColumnType("decimal(18,2)");
+            builder.Property(x => x.VatAmount).HasColumnType("decimal(18,2)");
             builder.Property(x => x.VoidReason).HasMaxLength(500);
             builder.HasOne<TillSession>().WithMany().HasForeignKey(x => x.TillSessionId);
             builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.SaleId);

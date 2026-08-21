@@ -175,6 +175,12 @@ namespace Sms.Infrastructure.Cafeteria
                 return new SaleLine { CafeteriaItemId = item.Id, Quantity = b.Quantity, UnitPrice = item.Price, LineTotal = item.Price * b.Quantity };
             }).ToList();
             var total = lines.Sum(l => l.LineTotal);
+
+            // G-2: backed out of the line rather than added to it. A counter price is what the
+            // student hands over, and the wallet is debited the same figure either way — so a rate
+            // splits the take between revenue and tax, it does not raise the price. Per line,
+            // because a basket can mix rates.
+            var vat = lines.Sum(l => VatCalculator.CalculateFromGross(l.LineTotal, items[l.CafeteriaItemId].VatRate).VatAmount);
             var now = _clock.UtcNow;
 
             if (holderKind == WalletHolderKind.Student)
@@ -263,7 +269,7 @@ namespace Sms.Infrastructure.Cafeteria
                     break;
             }
 
-            var sale = new Sale { HolderKind = holderKind, HolderId = holderId, TillSessionId = tillSessionId, OperatorUserId = operatorUserId, AtUtc = now, Tender = tender, Total = total, CapturedOfflineAtUtc = capturedOfflineAtUtc, Lines = lines };
+            var sale = new Sale { HolderKind = holderKind, HolderId = holderId, TillSessionId = tillSessionId, OperatorUserId = operatorUserId, AtUtc = now, Tender = tender, Total = total, VatAmount = vat, CapturedOfflineAtUtc = capturedOfflineAtUtc, Lines = lines };
             _db.Sales.Add(sale);
             await _db.SaveChangesAsync(cancellationToken);
 

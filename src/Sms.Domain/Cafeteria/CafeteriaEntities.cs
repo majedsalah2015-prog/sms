@@ -72,7 +72,27 @@ namespace Sms.Domain.Cafeteria
         /// <summary>Category code (e.g. "drinks", "snacks") — the unit of parent blocking (BR-CAF-002).</summary>
         public string Category { get; set; } = string.Empty;
 
+        /// <summary>What the counter charges. VAT-inclusive when <see cref="VatRate"/> is set — the wallet is debited this and nothing more.</summary>
         public decimal Price { get; set; }
+
+        /// <summary>
+        /// A fraction as BR-GLB-061 stores it (0.15 = 15%); null is exempt, and
+        /// is the default (gap G-2).
+        /// <para>
+        /// The item carried no rate at all, so a cafeteria sale recognised its
+        /// whole take as revenue and the school owed tax on part of it that the
+        /// ledger never showed. Left null everywhere until somebody sets it, so no
+        /// family's bill changes on the day this arrives — the price at the
+        /// counter is what it always was, and setting a rate splits that price
+        /// rather than adding to it.
+        /// </para>
+        /// <para>
+        /// A rate per item and not per category, unlike the school store: a
+        /// cafeteria category is "drinks" or "snacks", which is a merchandising
+        /// grouping and not a tax one.
+        /// </para>
+        /// </summary>
+        public decimal? VatRate { get; set; }
 
         /// <summary>Comma-separated allergen tags (e.g. "peanuts,milk").</summary>
         public string? AllergenTags { get; set; }
@@ -180,7 +200,15 @@ namespace Sms.Domain.Cafeteria
 
         public SaleTender Tender { get; set; }
 
+        /// <summary>What was taken, VAT included. The wallet or the drawer moved by exactly this.</summary>
         public decimal Total { get; set; }
+
+        /// <summary>
+        /// The tax inside <see cref="Total"/>, frozen line by line at the rates in
+        /// force when the sale happened — so re-rating an item next term never
+        /// rewrites what a sale in this one owed.
+        /// </summary>
+        public decimal VatAmount { get; set; }
 
         public SaleStatus Status { get; set; } = SaleStatus.Posted;
 

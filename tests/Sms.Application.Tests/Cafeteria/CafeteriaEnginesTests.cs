@@ -96,5 +96,39 @@ namespace Sms.Application.Tests.Cafeteria
             Assert.Equal(42m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.CafeteriaRevenue).Credit);
             Assert.Equal(112m, journal.Lines.Where(l => l.AccountKey == "Cash:Cash").Sum(l => l.Debit));
         }
+
+        [Fact]
+        [BusinessRule("BR-CAF-007")]
+        public void A_taxed_cafeteria_sale_splits_its_price_rather_than_adding_to_it()
+        {
+            // 115 at the counter with 15% inside it. The wallet moved by 115 either way — a rate
+            // decides how the take divides between revenue and tax, it does not raise the price
+            // (gap G-2, where the item carried no rate at all and the whole 115 was called revenue).
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                CafeteriaSales = new[] { new JournalSummaryBuilder.CafeteriaSaleDoc(true, 115m, 15m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(115m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.WalletLiability).Debit);
+            Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.CafeteriaRevenue).Credit);
+            Assert.Equal(15m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.VatOutput).Credit);
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAF-007")]
+        public void An_untaxed_cafeteria_sale_posts_exactly_as_it_always_did()
+        {
+            // The default everywhere until somebody sets a rate: no VAT line at all, and no change to
+            // any journal a school is already reading.
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                CafeteriaSales = new[] { new JournalSummaryBuilder.CafeteriaSaleDoc(true, 115m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(115m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.CafeteriaRevenue).Credit);
+            Assert.DoesNotContain(journal.Lines, l => l.AccountKey == GlAccountKeys.VatOutput);
+        }
     }
 }

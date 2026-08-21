@@ -67,6 +67,7 @@ namespace Sms.Application.GlExport
     ///   Till variance  Dr Cash:Cash / Cr CashOverShort   (over; reversed when short)
     ///   Write-off      Dr BadDebt (gross) / Cr Receivables
     ///   Wallet adj.    Dr WalletAdjustments / Cr WalletLiability   (credit; reversed when debited)
+    ///   Cafeteria sale Dr WalletLiability|Cash:Cash / Cr CafeteriaRevenue (net), Cr VatOutput (vat)
     ///   Late void      the original entry, reversed, in the period of the void
     /// Balanced by construction; the builder asserts it anyway.
     /// </summary>
@@ -117,8 +118,13 @@ namespace Sms.Application.GlExport
         /// <summary>E-605: wallet top-up receipt (Dr Cash[method] / Cr WalletLiability) — a wallet refund is a negative-amount top-up in journal terms (Dr WalletLiability / Cr Cash).</summary>
         public sealed record WalletTopUpDoc(string PaymentMethod, decimal Amount);
 
-        /// <summary>E-605 BR-CAF-007: a cafeteria sale — wallet-tendered (Dr WalletLiability / Cr CafeteriaRevenue) or cash (Dr Cash:Cash / Cr CafeteriaRevenue). Meal-plan redemptions are not journaled (revenue was recognized on the plan charge).</summary>
-        public sealed record CafeteriaSaleDoc(bool IsWalletTender, decimal Amount);
+        /// <summary>
+        /// E-605 BR-CAF-007: a cafeteria sale. Wallet-tendered (Dr WalletLiability)
+        /// or cash (Dr Cash:Cash), against revenue net of the tax inside it and
+        /// <c>VatOutput</c> for the rest (gap G-2). Meal-plan redemptions are not
+        /// journaled — revenue was recognised on the plan charge.
+        /// </summary>
+        public sealed record CafeteriaSaleDoc(bool IsWalletTender, decimal Amount, decimal VatAmount = 0m);
 
         /// <summary>
         /// A wallet-tendered store sale (Dr WalletLiability / Cr StoreRevenue).
@@ -168,7 +174,7 @@ namespace Sms.Application.GlExport
         public sealed record VoidedChargeDoc(int FeeCategoryId, string? GlExportCode, decimal NetAmount, decimal VatAmount, decimal GrossAmount);
 
         /// <summary>A cafeteria sale voided after its period was exported — the reverse of <see cref="CafeteriaSaleDoc"/>.</summary>
-        public sealed record VoidedCafeteriaSaleDoc(bool IsWalletTender, decimal Amount);
+        public sealed record VoidedCafeteriaSaleDoc(bool IsWalletTender, decimal Amount, decimal VatAmount = 0m);
 
         /// <summary>A wallet-tendered store sale voided after its period was exported — the reverse of <see cref="StoreWalletSaleDoc"/>.</summary>
         public sealed record VoidedStoreWalletSaleDoc(decimal Amount);
@@ -270,7 +276,8 @@ namespace Sms.Application.GlExport
             foreach (var s in cafeteriaSales)
             {
                 acc.Debit(s.IsWalletTender ? GlAccountKeys.WalletLiability : GlAccountKeys.Cash("Cash"), s.IsWalletTender ? "Cafeteria sales (wallet)" : "Cafeteria sales (cash)", s.Amount);
-                acc.Credit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales", s.Amount);
+                acc.Credit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales", s.Amount - s.VatAmount);
+                acc.Credit(GlAccountKeys.VatOutput, "VAT on cafeteria sales", s.VatAmount);
             }
 
             foreach (var s in storeWalletSales)
@@ -295,7 +302,8 @@ namespace Sms.Application.GlExport
 
             foreach (var s in documents.VoidedCafeteriaSales)
             {
-                acc.Debit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales voided", s.Amount);
+                acc.Debit(GlAccountKeys.CafeteriaRevenue, "Cafeteria sales voided", s.Amount - s.VatAmount);
+                acc.Debit(GlAccountKeys.VatOutput, "VAT on voided cafeteria sales", s.VatAmount);
                 acc.Credit(s.IsWalletTender ? GlAccountKeys.WalletLiability : GlAccountKeys.Cash("Cash"), "Cafeteria sales voided", s.Amount);
             }
 

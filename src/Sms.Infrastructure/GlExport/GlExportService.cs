@@ -141,7 +141,7 @@ namespace Sms.Infrastructure.GlExport
 
             var cafeteriaSales = await _db.Sales
                 .Where(s => s.Status == Sms.Domain.Cafeteria.SaleStatus.Posted && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan && s.AtUtc >= periodFromUtc && s.AtUtc <= periodToUtc)
-                .Select(s => new { s.Tender, s.Total }).ToListAsync(cancellationToken);
+                .Select(s => new { s.Tender, s.Total, s.VatAmount }).ToListAsync(cancellationToken);
 
             // Closed sessions only, and dated by the close rather than the open: the variance does
             // not exist until the drawer is counted, so a session opened in September and closed in
@@ -189,7 +189,7 @@ namespace Sms.Infrastructure.GlExport
                     && s.Tender != Sms.Domain.Cafeteria.SaleTender.MealPlan
                     && s.AtUtc < periodFromUtc
                     && s.VoidedAtUtc >= periodFromUtc && s.VoidedAtUtc <= periodToUtc)
-                .Select(s => new { s.Tender, s.Total })
+                .Select(s => new { s.Tender, s.Total, s.VatAmount })
                 .ToListAsync(cancellationToken);
 
             var voidedStoreWalletSales = await _db.StoreSales
@@ -211,14 +211,14 @@ namespace Sms.Infrastructure.GlExport
                 WalletTopUps = walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
                     .Concat(walletRefunds.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))).ToList(),
                 WalletAdjustments = walletAdjustments.Select(a => new JournalSummaryBuilder.WalletAdjustmentDoc(a)).ToList(),
-                CafeteriaSales = cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
+                CafeteriaSales = cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total, s.VatAmount)).ToList(),
                 StoreWalletSales = storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList(),
                 TillVariances = tillVariances.Select(v => new JournalSummaryBuilder.TillVarianceDoc(v)).ToList(),
                 WriteOffs = writeOffs.Select(a => new JournalSummaryBuilder.WriteOffDoc(a)).ToList(),
                 VoidedCharges = voidedCharges.Select(c => new JournalSummaryBuilder.VoidedChargeDoc(
                     c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var voidCode) ? voidCode : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
                 VoidedCafeteriaSales = voidedCafeteriaSales.Select(s => new JournalSummaryBuilder.VoidedCafeteriaSaleDoc(
-                    s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
+                    s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total, s.VatAmount)).ToList(),
                 VoidedStoreWalletSales = voidedStoreWalletSales.Select(t => new JournalSummaryBuilder.VoidedStoreWalletSaleDoc(t)).ToList(),
             });
 
