@@ -1,0 +1,165 @@
+@using System.Globalization
+@using Sms.Domain.Attendance
+@model JustificationQueueViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Justification review", "مراجعة الأعذار");
+    ViewData["Breadcrumb"] = T("Attendance / Excuses", "الحضور / الأعذار");
+    ViewData["AttendanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "just-help", Title = T("Justification review — help", "مراجعة الأعذار — مساعدة"),
+        Intro = T("Absences start unexcused and stay that way until an excuse is accepted here (BR-ATD-005). Accepting flips the day to Excused, or to Medical leave when the excuse is a medical one — the engine does the flip, so the two records can never disagree.", "الغياب يبدأ بدون عذر ويبقى كذلك حتى يُقبل العذر هنا (BR-ATD-005). القبول يحوّل اليوم إلى غياب بعذر، أو إلى إجازة مرضية إن كان العذر طبياً — والمحرك هو من يحوّل، فلا يختلف السجلان أبداً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The window", "المهلة"), T("The doc's default window is 3 days from the absence. A submission past it is flagged here, not blocked — the supervisor decides, and the lateness is visible while deciding.", "المهلة الافتراضية في الوثيقة 3 أيام من الغياب. والتقديم بعدها يُعلَّم هنا ولا يُمنع — القرار للمشرف والتأخير ظاهر أمامه.")),
+            new HelpPanelViewModel.Item(T("Rejection", "الرفض"), T("A rejection needs a reason and leaves the absence unexcused. Both outcomes are audited.", "الرفض يحتاج سبباً ويُبقي الغياب بدون عذر. وكلا القرارين مُدقَّق.")),
+            new HelpPanelViewModel.Item(T("Medical documents", "المستندات الطبية"), T("BR-ATD-005 requires a document for a medical excuse. The record has a field for it but no upload path yet — the attendance service takes no attachment, so a medical excuse is accepted on the reviewer's word for now.", "تشترط BR-ATD-005 مستنداً للعذر الطبي. الحقل موجود في السجل لكن لا مسار رفع بعد — فخدمة الحضور لا تستقبل مرفقاً، ويُقبل العذر الطبي حالياً بتقدير المراجع.")),
+            new HelpPanelViewModel.Item(T("Counter submissions", "التقديم في المكتب"), T("The panel on the right is the paper path: a parent hands in an excuse at the counter and the registrar records it against the absence. The portal upload half is not built.", "اللوحة على الجانب هي المسار الورقي: يسلّم ولي الأمر العذر في المكتب فيسجله المسجّل على الغياب. أما الرفع من البوابة فغير مبني.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Excuse cards, accept or reject with a reason.", "بطاقات الأعذار، قبول أو رفض مع السبب.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </form>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_AttendanceNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div class="sms-card">
+                <div class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+                    <div class="btn-group btn-group-sm">
+                        @foreach (JustificationReviewState st in Enum.GetValues(typeof(JustificationReviewState)))
+                        {
+                            var on = Model.State == null ? st == JustificationReviewState.Submitted : Model.State == st;
+                            <a class="btn @(on ? "btn-primary" : "btn-outline-secondary")" asp-action="Justifications" asp-route-year="@yid" asp-route-state="@st">
+                                @AttendanceLabels.JustificationState(st, isRtl)
+                                <span class="badge text-bg-light border ms-1">@(Model.CountsByState.TryGetValue(st, out var c) ? c : 0)</span>
+                            </a>
+                        }
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table sms-table mb-0">
+                        <caption class="visually-hidden">@T("Excuse submissions for review", "الأعذار المقدّمة للمراجعة")</caption>
+                        <thead><tr><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Absence", "الغياب")</th><th scope="col">@T("Type", "النوع")</th><th scope="col">@T("Submitted", "قُدِّم")</th><th scope="col" class="text-end">@T("Decision", "القرار")</th></tr></thead>
+                        <tbody>
+                            @foreach (var r in Model.Rows)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">@(r.Student == null ? "—" : AttendanceLabels.StudentName(r.Student, isRtl))</div>
+                                        <div class="small text-muted">@(r.Student == null ? "" : r.Student.StudentNo) @(r.Section == null ? "" : "· " + (isRtl ? r.Section.NameAr : r.Section.NameEn))</div>
+                                    </td>
+                                    <td>
+                                        <div>@r.Day.Date.ToString("yyyy-MM-dd")</div>
+                                        <span class="badge @AttendanceLabels.StatusBadge(r.Day.Status)">@AttendanceLabels.Status(r.Day.Status, isRtl)</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge @(r.Justification.Type == JustificationType.Medical ? "text-bg-info" : "text-bg-light border")">@AttendanceLabels.JustificationTypeName(r.Justification.Type, isRtl)</span>
+                                        @if (r.Justification.Type == JustificationType.Medical && r.Justification.DocumentAttachmentId == null)
+                                        {
+                                            <div class="small text-warning-emphasis"><i class="bi bi-paperclip" aria-hidden="true"></i> @T("no document on file", "لا مستند مرفق")</div>
+                                        }
+                                    </td>
+                                    <td class="small">
+                                        @r.Justification.SubmittedAtUtc.ToString("yyyy-MM-dd")
+                                        @if (r.OutsideWindow)
+                                        {
+                                            <div><span class="badge text-bg-warning" title="@string.Format(T("{0} days after the absence; the window is {1}", "بعد {0} يوماً من الغياب؛ والمهلة {1}"), r.DaysToSubmit, Model.WindowDays)"><i class="bi bi-hourglass-bottom" aria-hidden="true"></i> @T("late", "متأخر")</span></div>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (r.Justification.ReviewState == JustificationReviewState.Submitted)
+                                        {
+                                            <form method="post" asp-action="ReviewJustification" asp-route-id="@r.Justification.Id" asp-route-year="@yid" class="d-inline">
+                                                <input type="hidden" name="accept" value="true" />
+                                                <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check-lg" aria-hidden="true"></i> @T("Accept", "قبول")</button>
+                                            </form>
+                                            <button class="btn btn-sm btn-outline-danger ms-1" type="button" data-bs-toggle="collapse" data-bs-target="#rej@(r.Justification.Id)"><i class="bi bi-x-lg" aria-hidden="true"></i> @T("Reject", "رفض")</button>
+                                            <div class="collapse mt-2 text-start" id="rej@(r.Justification.Id)">
+                                                <form method="post" asp-action="ReviewJustification" asp-route-id="@r.Justification.Id" asp-route-year="@yid" class="d-flex gap-2">
+                                                    <input type="hidden" name="accept" value="false" />
+                                                    <input type="text" name="reason" class="form-control form-control-sm" aria-label="@T("Reason for rejection", "سبب الرفض")" placeholder="@T("Reason for rejection", "سبب الرفض")" required aria-required="true" />
+                                                    <button class="btn btn-sm btn-danger" type="submit">@T("Reject", "رفض")</button>
+                                                </form>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @AttendanceLabels.JustificationBadge(r.Justification.ReviewState)">@AttendanceLabels.JustificationState(r.Justification.ReviewState, isRtl)</span>
+                                            @if (!string.IsNullOrWhiteSpace(r.Justification.RejectionReason))
+                                            {
+                                                <div class="small text-muted">@r.Justification.RejectionReason</div>
+                                            }
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @if (Model.Rows.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-muted py-4">@T("Nothing in this queue.", "لا شيء في هذه القائمة.")</td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3"><i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>@T("Record an excuse from the counter", "تسجيل عذر من المكتب")</h2>
+                @if (Model.OpenAbsences.Count == 0)
+                {
+                    <div class="alert alert-light border small mb-0">@T("Every recorded absence already has an excuse on file.", "كل غياب مُسجَّل له عذر مُقيَّد سلفاً.")</div>
+                }
+                else
+                {
+                    <form method="post" asp-action="SubmitJustification" asp-route-year="@yid" class="d-grid gap-2">
+                        <div>
+                            <label class="form-label small" for="just-absence">@T("Absence", "الغياب")</label>
+                            <select id="just-absence" name="attendanceDayId" class="form-select form-select-sm" required aria-required="true">
+                                <option value="">—</option>
+                                @foreach (var a in Model.OpenAbsences)
+                                {
+                                    <option value="@a.AttendanceDayId">@a.Date.ToString("yyyy-MM-dd") · @a.Student.StudentNo @AttendanceLabels.StudentName(a.Student, isRtl) · @AttendanceLabels.Status(a.Status, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label small" for="just-type">@T("Type", "النوع")</label>
+                            <select id="just-type" name="type" class="form-select form-select-sm">
+                                @foreach (JustificationType t in Enum.GetValues(typeof(JustificationType)))
+                                {
+                                    <option value="@t">@AttendanceLabels.JustificationTypeName(t, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Record", "تسجيل")</button>
+                        <div class="form-text">@T("It lands in the queue as Submitted — recording it is not deciding it.", "يدخل القائمة بحالة مُقدَّم — والتسجيل ليس قراراً.")</div>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+}

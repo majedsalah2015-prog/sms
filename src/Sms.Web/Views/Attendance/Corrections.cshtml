@@ -1,0 +1,137 @@
+@using System.Globalization
+@using Sms.Domain.Attendance
+@model AttendanceCorrectionsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Attendance corrections", "تصحيح الحضور");
+    ViewData["Breadcrumb"] = T("Attendance / Corrections", "الحضور / التصحيحات");
+    ViewData["AttendanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var from = Model.From.ToString("yyyy-MM-dd");
+    var to = Model.To.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "corr-help", Title = T("Corrections — help", "التصحيحات — مساعدة"),
+        Intro = T("WF-14: changing attendance after the day is closed. The reason is mandatory and is what the audit trail keeps alongside the old and new status (BR-ATD-007) — the register at the bottom is that trail, read back.", "WF-14: تعديل الحضور بعد إقفال اليوم. السبب إلزامي وهو ما يحفظه سجل التدقيق مع الحالة القديمة والجديدة (BR-ATD-007) — والسجل في الأسفل هو ذلك الأثر معروضاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Why the reason is unavoidable", "لماذا السبب لا مفر منه"), T("AttendanceDay.Status is a reason-required field on a T1-audited record, so the save itself refuses to go through without one — this screen does not rely on a UI check.", "حالة يوم الحضور حقل يتطلب سبباً في سجل مُدقَّق من الفئة الأولى، فالحفظ نفسه يرفض المرور بدونه — والشاشة لا تعتمد على تحقق واجهة.")),
+            new HelpPanelViewModel.Item(T("Approval chain", "سلسلة الاعتماد"), T("The doc puts a P2 supervisor approval in front of a correction. This build applies the reason and the audit trail; the approval step itself is not enforced — role gating is not wired on these screens yet.", "تضع الوثيقة اعتماد مشرف P2 قبل التصحيح. هذا الإصدار يطبّق السبب وأثر التدقيق؛ أما خطوة الاعتماد فغير مفروضة — وضبط الصلاحيات غير مربوط بهذه الشاشات بعد.")),
+            new HelpPanelViewModel.Item(T("Unlocked rows", "الصفوف غير المقفلة"), T("Untick \"closed rows only\" to reach a day that has not been closed yet — though an open day is easier to fix on the capture sheet.", "أزل تحديد \"المقفلة فقط\" للوصول إلى يوم لم يُقفل بعد — مع أن اليوم المفتوح أسهل تعديلاً من كشف الرصد.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Post-closure changes, with a mandatory reason and a register of every one.", "تعديلات ما بعد الإقفال، بسبب إلزامي وسجل لكل تعديل.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_AttendanceNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div>
+}
+else
+{
+    <div class="sms-card mb-3">
+        <form method="get" class="p-2 d-flex flex-wrap gap-2 align-items-end">
+            <input type="hidden" name="year" value="@yid" />
+            <div><label class="form-label small mb-1" for="corr-from">@T("From", "من")</label><input type="date" name="from" id="corr-from" value="@from" class="form-control form-control-sm" /></div>
+            <div><label class="form-label small mb-1" for="corr-to">@T("To", "إلى")</label><input type="date" name="to" id="corr-to" value="@to" class="form-control form-control-sm" /></div>
+            <div>
+                <label class="form-label small mb-1" for="corr-section">@T("Section", "الشعبة")</label>
+                <select id="corr-section" name="section" class="form-select form-select-sm" style="max-width:14rem">
+                    <option value="">@T("Any section", "كل الشعب")</option>
+                    @foreach (var s in Model.AllSections) { <option value="@s.Section.Id" selected="@(s.Section.Id == Model.SectionId)">@s.Grade?.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }
+                </select>
+            </div>
+            <div><label class="form-label small mb-1" for="corr-q">@T("Student", "الطالب")</label><input type="search" name="q" id="corr-q" value="@Model.Query" class="form-control form-control-sm" placeholder="@T("Number or name", "الرقم أو الاسم")" /></div>
+            <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="lockedOnly" value="true" id="lockOnly" checked="@Model.LockedOnly" /><label class="form-check-label small" for="lockOnly">@T("Closed rows only", "المقفلة فقط")</label></div>
+            <button class="btn btn-sm btn-primary mb-2" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>@T("Filter", "تصفية")</button>
+        </form>
+    </div>
+
+    <div class="sms-card mb-3">
+        <div class="p-2 border-bottom d-flex align-items-center"><h2 class="h6 mb-0 me-auto"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Records", "السجلات")</h2><span class="badge text-bg-light border">@Model.Rows.Count</span></div>
+        <div class="table-responsive">
+            <table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Attendance records eligible for correction", "سجلات الحضور القابلة للتصحيح")</caption>
+                <thead><tr><th scope="col">@T("Date", "التاريخ")</th><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col" style="width:26rem">@T("Correct to", "تصحيح إلى")</th></tr></thead>
+                <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        <tr>
+                            <td class="small">@r.Day.Date.ToString("yyyy-MM-dd")@if (r.Day.IsLocked) { <i class="bi bi-lock text-muted ms-1" title="@T("Closed", "مقفل")" aria-hidden="true"></i><span class="visually-hidden">@T("Closed", "مقفل")</span> }</td>
+                            <td>
+                                <div class="fw-semibold">@(r.Student == null ? "—" : AttendanceLabels.StudentName(r.Student, isRtl))</div>
+                                <div class="small text-muted"><code>@(r.Student?.StudentNo)</code></div>
+                            </td>
+                            <td class="small text-muted">@r.Grade?.Code @(r.Section == null ? "" : (isRtl ? r.Section.NameAr : r.Section.NameEn))</td>
+                            <td><span class="badge @AttendanceLabels.StatusBadge(r.Day.Status)">@AttendanceLabels.Status(r.Day.Status, isRtl)</span></td>
+                            <td>
+                                <form method="post" asp-action="Correct" asp-route-id="@r.Day.Id" asp-route-year="@yid" class="d-flex gap-1">
+                                    <input type="hidden" name="from" value="@from" />
+                                    <input type="hidden" name="to" value="@to" />
+                                    <input type="hidden" name="section" value="@Model.SectionId" />
+                                    <select name="status" class="form-select form-select-sm" style="max-width:11rem" aria-label="@($"{T("Correct to", "تصحيح إلى")} — {(r.Student == null ? "" : AttendanceLabels.StudentName(r.Student, isRtl))} {r.Day.Date:yyyy-MM-dd}")">
+                                        @foreach (var st in AttendanceLabels.CaptureChips)
+                                        {
+                                            <option value="@st" selected="@(st == r.Day.Status)">@AttendanceLabels.Status(st, isRtl)</option>
+                                        }
+                                    </select>
+                                    <input type="text" name="reason" class="form-control form-control-sm" aria-label="@($"{T("Correction reason", "سبب التصحيح")} — {(r.Student == null ? "" : AttendanceLabels.StudentName(r.Student, isRtl))} {r.Day.Date:yyyy-MM-dd}")" placeholder="@T("Reason (required)", "السبب (مطلوب)")" required aria-required="true" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Save correction", "حفظ التصحيح")"><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    @if (Model.Rows.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-4">@T("No record matches — widen the dates, or untick \"closed rows only\" if the day has not been closed yet.", "لا سجل مطابق — وسّع التواريخ، أو أزل تحديد \"المقفلة فقط\" إن لم يُقفل اليوم بعد.")</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="sms-card">
+        <div class="p-2 border-bottom"><h2 class="h6 mb-0"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>@T("Correction register (WF-14 audit view)", "سجل التصحيحات (عرض تدقيق WF-14)")</h2></div>
+        <div class="table-responsive" style="max-height:22rem;overflow-y:auto">
+            <table class="table sms-table table-sm mb-0">
+                <caption class="visually-hidden">@T("Correction register", "سجل التصحيحات")</caption>
+                <thead><tr><th scope="col">@T("Changed", "وقت التغيير")</th><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Attendance date", "تاريخ الحضور")</th><th scope="col">@T("From → to", "من ← إلى")</th><th scope="col">@T("Reason", "السبب")</th></tr></thead>
+                <tbody>
+                    @foreach (var e in Model.Register)
+                    {
+                        <tr>
+                            <td class="small text-muted">@e.Entry.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="small">@(e.Student == null ? "—" : AttendanceLabels.StudentName(e.Student, isRtl))</td>
+                            <td class="small">@(e.Date?.ToString("yyyy-MM-dd") ?? "—")</td>
+                            <td class="small">
+                                @{
+                                    var oldOk = Enum.TryParse<AttendanceStatus>(e.Entry.OldValue, out var oldSt);
+                                    var newOk = Enum.TryParse<AttendanceStatus>(e.Entry.NewValue, out var newSt);
+                                }
+                                <span class="badge @(oldOk ? AttendanceLabels.StatusBadge(oldSt) : "text-bg-light")">@(oldOk ? AttendanceLabels.Status(oldSt, isRtl) : (e.Entry.OldValue ?? "—"))</span>
+                                <i class="bi bi-arrow-right mx-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>
+                                <span class="badge @(newOk ? AttendanceLabels.StatusBadge(newSt) : "text-bg-light")">@(newOk ? AttendanceLabels.Status(newSt, isRtl) : (e.Entry.NewValue ?? "—"))</span>
+                            </td>
+                            <td class="small">@(string.IsNullOrWhiteSpace(e.Entry.Reason) ? "—" : e.Entry.Reason)</td>
+                        </tr>
+                    }
+                    @if (Model.Register.Count == 0)
+                    {
+                        <tr><td colspan="5" class="text-center text-muted py-3">@T("No status change has been recorded yet.", "لم يُسجَّل أي تغيير حالة بعد.")</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}

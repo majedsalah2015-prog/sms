@@ -1,0 +1,166 @@
+@using System.Globalization
+@using Sms.Domain.Attendance
+@model AttendanceCaptureViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Section capture sheet", "كشف رصد الشعبة");
+    ViewData["Breadcrumb"] = T("Attendance / Capture", "الحضور / الرصد");
+    ViewData["AttendanceYear"] = Model.Year?.Id;
+    ViewData["AttendanceDate"] = Model.Date.ToString("yyyy-MM-dd");
+    var yid = Model.Year?.Id;
+    var d = Model.Date.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "cap-help", Title = T("Capture sheet — help", "كشف الرصد — مساعدة"),
+        Intro = T("One roster, one save. Everybody starts Present (BR-ATD-002) — tap only the exceptions, then save once. The whole sheet posts in a single request, so a flaky connection costs you the save, never half of it.", "كشف واحد وحفظ واحد. الجميع يبدأ حاضراً (BR-ATD-002) — اضغط على الاستثناءات فقط ثم احفظ مرة واحدة. يُرسل الكشف كاملاً في طلب واحد، فانقطاع الشبكة يفقدك الحفظ كله لا نصفه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Who appears", "من يظهر"), T("The students whose section membership covers this date and whose enrolment is active — a mid-year transfer shows in the section they belonged to on the day (BR-ATD-003/BR-SCN-005).", "الطلاب الذين تغطي عضويتهم في الشعبة هذا التاريخ وتسجيلهم نشط — والمنتقل أثناء العام يظهر في شعبته يوم التاريخ (BR-ATD-003/BR-SCN-005).")),
+            new HelpPanelViewModel.Item(T("Absences start unexcused", "الغياب يبدأ بدون عذر"), T("Mark a plain absence Unexcused; it flips to Excused or Medical only when an excuse is accepted in the review queue (BR-ATD-005). Do not pre-excuse it here.", "سجّل الغياب بدون عذر؛ ولا يتحول إلى بعذر أو مرضي إلا بقبول العذر في قائمة المراجعة (BR-ATD-005). لا تُعذره مسبقاً هنا.")),
+            new HelpPanelViewModel.Item(T("After the day closes", "بعد إقفال اليوم"), T("Locked rows are read-only here and show a padlock — they change only on the correction screen, with a reason (WF-14, BR-ATD-007).", "الصفوف المقفلة للقراءة فقط هنا وتظهر بقفل — ولا تتغير إلا من شاشة التصحيح وبسبب (WF-14، BR-ATD-007).")),
+            new HelpPanelViewModel.Item(T("Period mode", "نمط الحصص"), T("This build captures the daily mode only. Per-period capture needs Module 15's timetable sessions and is not built (BR-ATD-001).", "هذا الإصدار يرصد النمط اليومي فقط. الرصد بالحصة يحتاج حصص الجدول في الوحدة 15 وغير مبني (BR-ATD-001).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Default all present, tap the exceptions, save once.", "الافتراضي حضور الجميع، اضغط الاستثناءات، ثم احفظ مرة واحدة.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+            <select name="section" class="form-select form-select-sm" style="max-width:14rem" onchange="this.form.submit()">
+                <option value="">@T("Pick a section…", "اختر شعبة…")</option>
+                @foreach (var s in Model.AllSections) { <option value="@s.Section.Id" selected="@(s.Section.Id == Model.SectionId)">@s.Grade?.Code · @(isRtl ? s.Section.NameAr : s.Section.NameEn)</option> }
+            </select>
+            <input type="date" name="date" value="@d" class="form-control form-control-sm" onchange="this.form.submit()" style="max-width:10rem" />
+        </form>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_AttendanceNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div>
+}
+else if (Model.Section == null)
+{
+    <div class="alert alert-info"><i class="bi bi-arrow-up me-1"></i>@T("Pick a section to open its sheet.", "اختر شعبة لفتح كشفها.")</div>
+}
+else
+{
+    var blocked = Model.DayType != null && !Model.IsWorkingDay;
+    @if (!Model.DateInYear)
+    {
+        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1"></i>@T("This date falls outside the selected academic year.", "هذا التاريخ خارج نطاق العام الدراسي المحدد.")</div>
+    }
+    else if (Model.DayType == null)
+    {
+        <div class="alert alert-warning"><i class="bi bi-calendar-x me-1"></i>@T("The year's calendar has no entry for this date. Capture is still allowed, but build the calendar so working days are unambiguous (BR-CAL-003).", "لا يوجد إدخال لهذا التاريخ في تقويم العام. الرصد مسموح، لكن ابنِ التقويم ليكون يوم الدراسة محدداً (BR-CAL-003).")</div>
+    }
+    else if (blocked)
+    {
+        <div class="alert alert-danger"><i class="bi bi-slash-circle me-1"></i>@string.Format(T("{0} — attendance is only captured on working days (BR-ATD-003). Saving is disabled.", "{0} — لا يُرصد الحضور إلا في أيام الدراسة (BR-ATD-003). الحفظ معطّل."), AttendanceLabels.CalendarDayType(Model.DayType!.Value, isRtl))</div>
+    }
+
+    <form method="post" asp-action="SaveCapture" asp-route-year="@yid">
+        <input type="hidden" name="sectionId" value="@Model.Section.Id" />
+        <input type="hidden" name="date" value="@d" />
+        <div class="sms-card">
+            <div class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+                <h2 class="h6 mb-0">
+                    <i class="bi bi-people me-1"></i>@Model.Grade?.Code · @(isRtl ? Model.Section.NameAr : Model.Section.NameEn)
+                    <span class="text-muted fw-normal ms-2">@Model.Date.ToString("yyyy-MM-dd") · @AttendanceLabels.Weekday(Model.Date.DayOfWeek, isRtl)</span>
+                </h2>
+                <span class="badge text-bg-light border">@string.Format(T("{0} students", "{0} طالب"), Model.Rows.Count)</span>
+                @if (Model.CapturedCount > 0) { <span class="badge text-bg-info">@string.Format(T("{0} already captured", "{0} مرصود سلفاً"), Model.CapturedCount)</span> }
+                @if (Model.AnyLocked) { <span class="badge text-bg-secondary"><i class="bi bi-lock me-1"></i>@T("Day closed", "اليوم مقفل")</span> }
+                <div class="ms-auto d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="allPresent"><i class="bi bi-check-all me-1"></i>@T("All present", "الجميع حاضر")</button>
+                    <button class="btn btn-sm btn-primary" type="submit" disabled="@blocked"><i class="bi bi-save me-1"></i>@T("Save sheet", "حفظ الكشف")</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table sms-table mb-0 align-middle">
+                    <thead><tr><th style="width:3rem">#</th><th>@T("Student", "الطالب")</th><th>@T("Status", "الحالة")</th><th style="width:8rem">@T("Recorded", "المسجّل")</th></tr></thead>
+                    <tbody>
+                        @{ var n = 0; }
+                        @foreach (var r in Model.Rows)
+                        {
+                            n++;
+                            var current = r.Existing?.Status ?? AttendanceStatus.Present;
+                            var locked = r.Existing?.IsLocked == true;
+                            <tr class="@(locked ? "table-light" : "")">
+                                <td class="text-muted small">@n</td>
+                                <td>
+                                    <div class="fw-semibold">@AttendanceLabels.StudentName(r.Student, isRtl)</div>
+                                    <div class="small text-muted">
+                                        <code>@r.Student.StudentNo</code>
+                                        @if (r.HasOpenLeavePass) { <span class="badge text-bg-warning ms-1" title="@T("Has an approved or released leave pass today", "لديه استئذان معتمد أو خارج اليوم")"><i class="bi bi-box-arrow-right"></i> @T("leave pass", "استئذان")</span> }
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="@AttendanceLabels.StudentName(r.Student, isRtl)">
+                                        @foreach (var st in AttendanceLabels.CaptureChips)
+                                        {
+                                            var id = $"s{r.EnrollmentId}_{(int)st}";
+                                            <input type="radio" class="btn-check js-status" name="status_@r.EnrollmentId" id="@id" value="@st" autocomplete="off"
+                                                   checked="@(current == st)" disabled="@locked" />
+                                            <label class="btn btn-outline-secondary" for="@id" title="@AttendanceLabels.Status(st, isRtl)">
+                                                <i class="bi @AttendanceLabels.StatusIcon(st)"></i>
+                                            </label>
+                                        }
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (r.Existing == null)
+                                    {
+                                        <span class="text-muted small">@T("not captured", "غير مرصود")</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge @AttendanceLabels.StatusBadge(r.Existing.Status)">@AttendanceLabels.Status(r.Existing.Status, isRtl)</span>
+                                        @if (locked) { <i class="bi bi-lock text-muted ms-1" title="@T("Locked — use the correction screen", "مقفل — استخدم شاشة التصحيح")"></i> }
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Rows.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">@T("Nobody is a member of this section on this date.", "لا أحد عضو في هذه الشعبة بهذا التاريخ.")</td></tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-2 border-top d-flex align-items-center gap-2">
+                <span class="small text-muted me-auto"><i class="bi bi-info-circle me-1"></i>@T("Hover a chip to see its status. Locked rows are read-only.", "مرّر المؤشر فوق الرمز لمعرفة الحالة. الصفوف المقفلة للقراءة فقط.")</span>
+                <button class="btn btn-primary" type="submit" disabled="@blocked"><i class="bi bi-save me-1"></i>@T("Save sheet", "حفظ الكشف")</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="mt-3 d-flex flex-wrap gap-3">
+        @foreach (var st in AttendanceLabels.CaptureChips)
+        {
+            <span class="small text-muted"><i class="bi @AttendanceLabels.StatusIcon(st) me-1"></i>@AttendanceLabels.Status(st, isRtl)</span>
+        }
+    </div>
+
+    <script>
+        (function () {
+            var btn = document.getElementById('allPresent');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                Array.prototype.forEach.call(document.querySelectorAll('input.js-status[value="Present"]'), function (el) {
+                    if (!el.disabled) el.checked = true;
+                });
+            });
+        })();
+    </script>
+}
