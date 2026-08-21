@@ -177,6 +177,17 @@ namespace Sms.Web.Models
         public IReadOnlyDictionary<string, int> ReadThroughCounts { get; set; } = new Dictionary<string, int>();
 
         public string ActiveTab { get; set; } = "personal";
+
+        /// <summary>
+        /// BR-GLB-072: the social profile is a restricted category with its own permission
+        /// (<c>STU/SocialProfile</c>), and it renders inside this screen rather than on one of its
+        /// own. Gating only the actions would leave the data on the page for anyone who may open the
+        /// file at all, which is the whole thing the separate permission exists to prevent.
+        /// </summary>
+        public bool CanSeeSocialProfile { get; set; }
+
+        /// <summary>False leaves the section readable and its form absent — a reader is not an editor.</summary>
+        public bool CanEditSocialProfile { get; set; }
     }
 
     // ---------------------------------------------------------------- Parents (doc/Modules/11 §8)

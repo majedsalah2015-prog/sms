@@ -14,6 +14,7 @@ using Sms.Domain.Reports;
 using Sms.Domain.Security;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -86,6 +87,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Report center
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Catalog, ActionVerb.View)]
         public async Task<IActionResult> Index(string? q = null, string? module = null, ReportSensitivity? sensitivity = null)
         {
             var definitions = await _db.ReportDefinitions.AsNoTracking().OrderBy(d => d.Code).ToListAsync(Ct);
@@ -158,6 +160,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("definitions")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Catalog, ActionVerb.Configure)]
         public async Task<IActionResult> CreateDefinition(
             string code, string owningModuleCode, string titleAr, string titleEn,
             OutputFormat[] formats, ReportSensitivity sensitivity, int permissionId,
@@ -220,6 +223,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Report runner
 
         [HttpGet("{id:int}/run")]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Catalog, ActionVerb.View)]
         public async Task<IActionResult> Run(int id, int estimatedRowCount = 0)
         {
             var definition = await _db.ReportDefinitions.AsNoTracking().SingleOrDefaultAsync(d => d.Id == id, Ct);
@@ -276,6 +280,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/run")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Catalog, ActionVerb.Export)]
         public async Task<IActionResult> Execute(
             int id, string[]? paramKeys, string[]? paramValues,
             OutputFormat format, bool isExport, int estimatedRowCount)
@@ -352,6 +357,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("executions/{id:int}/complete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Executions, ActionVerb.Edit)]
         public async Task<IActionResult> CompleteRun(int id, int rowCount, int durationMs, string? returnUrl)
         {
             try
@@ -372,6 +378,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Subscription manager
 
         [HttpGet("subscriptions")]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Subscriptions, ActionVerb.View)]
         public async Task<IActionResult> Subscriptions(int? reportId = null, bool showCancelled = false)
         {
             var query = _db.ReportSubscriptions.AsNoTracking().AsQueryable();
@@ -436,6 +443,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("subscriptions")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Subscriptions, ActionVerb.Create)]
         public async Task<IActionResult> Subscribe(
             int reportDefinitionId, int subscriberUserId, SubscriptionFrequency frequency,
             OutputFormat format, DeliveryChannel deliveryChannel, string[]? paramKeys, string[]? paramValues)
@@ -488,6 +496,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("subscriptions/{id:int}/cancel")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Subscriptions, ActionVerb.Deactivate)]
         public async Task<IActionResult> CancelSubscription(int id)
         {
             if (!await _db.ReportSubscriptions.AnyAsync(s => s.Id == id, Ct))
@@ -503,6 +512,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Execution log
 
         [HttpGet("log")]
+        [RequirePermission(ScreenCatalog.Modules.Reports, ScreenCatalog.Reports.Executions, ActionVerb.View)]
         public async Task<IActionResult> Log(
             int? reportId = null, ReportExecutionStatus? status = null, bool exportsOnly = false,
             int? userId = null, DateTime? from = null, DateTime? to = null)

@@ -210,6 +210,10 @@ namespace Sms.Web
                 options.UseSqlServer(Configuration.GetConnectionString("Sms")));
             services.AddScoped<IPermissionService, PermissionService>();
 
+            // Reads the same grants the screen filter reads, so the menu and the screens agree about
+            // what this user can open. Scoped: it caches its answer for the request.
+            services.AddScoped<Sms.Web.Navigation.ModuleVisibility>();
+
             // E-003 authentication slice (doc 06 §3, BR-SEC-001..004). The
             // cookie/session wiring that consumes this (login screen, real
             // ICurrentUser off the authenticated principal) is a later slice.

@@ -11,6 +11,9 @@ using Sms.Domain.Classrooms;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -45,6 +48,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.View)]
         public async Task<IActionResult> Index()
         {
             var buildings = await _db.Buildings.AsNoTracking().OrderBy(b => b.Name.NameEn).ToListAsync();
@@ -74,6 +78,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("building")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Create)]
         public async Task<IActionResult> DefineBuilding(RoomCatalogViewModel form)
         {
             try { Require(form.BuildingNameAr, "Name (Arabic)"); Require(form.BuildingNameEn, "Name (English)"); await _rooms.DefineBuildingAsync(form.BuildingNameAr!, form.BuildingNameEn!); TempData["Flash"] = T("Building created.", "تم إنشاء المبنى."); }
@@ -83,6 +88,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("floor")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Create)]
         public async Task<IActionResult> DefineFloor(RoomCatalogViewModel form)
         {
             try
@@ -98,6 +104,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("room")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Create)]
         public async Task<IActionResult> DefineRoom(RoomCatalogViewModel form)
         {
             try
@@ -115,6 +122,7 @@ namespace Sms.Web.Controllers
         // --- Edit / delete (soft: deactivate) for building / floor / room ---------
 
         [HttpGet("building/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Edit)]
         public async Task<IActionResult> EditBuilding(int id)
         {
             var b = await _db.Buildings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -124,6 +132,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("building/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Edit)]
         public async Task<IActionResult> EditBuilding(int id, RoomEditViewModel form)
         {
             form.Id = id; form.Kind = "building";
@@ -139,6 +148,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("building/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteBuilding(int id)
         {
             try { await _rooms.DeactivateBuildingAsync(id); TempData["Flash"] = T("Building removed (deactivated).", "تم حذف المبنى (إلغاء تفعيل)."); }
@@ -147,6 +157,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("floor/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Edit)]
         public async Task<IActionResult> EditFloor(int id)
         {
             var f = await _db.Floors.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -156,6 +167,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("floor/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Edit)]
         public async Task<IActionResult> EditFloor(int id, RoomEditViewModel form)
         {
             form.Id = id; form.Kind = "floor";
@@ -172,6 +184,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("floor/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteFloor(int id)
         {
             try { await _rooms.DeactivateFloorAsync(id); TempData["Flash"] = T("Floor removed (deactivated).", "تم حذف الطابق (إلغاء تفعيل)."); }
@@ -180,6 +193,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Edit)]
         public async Task<IActionResult> EditRoom(int id)
         {
             var r = await _db.Rooms.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -194,6 +208,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Edit)]
         public async Task<IActionResult> EditRoom(int id, RoomEditViewModel form)
         {
             form.Id = id; form.Kind = "room";
@@ -210,6 +225,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteRoom(int id)
         {
             try { await _rooms.DeactivateRoomAsync(id); TempData["Flash"] = T("Room removed (deactivated; bookings/history kept).", "تم حذف القاعة (إلغاء تفعيل مع حفظ الحجوزات والسجل)."); }
@@ -228,6 +244,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.View)]
         public async Task<IActionResult> Details(int id)
         {
             var room = await _db.Rooms.AsNoTracking().SingleOrDefaultAsync(r => r.Id == id);
@@ -252,6 +269,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/feature")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Edit)]
         public async Task<IActionResult> AddFeature(int id, int? featureLookupId)
         {
             try
@@ -266,6 +284,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/unavailable")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Edit)]
         public async Task<IActionResult> SetUnavailable(int id, RoomAvailabilityReason reason, DateTime? startDate, DateTime? endDate, string? notes)
         {
             try
@@ -281,6 +300,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/booking")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.Edit)]
         public async Task<IActionResult> RequestBooking(int id, int? academicYearId, string? purpose, DateTime? start, DateTime? end)
         {
             try

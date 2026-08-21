@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -21,6 +22,7 @@ namespace Sms.Web.Controllers
             _db = db;
         }
 
+        [NoPermissionRequired("The shell's landing page; every tile behind it is gated on its own.")]
         public async Task<IActionResult> Index()
         {
             // AppDbContext already applies the tenant filter (E-002), so these
@@ -50,6 +52,7 @@ namespace Sms.Web.Controllers
             return View(model);
         }
 
+        [NoPermissionRequired("Static text.")]
         public IActionResult Privacy()
         {
             return View();
@@ -59,6 +62,7 @@ namespace Sms.Web.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
+        [NoPermissionRequired("Switching one's own display language.")]
         public IActionResult SetLanguage(string culture, string? returnUrl)
         {
             var requested = culture == "ar" ? "ar-SA" : "en-US";
@@ -72,6 +76,7 @@ namespace Sms.Web.Controllers
 
         [AllowAnonymous]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        [NoPermissionRequired("The error page.")]
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });

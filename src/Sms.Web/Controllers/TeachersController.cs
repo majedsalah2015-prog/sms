@@ -12,6 +12,9 @@ using Sms.Domain.Schools;
 using Sms.Domain.Teachers;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -53,6 +56,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Directory
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null)
         {
             var (years, yr) = await YearsAsync(year);
@@ -84,6 +88,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("designate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.Edit)]
         public async Task<IActionResult> Designate(int? employeeId, int? maxWeeklyPeriods, int? year)
         {
             try
@@ -99,6 +104,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{teacherProfileId:int}/remove")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.Deactivate)]
         public async Task<IActionResult> RemoveDesignation(int teacherProfileId, int? year)
         {
             try
@@ -113,6 +119,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Assignment matrix
 
         [HttpGet("matrix")]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Assignments, ActionVerb.View)]
         public async Task<IActionResult> Matrix(int? year = null, int? profile = null)
         {
             var m = await BuildMatrixAsync(year, profile);
@@ -121,6 +128,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("matrix/assign")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Assignments, ActionVerb.Create)]
         public async Task<IActionResult> Assign(int? year, int? profile, int? teacherProfileId, int? offeringId, int? sectionId, TeacherRole role, bool overrideLoad, DateTime? effectiveFrom)
         {
             try
@@ -135,6 +143,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("matrix/{assignmentId:int}/end")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Assignments, ActionVerb.Deactivate)]
         public async Task<IActionResult> EndAssignment(int assignmentId, int? year, int? profile, DateTime? effectiveTo)
         {
             try
@@ -148,6 +157,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("matrix/copy")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Assignments, ActionVerb.Create)]
         public async Task<IActionResult> CopyFromPreviousYear(int? year, int? profile, int? sourceProfile)
         {
             try
@@ -177,6 +187,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Load board
 
         [HttpGet("load")]
+        [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Load, ActionVerb.View)]
         public async Task<IActionResult> Load(int? year = null)
         {
             var (years, yr) = await YearsAsync(year);

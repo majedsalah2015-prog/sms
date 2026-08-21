@@ -14,6 +14,9 @@ using Sms.Domain.Employees;
 using Sms.Domain.Teachers;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -53,6 +56,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Directory
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Directory, ActionVerb.View)]
         public async Task<IActionResult> Index(string? q = null, EmployeeStatus? status = null, int? org = null, bool? teachers = null)
         {
             var query = _db.Employees.AsNoTracking().AsQueryable();
@@ -89,10 +93,12 @@ namespace Sms.Web.Controllers
         // ================================================================== Register
 
         [HttpGet("new")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Directory, ActionVerb.Create)]
         public async Task<IActionResult> Register() => View(await BuildFormAsync());
 
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Directory, ActionVerb.Create)]
         public async Task<IActionResult> Register(EmployeeFormViewModel form)
         {
             try
@@ -120,6 +126,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Employee file
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.View)]
         public async Task<IActionResult> File(int id, string? tab = null)
         {
             var m = await BuildFileAsync(id);
@@ -130,6 +137,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id, EmployeeFormViewModel form)
         {
             try
@@ -147,6 +155,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Approve)]
         public async Task<IActionResult> Status(int id, EmployeeStatus target, string? reason)
         {
             try
@@ -162,6 +171,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/position")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
         public async Task<IActionResult> AssignPosition(int id, int? orgUnitId, int? positionLookupId, int? managerEmployeeId, DateTime? effectiveFrom)
         {
             try
@@ -177,6 +187,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/contracts")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Contracts, ActionVerb.Create)]
         public async Task<IActionResult> DefineContract(int id, ContractType type, DateTime? startDate, DateTime? endDate, decimal? salaryBasic, decimal? salaryAllowances)
         {
             try
@@ -191,6 +202,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/contracts/{contractId:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Contracts, ActionVerb.Edit)]
         public async Task<IActionResult> EditContract(int id, int contractId, ContractType type, DateTime? startDate, DateTime? endDate, decimal? salaryBasic, decimal? salaryAllowances, string? reason, string? returnTo)
         {
             try
@@ -206,6 +218,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/contracts/{contractId:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Contracts, ActionVerb.Approve)]
         public async Task<IActionResult> ContractStatusChange(int id, int contractId, ContractStatus target, string? reason, string? returnTo)
         {
             try
@@ -220,6 +233,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/qualifications")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
         public async Task<IActionResult> AddQualification(int id, string? titleAr, string? titleEn, DateTime? dateAwarded, bool isTeachingRelevant, string? institution)
         {
             try
@@ -234,6 +248,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/teaching/designate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
         public async Task<IActionResult> Designate(int id, int? maxWeeklyPeriods)
         {
             try
@@ -249,6 +264,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/teaching/maxload")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
         public async Task<IActionResult> MaxLoad(int id, int profileId, int? maxWeeklyPeriods)
         {
             try
@@ -264,6 +280,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Org chart
 
         [HttpGet("org")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.OrgChart, ActionVerb.View)]
         public async Task<IActionResult> Org()
         {
             var units = await _db.OrgUnits.AsNoTracking().OrderBy(u => u.NameEn).ToListAsync();
@@ -293,6 +310,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("org/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.OrgChart, ActionVerb.Create)]
         public async Task<IActionResult> CreateOrgUnit(string? nameAr, string? nameEn, int? parentId)
         {
             try
@@ -307,6 +325,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("org/{unitId:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.OrgChart, ActionVerb.Edit)]
         public async Task<IActionResult> EditOrgUnit(int unitId, string? nameAr, string? nameEn, int? parentId)
         {
             try
@@ -321,6 +340,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Deactivate)]
         public async Task<IActionResult> Delete(int id, string? q, EmployeeStatus? status, int? org, bool? teachers)
         {
             var e = await _db.Employees.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -336,6 +356,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("org/{unitId:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.OrgChart, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteOrgUnit(int unitId)
         {
             try { await _employees.DeleteOrgUnitAsync(unitId); TempData["Flash"] = T("Org unit deleted.", "حُذفت الوحدة التنظيمية."); }
@@ -346,6 +367,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.6 Contract manager 🔒
 
         [HttpGet("contracts")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Contracts, ActionVerb.View)]
         public async Task<IActionResult> Contracts(int window = 90)
         {
             var now = _clock.UtcNow.Date;

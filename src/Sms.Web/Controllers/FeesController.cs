@@ -17,6 +17,9 @@ using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Finance;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -60,6 +63,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Charge explorer
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, string? q = null, int? category = null, ChargeSourceType? source = null, ChargeStatus? status = null, bool open = false)
         {
             var m = new ChargeExplorerViewModel { Q = q, CategoryId = category, Source = source, Status = status, OpenOnly = open };
@@ -98,6 +102,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Category catalog
 
         [HttpGet("categories")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Categories, ActionVerb.View)]
         public async Task<IActionResult> Categories(int? edit = null)
         {
             var m = new FeeCategoryCatalogViewModel { EditId = edit };
@@ -113,6 +118,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("categories/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Categories, ActionVerb.Create)]
         public async Task<IActionResult> CreateCategory(string nameAr, string nameEn, string? vatRate, bool isMandatory = false, bool isRefundable = false, bool isServiceLinked = false, string? glExportCode = null)
         {
             try
@@ -127,6 +133,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("categories/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Categories, ActionVerb.Edit)]
         public async Task<IActionResult> EditCategory(int id, string nameAr, string nameEn, string? vatRate, bool isMandatory = false, bool isRefundable = false, bool isServiceLinked = false, string? glExportCode = null)
         {
             try
@@ -141,6 +148,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("categories/{id:int}/deactivate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Categories, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeactivateCategory(int id)
         {
             try
@@ -155,6 +163,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Fee structure workbench
 
         [HttpGet("structure")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.View)]
         public async Task<IActionResult> Structure(int? year = null)
         {
             var m = new FeeStructureViewModel();
@@ -179,6 +188,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/lines/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Create)]
         public async Task<IActionResult> CreateLine(int profileId, int categoryId, decimal amount, int? year)
         {
             try
@@ -193,6 +203,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/lines/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Edit)]
         public async Task<IActionResult> EditLine(int id, decimal amount, string? reason, int? year)
         {
             try
@@ -208,6 +219,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/lines/{id:int}/approve")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Approve)]
         public async Task<IActionResult> ApproveLine(int id, int? year)
         {
             try
@@ -221,6 +233,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/lines/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteLine(int id, int? year)
         {
             try
@@ -234,6 +247,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/approve-all")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Approve)]
         public async Task<IActionResult> ApproveAll(int year)
         {
             var n = 0;
@@ -249,6 +263,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("structure/copy")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Create)]
         public async Task<IActionResult> CopyStructure(int sourceYear, int year, decimal uplift = 0m)
         {
             try
@@ -266,6 +281,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Misc charge entry (+ post from structure)
 
         [HttpGet("charges/new")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.Create)]
         public async Task<IActionResult> NewCharge(int? studentId = null, int? year = null)
         {
             var m = await BuildNewChargeAsync(studentId, year);
@@ -274,6 +290,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("charges/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.Post)]
         public async Task<IActionResult> PostCharge(int studentId, int parentId, string mode, int? categoryId, decimal? amount, string? reason, int? year, ChargeSourceType? sourceType = null)
         {
             try
@@ -307,6 +324,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 document view + 8.5 credit note flow
 
         [HttpGet("charges/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.View)]
         public async Task<IActionResult> Charge(int id, bool print = false)
         {
             var charge = await _db.Charges.AsNoTracking().SingleOrDefaultAsync(c => c.Id == id);
@@ -343,6 +361,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("charges/{id:int}/void")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.Deactivate)]
         public async Task<IActionResult> VoidCharge(int id, string? reason, int? year)
         {
             try
@@ -359,6 +378,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("charges/{id:int}/credit-note")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.Deactivate)]
         public async Task<IActionResult> IssueCreditNote(int id, decimal amount, string? reason)
         {
             try
@@ -376,6 +396,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.7 Student/payer position
 
         [HttpGet("position")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Position, ActionVerb.View)]
         public async Task<IActionResult> Position(int? payerId = null, string? q = null, DateTime? asOf = null)
         {
             var m = new PayerPositionViewModel { Q = q, AsOf = asOf };

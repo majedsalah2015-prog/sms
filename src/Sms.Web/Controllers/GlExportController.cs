@@ -11,6 +11,9 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.GlExport;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -59,6 +62,7 @@ namespace Sms.Web.Controllers
         // ================================================================== Batch register
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.View)]
         public async Task<IActionResult> Index()
         {
             var m = new GlExportIndexViewModel { LedgerAttached = _posting != null };
@@ -85,6 +89,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("generate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.Post)]
         public async Task<IActionResult> Generate(DateTime periodFrom, DateTime periodTo)
         {
             if (periodTo.Date < periodFrom.Date)
@@ -133,6 +138,7 @@ namespace Sms.Web.Controllers
         // ================================================================== One batch
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.View)]
         public async Task<IActionResult> Details(int id)
         {
             var batch = await _db.GlExportBatches.AsNoTracking()
@@ -161,6 +167,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}/csv")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.Export)]
         public async Task<IActionResult> Csv(int id)
         {
             var batch = await _db.GlExportBatches.AsNoTracking().SingleOrDefaultAsync(b => b.Id == id, HttpContext.RequestAborted);
@@ -180,6 +187,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/void")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.Deactivate)]
         public async Task<IActionResult> Void(int id, string? reason)
         {
             if (string.IsNullOrWhiteSpace(reason))
@@ -210,6 +218,7 @@ namespace Sms.Web.Controllers
         // ================================================================== Mapping table
 
         [HttpGet("mappings")]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlMapping, ActionVerb.View)]
         public async Task<IActionResult> Mappings()
         {
             var m = new GlMappingsViewModel { LedgerAttached = _posting != null };
@@ -220,6 +229,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("mappings")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlMapping, ActionVerb.Configure)]
         public async Task<IActionResult> SaveMapping(string? key, string? accountCode, string? accountNameAr, string? accountNameEn)
         {
             if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(accountCode))

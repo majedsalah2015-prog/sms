@@ -9,13 +9,19 @@
     ViewData["Title"] = s.StudentNo;
     ViewData["Breadcrumb"] = T("Students / ", "الطلاب / ") + s.StudentNo;
     var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
-    var tabs = new (string Key, string En, string Ar, string? Count)[]
+    var tabs = new List<(string Key, string En, string Ar, string? Count)>
     {
         ("personal", "Personal", "الشخصية", null), ("guardians", "Parents & guardians", "أولياء الأمور", Model.Guardians.Count.ToString()), ("emergency", "Emergency contacts", "جهات الطوارئ", Model.EmergencyContacts.Count.ToString()),
-        ("social", "Social profile", "البيانات الاجتماعية", null), ("academic", "Academic history", "السجل الأكاديمي", Model.Enrollments.Count.ToString()), ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()),
+        ("academic", "Academic history", "السجل الأكاديمي", Model.Enrollments.Count.ToString()), ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()),
         ("attendance", "Attendance", "الحضور", Model.ReadThroughCounts.TryGetValue("attendance", out var at) ? at.ToString() : "0"), ("fees", "Fees", "الرسوم", Model.ReadThroughCounts.TryGetValue("charges", out var ch) ? ch.ToString() : "0"), ("certificates", "Certificates", "الشهادات", Model.ReadThroughCounts.TryGetValue("certificates", out var ce) ? ce.ToString() : "0"),
         ("more", "More…", "المزيد…", null),
     };
+    // BR-GLB-072: a restricted category with its own permission. The tab is not rendered at all
+    // without it — a disabled tab still tells the reader the data exists and who it is about.
+    if (Model.CanSeeSocialProfile)
+    {
+        tabs.Insert(3, ("social", "Social profile", "البيانات الاجتماعية", null));
+    }
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
     string Badge(StudentStatus st) => st switch { StudentStatus.Enrolled => "text-bg-success", StudentStatus.Suspended => "text-bg-warning", StudentStatus.Graduated or StudentStatus.Alumni => "text-bg-primary", _ => "text-bg-secondary" };
 }
@@ -64,7 +70,10 @@
             <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Emergency contacts", "جهات الطوارئ")</caption><thead><tr><th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Phone", "الهاتف")</th><th scope="col">@T("Pickup", "استلام")</th></tr></thead><tbody>@foreach (var c in Model.EmergencyContacts) { <tr><td>@(isRtl ? c.NameAr : c.NameEn)</td><td dir="ltr">@c.Phone</td><td><span aria-hidden="true">@(c.IsPickupAuthorized ? "✓" : "—")</span><span class="visually-hidden">@(c.IsPickupAuthorized ? T("yes", "نعم") : T("no", "لا"))</span></td></tr> }@if (Model.EmergencyContacts.Count == 0) { <tr><td colspan="3" class="text-center text-warning-emphasis py-3">@T("At least one emergency contact is required (§9).", "يلزم جهة اتصال طوارئ واحدة على الأقل (§9).")</td></tr> }</tbody></table>
             <form method="post" asp-action="AddEmergencyContact" asp-route-id="@s.Id" class="row g-2 align-items-end"><div class="col-md-3"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" aria-label="@T("Contact name (Arabic)", "اسم جهة الاتصال (عربي)")" /></div><div class="col-md-3"><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" aria-label="@T("Contact name (English)", "اسم جهة الاتصال (إنجليزي)")" /></div><div class="col-md-2"><input name="phone" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" aria-label="@T("Contact phone", "هاتف جهة الاتصال")" /></div><div class="col-md-2"><select name="relationshipId" class="form-select form-select-sm" aria-label="@T("Contact relationship", "قرابة جهة الاتصال")"><option value="">@T("relationship", "القرابة")</option>@foreach (var r in Model.Relationships) { <option value="@r.Id">@(isRtl ? r.Ar : r.En)</option> }</select></div><div class="col-md-1 small"><label><input type="checkbox" name="isPickup" value="true" class="form-check-input" /> @T("pickup", "استلام")</label></div><div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit" aria-label="@T("Add emergency contact", "إضافة جهة طوارئ")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></div></form>
         </div>
+        @if (Model.CanSeeSocialProfile)
+        {
         <div class="tab-pane fade @Show("social")" id="tab-social">
+            <fieldset disabled="@(!Model.CanEditSocialProfile)">
             <form method="post" asp-action="UpdateSocialProfile" asp-route-id="@s.Id">
                 <p class="text-muted small">@T("Recorded as the documents arrive — nothing here is required to register a student. Every field is audited with a reason, because each one supports a decision the school has to defend.", "تُسجَّل مع وصول المستندات — لا شيء هنا مطلوب لتسجيل الطالب. وكل حقل مدقَّق بسبب، لأن كلاً منها يسند قراراً على المدرسة أن تدافع عنه.")</p>
 
@@ -149,7 +158,9 @@
                 <div class="mb-3"><label class="form-label small" for="so-Reason">@T("Reason (recorded in the audit trail)", "السبب (يُسجَّل في سجل التدقيق)")</label><input name="Reason" id="so-Reason" class="form-control form-control-sm" /></div>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-save" aria-hidden="true"></i> @T("Save social profile", "حفظ البيانات الاجتماعية")</button>
             </form>
+            </fieldset>
         </div>
+        }
 
         <div class="tab-pane fade @Show("academic")" id="tab-academic">
             <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Academic history", "السجل الأكاديمي")</caption><thead><tr><th scope="col">@T("Year", "العام")</th><th scope="col">@T("Grade", "الصف")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Enrolled", "القيد")</th><th scope="col">@T("Source", "المصدر")</th><th scope="col">@T("Status", "الحالة")</th></tr></thead>

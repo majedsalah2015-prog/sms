@@ -114,6 +114,7 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
             services.AddScoped<ISeedContributor, GeographySeedContributor>();
             services.AddScoped<ISeedContributor, RoleTemplateSeedContributor>();
+            services.AddScoped<ISeedContributor, PermissionSeedContributor>();
             services.AddScoped<ISeedContributor, SysAdminAccountSeedContributor>();
             services.AddScoped<ISeedContributor, Ksa01ContentPackSeedContributor>();
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();

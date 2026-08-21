@@ -47,6 +47,7 @@ namespace Sms.Web.Controllers
 
         [HttpGet]
         [AllowAnonymous]
+        [NoPermissionRequired("Signing in is what happens before there is anyone to check permissions for.")]
         public IActionResult Login(string? returnUrl = null)
         {
             if (User.Identity?.IsAuthenticated == true)
@@ -60,6 +61,7 @@ namespace Sms.Web.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
+        [NoPermissionRequired("Signing in is what happens before there is anyone to check permissions for.")]
         public async Task<IActionResult> Login(LoginViewModel model)
         {
             if (!ModelState.IsValid)
@@ -102,6 +104,7 @@ namespace Sms.Web.Controllers
 
         [HttpGet]
         [AllowAnonymous]
+        [NoPermissionRequired("Second factor of the sign-in itself.")]
         public async Task<IActionResult> TwoFactor(string? returnUrl = null)
         {
             var pending = await HttpContext.AuthenticateAsync(TwoFactorScheme);
@@ -116,6 +119,7 @@ namespace Sms.Web.Controllers
         [HttpPost]
         [AllowAnonymous]
         [ValidateAntiForgeryToken]
+        [NoPermissionRequired("Second factor of the sign-in itself.")]
         public async Task<IActionResult> TwoFactor(TwoFactorViewModel model)
         {
             var pending = await HttpContext.AuthenticateAsync(TwoFactorScheme);
@@ -150,6 +154,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet]
+        [NoPermissionRequired("Self-service on one's own credentials; BR-SEC-005 forces it before anything else.")]
         public IActionResult ChangePassword()
         {
             return View(new ChangePasswordViewModel { IsForced = User.FindFirst(SmsClaimTypes.MustChangePassword)?.Value == "1" });
@@ -157,6 +162,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [NoPermissionRequired("Self-service on one's own credentials; BR-SEC-005 forces it before anything else.")]
         public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
         {
             model.IsForced = User.FindFirst(SmsClaimTypes.MustChangePassword)?.Value == "1";
@@ -197,6 +203,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [NoPermissionRequired("Ending one's own session is never something to be denied.")]
         public async Task<IActionResult> Logout()
         {
             var token = User.FindFirst(SmsClaimTypes.SessionToken)?.Value;
@@ -211,6 +218,7 @@ namespace Sms.Web.Controllers
 
         [HttpGet]
         [AllowAnonymous]
+        [NoPermissionRequired("The page shown when something was denied.")]
         public IActionResult AccessDenied() => View();
 
         private async Task SignInSessionAsync(UserSession session, bool mustChangePassword, bool persistent)

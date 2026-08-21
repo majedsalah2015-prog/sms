@@ -14,6 +14,9 @@ using Sms.Domain.Grading;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -51,6 +54,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Marksheet workspace — list
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, MarksheetStatus? status = null, int? section = null)
         {
             var m = new MarksheetListViewModel { Status = status, SectionId = section };
@@ -105,6 +109,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("marksheets/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.Create)]
         public async Task<IActionResult> CreateMarksheet(int? blueprintId, int? sectionId, int? year)
         {
             try
@@ -126,6 +131,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Marksheet workspace — grid
 
         [HttpGet("marksheets/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.View)]
         public async Task<IActionResult> Marksheet(int id)
         {
             var m = await BuildWorkspaceAsync(id);
@@ -134,6 +140,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("marksheets/{id:int}/save")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.Edit)]
         public async Task<IActionResult> SaveMarks(int id)
         {
             try
@@ -171,6 +178,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("marksheets/{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.Submit)]
         public async Task<IActionResult> MarksheetStatusChange(int id, MarksheetStatus target)
         {
             try
@@ -186,6 +194,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("marksheets/{id:int}/correct")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.Approve)]
         public async Task<IActionResult> CorrectMarksheet(int id, string? reason)
         {
             try
@@ -200,6 +209,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("marksheets/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Marksheets, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteMarksheet(int id, int? year)
         {
             try
@@ -215,6 +225,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Scale designer
 
         [HttpGet("scales")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.View)]
         public async Task<IActionResult> Scales(int? year = null, int? id = null)
         {
             var m = new ScaleDesignerViewModel();
@@ -255,6 +266,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Create)]
         public async Task<IActionResult> CreateScale(int? year, int? stageId, string? nameAr, string? nameEn, int? curriculumId)
         {
             try
@@ -270,6 +282,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Edit)]
         public async Task<IActionResult> EditScale(int id, int? year, string? nameAr, string? nameEn, string? reason)
         {
             try
@@ -285,6 +298,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteScale(int id, int? year)
         {
             try { await _grading.DeleteScaleAsync(id); TempData["Flash"] = T("Scale deleted.", "حُذف السلم."); return RedirectToAction(nameof(Scales), new { year }); }
@@ -294,6 +308,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/lock")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Approve)]
         public async Task<IActionResult> LockScale(int id, int? year)
         {
             try
@@ -310,6 +325,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/bands")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Edit)]
         public async Task<IActionResult> AddBand(int id, int? year, decimal? min, decimal? max, string? code, string? labelAr, string? labelEn, bool isPassing, int? sortOrder, decimal? gpa)
         {
             try
@@ -324,6 +340,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/bands/{bandId:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Edit)]
         public async Task<IActionResult> EditBand(int id, int bandId, int? year, decimal? min, decimal? max, string? code, string? labelAr, string? labelEn, bool isPassing, int? sortOrder, decimal? gpa)
         {
             try
@@ -338,6 +355,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scales/{id:int}/bands/{bandId:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Scales, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteBand(int id, int bandId, int? year)
         {
             try { await _grading.RemoveScaleBandAsync(bandId); TempData["Flash"] = T("Band removed.", "أُزيل النطاق."); }
@@ -354,6 +372,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Blueprint & weights editor
 
         [HttpGet("blueprints")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.View)]
         public async Task<IActionResult> Blueprints(int? year = null, int? profile = null, int? term = null)
         {
             var m = new BlueprintListViewModel();
@@ -383,6 +402,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Create)]
         public async Task<IActionResult> CreateBlueprint(int? year, int? profile, int? term, int? offeringId, int? scaleId, bool redistribute)
         {
             try
@@ -398,6 +418,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("blueprints/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.View)]
         public async Task<IActionResult> Blueprint(int id)
         {
             var bp = await _db.Blueprints.AsNoTracking().SingleOrDefaultAsync(b => b.Id == id);
@@ -421,6 +442,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/{id:int}/components")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Edit)]
         public async Task<IActionResult> AddComponent(int id, string? nameAr, string? nameEn, decimal? weight, decimal? maxScore)
         {
             try
@@ -435,6 +457,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/{id:int}/components/{componentId:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Edit)]
         public async Task<IActionResult> EditComponent(int id, int componentId, string? nameAr, string? nameEn, decimal? weight, decimal? maxScore)
         {
             try
@@ -449,6 +472,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/{id:int}/components/{componentId:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteComponent(int id, int componentId)
         {
             try { await _grading.RemoveBlueprintComponentAsync(componentId); TempData["Flash"] = T("Component removed.", "أُزيل المكوّن."); }
@@ -458,6 +482,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/{id:int}/lock")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Approve)]
         public async Task<IActionResult> LockBlueprint(int id)
         {
             try { await _grading.LockBlueprintAsync(id); TempData["Flash"] = T("Blueprint finalized — marksheets can now be created from it.", "اعتُمد المخطط — يمكن الآن إنشاء كشوف الدرجات منه."); }
@@ -467,6 +492,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("blueprints/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Blueprints, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteBlueprint(int id, int? year, int? profile, int? term)
         {
             try { await _grading.DeleteBlueprintAsync(id); TempData["Flash"] = T("Blueprint deleted.", "حُذف المخطط."); return RedirectToAction(nameof(Blueprints), new { year, profile, term }); }
@@ -483,6 +509,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Criteria designer
 
         [HttpGet("criteria")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Criteria, ActionVerb.View)]
         public async Task<IActionResult> Criteria(int? year = null)
         {
             var m = new CriteriaDesignerViewModel();
@@ -499,6 +526,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("criteria/{profileId:int}")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Criteria, ActionVerb.Edit)]
         public async Task<IActionResult> SaveCriteria(int profileId, int? year, decimal? passMark, int? maxFailed, string? reason)
         {
             try
@@ -516,6 +544,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Results explorer
 
         [HttpGet("results")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Results, ActionVerb.View)]
         public async Task<IActionResult> Results(int? year = null, int? section = null, int? term = null)
         {
             var m = new ResultsExplorerViewModel();
@@ -561,6 +590,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("results/year")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.Results, ActionVerb.Post)]
         public async Task<IActionResult> ComputeYear(int? year, int? section, int? term, int? enrollmentId)
         {
             try
@@ -585,6 +615,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.6 Report card (HTML)
 
         [HttpGet("reportcard/{enrollmentId:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Grading, ScreenCatalog.Grading.ReportCard, ActionVerb.View)]
         public async Task<IActionResult> ReportCard(int enrollmentId, int? term = null, bool reprint = false)
         {
             var e = await _db.Enrollments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == enrollmentId);

@@ -20,6 +20,7 @@ using Sms.Domain.Sections;
 using Sms.Domain.Security;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -89,6 +90,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Dashboard shell
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Dashboard, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, DateTime? date = null, int? threshold = null, bool personalize = false)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -159,6 +161,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("personalize")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Dashboard, ActionVerb.Edit)]
         public async Task<IActionResult> Personalize(int[] widgetIds, int[] sortOrders, int[] visibleIds, int? year, DateTime? date)
         {
             var visible = new HashSet<int>(visibleIds ?? Array.Empty<int>());
@@ -186,6 +189,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("personalize/reset")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Dashboard, ActionVerb.Edit)]
         public async Task<IActionResult> ResetLayout(int? year, DateTime? date)
         {
             await _dashboards.ResetToDefaultAsync(_user.UserId, HttpContext.RequestAborted);
@@ -201,6 +205,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("refresh")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Dashboard, ActionVerb.Post)]
         public async Task<IActionResult> RefreshSnapshots(int? year, DateTime? date)
         {
             var day = (date ?? _clock.UtcNow).Date;
@@ -217,6 +222,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Layout administrator — widget registry
 
         [HttpGet("widgets")]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.View)]
         public async Task<IActionResult> Widgets()
         {
             var widgets = await _db.WidgetDefinitions.AsNoTracking().OrderBy(w => w.Code).ToListAsync();
@@ -245,6 +251,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("widgets")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.Create)]
         public async Task<IActionResult> DefineWidget(
             string code, string owningModuleCode, string titleAr, string titleEn, int requiredPermissionId,
             WidgetRefreshClass refreshClass, string? drillTargetCode, bool isPortalEligible)
@@ -267,6 +274,7 @@ namespace Sms.Web.Controllers
         /// <summary>Registers one of the overview's built-in panels, so it becomes permission-gated and personalizable.</summary>
         [HttpPost("widgets/built-in")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.Configure)]
         public async Task<IActionResult> RegisterBuiltIn(string code, int requiredPermissionId)
         {
             var panel = DashboardPanels.Find(code);
@@ -291,6 +299,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Layout administrator — role templates
 
         [HttpGet("layouts")]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Layouts, ActionVerb.View)]
         public async Task<IActionResult> Layouts(int? roleId = null)
         {
             var roles = await _db.Roles.AsNoTracking().OrderBy(r => r.Code).ToListAsync();
@@ -359,6 +368,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("layouts")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Layouts, ActionVerb.Create)]
         public async Task<IActionResult> CreateTemplate(int roleId)
         {
             if (await _db.LayoutTemplates.AnyAsync(t => t.RoleId == roleId))
@@ -375,6 +385,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("layouts/{templateId:int}/widgets")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Layouts, ActionVerb.Edit)]
         public async Task<IActionResult> AddWidget(int templateId, int widgetDefinitionId, int sortOrder, int roleId)
         {
             if (await _db.LayoutTemplateWidgets.AnyAsync(x => x.LayoutTemplateId == templateId && x.WidgetDefinitionId == widgetDefinitionId))
@@ -397,6 +408,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("layouts/{templateId:int}/arrange")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Layouts, ActionVerb.Edit)]
         public async Task<IActionResult> ArrangeTemplate(int templateId, int[] entryIds, int[] sortOrders, int[] removeIds, int roleId)
         {
             var remove = new HashSet<int>(removeIds ?? Array.Empty<int>());

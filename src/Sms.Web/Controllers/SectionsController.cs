@@ -12,6 +12,9 @@ using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -47,6 +50,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -79,6 +83,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Create)]
         public async Task<IActionResult> Define(SectionListViewModel form, int? year)
         {
             try
@@ -95,6 +100,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.View)]
         public async Task<IActionResult> Details(int id)
         {
             var model = await BuildDetailAsync(id);
@@ -103,6 +109,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/homeroom")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Roster, ActionVerb.Edit)]
         public async Task<IActionResult> Homeroom(int id, int? teacherUserId, DateTime? effectiveFrom)
         {
             try
@@ -117,6 +124,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/assign")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Roster, ActionVerb.Edit)]
         public async Task<IActionResult> Assign(int id, int? enrollmentId, DateTime? effectiveFrom)
         {
             try
@@ -131,6 +139,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/transfer")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Roster, ActionVerb.Edit)]
         public async Task<IActionResult> Transfer(int id, int enrollmentId, int? targetSectionId, string? reasonCode, DateTime? effectiveDate)
         {
             try
@@ -147,6 +156,7 @@ namespace Sms.Web.Controllers
         // --- Edit / delete ---------------------------------------------------------
 
         [HttpGet("{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id)
         {
             var model = await BuildEditAsync(id);
@@ -161,6 +171,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id, SectionEditViewModel form)
         {
             var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
@@ -184,6 +195,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Deactivate)]
         public async Task<IActionResult> Delete(int id)
         {
             var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
@@ -215,6 +227,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/close")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Approve)]
         public async Task<IActionResult> Close(int id)
         {
             var section = await _db.Sections.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);

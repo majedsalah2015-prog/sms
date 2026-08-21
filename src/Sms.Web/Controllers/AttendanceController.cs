@@ -16,6 +16,9 @@ using Sms.Domain.Sections;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -83,6 +86,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Attendance monitor
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Capture, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, DateTime? date = null, int? threshold = null)
         {
             var m = new AttendanceMonitorViewModel { ConsecutiveThreshold = threshold ?? DefaultConsecutiveThreshold };
@@ -151,6 +155,7 @@ namespace Sms.Web.Controllers
         /// <summary>BR-ATD-007: day-end closure locks every row captured for the date.</summary>
         [HttpPost("close")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Capture, ActionVerb.Approve)]
         public async Task<IActionResult> CloseDay(DateTime date, int? year)
         {
             try
@@ -167,6 +172,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Section capture sheet
 
         [HttpGet("capture")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Capture, ActionVerb.View)]
         public async Task<IActionResult> Capture(int? year = null, DateTime? date = null, int? section = null)
         {
             var m = new AttendanceCaptureViewModel { SectionId = section };
@@ -217,6 +223,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("capture")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Capture, ActionVerb.Edit)]
         public async Task<IActionResult> SaveCapture(int sectionId, DateTime date, int? year)
         {
             var redirect = new { year, date = date.ToString("yyyy-MM-dd"), section = sectionId };
@@ -280,6 +287,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Gate console
 
         [HttpGet("gate")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Gate, ActionVerb.View)]
         public async Task<IActionResult> Gate(int? year = null, DateTime? date = null, string? q = null, int? enrollment = null)
         {
             var m = new AttendanceGateViewModel { Query = q };
@@ -330,6 +338,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("gate/late")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Gate, ActionVerb.Create)]
         public async Task<IActionResult> RecordLate(int enrollmentId, DateTime date, string? time, bool markDay, int? year)
         {
             try
@@ -371,6 +380,7 @@ namespace Sms.Web.Controllers
         /// </summary>
         [HttpPost("gate/release")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Gate, ActionVerb.Create)]
         public async Task<IActionResult> RecordRelease(
             int enrollmentId, DateTime date, string? time, string? pickupPersonName, bool isOverride, string? reason, bool markDay, int? year)
         {
@@ -417,6 +427,7 @@ namespace Sms.Web.Controllers
         /// <summary>BR-ATD-006: in-day short leave — distinct from an early leave, it always expects a return.</summary>
         [HttpPost("gate/pass")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Gate, ActionVerb.Create)]
         public async Task<IActionResult> RequestPass(int enrollmentId, string reason, DateTime date, int? year)
         {
             try
@@ -432,6 +443,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("gate/pass/{id:int}")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Gate, ActionVerb.Edit)]
         public async Task<IActionResult> ChangePass(int id, LeavePassStatus target, DateTime date, int? year)
         {
             try
@@ -446,6 +458,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Justification review queue
 
         [HttpGet("justifications")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Justifications, ActionVerb.View)]
         public async Task<IActionResult> Justifications(int? year = null, DateTime? date = null, JustificationReviewState? state = null)
         {
             var m = new JustificationQueueViewModel { State = state, WindowDays = DefaultJustificationWindowDays };
@@ -493,6 +506,7 @@ namespace Sms.Web.Controllers
         /// <summary>BR-ATD-005's counter path ("paper at the counter") — the portal upload half is deferred with §8.7.</summary>
         [HttpPost("justifications/submit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Justifications, ActionVerb.Submit)]
         public async Task<IActionResult> SubmitJustification(int attendanceDayId, JustificationType type, int? year)
         {
             try
@@ -507,6 +521,7 @@ namespace Sms.Web.Controllers
         /// <summary>BR-ATD-005: accepting flips the referenced day to Excused/Medical (the engine does it, T2-audited).</summary>
         [HttpPost("justifications/{id:int}/review")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Justifications, ActionVerb.Approve)]
         public async Task<IActionResult> ReviewJustification(int id, bool accept, string? reason, JustificationReviewState? state, int? year)
         {
             try
@@ -531,6 +546,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Correction screen (WF-14)
 
         [HttpGet("corrections")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Corrections, ActionVerb.View)]
         public async Task<IActionResult> Corrections(
             int? year = null, DateTime? from = null, DateTime? to = null, int? section = null, string? q = null, bool lockedOnly = true)
         {
@@ -583,6 +599,7 @@ namespace Sms.Web.Controllers
         /// <summary>BR-ATD-007's post-closure correction: the reason is mandatory and the T1 pipeline enforces it independently.</summary>
         [HttpPost("corrections/{id:int}")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Corrections, ActionVerb.Approve)]
         public async Task<IActionResult> Correct(int id, AttendanceStatus status, string? reason, int? year, DateTime? from, DateTime? to, int? section)
         {
             try
@@ -607,6 +624,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.6 Analytics
 
         [HttpGet("analytics")]
+        [RequirePermission(ScreenCatalog.Modules.Attendance, ScreenCatalog.Attendance.Analytics, ActionVerb.View)]
         public async Task<IActionResult> Analytics(
             int? year = null, int? term = null, DateTime? from = null, DateTime? to = null, int? section = null, decimal? below = null)
         {

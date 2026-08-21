@@ -7,6 +7,9 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Setup;
 using Sms.Web.Models;
 using Sms.Web.Timetable;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -21,6 +24,7 @@ namespace Sms.Web.Controllers
     public partial class PortalController
     {
         [HttpGet("students/{id:int}/timetable")]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
         public async Task<IActionResult> Timetable(int id)
         {
             var student = await _db.Students.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);

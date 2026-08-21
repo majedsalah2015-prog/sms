@@ -14,6 +14,9 @@ using Sms.Domain.Geography;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -37,14 +40,16 @@ namespace Sms.Web.Controllers
         private readonly IAuditContext _audit;
         private readonly IClock _clock;
         private readonly IWorkingYearContext _workingYear;
+        private readonly IPermissionService _permissions;
 
-        public StudentsController(IStudentAdmin students, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear)
+        public StudentsController(IStudentAdmin students, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions)
         {
             _students = students;
             _db = db;
             _audit = audit;
             _clock = clock;
             _workingYear = workingYear;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -52,6 +57,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.View)]
         public async Task<IActionResult> Index(string? q = null, StudentStatus? status = null, int? grade = null)
         {
             var query = _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => s.SchoolId == _db.CurrentSchoolId);
@@ -91,6 +97,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("new")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Create)]
         public async Task<IActionResult> Register()
         {
             return View(await BuildFormAsync(null));
@@ -98,6 +105,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Create)]
         public async Task<IActionResult> Register(StudentFormViewModel form)
         {
             try
@@ -129,16 +137,32 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View)]
         public async Task<IActionResult> File(int id, string? tab = null)
         {
             var model = await BuildFileAsync(id);
             if (model == null) return NotFound();
             model.ActiveTab = tab ?? "personal";
+
+            // BR-GLB-072: the social profile has its own permission and no screen of its own, so the
+            // file has to ask on its behalf. Without this, holding STU/File/View would hand over a
+            // family's circumstances, and the separate permission would exist only on paper.
+            model.CanSeeSocialProfile = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View, HttpContext.RequestAborted);
+            model.CanEditSocialProfile = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.Edit, HttpContext.RequestAborted);
+
+            if (!model.CanSeeSocialProfile && model.ActiveTab == "social")
+            {
+                model.ActiveTab = "personal";
+            }
+
             return View(model);
         }
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id, StudentFormViewModel form)
         {
             try
@@ -156,6 +180,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/social")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.Edit)]
         public async Task<IActionResult> UpdateSocialProfile(int id, StudentFormViewModel form)
         {
             try
@@ -184,6 +209,7 @@ namespace Sms.Web.Controllers
         /// neighbourhood list beneath them will be longer still.
         /// </summary>
         [HttpGet("residence/areas")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View)]
         public async Task<IActionResult> ResidenceAreas(int governorateId)
         {
             var areas = await _db.ResidenceAreas.AsNoTracking()
@@ -195,6 +221,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("residence/neighbourhoods")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View)]
         public async Task<IActionResult> ResidenceNeighbourhoods(int areaId)
         {
             var hoods = await _db.Neighbourhoods.AsNoTracking()
@@ -207,6 +234,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Approve)]
         public async Task<IActionResult> Status(int id, StudentStatus target, string? reason)
         {
             try
@@ -221,6 +249,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/guardian")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Guardians, ActionVerb.Edit)]
         public async Task<IActionResult> LinkGuardian(int id, int? parentId, int? relationshipId, bool isPrimary, bool isFinancial, bool isPickup, bool isPortal, DateTime? effectiveFrom)
         {
             try
@@ -235,6 +264,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/guardian/{linkId:int}/unlink")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Guardians, ActionVerb.Deactivate)]
         public async Task<IActionResult> UnlinkGuardian(int id, int linkId, DateTime? effectiveTo)
         {
             try
@@ -248,6 +278,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/emergency")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Guardians, ActionVerb.Edit)]
         public async Task<IActionResult> AddEmergencyContact(int id, string? nameAr, string? nameEn, string? phone, bool isPickup, int? relationshipId)
         {
             try
@@ -262,6 +293,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/enroll")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Create)]
         public async Task<IActionResult> Enroll(int id, int? gradeYearProfileId, DateTime? enrollmentDate, EnrollmentSourceType sourceType)
         {
             try
@@ -276,6 +308,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Deactivate)]
         public async Task<IActionResult> Delete(int id, string? q, StudentStatus? status, int? grade)
         {
             var s = await _db.Students.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.SchoolId == _db.CurrentSchoolId);

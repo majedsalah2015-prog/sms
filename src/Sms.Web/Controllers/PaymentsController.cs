@@ -14,6 +14,9 @@ using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Finance;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -53,6 +56,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Cashier
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.View)]
         public async Task<IActionResult> Index(string? q = null, int? payerId = null, decimal? amount = null)
         {
             var m = new CashierViewModel { Q = q, PreviewAmount = amount };
@@ -84,6 +88,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("receipts/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.Create)]
         public async Task<IActionResult> Capture(int payerId, decimal amount, PaymentMethod method, string? methodRefNo, int? tillSessionId, string? q)
         {
             try
@@ -101,6 +106,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("receipts/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.View)]
         public async Task<IActionResult> Receipt(int id, bool print = false)
         {
             var receipt = await _db.Receipts.AsNoTracking().SingleOrDefaultAsync(r => r.Id == id);
@@ -122,6 +128,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Till session console
 
         [HttpGet("till")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.View)]
         public async Task<IActionResult> Till(int? close = null)
         {
             var sessions = await _db.TillSessions.AsNoTracking().OrderByDescending(s => s.OpenedAtUtc).Take(60).ToListAsync();
@@ -145,6 +152,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("till/open")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Create)]
         public async Task<IActionResult> OpenTill(string tillCode, decimal floatAmount = 0m)
         {
             try
@@ -162,6 +170,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("till/{id:int}/close")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Post)]
         public async Task<IActionResult> CloseTill(int id, decimal countedTotal, string? varianceReason)
         {
             try
@@ -178,6 +187,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 PDC registry
 
         [HttpGet("pdc")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Pdc, ActionVerb.View)]
         public async Task<IActionResult> Pdc(PdcStatus? status = null)
         {
             var all = await _db.Pdcs.AsNoTracking().OrderBy(p => p.ChequeDate).ToListAsync();
@@ -198,6 +208,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("pdc/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Pdc, ActionVerb.Create)]
         public async Task<IActionResult> LodgePdc(int payerId, string bankName, string chequeNo, DateTime? chequeDate, decimal amount)
         {
             try
@@ -214,6 +225,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("pdc/{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Pdc, ActionVerb.Edit)]
         public async Task<IActionResult> PdcStatusChange(int id, PdcStatus target, PdcStatus? filter)
         {
             try
@@ -233,6 +245,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Refund desk
 
         [HttpGet("refunds")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Refunds, ActionVerb.View)]
         public async Task<IActionResult> Refunds(int? payerId = null, RefundVoucherStatus? status = null)
         {
             var all = await _db.RefundVouchers.AsNoTracking().OrderByDescending(v => v.Id).Take(200).ToListAsync();
@@ -256,6 +269,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("refunds/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Refunds, ActionVerb.Submit)]
         public async Task<IActionResult> RequestRefund(int payerId, decimal amount, PaymentMethod method, string? reason)
         {
             try
@@ -272,6 +286,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("refunds/{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Refunds, ActionVerb.Approve)]
         public async Task<IActionResult> RefundStatusChange(int id, RefundVoucherStatus target, int? payerId, RefundVoucherStatus? filter)
         {
             try
@@ -286,6 +301,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Allocation explorer
 
         [HttpGet("allocations")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Allocations, ActionVerb.View)]
         public async Task<IActionResult> Allocations(int? payerId = null, string? q = null)
         {
             var m = new AllocationExplorerViewModel { Payers = await FinanceQueries.SearchPayersAsync(_db, q, take: 30) };

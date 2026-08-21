@@ -12,6 +12,9 @@ using Sms.Application.Schools;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -49,6 +52,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.View)]
         public async Task<IActionResult> Index()
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -98,14 +102,17 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/activate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Approve)]
         public Task<IActionResult> Activate(int id, string? reason) => Lifecycle(id, reason, () => _years.ActivateAsync(id), T("Year activated (the previous Active year moved to Closing).", "تم تفعيل العام (انتقل العام السابق إلى مرحلة الإغلاق)."));
 
         [HttpPost("{id:int}/close")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Approve)]
         public Task<IActionResult> Close(int id, string? reason) => Lifecycle(id, reason, () => _years.CloseAsync(id), T("Year closed (read-only; postings need WF-13).", "تم إغلاق العام (للقراءة فقط؛ الترحيل يتطلب WF-13)."));
 
         [HttpPost("{id:int}/archive")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Approve)]
         public Task<IActionResult> Archive(int id, string? reason) => Lifecycle(id, reason, () => _years.ArchiveAsync(id), T("Year archived (dropped from default pickers).", "تمت أرشفة العام (أُزيل من القوائم الافتراضية)."));
 
         private async Task<IActionResult> Lifecycle(int id, string? reason, Func<Task> action, string success)
@@ -127,6 +134,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("new")]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Create)]
         public IActionResult Define()
         {
             return View(new YearDefinitionViewModel());
@@ -134,6 +142,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Create)]
         public async Task<IActionResult> Define(YearDefinitionViewModel form)
         {
             try
@@ -161,6 +170,7 @@ namespace Sms.Web.Controllers
         // --- Edit / Delete: only while no student is enrolled in the year ----------
 
         [HttpGet("{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id)
         {
             var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == id);
@@ -184,6 +194,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id, YearDefinitionViewModel form)
         {
             var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == id);
@@ -235,6 +246,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Deactivate)]
         public async Task<IActionResult> Delete(int id, string? reason)
         {
             try
@@ -252,6 +264,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.View)]
         public async Task<IActionResult> Details(int id)
         {
             var model = await BuildDetailsAsync(id);
@@ -260,6 +273,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/semester")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Edit)]
         public async Task<IActionResult> DefineSemester(int id, YearDefinitionViewModel form)
         {
             try
@@ -282,6 +296,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/term")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.AcademicYears, ScreenCatalog.AcademicYears.Years, ActionVerb.Edit)]
         public async Task<IActionResult> DefineTerm(int id, YearDefinitionViewModel form)
         {
             try

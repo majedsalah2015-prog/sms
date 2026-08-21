@@ -10,6 +10,9 @@ using Sms.Application.Schools;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -44,6 +47,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Profile, ActionVerb.View)]
         public async Task<IActionResult> Profile(string? tab = null)
         {
             var model = await BuildProfileAsync();
@@ -53,6 +57,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Profile, ActionVerb.Edit)]
         public async Task<IActionResult> Profile(SchoolProfileViewModel form)
         {
             try
@@ -102,6 +107,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("signatories")]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Signatories, ActionVerb.View)]
         public async Task<IActionResult> Signatories()
         {
             return View(await BuildSignatoriesAsync());
@@ -109,6 +115,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("signatories")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Signatories, ActionVerb.Edit)]
         public async Task<IActionResult> Signatories(SignatoriesViewModel form)
         {
             try
@@ -141,6 +148,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("status")]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Status, ActionVerb.View)]
         public async Task<IActionResult> Status()
         {
             return View(await BuildStatusAsync());
@@ -148,6 +156,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Status, ActionVerb.Approve)]
         public async Task<IActionResult> Status(SchoolStatusViewModel form)
         {
             var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _tenant.SchoolId);

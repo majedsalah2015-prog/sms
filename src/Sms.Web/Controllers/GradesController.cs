@@ -10,6 +10,9 @@ using Sms.Domain.Grades;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -38,6 +41,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null)
         {
             return View(await BuildAsync(year));
@@ -45,6 +49,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("stage")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Stages, ActionVerb.Create)]
         public async Task<IActionResult> DefineStage(GradeLadderViewModel form, int? year)
         {
             try
@@ -60,6 +65,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grade")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.Create)]
         public async Task<IActionResult> DefineGrade(GradeLadderViewModel form, int? year)
         {
             try
@@ -77,6 +83,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grade/{id:int}/path")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.Edit)]
         public async Task<IActionResult> SetPath(int id, int? target, bool graduating, int? year)
         {
             try
@@ -90,6 +97,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("profile")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Profiles, ActionVerb.Create)]
         public async Task<IActionResult> DefineProfile(GradeLadderViewModel form, int year)
         {
             try
@@ -107,6 +115,7 @@ namespace Sms.Web.Controllers
         // --- Edit / delete (soft: deactivate) ------------------------------------
 
         [HttpGet("stage/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Stages, ActionVerb.Edit)]
         public async Task<IActionResult> EditStage(int id, int? year)
         {
             var stage = await _db.Stages.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
@@ -120,6 +129,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("stage/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Stages, ActionVerb.Edit)]
         public async Task<IActionResult> EditStage(int id, StageEditViewModel form)
         {
             form.Id = id;
@@ -141,6 +151,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("stage/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Stages, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteStage(int id, int? year)
         {
             try
@@ -153,6 +164,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("grade/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.Edit)]
         public async Task<IActionResult> EditGrade(int id, int? year)
         {
             var grade = await _db.GradeLevels.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id);
@@ -166,6 +178,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grade/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.Edit)]
         public async Task<IActionResult> EditGrade(int id, GradeEditViewModel form)
         {
             form.Id = id;
@@ -189,6 +202,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grade/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Grades_, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteGrade(int id, int? year)
         {
             try
@@ -202,6 +216,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("profile/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Grades, ScreenCatalog.Grades.Profiles, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteProfile(int id, int? year)
         {
             try

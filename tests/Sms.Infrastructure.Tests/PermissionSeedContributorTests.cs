@@ -1,0 +1,258 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Sms.Application.Common.Interfaces;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Seeding;
+using Sms.TestSupport;
+using Xunit;
+
+namespace Sms.Infrastructure.Tests
+{
+    /// <summary>
+    /// The role matrix is a security decision written as data, so it is tested as
+    /// one: not "does the seeder insert rows" but "can the cashier reach the fee
+    /// structure". A default that is wrong in the direction of generosity is the
+    /// failure mode worth catching, and it is invisible in a row count.
+    /// </summary>
+    public sealed class PermissionSeedContributorTests : IDisposable
+    {
+        private sealed class Tenant : ITenantContext
+        {
+            public int SchoolId => 1;
+        }
+
+        private sealed class User : ICurrentUser
+        {
+            public int UserId { get; set; }
+        }
+
+        private sealed class Clock : IClock
+        {
+            public DateTime UtcNow => new(2026, 8, 21, 12, 0, 0, DateTimeKind.Utc);
+        }
+
+        private readonly SqliteConnection _connection;
+        private readonly User _user = new();
+
+        public PermissionSeedContributorTests()
+        {
+            _connection = new SqliteConnection("DataSource=:memory:");
+            _connection.Open();
+            using var db = CreateContext();
+            db.Database.EnsureCreated();
+        }
+
+        public void Dispose() => _connection.Dispose();
+
+        private AppDbContext CreateContext()
+            => new(new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options, new Tenant(), _user, new Clock());
+
+        private async Task SeedAsync()
+        {
+            using var db = CreateContext();
+            await new RoleTemplateSeedContributor(db).SeedAsync();
+            await new PermissionSeedContributor(db).SeedAsync();
+        }
+
+        /// <summary>Signs a fresh account into <paramref name="roleCode"/> and returns a service that answers for it.</summary>
+        private async Task<(AppDbContext Db, PermissionService Service)> AsAsync(string roleCode)
+        {
+            var db = CreateContext();
+            var role = await db.Roles.SingleAsync(r => r.Code == roleCode);
+            var account = new UserAccount { UserName = $"{roleCode.ToLowerInvariant()}.test", AccountType = AccountType.Staff };
+            db.UserAccounts.Add(account);
+            await db.SaveChangesAsync();
+            db.RoleAssignments.Add(new RoleAssignment { UserAccountId = account.Id, RoleId = role.Id });
+            await db.SaveChangesAsync();
+
+            _user.UserId = account.Id;
+            return (db, new PermissionService(db, _user));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task Every_catalogued_permission_is_created_once_and_re_running_adds_none()
+        {
+            await SeedAsync();
+            using var db = CreateContext();
+            var expected = ScreenCatalog.Permissions().Count();
+            Assert.Equal(expected, await db.Permissions.CountAsync());
+
+            await SeedAsync();
+            using var again = CreateContext();
+            Assert.Equal(expected, await again.Permissions.CountAsync());
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task The_system_administrator_holds_every_permission_except_the_portal_audience()
+        {
+            await SeedAsync();
+            var (db, service) = await AsAsync("SYSADMIN");
+            using var _ = db;
+
+            foreach (var (module, screen, action) in ScreenCatalog.Permissions().Where(p => p.ModuleCode != ScreenCatalog.Modules.Portal))
+            {
+                Assert.True(await service.HasPermissionAsync(module, screen, action),
+                    $"SYSADMIN is missing {module}/{screen}/{action}, and nobody else can grant it.");
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task A_cashier_takes_money_but_cannot_price_or_forgive_it()
+        {
+            await SeedAsync();
+            var (db, service) = await AsAsync("CASHIER");
+            using var _ = db;
+
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.Create));
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Post));
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.View));
+
+            // The three that separate a cashier from a finance manager.
+            Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Edit));
+            Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Categories, ActionVerb.Edit));
+            Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Approve));
+
+            // And the seam to the ledger is not a cashier's to operate.
+            Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.GlExport, ActionVerb.Post));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-072")]
+        public async Task Only_the_roles_that_case_manage_a_family_see_the_social_profile()
+        {
+            await SeedAsync();
+
+            var (registrarDb, registrar) = await AsAsync("REGISTRAR");
+            using (registrarDb)
+            {
+                Assert.True(await registrar.HasPermissionAsync(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View));
+            }
+
+            // A teacher holds the student file and not the family's circumstances — the whole reason
+            // the social profile is a separate screen code rather than a section of the file.
+            var (teacherDb, teacher) = await AsAsync("TEACHER");
+            using (teacherDb)
+            {
+                Assert.True(await teacher.HasPermissionAsync(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View));
+                Assert.False(await teacher.HasPermissionAsync(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View));
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task An_auditor_reads_everything_and_writes_nothing()
+        {
+            await SeedAsync();
+            var (db, service) = await AsAsync("AUDITOR");
+            using var _ = db;
+
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.View));
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.View));
+
+            var writes = new[] { ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve, ActionVerb.Post, ActionVerb.Configure, ActionVerb.Import };
+            foreach (var (module, screen, action) in ScreenCatalog.Permissions().Where(p => writes.Contains(p.Action)))
+            {
+                Assert.False(await service.HasPermissionAsync(module, screen, action),
+                    $"AUDITOR should be read-only but holds {module}/{screen}/{action}.");
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public async Task A_staff_wildcard_never_reaches_the_portal()
+        {
+            await SeedAsync();
+
+            foreach (var roleCode in new[] { "SYSADMIN", "PRINCIPAL", "AUDITOR" })
+            {
+                var (db, service) = await AsAsync(roleCode);
+                using var _ = db;
+                Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View),
+                    $"{roleCode} picked up a portal permission from a wildcard.");
+            }
+
+            var (parentDb, parent) = await AsAsync("PARENT");
+            using (parentDb)
+            {
+                Assert.True(await parent.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View));
+                Assert.False(await parent.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Charges, ActionVerb.View));
+            }
+
+            // A student is in the portal but is not shown what the family owes.
+            var (studentDb, student) = await AsAsync("STUDENT");
+            using (studentDb)
+            {
+                Assert.True(await student.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, ActionVerb.View));
+                Assert.False(await student.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View));
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task A_hosted_subsystems_grants_are_not_mistaken_for_curation()
+        {
+            // The bug this pins: the ERP catalogues its own permissions under its own module code
+            // and grants them to SYSADMIN. Treating "holds any grant" as "already curated" meant the
+            // administrator came out of a real seeding run with the accounting screens and nothing
+            // else - locked out of the school system by the thing meant to provision it.
+            using (var db = CreateContext())
+            {
+                await new RoleTemplateSeedContributor(db).SeedAsync();
+
+                var foreign = new Permission { ModuleCode = "ERP", ScreenCode = "Accounting.JournalEntries.Post", Action = ActionVerb.View };
+                db.Permissions.Add(foreign);
+                await db.SaveChangesAsync();
+
+                var sysadmin = await db.Roles.SingleAsync(r => r.Code == "SYSADMIN");
+                db.RolePermissions.Add(new RolePermission { RoleId = sysadmin.Id, PermissionId = foreign.Id });
+                await db.SaveChangesAsync();
+            }
+
+            using (var db = CreateContext())
+            {
+                await new PermissionSeedContributor(db).SeedAsync();
+            }
+
+            var (verifyDb, service) = await AsAsync("SYSADMIN");
+            using var _ = verifyDb;
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Approve));
+            Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
+        public async Task A_curated_role_is_never_re_seeded()
+        {
+            await SeedAsync();
+
+            using (var db = CreateContext())
+            {
+                var cashier = await db.Roles.SingleAsync(r => r.Code == "CASHIER");
+                var grants = await db.RolePermissions.Where(rp => rp.RoleId == cashier.Id).ToListAsync();
+                Assert.NotEmpty(grants);
+
+                // A school takes the till away from its cashiers. That is their decision to make.
+                var till = await db.Permissions.SingleAsync(p =>
+                    p.ModuleCode == ScreenCatalog.Modules.Payments && p.ScreenCode == ScreenCatalog.Payments.Till && p.Action == ActionVerb.Post);
+                db.RolePermissions.RemoveRange(grants.Where(g => g.PermissionId == till.Id));
+                await db.SaveChangesAsync();
+            }
+
+            await SeedAsync();
+
+            var (verifyDb, service) = await AsAsync("CASHIER");
+            using var __ = verifyDb;
+            Assert.False(await service.HasPermissionAsync(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Post),
+                "A revoked grant came back on the next start, which makes curation pointless.");
+        }
+    }
+}

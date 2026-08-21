@@ -19,6 +19,9 @@ using Sms.Domain.Timetable;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Web.Timetable;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -70,6 +73,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Shape designer
 
         [HttpGet("shape")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Shape, ActionVerb.View)]
         public async Task<IActionResult> Shape(int? year = null, int? stage = null)
         {
             var m = new ShapeDesignerViewModel();
@@ -97,6 +101,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("shape/define")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Shape, ActionVerb.Create)]
         public async Task<IActionResult> DefineShape(int year, int stageId)
         {
             try
@@ -111,6 +116,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("shape/{shapeId:int}/slots")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Shape, ActionVerb.Edit)]
         public async Task<IActionResult> AddSlot(int shapeId, int year, int stage, DayOfWeek? day, int? sequence, TimeSpan? start, TimeSpan? end, bool isBreak, bool allWorkingDays)
         {
             try
@@ -135,6 +141,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("shape/slots/{slotId:int}/remove")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Shape, ActionVerb.Deactivate)]
         public async Task<IActionResult> RemoveSlot(int slotId, int year, int stage)
         {
             try { await _timetable.RemovePeriodSlotAsync(slotId); TempData["Flash"] = T("Slot removed.", "حُذفت الحصة."); }
@@ -145,6 +152,7 @@ namespace Sms.Web.Controllers
         /// <summary>Visual day template: copy one day's slots onto another day (a short Friday is then just "copy Sunday, remove the last two").</summary>
         [HttpPost("shape/{shapeId:int}/copy-day")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Shape, ActionVerb.Edit)]
         public async Task<IActionResult> CopyDay(int shapeId, int year, int stage, DayOfWeek fromDay, DayOfWeek toDay)
         {
             try
@@ -168,6 +176,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Timetable builder
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.View)]
         public async Task<IActionResult> Builder(int? year = null, int? version = null, int? section = null, string? mode = null, int? teacher = null, int? room = null)
         {
             var m = new BuilderViewModel { Mode = mode is "teacher" or "room" ? mode : "section" };
@@ -232,6 +241,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("versions/define")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Versions, ActionVerb.Create)]
         public async Task<IActionResult> DefineVersion(int year, int? termId, string? returnTo)
         {
             TimetableVersion? v = null;
@@ -242,6 +252,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("place")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.Edit)]
         public async Task<IActionResult> Place(int year, int version, int section, int slot, string? pick, int? room)
         {
             try
@@ -258,6 +269,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("placements/{id:int}/remove")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.Deactivate)]
         public async Task<IActionResult> RemovePlacement(int id, int year, int version, int? section, string? mode, int? teacher, int? room)
         {
             try { await _timetable.RemovePlacementAsync(id); TempData["Flash"] = T("Placement removed.", "أُزيلت الحصة."); }
@@ -268,6 +280,7 @@ namespace Sms.Web.Controllers
         /// <summary>Copy-section tool: replays another section's week onto this one, re-pointing each placement at the teacher assigned to the same offering in the target section (BR-TCH-002); conflicts/unassigned are skipped and counted.</summary>
         [HttpPost("copy-section")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.Create)]
         public async Task<IActionResult> CopySection(int year, int version, int section, int? fromSection)
         {
             try
@@ -292,6 +305,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Conflict & validation board
 
         [HttpGet("validation")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Validation, ActionVerb.View)]
         public async Task<IActionResult> Validation(int? year = null, int? version = null)
         {
             var m = new ValidationBoardViewModel();
@@ -321,6 +335,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("versions/{id:int}/validate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Validation, ActionVerb.Approve)]
         public async Task<IActionResult> ValidateVersion(int id, int year, string? returnTo)
         {
             try { await _timetable.ValidateVersionAsync(id); TempData["Flash"] = T("Version validated — zero hard-constraint violations, every placed section complete (BR-TTB-002/003). Editing is now locked; reopen to change.", "تم التحقق من الإصدار — لا مخالفات صارمة وكل شعبة موضوعة مكتملة (BR-TTB-002/003). التحرير مقفل الآن؛ أعد الفتح للتعديل."); }
@@ -330,6 +345,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("versions/{id:int}/reopen")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Versions, ActionVerb.Approve)]
         public async Task<IActionResult> ReopenVersion(int id, int year, string? returnTo)
         {
             try { await _timetable.ReopenVersionAsync(id); TempData["Flash"] = T("Version reopened for editing.", "أُعيد فتح الإصدار للتحرير."); }
@@ -340,6 +356,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Publication console
 
         [HttpGet("publish")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Versions, ActionVerb.View)]
         public async Task<IActionResult> Publish(int? year = null, int? version = null)
         {
             var m = new PublishConsoleViewModel();
@@ -400,6 +417,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("versions/{id:int}/publish")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Versions, ActionVerb.Approve)]
         public async Task<IActionResult> PublishVersion(int id, int year, DateTime? rangeStart, DateTime? rangeEnd, bool acknowledgeSoft)
         {
             try
@@ -418,6 +436,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Daily cover console
 
         [HttpGet("cover")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Cover, ActionVerb.View)]
         public async Task<IActionResult> Cover(DateTime? date = null, int? teacher = null, bool print = false)
         {
             var d = (date ?? Today).Date;
@@ -472,6 +491,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("sessions/{id:int}/substitute")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Cover, ActionVerb.Edit)]
         public async Task<IActionResult> Substitute(int id, DateTime date, int teacher, int? substituteProfileId, string? reason, bool superviseOnly, bool notCounted)
         {
             try
@@ -487,6 +507,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("sessions/{id:int}/room")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Cover, ActionVerb.Edit)]
         public async Task<IActionResult> ChangeRoom(int id, int? roomId, string? reason, string? returnTo, DateTime? date, int? teacher, int? days)
         {
             try
@@ -502,6 +523,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("sessions/{id:int}/cancel")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Cover, ActionVerb.Deactivate)]
         public async Task<IActionResult> CancelSession(int id, string? reason, string? returnTo, DateTime? date, int? teacher, int? days)
         {
             try
@@ -517,6 +539,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.6 Session conflict queue
 
         [HttpGet("conflicts")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Validation, ActionVerb.View)]
         public async Task<IActionResult> Conflicts(DateTime? from = null, int days = 30)
         {
             var start = (from ?? Today).Date; var end = start.AddDays(Math.Clamp(days, 1, 120));
@@ -556,6 +579,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.7 Personal views
 
         [HttpGet("teachers/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.View)]
         public async Task<IActionResult> Teacher(int id, int? year = null, int? version = null, bool print = false)
         {
             var m = await TimetableQueries.PersonalAsync(_db, _setup, "teacher", id, year ?? _workingYear.AcademicYearId, Today, version, IsArabic);
@@ -564,6 +588,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("sections/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.View)]
         public async Task<IActionResult> Section(int id, int? year = null, int? version = null, bool print = false)
         {
             var m = await TimetableQueries.PersonalAsync(_db, _setup, "section", id, year ?? _workingYear.AcademicYearId, Today, version, IsArabic);
@@ -572,6 +597,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("rooms/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Timetable, ScreenCatalog.Timetable.Builder, ActionVerb.View)]
         public async Task<IActionResult> Room(int id, int? year = null, int? version = null, bool print = false)
         {
             var m = await TimetableQueries.PersonalAsync(_db, _setup, "room", id, year ?? _workingYear.AcademicYearId, Today, version, IsArabic);

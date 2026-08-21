@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Sms.Web.Navigation;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -12,6 +13,7 @@ namespace Sms.Web.Controllers
     public class ModulesController : Controller
     {
         [HttpGet("{code}")]
+        [NoPermissionRequired("A landing card that says what a module is and whether its screens exist yet; it reads nothing.")]
         public IActionResult Index(string code)
         {
             var module = ModuleCatalog.Find(code);

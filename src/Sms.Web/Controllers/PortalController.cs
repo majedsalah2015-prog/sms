@@ -13,6 +13,8 @@ using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Web.Security;
+using Sms.Application.Security;
+using Sms.Domain.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -56,11 +58,13 @@ namespace Sms.Web.Controllers
         /// on any authenticated request, so an empty 204 suffices.
         /// </summary>
         [HttpGet("ping")]
+        [NoPermissionRequired("Liveness probe for the portal shell.")]
         public IActionResult Ping() => NoContent();
 
         // ================================================================== My family
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, ActionVerb.View)]
         public async Task<IActionResult> Index()
         {
             var m = new PortalHomeViewModel
@@ -94,6 +98,7 @@ namespace Sms.Web.Controllers
         // ================================================================== Portal student profile
 
         [HttpGet("students/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
         public async Task<IActionResult> Student(int id, string? tab = null)
         {
             var student = await _db.Students.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
@@ -137,6 +142,7 @@ namespace Sms.Web.Controllers
 
         [HttpGet("statement")]
         [PortalReauth]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View)]
         public async Task<IActionResult> Statement()
         {
             var lines = new List<PortalStatementViewModel.Line>();
@@ -151,6 +157,7 @@ namespace Sms.Web.Controllers
         // ================================================================== Announcements (read-only)
 
         [HttpGet("announcements")]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Announcements, ActionVerb.View)]
         public async Task<IActionResult> Announcements()
             => View(new PortalAnnouncementsViewModel { Announcements = await AnnouncementsAsync(50) });
 

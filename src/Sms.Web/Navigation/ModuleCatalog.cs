@@ -91,8 +91,15 @@ namespace Sms.Web.Navigation
         public static ModuleInfo? Find(string code) =>
             All.FirstOrDefault(m => string.Equals(m.Code, code, System.StringComparison.OrdinalIgnoreCase));
 
-        /// <summary>Sidebar tree: Home leaf, then one collapsible group per stage. <paramref name="isVisible"/> lets the caller drop modules whose feature toggle is off (BR-SET-006).</summary>
-        public static IReadOnlyList<NavItem> BuildSidebar(Func<ModuleInfo, bool>? isVisible = null)
+        /// <summary>
+        /// Sidebar tree: Home leaf, then one collapsible group per stage.
+        /// <paramref name="isVisible"/> drops modules whose feature toggle is off (BR-SET-006);
+        /// <paramref name="isPermitted"/> drops the ones this user cannot open a single screen of
+        /// (BR-SEC-010 - unauthorized surface disappears rather than errors). A group left empty by
+        /// either filter goes with it, so nobody is shown a heading over nothing.
+        /// </summary>
+        public static IReadOnlyList<NavItem> BuildSidebar(
+            Func<ModuleInfo, bool>? isVisible = null, Func<ModuleInfo, bool>? isPermitted = null, bool canExportToLedger = true)
         {
             var items = new List<NavItem>
             {
@@ -102,17 +109,20 @@ namespace Sms.Web.Navigation
             foreach (var (key, titleEn, titleAr, icon) in Groups)
             {
                 var group = new NavItem(key, titleEn, titleAr, icon);
-                foreach (var m in All.Where(x => x.Group == key && (isVisible == null || isVisible(x))))
+                foreach (var m in All.Where(x => x.Group == key && (isVisible == null || isVisible(x)) && (isPermitted == null || isPermitted(x))))
                 {
                     group.Items.Add(m.ScreenController == null
                         ? new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, "Modules", "Index", new { code = m.Code })
                         : new NavItem(m.Code, m.TitleEn, m.TitleAr, m.Icon, m.ScreenController, m.ScreenAction));
                 }
 
-                items.Add(group);
+                if (group.Items.Count > 0)
+                {
+                    items.Add(group);
+                }
             }
 
-            items.Add(BuildAccountingGroup());
+            items.Add(BuildAccountingGroup(canExportToLedger));
 
             return items;
         }
@@ -124,18 +134,22 @@ namespace Sms.Web.Navigation
         /// hosted here, and modelling them as school modules would make the catalogue lie about what
         /// this product contains.
         /// <para>
-        /// Like every other entry, these are shown regardless of permission; the sidebar filters on
-        /// feature toggles only, and a screen the user cannot open refuses at the screen. That is the
-        /// existing behaviour of this shell, not a decision taken here.
+        /// The ERP's own entries below are shown regardless of permission: each of those screens
+        /// enforces its own on arrival, and this system does not hold their catalogue to filter by.
+        /// The GL export entry is this system's, so it is filtered like any other screen of ours.
         /// </para>
         /// </summary>
-        private static NavItem BuildAccountingGroup()
+        private static NavItem BuildAccountingGroup(bool canExportToLedger)
         {
             var group = new NavItem("accounting", "Accounting", "المحاسبة", "bi-calculator");
 
             // This system's own screen, not an ERP area: it is the seam where the school's
             // documents become one journal entry, so it sits first in the accounting group.
-            group.Items.Add(new NavItem("acc-glexport", "GL export", "الترحيل المحاسبي", "bi-arrow-left-right", "GlExport", "Index"));
+            if (canExportToLedger)
+            {
+                group.Items.Add(new NavItem("acc-glexport", "GL export", "الترحيل المحاسبي", "bi-arrow-left-right", "GlExport", "Index"));
+            }
+
             group.Items.Add(new NavItem("acc-accounts", "Chart of accounts", "دليل الحسابات", "bi-diagram-3", "Accounts", "Index", new { area = "Accounting" }));
             group.Items.Add(new NavItem("acc-journal", "Journal entries", "القيود اليومية", "bi-journal-text", "JournalEntries", "Index", new { area = "Accounting" }));
             group.Items.Add(new NavItem("acc-vouchers", "Manual vouchers", "السندات اليدوية", "bi-receipt", "ManualVouchers", "Index", new { area = "Accounting" }));

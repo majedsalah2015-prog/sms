@@ -16,6 +16,9 @@ using Sms.Domain.Lookups;
 using Sms.Domain.Setup;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -59,6 +62,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.View)]
         public async Task<IActionResult> Index()
         {
             var steps = await _setup.GetChecklistAsync();
@@ -76,6 +80,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("complete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.Configure)]
         public async Task<IActionResult> Complete()
         {
             try
@@ -92,6 +97,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("step/{code}")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.View)]
         public async Task<IActionResult> Step(string code)
         {
             if (!SetupWizardSteps.TryGet(code, out var step))
@@ -105,6 +111,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("step/{code}")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.Configure)]
         public async Task<IActionResult> Step(string code, SetupStepViewModel form)
         {
             if (!SetupWizardSteps.TryGet(code, out var step))
@@ -296,6 +303,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("settings")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Settings, ActionVerb.View)]
         public async Task<IActionResult> Settings(string? group = null)
         {
             return View(await BuildSettingsAsync(group ?? "Regional"));
@@ -303,6 +311,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("settings")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Settings, ActionVerb.Configure)]
         public async Task<IActionResult> Settings(SettingsHubViewModel form)
         {
             var group = SettingKeys.TryGet(form.Key ?? string.Empty, out var def) ? def.Group : "Regional";
@@ -335,6 +344,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("features")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Features, ActionVerb.View)]
         public async Task<IActionResult> Features()
         {
             return View(new FeaturesViewModel { States = await _setup.GetFeatureStatesAsync() });
@@ -342,6 +352,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("features/toggle")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Features, ActionVerb.Configure)]
         public async Task<IActionResult> Toggle(string code, bool enabled, string? reason)
         {
             try
@@ -363,6 +374,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("pack")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.ContentPack, ActionVerb.View)]
         public async Task<IActionResult> Pack()
         {
             var bound = await _setup.GetBoundCountryPackAsync();
@@ -375,6 +387,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
 
         [HttpGet("lookups")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.View)]
         public async Task<IActionResult> Lookups(string? category = null)
         {
             return View(await BuildLookupsAsync(category));
@@ -382,6 +395,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("lookups/value")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Create)]
         public async Task<IActionResult> DefineLookupValue(LookupsViewModel form, string category)
         {
             try
@@ -408,6 +422,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("lookups/category")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Create)]
         public async Task<IActionResult> DefineLookupCategory(LookupsViewModel form)
         {
             try
@@ -428,6 +443,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("lookups/deactivate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeactivateLookupValue(int id, string category)
         {
             try
@@ -460,6 +476,7 @@ namespace Sms.Web.Controllers
         private const string NationalityCategory = "Nationality";
 
         [HttpGet("nationalities")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Nationalities, ActionVerb.View)]
         public async Task<IActionResult> Nationalities()
         {
             var values = await LookupValuesAsync(NationalityCategory, includeInactive: true);
@@ -468,6 +485,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("nationalities/save")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Nationalities, ActionVerb.Create)]
         public async Task<IActionResult> SaveNationality(string? code, string? nameAr, string? nameEn, int? sortOrder)
         {
             try
@@ -490,6 +508,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("nationalities/{id:int}/deactivate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Nationalities, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeactivateNationality(int id)
         {
             try
@@ -503,6 +522,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("nationalities/{id:int}/activate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Nationalities, ActionVerb.Edit)]
         public async Task<IActionResult> ActivateNationality(int id)
         {
             try
@@ -526,6 +546,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("lookups/quick-add")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Create)]
         public async Task<IActionResult> QuickAddLookupValue(string? category, string? code, string? nameAr, string? nameEn)
         {
             try

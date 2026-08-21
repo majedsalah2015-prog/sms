@@ -11,6 +11,9 @@ using Sms.Domain.Parents;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -42,6 +45,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.Directory, ActionVerb.View)]
         public async Task<IActionResult> Index(string? q = null, string? filter = null)
         {
             var query = _db.Parents.AsNoTracking().AsQueryable();
@@ -74,10 +78,12 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("new")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.Directory, ActionVerb.Create)]
         public IActionResult Register() => View(new ParentFormViewModel());
 
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.Directory, ActionVerb.Create)]
         public async Task<IActionResult> Register(ParentFormViewModel form)
         {
             try
@@ -94,6 +100,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
         public async Task<IActionResult> File(int id, string? tab = null)
         {
             var p = await _db.Parents.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.SchoolId == _db.CurrentSchoolId);
@@ -141,6 +148,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.Edit)]
         public async Task<IActionResult> Edit(int id, ParentFormViewModel form)
         {
             try
@@ -158,6 +166,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.Deactivate)]
         public async Task<IActionResult> Delete(int id, string? q, string? filter)
         {
             var p = await _db.Parents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -172,6 +181,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("dedup")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.Dedup, ActionVerb.View)]
         public async Task<IActionResult> Dedup()
         {
             var parents = await _db.Parents.AsNoTracking().OrderBy(p => p.Id).ToListAsync();

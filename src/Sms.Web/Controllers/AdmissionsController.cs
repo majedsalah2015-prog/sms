@@ -14,6 +14,9 @@ using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 using AdmissionApplication = Sms.Domain.Admissions.Application;
 
 namespace Sms.Web.Controllers
@@ -57,6 +60,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Campaigns
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -85,6 +89,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("campaign")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Campaigns, ActionVerb.Create)]
         public async Task<IActionResult> DefineCampaign(CampaignListViewModel form, int? year)
         {
             try
@@ -100,6 +105,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("campaign/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Campaigns, ActionVerb.Edit)]
         public async Task<IActionResult> EditCampaign(int id, DateTime? openDate, DateTime? closeDate, bool requiresAssessment, decimal? applicationFeeAmount, int? year)
         {
             try
@@ -114,6 +120,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("campaign/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Campaigns, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteCampaign(int id, int? year)
         {
             try
@@ -134,6 +141,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Pipeline board
 
         [HttpGet("board")]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Board, ActionVerb.View)]
         public async Task<IActionResult> Board(int? campaign = null, string? view = null)
         {
             var campaigns = await _db.AdmissionCampaigns.AsNoTracking().OrderByDescending(c => c.OpenDate).ToListAsync();
@@ -167,6 +175,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/status")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Approve)]
         public async Task<IActionResult> ChangeStatus(int id, ApplicationStatus target, string? returnTo)
         {
             try
@@ -181,6 +190,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Counter capture
 
         [HttpGet("apply")]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Create)]
         public async Task<IActionResult> Apply(int campaign)
         {
             var c = await _db.AdmissionCampaigns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == campaign);
@@ -190,6 +200,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("apply")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Create)]
         public async Task<IActionResult> Apply(ApplicationFormViewModel form)
         {
             var c = await _db.AdmissionCampaigns.AsNoTracking().SingleOrDefaultAsync(x => x.Id == form.CampaignId);
@@ -262,6 +273,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Detail
 
         [HttpGet("{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.View)]
         public async Task<IActionResult> Details(int id)
         {
             var app = await _db.Applications.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id);
@@ -293,6 +305,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Edit)]
         public async Task<IActionResult> EditApplication(int id, ApplicationFormViewModel form)
         {
             try
@@ -312,6 +325,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteApplication(int id)
         {
             var app = await _db.Applications.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id);
@@ -327,6 +341,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/assess")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Edit)]
         public async Task<IActionResult> Assess(int id, decimal? score, string? notes)
         {
             try
@@ -341,6 +356,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/parent")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Edit)]
         public async Task<IActionResult> LinkParent(int id, int? parentId)
         {
             // The engine has no dedicated "set parent" op; the application is a Draft-to-Approved
@@ -356,6 +372,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/waitlist")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.Edit)]
         public async Task<IActionResult> Waitlist(int id)
         {
             try
@@ -375,6 +392,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("{id:int}/register")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Applications, ActionVerb.Approve)]
         public async Task<IActionResult> Register(int id, int? sectionId, DateTime? enrollmentDate, int? relationshipId)
         {
             try
@@ -390,6 +408,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------ Waiting list
 
         [HttpGet("waitlist")]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.View)]
         public async Task<IActionResult> WaitingList(int? profile = null)
         {
             var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
@@ -417,6 +436,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("waitlist/{entryId:int}/offer")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.Approve)]
         public async Task<IActionResult> Offer(int entryId, int? profile, DateTime? expires)
         {
             try
@@ -430,6 +450,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("waitlist/{entryId:int}/respond")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.Edit)]
         public async Task<IActionResult> Respond(int entryId, bool accepted, int? profile)
         {
             try
@@ -443,6 +464,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("waitlist/{entryId:int}/remove")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Admissions, ScreenCatalog.Admissions.Waitlist, ActionVerb.Deactivate)]
         public async Task<IActionResult> RemoveFromWaitlist(int entryId, int? profile)
         {
             try

@@ -17,6 +17,9 @@ using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Finance;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -67,6 +70,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Template designer
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null)
         {
             var m = new TemplatesViewModel();
@@ -107,6 +111,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("templates/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.Create)]
         public async Task<IActionResult> CreateTemplate(
             int academicYearId, string nameAr, string nameEn, int? feeCategoryId,
             decimal downPaymentPercent, int graceDays,
@@ -206,6 +211,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("templates/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.View)]
         public async Task<IActionResult> TemplateDetails(int id)
         {
             var template = await _db.PlanTemplates.IgnoreQueryFilters().AsNoTracking()
@@ -260,6 +266,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("templates/{id:int}/approve")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.Approve)]
         public async Task<IActionResult> ApproveTemplate(int id, int? year)
         {
             await _installments.ApproveTemplateAsync(id, HttpContext.RequestAborted);
@@ -269,6 +276,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("templates/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.Edit)]
         public async Task<IActionResult> EditTemplate(
             int id, int academicYearId, string nameAr, string nameEn, int? feeCategoryId,
             decimal downPaymentPercent, int graceDays,
@@ -305,6 +313,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("templates/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Templates, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteTemplate(int id, int? year)
         {
             try
@@ -327,6 +336,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Assignment console
 
         [HttpGet("assign")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Assignment, ActionVerb.View)]
         public async Task<IActionResult> Assign(int? year = null, int? studentId = null)
         {
             var m = new AssignViewModel();
@@ -399,6 +409,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("assign")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Assignment, ActionVerb.Create)]
         public async Task<IActionResult> AssignPlan(int studentId, int payerId, int planTemplateId, bool isException, string? exceptionReason, int? year)
         {
             try
@@ -419,6 +430,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Family schedule
 
         [HttpGet("family")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.View)]
         public async Task<IActionResult> Family(int? payerId = null, string? q = null)
         {
             var m = new FamilyScheduleViewModel { Q = q };
@@ -467,6 +479,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("schedule/{id:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.View)]
         public async Task<IActionResult> Schedule(int id)
         {
             var assignment = await _db.PlanAssignments.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id);
@@ -511,6 +524,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("installments/{id:int}/promise")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Edit)]
         public async Task<IActionResult> RecordPromise(int id, DateTime promisedDate, decimal amount, string? returnUrl)
         {
             try
@@ -528,6 +542,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("installments/{id:int}/cover-pdc")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Edit)]
         public async Task<IActionResult> CoverWithPdc(int id, int pdcId, string? returnUrl)
         {
             try
@@ -545,6 +560,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("installments/{id:int}/write-off")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Approve)]
         public async Task<IActionResult> WriteOff(int id, string reason, string? returnUrl)
         {
             if (string.IsNullOrWhiteSpace(reason))
@@ -560,6 +576,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("schedule/{id:int}/reduce")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Edit)]
         public async Task<IActionResult> Reduce(int id, decimal reduction, string reason)
         {
             try
@@ -578,6 +595,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Reschedule wizard
 
         [HttpGet("schedule/{id:int}/reschedule")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Submit)]
         public async Task<IActionResult> Reschedule(int id)
         {
             var assignment = await _db.PlanAssignments.AsNoTracking().SingleOrDefaultAsync(a => a.Id == id);
@@ -601,6 +619,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("schedule/{id:int}/reschedule")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Schedule, ActionVerb.Submit)]
         public async Task<IActionResult> ProposeReschedule(int id, string reason, DateTime[] dueDates, decimal[] amounts)
         {
             var proposal = new List<ProposedInstallment>();
@@ -630,6 +649,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("cases")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Cases, ActionVerb.View)]
         public async Task<IActionResult> Cases(RescheduleCaseStatus? status = null)
         {
             var query = _db.RescheduleCases.AsNoTracking().AsQueryable();
@@ -662,6 +682,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("cases/{id:int}/decide")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Cases, ActionVerb.Approve)]
         public async Task<IActionResult> DecideCase(int id, bool approve, string? decisionReason)
         {
             try
@@ -682,6 +703,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Dunning console
 
         [HttpGet("dunning")]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Dunning, ActionVerb.View)]
         public async Task<IActionResult> Dunning()
         {
             var m = new DunningConsoleViewModel { LastRunFiredCount = TempData["DunningFired"] as int? };
@@ -757,6 +779,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("dunning/run")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Dunning, ActionVerb.Post)]
         public async Task<IActionResult> RunDunning()
         {
             var fired = await _installments.RunDunningAsync(HttpContext.RequestAborted);
@@ -767,6 +790,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("dunning/evaluate-promises")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Dunning, ActionVerb.Post)]
         public async Task<IActionResult> EvaluatePromises()
         {
             var broken = await _installments.EvaluatePromisesAsync(HttpContext.RequestAborted);

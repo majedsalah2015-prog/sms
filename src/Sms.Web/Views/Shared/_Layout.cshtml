@@ -2,6 +2,7 @@
 @using Sms.Web.Navigation
 @using Sms.Application.Setup
 @inject ISystemSetupAdmin SetupAdmin
+@inject Sms.Web.Navigation.ModuleVisibility Visibility
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     var culture = CultureInfo.CurrentUICulture;
@@ -13,7 +14,20 @@
     var productName = isRtl ? "نظام إدارة المدارس" : "School Management System";
     // BR-SET-006: modules whose feature toggle is off vanish from the menu.
     var featureStates = await SetupAdmin.GetFeatureStatesAsync();
-    var sidebar = ModuleCatalog.BuildSidebar(m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code]);
+    // BR-SEC-010: so do the ones this user cannot open a single screen of. Two different reasons to
+    // hide the same link - the deployment does not have it, or this person may not have it - and a
+    // link that exists only to answer 404 is worse than no link.
+    var visibleModules = new HashSet<string>();
+    foreach (var m in ModuleCatalog.Modules)
+    {
+        if (await Visibility.CanSeeAsync(m.Code)) { visibleModules.Add(m.Code); }
+    }
+    var canExportToLedger = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Fees, Sms.Application.Security.ScreenCatalog.Fees.GlExport);
+    var sidebar = ModuleCatalog.BuildSidebar(
+        m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code],
+        m => visibleModules.Contains(m.Code),
+        canExportToLedger);
     // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
     var erpUrl = Configuration["ExternalApps:ErpUrl"];
     var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";

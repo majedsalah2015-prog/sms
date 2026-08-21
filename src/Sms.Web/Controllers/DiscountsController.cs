@@ -12,6 +12,9 @@ using Sms.Domain.Fees;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -51,6 +54,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.1 Grant desk
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, DiscountGrantStatus? status = null, int? typeId = null, string? q = null)
         {
             var m = new GrantDeskViewModel { Status = status, TypeId = typeId, Q = q };
@@ -86,6 +90,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/manual")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Submit)]
         public async Task<IActionResult> ProposeManualGrant(int studentId, int discountTypeId, decimal basisValue, string reason, bool hasHardshipDocumentation, int? year)
         {
             try
@@ -101,6 +106,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/automatic")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Submit)]
         public async Task<IActionResult> ProposeAutomaticGrants(int discountTypeId, int? year)
         {
             try
@@ -116,6 +122,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/{id:int}/approve")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Approve)]
         public async Task<IActionResult> ApproveGrant(int id, string? envelopeOverrideReason, int? year)
         {
             try
@@ -129,6 +136,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/approve-batch")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Approve)]
         public async Task<IActionResult> ApproveGrants(List<int>? ids, int? year)
         {
             try
@@ -143,6 +151,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/{id:int}/reject")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Approve)]
         public async Task<IActionResult> RejectGrant(int id, string? reason, int? year)
         {
             try
@@ -157,6 +166,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("grants/{id:int}/revoke")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Grants, ActionVerb.Deactivate)]
         public async Task<IActionResult> RevokeGrant(int id, DateTime effectiveDate, string? reason, bool clawBack, int? year)
         {
             try
@@ -174,6 +184,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.2 Type catalog
 
         [HttpGet("types")]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.View)]
         public async Task<IActionResult> Types(int? year = null)
         {
             var m = new TypeCatalogViewModel();
@@ -186,6 +197,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("types/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.Create)]
         public async Task<IActionResult> CreateType(
             string nameAr, string nameEn, DiscountBasis basis, DiscountEligibilityMode eligibilityMode,
             int? feeCategoryId, DiscountComputationStage stage, decimal? capAmountPerStudent,
@@ -212,6 +224,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.3 Scholarship board
 
         [HttpGet("scholarships")]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Scholarships, ActionVerb.View)]
         public async Task<IActionResult> Scholarships(int? year = null)
         {
             var m = new ScholarshipBoardViewModel();
@@ -235,6 +248,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scholarships/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Scholarships, ActionVerb.Create)]
         public async Task<IActionResult> CreateScholarshipProgram(string nameAr, string nameEn, int discountTypeId, int? maxAwards, decimal? maxTotalAmount, int? year)
         {
             try
@@ -249,6 +263,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("scholarships/nominate")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Scholarships, ActionVerb.Submit)]
         public async Task<IActionResult> Nominate(int studentId, int scholarshipProgramId, decimal basisValue, string reason, string? sponsorNote, int? year)
         {
             try
@@ -265,6 +280,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.4 Renewal queue
 
         [HttpGet("renewals")]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Renewals, ActionVerb.View)]
         public async Task<IActionResult> Renewals(int? fromYear = null, int? toYear = null)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -290,6 +306,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("renewals/build")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Renewals, ActionVerb.Create)]
         public async Task<IActionResult> BuildRenewalQueue(int fromYear, int toYear)
         {
             try
@@ -306,6 +323,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("renewals/{id:int}/decide")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Renewals, ActionVerb.Approve)]
         public async Task<IActionResult> DecideRenewal(int id, RenewalDecision decision, decimal? adjustedBasisValue, int? fromYear, int? toYear)
         {
             try
@@ -320,6 +338,7 @@ namespace Sms.Web.Controllers
         // ================================================================== 8.5 Waiver desk
 
         [HttpGet("waivers")]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Waivers, ActionVerb.View)]
         public async Task<IActionResult> Waivers(string? chargeQ = null, WaiverStatus? status = null)
         {
             var m = new WaiverDeskViewModel { ChargeQ = chargeQ, Status = status };
@@ -352,6 +371,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("waivers/new")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Waivers, ActionVerb.Submit)]
         public async Task<IActionResult> ProposeWaiver(int chargeId, WaiverKind kind, decimal amount, string reason, string? chargeQ)
         {
             try
@@ -367,6 +387,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("waivers/{id:int}/decide")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Waivers, ActionVerb.Approve)]
         public async Task<IActionResult> DecideWaiver(int id, bool approve)
         {
             try

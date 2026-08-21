@@ -11,6 +11,9 @@ using Sms.Domain.Schools;
 using Sms.Domain.Subjects;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -43,6 +46,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.View)]
         public async Task<IActionResult> Index(string? tab = null, int? department = null)
         {
             var subjects = await _db.Subjects.AsNoTracking().OrderBy(s => s.Code).ToListAsync();
@@ -74,6 +78,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("subject")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Create)]
         public async Task<IActionResult> DefineSubject(SubjectCatalogViewModel form)
         {
             try
@@ -88,6 +93,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("department")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Departments, ActionVerb.Create)]
         public async Task<IActionResult> DefineDepartment(SubjectCatalogViewModel form)
         {
             try
@@ -103,6 +109,7 @@ namespace Sms.Web.Controllers
         // --- Edit / delete (soft: deactivate) ----------------------------------------
 
         [HttpGet("subject/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Edit)]
         public async Task<IActionResult> EditSubject(int id)
         {
             var s = await _db.Subjects.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -117,6 +124,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("subject/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Edit)]
         public async Task<IActionResult> EditSubject(int id, SubjectEditViewModel form)
         {
             form.Id = id;
@@ -138,6 +146,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("subject/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteSubject(int id)
         {
             try
@@ -150,6 +159,7 @@ namespace Sms.Web.Controllers
         }
 
         [HttpGet("department/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Departments, ActionVerb.Edit)]
         public async Task<IActionResult> EditDepartment(int id)
         {
             var d = await _db.Departments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
@@ -164,6 +174,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("department/{id:int}/edit")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Departments, ActionVerb.Edit)]
         public async Task<IActionResult> EditDepartment(int id, DepartmentEditViewModel form)
         {
             form.Id = id;
@@ -185,6 +196,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("department/{id:int}/delete")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Departments, ActionVerb.Deactivate)]
         public async Task<IActionResult> DeleteDepartment(int id)
         {
             try
@@ -198,6 +210,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("qualification")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Edit)]
         public async Task<IActionResult> DefineQualification(SubjectCatalogViewModel form)
         {
             try
@@ -213,6 +226,7 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------ Curriculum plan
 
         [HttpGet("plan")]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.View)]
         public async Task<IActionResult> Plan(int? year = null, int? profile = null, int? slots = null)
         {
             var model = await BuildPlanAsync(year, profile, slots);
@@ -221,6 +235,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("plan/offering")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Create)]
         public async Task<IActionResult> AddOffering(CurriculumPlanViewModel form, int year, int profile, int? slots)
         {
             try
@@ -236,6 +251,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("plan/offering/{id:int}/end")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Deactivate)]
         public async Task<IActionResult> EndOffering(int id, int year, int profile, DateTime? effectiveTo, int? slots)
         {
             try
@@ -250,6 +266,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("plan/copy")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Create)]
         public async Task<IActionResult> CopyPlan(int year, int profile, int sourceProfile, int? slots)
         {
             var copied = 0;

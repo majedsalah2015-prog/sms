@@ -2,9 +2,17 @@
 @using Sms.Web.Navigation
 @using Sms.Application.Setup
 @inject ISystemSetupAdmin SetupAdmin
+@inject Sms.Web.Navigation.ModuleVisibility Visibility
 @model Sms.Web.Models.HomeDashboardViewModel
 @{
     var featureStates = await SetupAdmin.GetFeatureStatesAsync();
+    // The tiles are the sidebar in another shape, so they hide for the same two reasons it does:
+    // the feature is off, or this user cannot open a single screen of the module (BR-SEC-010).
+    var visibleModules = new HashSet<string>();
+    foreach (var mod in ModuleCatalog.Modules)
+    {
+        if (await Visibility.CanSeeAsync(mod.Code)) { visibleModules.Add(mod.Code); }
+    }
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
     ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
@@ -56,7 +64,7 @@
 
 <h2 class="sms-section-title">@T("Modules", "الوحدات")</h2>
 <div class="row g-3">
-    @foreach (var m in ModuleCatalog.Modules.Where(x => FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]))
+    @foreach (var m in ModuleCatalog.Modules.Where(x => (FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]) && visibleModules.Contains(x.Code)))
     {
         <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
             <a class="sms-card sms-module-card" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">

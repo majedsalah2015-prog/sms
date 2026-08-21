@@ -12,6 +12,9 @@ using Sms.Domain.Calendar;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Application.Security;
+using Sms.Domain.Security;
+using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
 {
@@ -48,6 +51,7 @@ namespace Sms.Web.Controllers
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
         [HttpGet("")]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.View)]
         public async Task<IActionResult> Index(int? year = null, bool? hijri = null)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
@@ -66,6 +70,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("day")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.Edit)]
         public async Task<IActionResult> Day(CalendarDayFormViewModel form)
         {
             try
@@ -100,6 +105,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("event")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.Edit)]
         public async Task<IActionResult> Event(CalendarEventFormViewModel form)
         {
             try
@@ -136,6 +142,7 @@ namespace Sms.Web.Controllers
 
         [HttpPost("publish")]
         [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.Approve)]
         public async Task<IActionResult> Publish(int academicYearId)
         {
             try
