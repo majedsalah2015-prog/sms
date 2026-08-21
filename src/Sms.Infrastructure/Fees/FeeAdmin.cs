@@ -8,6 +8,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Fees;
 using Sms.Application.Numbering;
 using Sms.Domain.Fees;
+using Sms.Domain.Payments;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Fees
@@ -262,7 +263,73 @@ namespace Sms.Infrastructure.Fees
             var (vatAmount, _) = VatCalculator.Calculate(netAmount, vatRate);
             var charge = await BuildChargeAsync(studentId, payerId, academicYearId, feeCategoryId, vatRate, netAmount, vatAmount, sourceType, sourceAcademicYearId: null, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
+
+            // BR-PAY-003: an advance is "auto-consumed by the next due charge". The rule was written
+            // and never applied, so AdvancesReceived only ever grew (gap G-10) and a family with money
+            // on account was dunned for a charge that money should already have settled.
+            await ConsumeAdvancesAsync(charge, cancellationToken);
             return charge;
+        }
+
+        /// <summary>
+        /// Settles a new charge from whatever the payer has already handed over and nobody has
+        /// applied yet, oldest receipt first.
+        /// <para>
+        /// Only up to the charge's gross: an advance larger than the charge stays an advance for the
+        /// next one. Only receipts with something left on them, which is what makes this safe to run
+        /// after every charge — with no advance outstanding it allocates nothing and writes nothing.
+        /// </para>
+        /// </summary>
+        private async Task ConsumeAdvancesAsync(Charge charge, CancellationToken cancellationToken)
+        {
+            var receipts = await _db.Receipts
+                .Where(r => r.PayerId == charge.PayerId && r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment)
+                .OrderBy(r => r.IssuedAtUtc).ThenBy(r => r.Id)
+                .Select(r => new { r.Id, r.Amount })
+                .ToListAsync(cancellationToken);
+            if (receipts.Count == 0)
+            {
+                return;
+            }
+
+            // EF Core's Sqlite provider can't translate Sum() over decimal - materialize then sum.
+            var receiptIds = receipts.Select(r => r.Id).ToList();
+            var allocatedByReceipt = (await _db.PaymentAllocations
+                    .Where(a => receiptIds.Contains(a.ReceiptId))
+                    .Select(a => new { a.ReceiptId, a.AllocatedAmount })
+                    .ToListAsync(cancellationToken))
+                .GroupBy(a => a.ReceiptId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
+
+            var outstanding = charge.GrossAmount;
+            var wrote = false;
+            foreach (var receipt in receipts)
+            {
+                if (outstanding <= 0m)
+                {
+                    break;
+                }
+
+                var unapplied = receipt.Amount - (allocatedByReceipt.TryGetValue(receipt.Id, out var a) ? a : 0m);
+                var take = Math.Min(unapplied, outstanding);
+                if (take <= 0m)
+                {
+                    continue;
+                }
+
+                _db.PaymentAllocations.Add(new PaymentAllocation
+                {
+                    ReceiptId = receipt.Id,
+                    ChargeId = charge.Id,
+                    AllocatedAmount = take,
+                });
+                outstanding -= take;
+                wrote = true;
+            }
+
+            if (wrote)
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
         }
 
         private async Task<Charge> BuildChargeAsync(

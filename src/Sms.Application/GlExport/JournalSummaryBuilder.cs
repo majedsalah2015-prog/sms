@@ -61,7 +61,8 @@ namespace Sms.Application.GlExport
     ///   Credit note    Dr Revenue[category] (net part), Dr VatOutput (vat part) / Cr Receivables (gross)
     ///   Discount doc   Dr Discounts (net part), Dr VatOutput (vat part) / Cr Receivables (gross)
     ///   Store sale     Dr WalletLiability / Cr StoreRevenue   (wallet-tendered only)
-    ///   Receipt        Dr Cash[method] (amount) / Cr Receivables (allocated), Cr AdvancesReceived (unallocated)
+    ///   Receipt        Dr Cash[method] / Cr AdvancesReceived  (the whole amount)
+    ///   Allocation     Dr AdvancesReceived / Cr Receivables   (dated when it was made)
     ///   Refund paid    Dr AdvancesReceived / Cr Cash[method]
     ///   Till variance  Dr Cash:Cash / Cr CashOverShort   (over; reversed when short)
     ///   Write-off      Dr BadDebt (gross) / Cr Receivables
@@ -91,7 +92,24 @@ namespace Sms.Application.GlExport
         /// </summary>
         public sealed record DiscountDoc(decimal Amount, decimal VatRate);
 
-        public sealed record ReceiptDoc(string PaymentMethod, decimal Amount, decimal AllocatedAmount);
+        /// <summary>
+        /// A posted receipt: Dr Cash[method] / Cr AdvancesReceived, for the whole
+        /// amount.
+        /// <para>
+        /// Every receipt lands on advances first and an
+        /// <see cref="AllocationDoc"/> moves it to receivables, even when both
+        /// happen the same minute — the two net to the direct entry in that case,
+        /// so nothing is lost. The reason is the case where they do not: an
+        /// allocation made in October against a September receipt used to be
+        /// counted inside September's receipt line, which meant regenerating
+        /// September produced different numbers from the batch already posted for
+        /// it, and October never saw the movement at all (gap G-10).
+        /// </para>
+        /// </summary>
+        public sealed record ReceiptDoc(string PaymentMethod, decimal Amount);
+
+        /// <summary>One receipt-to-charge allocation, dated when it was made: Dr AdvancesReceived / Cr Receivables.</summary>
+        public sealed record AllocationDoc(decimal Amount);
 
         public sealed record RefundDoc(string PaymentMethod, decimal Amount);
 
@@ -143,26 +161,61 @@ namespace Sms.Application.GlExport
             public bool IsBalanced => TotalDebit == TotalCredit;
         }
 
+        /// <summary>
+        /// Everything a period holds, each kind defaulting to nothing. Named
+        /// rather than positional because the list only grows: it reached a dozen
+        /// collections while the ledger gaps were being closed, and at that width
+        /// a call site is a wall of <c>Array.Empty</c> in which one misplaced
+        /// argument is a silent posting to the wrong account.
+        /// </summary>
+        public sealed record PeriodDocuments
+        {
+            public IReadOnlyCollection<ChargeDoc> Charges { get; init; } = Array.Empty<ChargeDoc>();
+
+            public IReadOnlyCollection<CreditNoteDoc> CreditNotes { get; init; } = Array.Empty<CreditNoteDoc>();
+
+            public IReadOnlyCollection<DiscountDoc> Discounts { get; init; } = Array.Empty<DiscountDoc>();
+
+            public IReadOnlyCollection<ReceiptDoc> Receipts { get; init; } = Array.Empty<ReceiptDoc>();
+
+            public IReadOnlyCollection<AllocationDoc> Allocations { get; init; } = Array.Empty<AllocationDoc>();
+
+            public IReadOnlyCollection<RefundDoc> Refunds { get; init; } = Array.Empty<RefundDoc>();
+
+            public IReadOnlyCollection<WalletTopUpDoc> WalletTopUps { get; init; } = Array.Empty<WalletTopUpDoc>();
+
+            public IReadOnlyCollection<WalletAdjustmentDoc> WalletAdjustments { get; init; } = Array.Empty<WalletAdjustmentDoc>();
+
+            public IReadOnlyCollection<CafeteriaSaleDoc> CafeteriaSales { get; init; } = Array.Empty<CafeteriaSaleDoc>();
+
+            public IReadOnlyCollection<StoreWalletSaleDoc> StoreWalletSales { get; init; } = Array.Empty<StoreWalletSaleDoc>();
+
+            public IReadOnlyCollection<TillVarianceDoc> TillVariances { get; init; } = Array.Empty<TillVarianceDoc>();
+
+            public IReadOnlyCollection<WriteOffDoc> WriteOffs { get; init; } = Array.Empty<WriteOffDoc>();
+
+            public int Count => Charges.Count + CreditNotes.Count + Discounts.Count + Receipts.Count + Allocations.Count
+                + Refunds.Count + WalletTopUps.Count + WalletAdjustments.Count + CafeteriaSales.Count
+                + StoreWalletSales.Count + TillVariances.Count + WriteOffs.Count;
+        }
+
+        /// <summary>The five documents a fee cycle cannot do without — a convenience for callers that touch nothing else.</summary>
         public static Journal Build(
             IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
             IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds)
-            => Build(charges, creditNotes, discounts, receipts, refunds, Array.Empty<WalletTopUpDoc>(), Array.Empty<CafeteriaSaleDoc>(), Array.Empty<StoreWalletSaleDoc>(), Array.Empty<TillVarianceDoc>(), Array.Empty<WriteOffDoc>(), Array.Empty<WalletAdjustmentDoc>());
+            => Build(new PeriodDocuments
+            {
+                Charges = charges, CreditNotes = creditNotes, Discounts = discounts, Receipts = receipts, Refunds = refunds,
+            });
 
-        public static Journal Build(
-            IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
-            IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
-            IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales)
-            => Build(charges, creditNotes, discounts, receipts, refunds, walletTopUps, cafeteriaSales, Array.Empty<StoreWalletSaleDoc>(), Array.Empty<TillVarianceDoc>(), Array.Empty<WriteOffDoc>(), Array.Empty<WalletAdjustmentDoc>());
-
-        public static Journal Build(
-            IReadOnlyCollection<ChargeDoc> charges, IReadOnlyCollection<CreditNoteDoc> creditNotes, IReadOnlyCollection<DiscountDoc> discounts,
-            IReadOnlyCollection<ReceiptDoc> receipts, IReadOnlyCollection<RefundDoc> refunds,
-            IReadOnlyCollection<WalletTopUpDoc> walletTopUps, IReadOnlyCollection<CafeteriaSaleDoc> cafeteriaSales,
-            IReadOnlyCollection<StoreWalletSaleDoc> storeWalletSales,
-            IReadOnlyCollection<TillVarianceDoc> tillVariances,
-            IReadOnlyCollection<WriteOffDoc> writeOffs,
-            IReadOnlyCollection<WalletAdjustmentDoc> walletAdjustments)
+        public static Journal Build(PeriodDocuments documents)
         {
+            var (charges, creditNotes, discounts) = (documents.Charges, documents.CreditNotes, documents.Discounts);
+            var (receipts, refunds, allocations) = (documents.Receipts, documents.Refunds, documents.Allocations);
+            var (walletTopUps, walletAdjustments) = (documents.WalletTopUps, documents.WalletAdjustments);
+            var (cafeteriaSales, storeWalletSales) = (documents.CafeteriaSales, documents.StoreWalletSales);
+            var (tillVariances, writeOffs) = (documents.TillVariances, documents.WriteOffs);
+
             var acc = new Accumulator();
 
             foreach (var w in walletTopUps)
@@ -221,8 +274,13 @@ namespace Sms.Application.GlExport
             foreach (var r in receipts)
             {
                 acc.Debit(GlAccountKeys.Cash(r.PaymentMethod), $"Receipts ({r.PaymentMethod})", r.Amount);
-                acc.Credit(GlAccountKeys.Receivables, "Receipts allocated", r.AllocatedAmount);
-                acc.Credit(GlAccountKeys.AdvancesReceived, "Receipts unallocated (advances)", r.Amount - r.AllocatedAmount);
+                acc.Credit(GlAccountKeys.AdvancesReceived, "Receipts taken", r.Amount);
+            }
+
+            foreach (var a in allocations)
+            {
+                acc.Debit(GlAccountKeys.AdvancesReceived, "Receipts applied to charges", a.Amount);
+                acc.Credit(GlAccountKeys.Receivables, "Receipts applied to charges", a.Amount);
             }
 
             foreach (var f in refunds)
@@ -269,9 +327,7 @@ namespace Sms.Application.GlExport
             var journal = new Journal
             {
                 Lines = acc.ToLines(),
-                SourceDocumentCount = charges.Count + creditNotes.Count + discounts.Count + receipts.Count + refunds.Count
-                    + walletTopUps.Count + cafeteriaSales.Count + storeWalletSales.Count + tillVariances.Count + writeOffs.Count
-                    + walletAdjustments.Count,
+                SourceDocumentCount = documents.Count,
             };
             if (!journal.IsBalanced)
             {

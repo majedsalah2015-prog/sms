@@ -148,13 +148,19 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal("GLX-0001", batch.BatchNo);
             Assert.Equal(batch.TotalDebit, batch.TotalCredit);
-            Assert.Equal(3, batch.SourceDocumentCount);
+            // Four, not three: the allocation the receipt triggered is its own document now, dated
+            // when it was made rather than folded into the receipt that funded it (G-10).
+            Assert.Equal(4, batch.SourceDocumentCount);
             var lines = db.GlJournalLines.Where(l => l.GlExportBatchId == batch.Id).ToList();
             Assert.Equal(1000m, lines.Single(l => l.AccountKey == "4100" && l.Credit > 0).Credit);
             Assert.Equal("4100", lines.Single(l => l.AccountKey == "4100" && l.Credit > 0).AccountCode);
             Assert.Equal(100m, lines.Single(l => l.AccountKey == "4100" && l.Debit > 0).Debit);
             Assert.Equal(1200m, lines.Single(l => l.AccountKey == "Cash:Cash").Debit);
-            Assert.Equal(165m, lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived).Credit);
+
+            // The whole receipt to advances, 1035 of it straight back out to receivables: the family
+            // is 165 in credit, which is what the single netted line used to say on its own.
+            Assert.Equal(1200m, lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Credit > 0).Credit);
+            Assert.Equal(1035m, lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Debit > 0).Debit);
         }
 
         [Fact]

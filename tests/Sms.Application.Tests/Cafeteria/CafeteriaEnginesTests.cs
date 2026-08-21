@@ -83,11 +83,11 @@ namespace Sms.Application.Tests.Cafeteria
         [BusinessRule("BR-CAF-007")]
         public void Wallet_money_journals_as_liability_and_cafeteria_sales_as_revenue()
         {
-            var journal = JournalSummaryBuilder.Build(
-                Array.Empty<JournalSummaryBuilder.ChargeDoc>(), Array.Empty<JournalSummaryBuilder.CreditNoteDoc>(), Array.Empty<JournalSummaryBuilder.DiscountDoc>(),
-                Array.Empty<JournalSummaryBuilder.ReceiptDoc>(), Array.Empty<JournalSummaryBuilder.RefundDoc>(),
-                new[] { new JournalSummaryBuilder.WalletTopUpDoc("Cash", 100m), new JournalSummaryBuilder.WalletTopUpDoc("Cash", -20m) },
-                new[] { new JournalSummaryBuilder.CafeteriaSaleDoc(true, 30m), new JournalSummaryBuilder.CafeteriaSaleDoc(false, 12m) });
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                WalletTopUps = new[] { new JournalSummaryBuilder.WalletTopUpDoc("Cash", 100m), new JournalSummaryBuilder.WalletTopUpDoc("Cash", -20m) },
+                CafeteriaSales = new[] { new JournalSummaryBuilder.CafeteriaSaleDoc(true, 30m), new JournalSummaryBuilder.CafeteriaSaleDoc(false, 12m) },
+            });
 
             Assert.True(journal.IsBalanced);
             Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.WalletLiability && l.Description == "Wallet top-ups").Credit);

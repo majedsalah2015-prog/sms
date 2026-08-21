@@ -104,6 +104,15 @@ namespace Sms.Infrastructure.GlExport
             var receipts = await _db.Receipts
                 .Where(r => r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc)
                 .Select(r => new { r.Id, r.Method, r.Amount }).ToListAsync(cancellationToken);
+            // G-10: scoped by when the allocation was made, not by when its receipt was issued. The
+            // old query summed every allocation belonging to a receipt of the period, so an October
+            // allocation against a September receipt silently changed what September would regenerate
+            // as — and never appeared in October at all.
+            var allocations = await _db.PaymentAllocations
+                .Where(a => a.CreatedAtUtc >= periodFromUtc && a.CreatedAtUtc <= periodToUtc && a.AllocatedAmount != 0m)
+                .Select(a => a.AllocatedAmount)
+                .ToListAsync(cancellationToken);
+
             var receiptIds = receipts.Select(r => r.Id).ToList();
             var allocatedByReceipt = (await _db.PaymentAllocations.Where(a => receiptIds.Contains(a.ReceiptId)).Select(a => new { a.ReceiptId, a.AllocatedAmount }).ToListAsync(cancellationToken))
                 .GroupBy(a => a.ReceiptId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
@@ -163,19 +172,22 @@ namespace Sms.Infrastructure.GlExport
                 .Select(e => e.Amount)
                 .ToListAsync(cancellationToken);
 
-            var journal = JournalSummaryBuilder.Build(
-                charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
-                creditNotes.Select(n => new JournalSummaryBuilder.CreditNoteDoc(n.FeeCategoryId, categories.TryGetValue(n.FeeCategoryId, out var code) ? code : null, n.Amount, n.VatRate)).ToList(),
-                discounts.Select(d => new JournalSummaryBuilder.DiscountDoc(d.Amount, d.VatRate)).ToList(),
-                receipts.Select(r => new JournalSummaryBuilder.ReceiptDoc(r.Method.ToString(), r.Amount, allocatedByReceipt.TryGetValue(r.Id, out var a) ? a : 0m)).ToList(),
-                refunds.Select(f => new JournalSummaryBuilder.RefundDoc(f.Method.ToString(), f.Amount)).ToList(),
-                walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                Charges = charges.Select(c => new JournalSummaryBuilder.ChargeDoc(c.FeeCategoryId, categories.TryGetValue(c.FeeCategoryId, out var code) ? code : null, c.NetAmount, c.VatAmount, c.GrossAmount)).ToList(),
+                CreditNotes = creditNotes.Select(n => new JournalSummaryBuilder.CreditNoteDoc(n.FeeCategoryId, categories.TryGetValue(n.FeeCategoryId, out var code) ? code : null, n.Amount, n.VatRate)).ToList(),
+                Discounts = discounts.Select(d => new JournalSummaryBuilder.DiscountDoc(d.Amount, d.VatRate)).ToList(),
+                Receipts = receipts.Select(r => new JournalSummaryBuilder.ReceiptDoc(r.Method.ToString(), r.Amount)).ToList(),
+                Allocations = allocations.Select(a => new JournalSummaryBuilder.AllocationDoc(a)).ToList(),
+                Refunds = refunds.Select(f => new JournalSummaryBuilder.RefundDoc(f.Method.ToString(), f.Amount)).ToList(),
+                WalletTopUps = walletTopUps.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))
                     .Concat(walletRefunds.Select(w => new JournalSummaryBuilder.WalletTopUpDoc(w.Method.ToString(), w.Amount))).ToList(),
-                cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
-                storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList(),
-                tillVariances.Select(v => new JournalSummaryBuilder.TillVarianceDoc(v)).ToList(),
-                writeOffs.Select(a => new JournalSummaryBuilder.WriteOffDoc(a)).ToList(),
-                walletAdjustments.Select(a => new JournalSummaryBuilder.WalletAdjustmentDoc(a)).ToList());
+                WalletAdjustments = walletAdjustments.Select(a => new JournalSummaryBuilder.WalletAdjustmentDoc(a)).ToList(),
+                CafeteriaSales = cafeteriaSales.Select(s => new JournalSummaryBuilder.CafeteriaSaleDoc(s.Tender == Sms.Domain.Cafeteria.SaleTender.Wallet, s.Total)).ToList(),
+                StoreWalletSales = storeWalletSales.Select(t => new JournalSummaryBuilder.StoreWalletSaleDoc(t)).ToList(),
+                TillVariances = tillVariances.Select(v => new JournalSummaryBuilder.TillVarianceDoc(v)).ToList(),
+                WriteOffs = writeOffs.Select(a => new JournalSummaryBuilder.WriteOffDoc(a)).ToList(),
+            });
 
             var keys = journal.Lines.Select(l => l.AccountKey).Distinct().ToList();
             var mappings = await _db.GlAccountMappings.Where(m => keys.Contains(m.Key)).ToDictionaryAsync(m => m.Key, m => m.AccountCode, cancellationToken);

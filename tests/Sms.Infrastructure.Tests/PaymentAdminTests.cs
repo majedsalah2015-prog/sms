@@ -10,6 +10,7 @@ using Sms.Domain.Fees;
 using Sms.Domain.Grades;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
+using Sms.Application.Payments;
 using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Students;
@@ -220,6 +221,45 @@ namespace Sms.Infrastructure.Tests
 
             var allocated = db.PaymentAllocations.Where(a => a.ChargeId == charge.Id).ToList().Sum(a => a.AllocatedAmount);
             Assert.Equal(400m, allocated); // only the open charge's balance is allocated; 600 sits as advance
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public async Task The_next_charge_consumes_the_advance_without_anyone_asking_it_to()
+        {
+            using var db = CreateContext();
+            await PostCharge(db, 400m);
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 1000m);   // 600 left over
+
+            // BR-PAY-003 says an advance is consumed by the next due charge. The rule was written and
+            // never applied (gap G-10): AdvancesReceived only grew, and a family with money on account
+            // was dunned for a charge that money should already have settled.
+            var later = await PostCharge(db, 250m);
+
+            var allocated = db.PaymentAllocations.Where(a => a.ChargeId == later.Id).ToList().Sum(a => a.AllocatedAmount);
+            Assert.Equal(250m, allocated);
+            Assert.Equal(0m, await CreateFeeAdmin(db).ComputeStudentPositionAsync(_studentId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public async Task An_advance_larger_than_the_charge_stays_an_advance_for_the_next_one()
+        {
+            using var db = CreateContext();
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 1000m);   // nothing open yet
+
+            var first = await PostCharge(db, 300m);
+            var second = await PostCharge(db, 200m);
+
+            Assert.Equal(300m, db.PaymentAllocations.Where(a => a.ChargeId == first.Id).ToList().Sum(a => a.AllocatedAmount));
+            Assert.Equal(200m, db.PaymentAllocations.Where(a => a.ChargeId == second.Id).ToList().Sum(a => a.AllocatedAmount));
+
+            // 500 of the 1000 is still unapplied — the payer's advance, which is not the student's
+            // position: a position is charges less what settled them, and an advance has settled nothing.
+            var received = db.Receipts.Where(r => r.PayerId == _payerId).ToList().Sum(r => r.Amount);
+            var applied = db.PaymentAllocations.ToList().Sum(a => a.AllocatedAmount);
+            Assert.Equal(500m, AdvanceBalanceCalculator.Calculate(received, applied));
+            Assert.Equal(0m, await CreateFeeAdmin(db).ComputeStudentPositionAsync(_studentId));
         }
 
         // --- BR-PAY-004 PDC lifecycle -------------------------------------------------

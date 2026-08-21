@@ -25,13 +25,13 @@ namespace Sms.Application.Tests.GlExport
 
         [Fact]
         [BusinessRule("BR-FEE-001")]
-        public void Credit_notes_split_VAT_back_out_and_receipts_split_allocated_from_advances()
+        public void Credit_notes_and_discounts_both_split_their_VAT_back_out()
         {
             var journal = JournalSummaryBuilder.Build(
                 Array.Empty<JournalSummaryBuilder.ChargeDoc>(),
                 new[] { new JournalSummaryBuilder.CreditNoteDoc(1, "4100", 115m, 0.15m) },
                 new[] { new JournalSummaryBuilder.DiscountDoc(115m, 0.15m) },
-                new[] { new JournalSummaryBuilder.ReceiptDoc("Cash", 500m, 400m) },
+                Array.Empty<JournalSummaryBuilder.ReceiptDoc>(),
                 new[] { new JournalSummaryBuilder.RefundDoc("BankTransfer", 30m) });
 
             Assert.True(journal.IsBalanced);
@@ -42,26 +42,59 @@ namespace Sms.Application.Tests.GlExport
             // VatOutput as tax on revenue that never happened.
             Assert.Equal(30m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.VatOutput).Sum(l => l.Debit));
             Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Discounts).Debit);
-            Assert.Equal(500m, journal.Lines.Single(l => l.AccountKey == "Cash:Cash").Debit);
-            Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Credit > 0).Credit);
-            Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Debit > 0).Debit);
+            Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived).Debit);
             Assert.Equal(30m, journal.Lines.Single(l => l.AccountKey == "Cash:BankTransfer").Credit);
-            // Receivables is credited the gross of each: 115 credit note + 115 discount + 400 allocated.
-            Assert.Equal(630m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Credit));
-            Assert.Equal(4, journal.SourceDocumentCount);
+            Assert.Equal(230m, journal.Lines.Where(l => l.AccountKey == GlAccountKeys.Receivables).Sum(l => l.Credit));
+            Assert.Equal(3, journal.SourceDocumentCount);
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public void A_receipt_lands_on_advances_and_its_allocation_is_what_settles_the_receivable()
+        {
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                Receipts = new[] { new JournalSummaryBuilder.ReceiptDoc("Cash", 500m) },
+                Allocations = new[] { new JournalSummaryBuilder.AllocationDoc(400m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(500m, journal.Lines.Single(l => l.AccountKey == "Cash:Cash").Debit);
+
+            // Taken in full to advances, then 400 of it moved on to receivables. Net over the two
+            // lines is the 100 the family is still in credit for — the same answer the old one-step
+            // entry gave, reached in a way that survives the allocation happening a month later.
+            Assert.Equal(500m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Credit > 0m).Credit);
+            Assert.Equal(400m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived && l.Debit > 0m).Debit);
+            Assert.Equal(400m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Receivables).Credit);
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public void An_allocation_alone_clears_an_advance_raised_in_an_earlier_period()
+        {
+            // October's batch, against a receipt September already took to advances. Before G-10 this
+            // period showed nothing at all, and September's posted batch quietly disagreed with what
+            // regenerating it would now produce.
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                Allocations = new[] { new JournalSummaryBuilder.AllocationDoc(100m) },
+            });
+
+            Assert.True(journal.IsBalanced);
+            Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.AdvancesReceived).Debit);
+            Assert.Equal(100m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.Receivables).Credit);
+            Assert.DoesNotContain(journal.Lines, l => l.AccountKey.StartsWith("Cash:"));
         }
 
         [Fact]
         [BusinessRule("BR-PAY-001")]
         public void A_till_over_and_a_till_short_both_reach_the_ledger_and_net()
         {
-            var journal = JournalSummaryBuilder.Build(
-                Array.Empty<JournalSummaryBuilder.ChargeDoc>(), Array.Empty<JournalSummaryBuilder.CreditNoteDoc>(),
-                Array.Empty<JournalSummaryBuilder.DiscountDoc>(), Array.Empty<JournalSummaryBuilder.ReceiptDoc>(),
-                Array.Empty<JournalSummaryBuilder.RefundDoc>(), Array.Empty<JournalSummaryBuilder.WalletTopUpDoc>(),
-                Array.Empty<JournalSummaryBuilder.CafeteriaSaleDoc>(), Array.Empty<JournalSummaryBuilder.StoreWalletSaleDoc>(),
-                new[] { new JournalSummaryBuilder.TillVarianceDoc(12m), new JournalSummaryBuilder.TillVarianceDoc(-30m) },
-                Array.Empty<JournalSummaryBuilder.WriteOffDoc>(), Array.Empty<JournalSummaryBuilder.WalletAdjustmentDoc>());
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                TillVariances = new[] { new JournalSummaryBuilder.TillVarianceDoc(12m), new JournalSummaryBuilder.TillVarianceDoc(-30m) },
+            });
 
             Assert.True(journal.IsBalanced);
 
@@ -78,13 +111,10 @@ namespace Sms.Application.Tests.GlExport
         [BusinessRule("BR-INS-010")]
         public void A_write_off_hits_bad_debt_and_leaves_revenue_and_VAT_alone()
         {
-            var journal = JournalSummaryBuilder.Build(
-                Array.Empty<JournalSummaryBuilder.ChargeDoc>(), Array.Empty<JournalSummaryBuilder.CreditNoteDoc>(),
-                Array.Empty<JournalSummaryBuilder.DiscountDoc>(), Array.Empty<JournalSummaryBuilder.ReceiptDoc>(),
-                Array.Empty<JournalSummaryBuilder.RefundDoc>(), Array.Empty<JournalSummaryBuilder.WalletTopUpDoc>(),
-                Array.Empty<JournalSummaryBuilder.CafeteriaSaleDoc>(), Array.Empty<JournalSummaryBuilder.StoreWalletSaleDoc>(),
-                Array.Empty<JournalSummaryBuilder.TillVarianceDoc>(),
-                new[] { new JournalSummaryBuilder.WriteOffDoc(115m) }, Array.Empty<JournalSummaryBuilder.WalletAdjustmentDoc>());
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                WriteOffs = new[] { new JournalSummaryBuilder.WriteOffDoc(115m) },
+            });
 
             Assert.True(journal.IsBalanced);
             Assert.Equal(115m, journal.Lines.Single(l => l.AccountKey == GlAccountKeys.BadDebt).Debit);
@@ -101,13 +131,10 @@ namespace Sms.Application.Tests.GlExport
         [BusinessRule("BR-CAF-009")]
         public void A_wallet_correction_moves_the_liability_against_an_adjustments_account()
         {
-            var journal = JournalSummaryBuilder.Build(
-                Array.Empty<JournalSummaryBuilder.ChargeDoc>(), Array.Empty<JournalSummaryBuilder.CreditNoteDoc>(),
-                Array.Empty<JournalSummaryBuilder.DiscountDoc>(), Array.Empty<JournalSummaryBuilder.ReceiptDoc>(),
-                Array.Empty<JournalSummaryBuilder.RefundDoc>(), Array.Empty<JournalSummaryBuilder.WalletTopUpDoc>(),
-                Array.Empty<JournalSummaryBuilder.CafeteriaSaleDoc>(), Array.Empty<JournalSummaryBuilder.StoreWalletSaleDoc>(),
-                Array.Empty<JournalSummaryBuilder.TillVarianceDoc>(), Array.Empty<JournalSummaryBuilder.WriteOffDoc>(),
-                new[] { new JournalSummaryBuilder.WalletAdjustmentDoc(25m), new JournalSummaryBuilder.WalletAdjustmentDoc(-10m) });
+            var journal = JournalSummaryBuilder.Build(new JournalSummaryBuilder.PeriodDocuments
+            {
+                WalletAdjustments = new[] { new JournalSummaryBuilder.WalletAdjustmentDoc(25m), new JournalSummaryBuilder.WalletAdjustmentDoc(-10m) },
+            });
 
             Assert.True(journal.IsBalanced);
 
