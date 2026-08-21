@@ -40,7 +40,10 @@ namespace Sms.Web.Security
             {
                 await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 var tempData = http.RequestServices.GetRequiredService<ITempDataDictionaryFactory>().GetTempData(http);
-                tempData["Error"] = "Please sign in again to open this page (idle for more than 15 minutes — BR-SEC-013). / يرجى تسجيل الدخول مجدداً لفتح هذه الصفحة (خمول أكثر من 15 دقيقة — BR-SEC-013).";
+                // Request localization has already run, so the UI culture is the user's — single language, not the concatenated pair (WCAG 3.1.2).
+                tempData["Error"] = System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft
+                    ? "يرجى تسجيل الدخول مجدداً لفتح هذه الصفحة (خمول أكثر من 15 دقيقة — BR-SEC-013)."
+                    : "Please sign in again to open this page (idle for more than 15 minutes — BR-SEC-013).";
                 var returnUrl = http.Request.Path + http.Request.QueryString;
                 context.Result = new RedirectToActionResult("Login", "Account", new { returnUrl });
                 return;

@@ -50,14 +50,14 @@
             <h2 class="h6">@T("Set a value", "تحديد قيمة")</h2>
             <form method="post" asp-action="Settings">
                 <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
-                <div class="mb-2"><label class="form-label">@T("Key", "المفتاح")</label>
-                    <select name="Key" class="form-select">
+                <div class="mb-2"><label class="form-label" for="setting-key">@T("Key", "المفتاح")</label>
+                    <select name="Key" id="setting-key" class="form-select">
                         @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup)) { <option value="@d.Key" selected="@(d.Key == (Model.Key ?? Context.Request.Query["key"].ToString()))">@d.Key</option> }
                     </select></div>
-                <div class="mb-2"><label class="form-label">@T("Value", "القيمة")</label><input name="Value" class="form-control" dir="ltr" value="@Model.Value" /></div>
-                <div class="mb-2"><label class="form-label">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
-                    <select name="AcademicYearId" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></div>
-                <div class="mb-3"><label class="form-label">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" class="form-control" value="@Model.Reason" /></div>
+                <div class="mb-2"><label class="form-label" for="setting-value">@T("Value", "القيمة")</label><input name="Value" id="setting-value" class="form-control" dir="ltr" value="@Model.Value" /></div>
+                <div class="mb-2"><label class="form-label" for="setting-year">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
+                    <select name="AcademicYearId" id="setting-year" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></div>
+                <div class="mb-3"><label class="form-label" for="setting-reason">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" id="setting-reason" class="form-control" value="@Model.Reason" /></div>
                 <button class="btn btn-primary w-100" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
             </form>
         </div>

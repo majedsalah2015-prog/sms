@@ -20,7 +20,7 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Rules per grade-year with a plain-language preview (“Student passes if…”).", "قواعد لكل صف سنوي مع معاينة بلغة بسيطة («ينجح الطالب إذا…»).")</p></div>
-    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
 <partial name="_GradingNav" />
 
 @if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
@@ -36,9 +36,9 @@ else
                 <tr>
                     <td class="fw-semibold">@r.Profile.Grade.Code @(isRtl ? r.Profile.Grade.Name.NameAr : r.Profile.Grade.Name.NameEn) <span class="small text-muted">· @(isRtl ? r.Profile.Stage.Name.NameAr : r.Profile.Stage.Name.NameEn)</span>@if (r.YearResultCount > 0) { <div class="small text-muted">@r.YearResultCount @T("year results computed", "نتيجة عام محسوبة")</div> }</td>
                     <td>@r.OfferingCount</td>
-                    <td><input form="@fid" name="passMark" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" style="width:7rem" value="@(c?.OverallPassMark.ToString(CultureInfo.InvariantCulture))" placeholder="50" /></td>
-                    <td><input form="@fid" name="maxFailed" type="number" min="0" class="form-control form-control-sm" style="width:6rem" value="@(c?.MaxFailedSubjectsForPromotion)" placeholder="0" /></td>
-                    <td><input form="@fid" name="reason" class="form-control form-control-sm" placeholder="@(c == null ? "—" : T("required for changes (T1)", "مطلوب عند التعديل (T1)"))" @(c == null ? "disabled" : "") /></td>
+                    <td><input form="@fid" name="passMark" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" style="width:7rem" value="@(c?.OverallPassMark.ToString(CultureInfo.InvariantCulture))" placeholder="50" aria-label="@T($"Overall pass mark % — {r.Profile.Grade.Name.NameEn}", $"درجة النجاح العامة % — {r.Profile.Grade.Name.NameAr}")" /></td>
+                    <td><input form="@fid" name="maxFailed" type="number" min="0" class="form-control form-control-sm" style="width:6rem" value="@(c?.MaxFailedSubjectsForPromotion)" placeholder="0" aria-label="@T($"Max failed subjects — {r.Profile.Grade.Name.NameEn}", $"الحد الأقصى للمواد الراسبة — {r.Profile.Grade.Name.NameAr}")" /></td>
+                    <td><input form="@fid" name="reason" class="form-control form-control-sm" placeholder="@(c == null ? "—" : T("required for changes (T1)", "مطلوب عند التعديل (T1)"))" @(c == null ? "disabled" : "") aria-label="@T($"Reason — {r.Profile.Grade.Name.NameEn}", $"السبب — {r.Profile.Grade.Name.NameAr}")" /></td>
                     <td class="text-end"><form id="@fid" method="post" asp-action="SaveCriteria" asp-route-profileId="@r.Profile.ProfileId" asp-route-year="@yid"><button class="btn btn-sm @(c == null ? "btn-primary" : "btn-outline-primary")" type="submit"><i class="bi bi-@(c == null ? "plus-lg" : "check-lg") me-1" aria-hidden="true"></i>@(c == null ? T("Define", "تعريف") : T("Save", "حفظ"))</button></form></td>
                 </tr>
                 <tr class="table-light"><td colspan="6" class="small text-muted py-1 ps-4">

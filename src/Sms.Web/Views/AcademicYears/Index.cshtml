@@ -40,15 +40,15 @@
             <div class="d-flex gap-2 align-items-center">
                 @if (y.Status == AcademicYearStatus.Preparation)
                 {
-                    <form method="post" asp-action="Activate" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-play-fill" aria-hidden="true"></i> @T("Activate", "تفعيل")</button></form>
+                    <form method="post" asp-action="Activate" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" id="activate-reason-@y.Id" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" aria-label="@T($"Activation reason — {y.LabelEn}", $"سبب التفعيل — {y.LabelAr}")" style="width:11rem" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-play-fill" aria-hidden="true"></i> @T("Activate", "تفعيل")</button></form>
                 }
                 else if (y.Status == AcademicYearStatus.Closing)
                 {
-                    <form method="post" asp-action="Close" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-warning" type="submit"><i class="bi bi-lock" aria-hidden="true"></i> @T("Close", "إغلاق")</button></form>
+                    <form method="post" asp-action="Close" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" id="close-reason-@y.Id" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" aria-label="@T($"Closing reason — {y.LabelEn}", $"سبب الإغلاق — {y.LabelAr}")" style="width:11rem" /><button class="btn btn-sm btn-warning" type="submit"><i class="bi bi-lock" aria-hidden="true"></i> @T("Close", "إغلاق")</button></form>
                 }
                 else if (y.Status == AcademicYearStatus.Closed)
                 {
-                    <form method="post" asp-action="Archive" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" /><button class="btn btn-sm btn-outline-dark" type="submit"><i class="bi bi-archive" aria-hidden="true"></i> @T("Archive", "أرشفة")</button></form>
+                    <form method="post" asp-action="Archive" asp-route-id="@y.Id" class="d-flex gap-1"><input name="reason" id="archive-reason-@y.Id" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" aria-label="@T($"Archive reason — {y.LabelEn}", $"سبب الأرشفة — {y.LabelAr}")" style="width:11rem" /><button class="btn btn-sm btn-outline-dark" type="submit"><i class="bi bi-archive" aria-hidden="true"></i> @T("Archive", "أرشفة")</button></form>
                 }
                 <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@y.Id"><i class="bi bi-calendar-range" aria-hidden="true"></i> @T("Structure", "الهيكل")</a>
                 @if (r.CanEditOrDelete)

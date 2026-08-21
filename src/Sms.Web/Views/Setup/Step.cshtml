@@ -40,22 +40,22 @@
                         <p class="text-muted small">@T("Identity fields appear on official documents; later edits require an audit reason (BR-SCH-002).", "حقول الهوية تظهر في المستندات الرسمية؛ التعديلات اللاحقة تتطلب سبباً للتدقيق (BR-SCH-002).")</p>
                         <input type="hidden" asp-for="SchoolId" />
                         <div class="sms-bilingual mb-3">
-                            <div><label class="form-label">@T("School name (Arabic)", "اسم المدرسة (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-                            <div><label class="form-label">@T("School name (English)", "اسم المدرسة (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                            <div><label class="form-label" asp-for="NameAr">@T("School name (Arabic)", "اسم المدرسة (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                            <div><label class="form-label" asp-for="NameEn">@T("School name (English)", "اسم المدرسة (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4"><label class="form-label">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
-                            <div class="col-md-4"><label class="form-label">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
-                            <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="LicenseNumber">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="MinistryCode">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="LicenseExpiryDate">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4"><label class="form-label">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
-                            <div class="col-md-8"><label class="form-label">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="City">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
+                            <div class="col-md-8"><label class="form-label" asp-for="AddressLine">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
                         </div>
                         <div class="row g-3 mb-3">
-                            <div class="col-md-4"><label class="form-label">@T("Contact email", "البريد الإلكتروني")</label><input asp-for="ContactEmail" class="form-control" dir="ltr" type="email" /></div>
-                            <div class="col-md-4"><label class="form-label">@T("Contact phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
-                            <div class="col-md-4"><label class="form-label">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="ContactEmail">@T("Contact email", "البريد الإلكتروني")</label><input asp-for="ContactEmail" class="form-control" dir="ltr" type="email" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="ContactPhone">@T("Contact phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
+                            <div class="col-md-4"><label class="form-label" asp-for="Website">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
                         </div>
                         break;
 
@@ -63,8 +63,8 @@
                         <p class="text-muted small">@T("The pack binds VAT default, ID-type requirements, Hijri display and retention defaults (BR-SET-004). Changing it after go-live needs product-support permission.", "تربط الحزمة افتراضيات الضريبة ومتطلبات الهوية وعرض الهجري والاحتفاظ (BR-SET-004). تغييرها بعد التشغيل يتطلب صلاحية دعم المنتج.")</p>
                         @foreach (var p in Model.Packs)
                         {
-                            <label class="sms-card p-3 d-flex align-items-start gap-3 mb-2 @(Model.PackCode == p.Code ? "border-primary" : "")">
-                                <input class="form-check-input mt-1" type="radio" asp-for="PackCode" value="@p.Code" />
+                            <label class="sms-card p-3 d-flex align-items-start gap-3 mb-2 @(Model.PackCode == p.Code ? "border-primary" : "")" for="pack-@p.Code">
+                                <input class="form-check-input mt-1" type="radio" asp-for="PackCode" value="@p.Code" id="pack-@p.Code" />
                                 <span>
                                     <span class="fw-semibold d-block">@(isRtl ? p.Name.NameAr : p.Name.NameEn) <span class="text-muted small">(@p.Code v@(p.Version))</span></span>
                                     <span class="small text-muted">@p.CountryIsoCode · @p.DefaultCurrencyCode · @T("VAT", "ض.ق.م") @((p.DefaultVatRate * 100).ToString("0.#"))% · @T("Hijri", "هجري"): @(p.HijriDisplayDefault ? T("on", "مفعّل") : T("off", "معطّل")) · @T("IDs", "الهويات"): @p.RequiredIdTypeCodes</span>
@@ -77,7 +77,7 @@
                     case SetupWizardSteps.Currency:
                         <p class="text-muted small">@T("Picked from the ISO currency list (BR-GLB-112).", "تُختار من قائمة عملات ISO (BR-GLB-112).")</p>
                         <div class="mb-3" style="max-width:420px">
-                            <label class="form-label">@T("Currency", "العملة")</label>
+                            <label class="form-label" asp-for="CurrencyCode">@T("Currency", "العملة")</label>
                             <select asp-for="CurrencyCode" class="form-select">
                                 @foreach (var c in Model.Currencies) { <option value="@c.Code">@c.Code — @(isRtl ? c.Name.NameAr : c.Name.NameEn)</option> }
                             </select>
@@ -86,7 +86,7 @@
 
                     case SetupWizardSteps.TimeZone:
                         <div class="mb-3" style="max-width:520px">
-                            <label class="form-label">@T("Time zone", "المنطقة الزمنية")</label>
+                            <label class="form-label" asp-for="TimeZoneId">@T("Time zone", "المنطقة الزمنية")</label>
                             <select asp-for="TimeZoneId" class="form-select">
                                 @foreach (var tz in Model.TimeZones) { <option value="@tz.Id">@tz.DisplayName</option> }
                             </select>
@@ -105,7 +105,7 @@
                             }
                         </div>
                         <div class="mb-3" style="max-width:320px">
-                            <label class="form-label">@T("First day of week", "أول أيام الأسبوع")</label>
+                            <label class="form-label" asp-for="FirstDayOfWeek">@T("First day of week", "أول أيام الأسبوع")</label>
                             <select asp-for="FirstDayOfWeek" class="form-select">
                                 @foreach (var d in days) { <option value="@d">@DayName(d)</option> }
                             </select>
@@ -124,7 +124,7 @@
                             }
                         </div>
                         <div class="mb-3" style="max-width:320px">
-                            <label class="form-label">@T("Default language", "اللغة الافتراضية")</label>
+                            <label class="form-label" asp-for="DefaultLanguage">@T("Default language", "اللغة الافتراضية")</label>
                             <select asp-for="DefaultLanguage" class="form-select"><option value="ar">العربية</option><option value="en">English</option></select>
                         </div>
                         break;
@@ -175,27 +175,27 @@
                         <fieldset class="border rounded p-3 mb-3">
                             <legend class="float-none w-auto px-2 small text-muted">@T("New stage (optional)", "مرحلة جديدة (اختياري)")</legend>
                             <div class="row g-3">
-                                <div class="col-md-5"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="StageNameAr" class="form-control" dir="rtl" /></div>
-                                <div class="col-md-5"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="StageNameEn" class="form-control" dir="ltr" /></div>
-                                <div class="col-md-2"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="StageOrder" class="form-control" type="number" min="1" /></div>
+                                <div class="col-md-5"><label class="form-label" asp-for="StageNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="StageNameAr" class="form-control" dir="rtl" /></div>
+                                <div class="col-md-5"><label class="form-label" asp-for="StageNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="StageNameEn" class="form-control" dir="ltr" /></div>
+                                <div class="col-md-2"><label class="form-label" asp-for="StageOrder">@T("Order", "الترتيب")</label><input asp-for="StageOrder" class="form-control" type="number" min="1" /></div>
                             </div>
                         </fieldset>
                         <fieldset class="border rounded p-3 mb-3">
                             <legend class="float-none w-auto px-2 small text-muted">@T("New grade (optional)", "صف جديد (اختياري)")</legend>
                             <div class="row g-3">
-                                <div class="col-md-3"><label class="form-label">@T("Stage", "المرحلة")</label>
+                                <div class="col-md-3"><label class="form-label" asp-for="ExistingStageId">@T("Stage", "المرحلة")</label>
                                     <select asp-for="ExistingStageId" class="form-select"><option value="">@T("— the new stage above —", "— المرحلة الجديدة أعلاه —")</option>@foreach (var s in Model.StageOptions) { <option value="@s.Id">@(isRtl ? s.Ar : s.En)</option> }</select></div>
-                                <div class="col-md-2"><label class="form-label">@T("Code", "الرمز")</label><input asp-for="GradeCode" class="form-control" dir="ltr" placeholder="G1" /></div>
-                                <div class="col-md-2"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="GradeNameAr" class="form-control" dir="rtl" /></div>
-                                <div class="col-md-3"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="GradeNameEn" class="form-control" dir="ltr" /></div>
-                                <div class="col-md-2"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="GradeOrder" class="form-control" type="number" min="1" /></div>
+                                <div class="col-md-2"><label class="form-label" asp-for="GradeCode">@T("Code", "الرمز")</label><input asp-for="GradeCode" class="form-control" dir="ltr" placeholder="G1" /></div>
+                                <div class="col-md-2"><label class="form-label" asp-for="GradeNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="GradeNameAr" class="form-control" dir="rtl" /></div>
+                                <div class="col-md-3"><label class="form-label" asp-for="GradeNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="GradeNameEn" class="form-control" dir="ltr" /></div>
+                                <div class="col-md-2"><label class="form-label" asp-for="GradeOrder">@T("Order", "الترتيب")</label><input asp-for="GradeOrder" class="form-control" type="number" min="1" /></div>
                             </div>
                         </fieldset>
                         break;
                 }
 
                 <div class="mb-3">
-                    <label class="form-label">@T("Note (optional)", "ملاحظة (اختياري)")</label>
+                    <label class="form-label" asp-for="Notes">@T("Note (optional)", "ملاحظة (اختياري)")</label>
                     <input asp-for="Notes" class="form-control" maxlength="500" />
                 </div>
 

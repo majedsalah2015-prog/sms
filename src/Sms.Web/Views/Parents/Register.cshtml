@@ -7,21 +7,22 @@
     ViewData["Breadcrumb"] = T("Parents / New", "أولياء الأمور / جديد");
 }
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("An independent parent file (PAR series) that students link to; the primary mobile is the dedup key (BR-PAR-002).", "ملف ولي أمر مستقل (سلسلة PAR) يرتبط به الطلاب؛ الجوال الأساسي مفتاح منع التكرار (BR-PAR-002).")</p></div></div>
-<form method="post" asp-action="Register" novalidate>
+<form method="post" asp-action="Register">
     <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+    <p class="form-text">@T("Fields marked * are required.", "الحقول المعلّمة بـ * إلزامية.")</p>
     <div class="row g-3">
         <div class="col-xl-8">
             <div class="sms-card p-4">
                 <div class="sms-bilingual mb-3">
-                    <div><label class="form-label small">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" /></div>
-                    <div><label class="form-label small">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#NameAr" /></div>
+                    <div><label class="form-label small" asp-for="NameAr">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" required aria-required="true" /><span asp-validation-for="NameAr" class="text-danger small"></span></div>
+                    <div><label class="form-label small" asp-for="NameEn">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#NameAr" required aria-required="true" /><span asp-validation-for="NameEn" class="text-danger small"></span></div>
                 </div>
                 <div class="row g-3">
-                    <div class="col-md-3"><label class="form-label small">@T("Primary mobile", "الجوال الأساسي")</label><input asp-for="PrimaryMobile" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" /></div>
-                    <div class="col-md-4"><label class="form-label small">@T("Email", "البريد")</label><input asp-for="Email" type="email" class="form-control form-control-sm" dir="ltr" /></div>
-                    <div class="col-md-3"><label class="form-label small">@T("Occupation / employer", "المهنة / جهة العمل")</label><input asp-for="OccupationEmployer" class="form-control form-control-sm" /></div>
-                    <div class="col-md-2"><label class="form-label small">@T("Preferred language", "لغة التواصل")</label><select asp-for="PreferredLanguage" class="form-select form-select-sm"><option value="ar">العربية</option><option value="en">English</option></select></div>
-                    <div class="col-12"><label class="form-label small">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" /></div>
+                    <div class="col-md-3"><label class="form-label small" asp-for="PrimaryMobile">@T("Primary mobile", "الجوال الأساسي") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="PrimaryMobile" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" required aria-required="true" /><span asp-validation-for="PrimaryMobile" class="text-danger small"></span></div>
+                    <div class="col-md-4"><label class="form-label small" asp-for="Email">@T("Email", "البريد")</label><input asp-for="Email" type="email" class="form-control form-control-sm" dir="ltr" /></div>
+                    <div class="col-md-3"><label class="form-label small" asp-for="OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input asp-for="OccupationEmployer" class="form-control form-control-sm" /></div>
+                    <div class="col-md-2"><label class="form-label small" asp-for="PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select asp-for="PreferredLanguage" class="form-select form-select-sm"><option value="ar">العربية</option><option value="en">English</option></select></div>
+                    <div class="col-12"><label class="form-label small" asp-for="Address">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" /></div>
                 </div>
             </div>
         </div>

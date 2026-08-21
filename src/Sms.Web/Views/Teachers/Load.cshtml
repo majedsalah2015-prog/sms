@@ -11,7 +11,7 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All teachers' load vs max (BR-TCH-004):", "نصاب كل المعلمين مقابل الحد (BR-TCH-004):") <span class="text-danger">@over @T("over", "متجاوز")</span> · <span class="text-warning-emphasis">@under @T("under half", "أقل من النصف")</span></p></div>
-    <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form></div>
+    <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form></div>
 <partial name="_StaffNav" />
 
 <div class="sms-card">

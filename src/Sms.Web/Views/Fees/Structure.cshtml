@@ -22,7 +22,7 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Grade-year × category grid; approve before the registration wave.", "شبكة صف-عام × فئة؛ اعتمد قبل موجة التسجيل.")</p></div>
-    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
 <partial name="_FinanceNav" />
 
 @if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
@@ -40,8 +40,8 @@ else
             <form method="post" asp-action="ApproveAll" asp-route-year="@yid" onsubmit="return confirm('@T("Approve every draft line of this year?", "اعتماد كل مسودات هذا العام؟")');"><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-all me-1" aria-hidden="true"></i>@T("Approve all drafts", "اعتماد كل المسودات")</button></form>
         }
         <form method="post" asp-action="CopyStructure" asp-route-year="@yid" class="d-flex gap-1 align-items-center">
-            <select name="sourceYear" class="form-select form-select-sm" style="width:auto">@foreach (var y in Model.Years.Where(y => y.Id != yid)) { <option value="@y.Id" selected="@(y.Id == Model.PreviousYear?.Id)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
-            <div class="input-group input-group-sm" style="width:9rem"><input name="uplift" type="number" step="0.01" class="form-control" value="0" /><span class="input-group-text">%</span></div>
+            <select name="sourceYear" class="form-select form-select-sm" style="width:auto" aria-label="@T("Source year", "العام المصدر")">@foreach (var y in Model.Years.Where(y => y.Id != yid)) { <option value="@y.Id" selected="@(y.Id == Model.PreviousYear?.Id)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <div class="input-group input-group-sm" style="width:9rem"><input name="uplift" type="number" step="0.01" class="form-control" value="0" aria-label="@T("Uplift %", "نسبة الرفع %")" /><span class="input-group-text" aria-hidden="true">%</span></div>
             <button class="btn btn-sm btn-outline-primary" type="submit" @(Model.Years.Count < 2 ? "disabled" : "")><i class="bi bi-files me-1" aria-hidden="true"></i>@T("Copy from year", "نسخ من عام")</button>
         </form>
     </div>
@@ -70,8 +70,8 @@ else
                             {
                                 var fid = $"ln{line.Id}";
                                 <div class="d-flex gap-1 justify-content-center align-items-center">
-                                    <input form="@fid" name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" />
-                                    <input form="@fid" name="reason" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" />
+                                    <input form="@fid" name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
+                                    <input form="@fid" name="reason" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" aria-label="@T($"Reason — {p.Grade.Name.NameEn} × {c.NameEn}", $"السبب — {p.Grade.Name.NameAr} × {c.NameAr}")" />
                                     <form id="@fid" method="post" asp-action="EditLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save amount", "حفظ المبلغ")" aria-label="@T("Save amount", "حفظ المبلغ")"><i class="bi bi-pencil" aria-hidden="true"></i></button></form>
                                     <form method="post" asp-action="ApproveLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")" aria-label="@T("Approve", "اعتماد")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
                                     <form method="post" asp-action="DeleteLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove draft", "حذف المسودة")" aria-label="@T("Remove draft", "حذف المسودة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form>
@@ -81,7 +81,7 @@ else
                         }
                         else
                         {
-                            <form method="post" asp-action="CreateLine" asp-route-year="@yid" class="d-flex justify-content-center"><input type="hidden" name="profileId" value="@p.Profile.Id" /><input type="hidden" name="categoryId" value="@c.Id" /><input name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and press Enter", "اكتب مبلغاً واضغط Enter")" /></form>
+                            <form method="post" asp-action="CreateLine" asp-route-year="@yid" class="d-flex justify-content-center"><input type="hidden" name="profileId" value="@p.Profile.Id" /><input type="hidden" name="categoryId" value="@c.Id" /><input name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and press Enter", "اكتب مبلغاً واضغط Enter")" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" /><button type="submit" class="visually-hidden">@T("Save amount", "حفظ المبلغ")</button></form>
                         }
                         </td>
                     }

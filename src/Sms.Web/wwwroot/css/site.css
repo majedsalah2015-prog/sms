@@ -211,7 +211,7 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
 
 /* ---- E-803 P1 (WCAG/RTL sweep) ---- */
 /* Latin identifiers (INV/RCP/STU numbers, ISO dates) must not reorder inside RTL runs */
-.sms-table code, td code, th code, dd code, .list-group-item code { unicode-bidi: isolate; direction: ltr; display: inline-block; }
+.sms-table code, td code, th code, dd code, .list-group-item code, .sms-card code { unicode-bidi: isolate; direction: ltr; display: inline-block; }
 .sms-num { unicode-bidi: isolate; direction: ltr; display: inline-block; }
 /* amber readable as foreground text (text-warning is 1.63:1 on white) */
 .sms-amber { color: #8a6100; }

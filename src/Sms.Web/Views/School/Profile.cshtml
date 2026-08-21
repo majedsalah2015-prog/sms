@@ -25,32 +25,32 @@
         <div class="tab-content p-4">
             <div class="tab-pane fade @Show("identity")" id="tab-identity">
                 <div class="sms-bilingual mb-3">
-                    <div><label class="form-label">@T("Official name (Arabic)", "الاسم الرسمي (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-                    <div><label class="form-label">@T("Official name (English)", "الاسم الرسمي (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                    <div><label class="form-label" asp-for="NameAr">@T("Official name (Arabic)", "الاسم الرسمي (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                    <div><label class="form-label" asp-for="NameEn">@T("Official name (English)", "الاسم الرسمي (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
                 </div>
-                <div class="row g-3"><div class="col-md-4"><label class="form-label">@T("Time zone", "المنطقة الزمنية")</label><input class="form-control" value="@Model.TimeZoneId" disabled /><div class="form-text">@T("Set in the Setup wizard.", "يُحدَّد في معالج الإعداد.")</div></div>
-                    <div class="col-md-4"><label class="form-label">@T("Currency", "العملة")</label><input class="form-control" value="@Model.CurrencyCode" disabled /></div></div>
+                <div class="row g-3"><div class="col-md-4"><label class="form-label" for="tz-display">@T("Time zone", "المنطقة الزمنية")</label><input id="tz-display" class="form-control" value="@Model.TimeZoneId" disabled /><div class="form-text">@T("Set in the Setup wizard.", "يُحدَّد في معالج الإعداد.")</div></div>
+                    <div class="col-md-4"><label class="form-label" for="currency-display">@T("Currency", "العملة")</label><input id="currency-display" class="form-control" value="@Model.CurrencyCode" disabled /></div></div>
             </div>
             <div class="tab-pane fade @Show("license")" id="tab-license">
                 <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="LicenseNumber">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="MinistryCode">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="LicenseExpiryDate">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
                 </div>
             </div>
             <div class="tab-pane fade @Show("contacts")" id="tab-contacts">
                 <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
-                    <div class="col-md-8"><label class="form-label">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="City">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
+                    <div class="col-md-8"><label class="form-label" asp-for="AddressLine">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
                 </div>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label">@T("Official email", "البريد الرسمي")</label><input asp-for="ContactEmail" class="form-control" type="email" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label">@T("Phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="ContactEmail">@T("Official email", "البريد الرسمي")</label><input asp-for="ContactEmail" class="form-control" type="email" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="ContactPhone">@T("Phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
+                    <div class="col-md-4"><label class="form-label" asp-for="Website">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
                 </div>
                 <div class="row g-3">
-                    <div class="col-md-3"><label class="form-label">@T("Latitude", "خط العرض")</label><input asp-for="Latitude" class="form-control" dir="ltr" disabled /></div>
-                    <div class="col-md-3"><label class="form-label">@T("Longitude", "خط الطول")</label><input asp-for="Longitude" class="form-control" dir="ltr" disabled /></div>
+                    <div class="col-md-3"><label class="form-label" asp-for="Latitude">@T("Latitude", "خط العرض")</label><input asp-for="Latitude" class="form-control" dir="ltr" disabled /></div>
+                    <div class="col-md-3"><label class="form-label" asp-for="Longitude">@T("Longitude", "خط الطول")</label><input asp-for="Longitude" class="form-control" dir="ltr" disabled /></div>
                     <div class="col-md-6"><div class="form-text mt-4">@T("Map pin picker pending (BR-SCH-008 geo validation).", "منتقي الخريطة لاحقاً (BR-SCH-008).")</div></div>
                 </div>
             </div>
@@ -64,7 +64,7 @@
             </div>
         </div>
         <div class="p-3 border-top d-flex gap-2 align-items-end">
-            <div style="max-width:420px" class="flex-grow-1"><label class="form-label small">@T("Reason (required when changing identity fields)", "السبب (مطلوب عند تعديل حقول الهوية)")</label><input asp-for="Reason" class="form-control" /></div>
+            <div style="max-width:420px" class="flex-grow-1"><label class="form-label small" asp-for="Reason">@T("Reason (required when changing identity fields)", "السبب (مطلوب عند تعديل حقول الهوية)")</label><input asp-for="Reason" class="form-control" /></div>
             <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
         </div>
     </div>

@@ -25,7 +25,7 @@ else
             var name = isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
             var att = c.Attendance?.ScheduledDays > 0 ? c.Attendance.AttendancePercent : (decimal?)null;
             <div class="col-md-6 col-xl-4">
-                <a class="sms-card p-3 h-100 text-decoration-none" asp-action="Student" asp-route-id="@s.Id">
+                <a class="sms-card p-3 h-100 text-decoration-none" asp-action="Student" asp-route-id="@s.Id" aria-label="@T($"Open {name}'s file", $"فتح ملف {name}")">
                     <div class="d-flex align-items-center gap-3 mb-3"><span class="sms-brand__mark" style="width:48px;height:48px;font-size:1.4rem"><i class="bi bi-person" aria-hidden="true"></i></span><div><div class="fw-semibold">@name @if (c.IsSelf) { <span class="badge text-bg-light border">@T("me", "أنا")</span> }</div><div class="small text-muted"><code>@s.StudentNo</code> · @(c.Grade == null ? T("not enrolled this year", "غير مقيّد هذا العام") : $"{c.Grade.Code} {(isRtl ? c.Grade.Name.NameAr : c.Grade.Name.NameEn)}{(c.Section == null ? "" : " / " + (isRtl ? c.Section.NameAr : c.Section.NameEn))}")</div></div></div>
                     <div class="row g-2 text-center small">
                         <div class="col-4"><div class="fw-semibold fs-5">@(att == null ? "—" : att.Value.ToString("0.#") + "%")</div><div class="text-muted">@T("attendance", "الحضور")</div></div>

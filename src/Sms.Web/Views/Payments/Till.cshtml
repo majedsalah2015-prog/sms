@@ -75,9 +75,9 @@
                     <dt class="col-7 fw-bold">@T("Expected in drawer", "المتوقع في الدرج")</dt><dd class="col-5 text-end fw-bold">@expectedCash.ToString("N2")</dd>
                 </dl>
                 <form method="post" asp-action="CloseTill" asp-route-id="@c.Session.Id" class="d-grid gap-2">
-                    <div class="input-group input-group-sm"><span class="input-group-text">@T("Counted receipts total", "إجمالي السندات المعدود")</span><input name="countedTotal" type="number" step="0.01" min="0" class="form-control text-end" value="@c.Total.ToString("0.##", CultureInfo.InvariantCulture)" required /></div>
+                    <div class="input-group input-group-sm"><span class="input-group-text" id="till-counted-lbl">@T("Counted receipts total", "إجمالي السندات المعدود")</span><input name="countedTotal" type="number" step="0.01" min="0" class="form-control text-end" value="@c.Total.ToString("0.##", CultureInfo.InvariantCulture)" required aria-required="true" aria-labelledby="till-counted-lbl" /></div>
                     <div class="small text-muted">@T("Enter the receipts you physically reconcile (all methods); a difference from the system total needs a reason.", "أدخل السندات التي طابقتها فعلياً (كل الطرق)؛ أي اختلاف عن إجمالي النظام يتطلب سبباً.")</div>
-                    <input name="varianceReason" class="form-control form-control-sm" placeholder="@T("Variance reason (if any)", "سبب الفرق (إن وجد)")" />
+                    <input name="varianceReason" class="form-control form-control-sm" aria-label="@T("Variance reason", "سبب الفرق")" placeholder="@T("Variance reason (if any)", "سبب الفرق (إن وجد)")" />
                     <div class="d-flex gap-2"><button class="btn btn-dark btn-sm" type="submit" onclick="return confirm('@T("Close this session? It cannot be reopened.", "إغلاق الجلسة؟ لا يمكن إعادة فتحها.")');"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("Close", "إغلاق")</button><a class="btn btn-outline-secondary btn-sm" asp-action="Till">@T("Cancel", "إلغاء")</a></div>
                 </form>
             </div>
@@ -88,8 +88,8 @@
             else
             {
                 <form method="post" asp-action="OpenTill" class="d-grid gap-2">
-                    <input name="tillCode" class="form-control form-control-sm" placeholder="@T("Till code (e.g. TILL-1)", "رمز الصندوق (مثل TILL-1)")" required />
-                    <div class="input-group input-group-sm"><span class="input-group-text">@T("Float", "العهدة")</span><input name="floatAmount" type="number" step="0.01" min="0" class="form-control text-end" value="0" /></div>
+                    <input name="tillCode" class="form-control form-control-sm" aria-label="@T("Till code", "رمز الصندوق")" placeholder="@T("Till code (e.g. TILL-1)", "رمز الصندوق (مثل TILL-1)")" required aria-required="true" />
+                    <div class="input-group input-group-sm"><span class="input-group-text" id="till-float-lbl">@T("Float", "العهدة")</span><input name="floatAmount" type="number" step="0.01" min="0" class="form-control text-end" value="0" aria-labelledby="till-float-lbl" /></div>
                     <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Open", "فتح")</button>
                 </form>
             }

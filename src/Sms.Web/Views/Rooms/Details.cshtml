@@ -35,19 +35,19 @@
     <div class="col-xl-4">
         <div class="sms-card p-3 mb-3"><h2 class="h6">@T("Features", "التجهيزات")</h2>
             <div class="d-flex flex-wrap gap-1 mb-2">@foreach (var f in Model.Features) { <span class="badge text-bg-light border">@(isRtl ? f.Ar : f.En)</span> }@if (Model.Features.Count == 0) { <span class="small text-muted">@T("None yet.", "لا شيء بعد.")</span> }</div>
-            @if (Model.AvailableFeatures.Count > 0) { <form method="post" asp-action="AddFeature" asp-route-id="@Model.Room.Id" class="d-flex gap-1"><select name="featureLookupId" class="form-select form-select-sm">@foreach (var f in Model.AvailableFeatures) { <option value="@f.Id">@(isRtl ? f.Ar : f.En)</option> }</select><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Add feature", "إضافة ميزة")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form> }</div>
+            @if (Model.AvailableFeatures.Count > 0) { <form method="post" asp-action="AddFeature" asp-route-id="@Model.Room.Id" class="d-flex gap-1"><select name="featureLookupId" class="form-select form-select-sm" aria-label="@T("Feature", "التجهيز")">@foreach (var f in Model.AvailableFeatures) { <option value="@f.Id">@(isRtl ? f.Ar : f.En)</option> }</select><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Add feature", "إضافة ميزة")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form> }</div>
         <div class="sms-card p-3 mb-3"><h2 class="h6">@T("Set unavailable", "تعيين عدم التوفر")</h2>
             <form method="post" asp-action="SetUnavailable" asp-route-id="@Model.Room.Id">
-                <div class="mb-2"><select name="reason" class="form-select form-select-sm"><option value="Maintenance">@T("Maintenance", "صيانة")</option><option value="Reserved">@T("Reserved", "محجوزة")</option></select></div>
-                <div class="row g-2 mb-2"><div class="col-6"><input name="startDate" type="date" class="form-control form-control-sm" value="@today" /></div><div class="col-6"><input name="endDate" type="date" class="form-control form-control-sm" value="@today" /></div></div>
-                <div class="mb-2"><input name="notes" class="form-control form-control-sm" placeholder="@T("notes", "ملاحظات")" /></div>
+                <div class="mb-2"><select name="reason" class="form-select form-select-sm" aria-label="@T("Reason", "السبب")"><option value="Maintenance">@T("Maintenance", "صيانة")</option><option value="Reserved">@T("Reserved", "محجوزة")</option></select></div>
+                <div class="row g-2 mb-2"><div class="col-6"><input name="startDate" type="date" class="form-control form-control-sm" value="@today" required aria-required="true" aria-label="@T("Start date", "تاريخ البداية")" /></div><div class="col-6"><input name="endDate" type="date" class="form-control form-control-sm" value="@today" required aria-required="true" aria-label="@T("End date", "تاريخ النهاية")" /></div></div>
+                <div class="mb-2"><input name="notes" class="form-control form-control-sm" placeholder="@T("notes", "ملاحظات")" aria-label="@T("Notes", "ملاحظات")" /></div>
                 <button class="btn btn-sm btn-warning w-100" type="submit"><i class="bi bi-tools me-1" aria-hidden="true"></i>@T("Record window", "تسجيل الفترة")</button>
             </form></div>
         <div class="sms-card p-3"><h2 class="h6">@T("Request booking", "طلب حجز")</h2>
             <form method="post" asp-action="RequestBooking" asp-route-id="@Model.Room.Id">
-                <div class="mb-2"><input name="purpose" class="form-control form-control-sm" placeholder="@T("purpose", "الغرض")" /></div>
-                <div class="mb-2"><select name="academicYearId" class="form-select form-select-sm">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.WorkingYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></div>
-                <div class="row g-2 mb-2"><div class="col-6"><input name="start" type="datetime-local" class="form-control form-control-sm" /></div><div class="col-6"><input name="end" type="datetime-local" class="form-control form-control-sm" /></div></div>
+                <div class="mb-2"><input name="purpose" class="form-control form-control-sm" placeholder="@T("purpose", "الغرض")" required aria-required="true" aria-label="@T("Purpose", "الغرض")" /></div>
+                <div class="mb-2"><select name="academicYearId" class="form-select form-select-sm" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.WorkingYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-6"><input name="start" type="datetime-local" class="form-control form-control-sm" required aria-required="true" aria-label="@T("Start", "البداية")" /></div><div class="col-6"><input name="end" type="datetime-local" class="form-control form-control-sm" required aria-required="true" aria-label="@T("End", "النهاية")" /></div></div>
                 <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-calendar-check me-1" aria-hidden="true"></i>@T("Request", "طلب")</button>
             </form></div>
     </div>

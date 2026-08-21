@@ -34,9 +34,9 @@
                         <td>@if (Model.SiblingSections.Count > 0) {
                             <form method="post" asp-action="Transfer" asp-route-id="@Model.Section.Id" class="d-flex gap-1 align-items-center">
                                 <input type="hidden" name="enrollmentId" value="@m.EnrollmentId" />
-                                <select name="targetSectionId" class="form-select form-select-sm" style="width:8rem"><option value="">@T("to…", "إلى…")</option>@foreach (var s in Model.SiblingSections) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)</option> }</select>
-                                <select name="reasonCode" class="form-select form-select-sm" style="width:9rem"><option value="BALANCE">@T("Balancing", "موازنة")</option><option value="PARENT_REQUEST">@T("Parent request", "طلب ولي الأمر")</option><option value="DISCIPLINE">@T("Discipline", "سلوكي")</option><option value="ACADEMIC">@T("Academic", "أكاديمي")</option></select>
-                                <input name="effectiveDate" type="date" class="form-control form-control-sm" value="@today" style="width:9.5rem" />
+                                <select name="targetSectionId" class="form-select form-select-sm" style="width:8rem" required aria-required="true" aria-label="@T("Transfer to section:", "نقل إلى شعبة:") @m.StudentNo"><option value="">@T("to…", "إلى…")</option>@foreach (var s in Model.SiblingSections) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)</option> }</select>
+                                <select name="reasonCode" class="form-select form-select-sm" style="width:9rem" aria-label="@T("Transfer reason:", "سبب النقل:") @m.StudentNo"><option value="BALANCE">@T("Balancing", "موازنة")</option><option value="PARENT_REQUEST">@T("Parent request", "طلب ولي الأمر")</option><option value="DISCIPLINE">@T("Discipline", "سلوكي")</option><option value="ACADEMIC">@T("Academic", "أكاديمي")</option></select>
+                                <input name="effectiveDate" type="date" class="form-control form-control-sm" value="@today" style="width:9.5rem" aria-label="@T("Transfer date:", "تاريخ النقل:") @m.StudentNo" />
                                 <button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Transfer student", "نقل الطالب")"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></button>
                             </form> } else { <span class="small text-muted">@T("no sibling section", "لا شعبة أخرى") </span> }</td></tr>
                 }
@@ -65,8 +65,8 @@
                 else
                 {
                     <form method="post" asp-action="Assign" asp-route-id="@Model.Section.Id">
-                        <div class="mb-2"><select name="enrollmentId" class="form-select form-select-sm">@foreach (var u in Model.Unassigned) { <option value="@u.EnrollmentId">@u.StudentNo — @(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
-                        <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" /></div>
+                        <div class="mb-2"><select name="enrollmentId" class="form-select form-select-sm" aria-label="@T("Student", "الطالب")">@foreach (var u in Model.Unassigned) { <option value="@u.EnrollmentId">@u.StudentNo — @(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
+                        <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" aria-label="@T("Effective from", "تاريخ السريان")" /></div>
                         <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>@T("Assign", "إسناد")</button>
                         <div class="form-text">@T("Capacity is enforced (BR-SCN-002).", "السعة مُلزِمة (BR-SCN-002).")</div>
                     </form>
@@ -75,8 +75,8 @@
             <div class="sms-card p-3">
                 <h2 class="h6">@T("Homeroom teacher", "رائد الفصل")</h2>
                 <form method="post" asp-action="Homeroom" asp-route-id="@Model.Section.Id">
-                    <div class="mb-2"><select name="teacherUserId" class="form-select form-select-sm"><option value="">@T("— teacher —", "— المعلم —")</option>@foreach (var t in Model.Teachers) { <option value="@t.UserAccountId" disabled="@(t.UserAccountId == null)">@(isRtl ? t.NameAr : t.NameEn)@(t.UserAccountId == null ? " (" + T("no user account", "بلا حساب مستخدم") + ")" : "")</option> }</select></div>
-                    <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" /></div>
+                    <div class="mb-2"><select name="teacherUserId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Teacher", "المعلم")"><option value="">@T("— teacher —", "— المعلم —")</option>@foreach (var t in Model.Teachers) { <option value="@t.UserAccountId" disabled="@(t.UserAccountId == null)">@(isRtl ? t.NameAr : t.NameEn)@(t.UserAccountId == null ? " (" + T("no user account", "بلا حساب مستخدم") + ")" : "")</option> }</select></div>
+                    <div class="mb-2"><input name="effectiveFrom" type="date" class="form-control form-control-sm" value="@today" aria-label="@T("Effective from", "تاريخ السريان")" /></div>
                     <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi bi-person-badge me-1" aria-hidden="true"></i>@T("Assign homeroom", "تعيين رائد الفصل")</button>
                     <div class="form-text">@T("Effective-dated; the previous assignment is closed out (BR-SCN-004). Teachers need a linked user account.", "بتاريخ سريان؛ يُغلق التعيين السابق (BR-SCN-004). يحتاج المعلم حساب مستخدم مرتبطاً.")</div>
                 </form>

@@ -36,15 +36,15 @@
                     {
                         var fid = $"edit{c.Id}";
                         <tr class="table-warning">
-                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" required /></td>
-                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" required /></td>
-                            <td><input form="@fid" name="vatRate" class="form-control form-control-sm" style="width:5.5rem" value="@(c.VatRate == null ? "" : (c.VatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" placeholder="15" /></td>
+                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" required aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /></td>
+                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" required aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></td>
+                            <td><input form="@fid" name="vatRate" class="form-control form-control-sm" style="width:5.5rem" value="@(c.VatRate == null ? "" : (c.VatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" placeholder="15" aria-label="@T("VAT %", "الضريبة %")" /></td>
                             <td class="text-nowrap small">
                                 <label class="me-2"><input form="@fid" type="checkbox" name="isMandatory" value="true" class="form-check-input" checked="@c.IsMandatory" /> @T("mandatory", "إلزامي")</label>
                                 <label class="me-2"><input form="@fid" type="checkbox" name="isRefundable" value="true" class="form-check-input" checked="@c.IsRefundable" /> @T("refundable", "قابل للاسترداد")</label>
                                 <label><input form="@fid" type="checkbox" name="isServiceLinked" value="true" class="form-check-input" checked="@c.IsServiceLinked" /> @T("service", "خدمة")</label>
                             </td>
-                            <td><input form="@fid" name="glExportCode" class="form-control form-control-sm" style="width:6rem" value="@c.GlExportCode" /></td>
+                            <td><input form="@fid" name="glExportCode" class="form-control form-control-sm" style="width:6rem" value="@c.GlExportCode" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" /></td>
                             <td class="small text-muted">@r.LineCount / @r.ChargeCount</td>
                             <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditCategory" asp-route-id="@c.Id" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form> <a class="btn btn-sm btn-outline-secondary" asp-action="Categories" aria-label="@T("Cancel", "إلغاء")"><i class="bi bi-x-lg" aria-hidden="true"></i></a></td>
                         </tr>
@@ -77,14 +77,14 @@
         <div class="sms-card p-3">
             <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New category", "فئة جديدة")</h2>
             <form method="post" asp-action="CreateCategory" class="d-grid gap-2">
-                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required /></div>
-                <div class="input-group input-group-sm"><span class="input-group-text">@T("VAT %", "الضريبة %")</span><input name="vatRate" class="form-control" placeholder="@(Model.DefaultVatRate == null ? "15" : (Model.DefaultVatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" /><span class="input-group-text text-muted small">@T("blank = exempt", "فارغ = معفاة")</span></div>
+                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                <div class="input-group input-group-sm"><span class="input-group-text" id="cat-vat-lbl">@T("VAT %", "الضريبة %")</span><input name="vatRate" class="form-control" aria-labelledby="cat-vat-lbl" placeholder="@(Model.DefaultVatRate == null ? "15" : (Model.DefaultVatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" /><span class="input-group-text text-muted small">@T("blank = exempt", "فارغ = معفاة")</span></div>
                 <div class="d-flex flex-wrap gap-3 small">
                     <label><input type="checkbox" name="isMandatory" value="true" class="form-check-input" /> @T("Mandatory", "إلزامي")</label>
                     <label><input type="checkbox" name="isRefundable" value="true" class="form-check-input" /> @T("Refundable", "قابل للاسترداد")</label>
                     <label><input type="checkbox" name="isServiceLinked" value="true" class="form-check-input" /> @T("Service-linked", "مرتبط بخدمة")</label>
                 </div>
-                <input name="glExportCode" class="form-control form-control-sm" placeholder="@T("GL export code (optional)", "رمز التصدير المحاسبي (اختياري)")" />
+                <input name="glExportCode" class="form-control form-control-sm" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" placeholder="@T("GL export code (optional)", "رمز التصدير المحاسبي (اختياري)")" />
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
             </form>
             @if (Model.DefaultVatRate != null) { <div class="small text-muted mt-2">@T("School default VAT rate", "نسبة الضريبة الافتراضية للمدرسة"): @Pct(Model.DefaultVatRate) (Financial.VatRate)</div> }

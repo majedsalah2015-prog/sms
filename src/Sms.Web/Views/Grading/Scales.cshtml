@@ -22,7 +22,7 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Band tables per stage/curriculum, year-versioned; locked once results reference them.", "جداول نطاقات لكل مرحلة/منهج بإصدار سنوي؛ تُقفل حين تشير إليها النتائج.")</p></div>
-    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
 <partial name="_GradingNav" />
 
 @if (Model.Year == null) { <div class="alert alert-info">@T("Define an academic year first.", "عرّف عاماً دراسياً أولاً.")</div> }
@@ -46,9 +46,9 @@ else
             <div class="sms-card p-3">
                 <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New scale", "سلم جديد")</h2>
                 <form method="post" asp-action="CreateScale" asp-route-year="@yid" class="d-grid gap-2">
-                    <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required /></div>
-                    <select name="stageId" class="form-select form-select-sm" required><option value="">@T("Stage", "المرحلة")</option>@foreach (var st in Model.Stages) { <option value="@st.Id">@(isRtl ? st.Name.NameAr : st.Name.NameEn)</option> }</select>
-                    <select name="curriculumId" class="form-select form-select-sm"><option value="">@T("Any curriculum", "أي منهج")</option>@foreach (var c in Model.Curricula) { <option value="@c.Id">@(isRtl ? c.Ar : c.En)</option> }</select>
+                    <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                    <select name="stageId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Stage", "المرحلة")"><option value="">@T("Stage", "المرحلة")</option>@foreach (var st in Model.Stages) { <option value="@st.Id">@(isRtl ? st.Name.NameAr : st.Name.NameEn)</option> }</select>
+                    <select name="curriculumId" class="form-select form-select-sm" aria-label="@T("Curriculum", "المنهج")"><option value="">@T("Any curriculum", "أي منهج")</option>@foreach (var c in Model.Curricula) { <option value="@c.Id">@(isRtl ? c.Ar : c.En)</option> }</select>
                     <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create", "إنشاء")</button>
                 </form>
             </div>
@@ -61,7 +61,7 @@ else
                 <div class="sms-card mb-3">
                     <div class="p-3 border-bottom d-flex flex-wrap align-items-center gap-2">
                         <form method="post" asp-action="EditScale" asp-route-id="@sel.Id" asp-route-year="@yid" class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
-                            <input name="nameAr" class="form-control form-control-sm" dir="rtl" value="@sel.NameAr" style="width:12rem" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" value="@sel.NameEn" style="width:12rem" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason (T1)", "السبب (T1)")" style="width:11rem" /><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Rename", "إعادة تسمية")" aria-label="@T("Rename", "إعادة تسمية")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                            <input name="nameAr" class="form-control form-control-sm" dir="rtl" value="@sel.NameAr" style="width:12rem" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" value="@sel.NameEn" style="width:12rem" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /><input name="reason" class="form-control form-control-sm" aria-label="@T("Rename reason", "سبب إعادة التسمية")" placeholder="@T("reason (T1)", "السبب (T1)")" style="width:11rem" /><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Rename", "إعادة تسمية")" aria-label="@T("Rename", "إعادة تسمية")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
                         </form>
                         <span class="badge text-bg-light border">@(Model.SelectedStage == null ? "?" : (isRtl ? Model.SelectedStage.Name.NameAr : Model.SelectedStage.Name.NameEn))</span>
                         @if (locked) { <span class="badge text-bg-dark"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("Locked", "مقفل")</span> }
@@ -96,14 +96,14 @@ else
                                 else
                                 {
                                     var fid = $"band{b.Id}";
-                                    <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@b.SortOrder" /></td>
-                                    <td><input form="@fid" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MinPercent.ToString(CultureInfo.InvariantCulture)" /></td>
-                                    <td><input form="@fid" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MaxPercent.ToString(CultureInfo.InvariantCulture)" /></td>
-                                    <td><input form="@fid" name="code" class="form-control form-control-sm" style="width:4.5rem" value="@b.BandCode" /></td>
-                                    <td><input form="@fid" name="labelAr" class="form-control form-control-sm" dir="rtl" value="@b.LabelAr" /></td>
-                                    <td><input form="@fid" name="labelEn" class="form-control form-control-sm" dir="ltr" value="@b.LabelEn" /></td>
-                                    <td><input form="@fid" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" value="@(b.GpaPoints?.ToString(CultureInfo.InvariantCulture))" /></td>
-                                    <td><input form="@fid" name="isPassing" type="checkbox" class="form-check-input" value="true" checked="@b.IsPassing" /></td>
+                                    <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@b.SortOrder" aria-label="@T($"Order — band {b.BandCode}", $"الترتيب — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MinPercent.ToString(CultureInfo.InvariantCulture)" aria-label="@T($"Min % — band {b.BandCode}", $"من % — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" value="@b.MaxPercent.ToString(CultureInfo.InvariantCulture)" aria-label="@T($"Max % — band {b.BandCode}", $"إلى % — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="code" class="form-control form-control-sm" style="width:4.5rem" value="@b.BandCode" aria-label="@T($"Code — band {b.BandCode}", $"الرمز — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="labelAr" class="form-control form-control-sm" dir="rtl" value="@b.LabelAr" aria-label="@T($"Label (Arabic) — band {b.BandCode}", $"التسمية بالعربية — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="labelEn" class="form-control form-control-sm" dir="ltr" value="@b.LabelEn" aria-label="@T($"Label (English) — band {b.BandCode}", $"التسمية بالإنجليزية — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" value="@(b.GpaPoints?.ToString(CultureInfo.InvariantCulture))" aria-label="@T($"GPA points — band {b.BandCode}", $"نقاط المعدل — نطاق {b.BandCode}")" /></td>
+                                    <td><input form="@fid" name="isPassing" type="checkbox" class="form-check-input" value="true" checked="@b.IsPassing" aria-label="@T($"Passing — band {b.BandCode}", $"ناجح — نطاق {b.BandCode}")" /></td>
                                     <td class="text-end text-nowrap">
                                         <form id="@fid" method="post" asp-action="EditBand" asp-route-id="@sel.Id" asp-route-bandId="@b.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
                                         <form method="post" asp-action="DeleteBand" asp-route-id="@sel.Id" asp-route-bandId="@b.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove", "إزالة")" aria-label="@T("Remove", "إزالة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form>
@@ -114,14 +114,14 @@ else
                         @if (!locked)
                         {
                             <tr class="table-light">
-                                <td><input form="newBand" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@(Model.Bands.Count + 1)" /></td>
-                                <td><input form="newBand" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="0" /></td>
-                                <td><input form="newBand" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="100" /></td>
-                                <td><input form="newBand" name="code" class="form-control form-control-sm" style="width:4.5rem" placeholder="A" /></td>
-                                <td><input form="newBand" name="labelAr" class="form-control form-control-sm" dir="rtl" placeholder="ممتاز" /></td>
-                                <td><input form="newBand" name="labelEn" class="form-control form-control-sm" dir="ltr" placeholder="Excellent" /></td>
-                                <td><input form="newBand" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" placeholder="4" /></td>
-                                <td><input form="newBand" name="isPassing" type="checkbox" class="form-check-input" value="true" checked /></td>
+                                <td><input form="newBand" name="sortOrder" type="number" class="form-control form-control-sm" style="width:4rem" value="@(Model.Bands.Count + 1)" aria-label="@T("Order — new band", "الترتيب — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="min" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="0" aria-label="@T("Min % — new band", "من % — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="max" type="number" step="0.01" class="form-control form-control-sm" style="width:5.5rem" placeholder="100" aria-label="@T("Max % — new band", "إلى % — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="code" class="form-control form-control-sm" style="width:4.5rem" placeholder="A" aria-label="@T("Code — new band", "الرمز — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="labelAr" class="form-control form-control-sm" dir="rtl" placeholder="ممتاز" aria-label="@T("Label (Arabic) — new band", "التسمية بالعربية — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="labelEn" class="form-control form-control-sm" dir="ltr" placeholder="Excellent" aria-label="@T("Label (English) — new band", "التسمية بالإنجليزية — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="gpa" type="number" step="0.01" class="form-control form-control-sm" style="width:4.5rem" placeholder="4" aria-label="@T("GPA points — new band", "نقاط المعدل — نطاق جديد")" /></td>
+                                <td><input form="newBand" name="isPassing" type="checkbox" class="form-check-input" value="true" checked aria-label="@T("Passing — new band", "ناجح — نطاق جديد")" /></td>
                                 <td class="text-end"><form id="newBand" method="post" asp-action="AddBand" asp-route-id="@sel.Id" asp-route-year="@yid"><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Add band", "إضافة نطاق")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form></td>
                             </tr>
                         }

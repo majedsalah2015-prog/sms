@@ -21,10 +21,10 @@
         {
             var fid = $"nat-{v.Id}";
             <tr class="@(v.IsActive ? "" : "table-light text-muted")">
-                <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" value="@v.SortOrder" /></td>
+                <td><input form="@fid" name="sortOrder" type="number" class="form-control form-control-sm" value="@v.SortOrder" aria-label="@T($"Sort order — {v.Code}", $"الترتيب — {v.Code}")" /></td>
                 <td><code>@v.Code</code><input form="@fid" type="hidden" name="code" value="@v.Code" /></td>
-                <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@v.Name.NameAr" required /></td>
-                <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@v.Name.NameEn" required /></td>
+                <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@v.Name.NameAr" required aria-label="@T($"Arabic name — {v.Code}", $"الاسم بالعربية — {v.Code}")" /></td>
+                <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@v.Name.NameEn" required aria-label="@T($"English name — {v.Code}", $"الاسم بالإنجليزية — {v.Code}")" /></td>
                 <td>@if (v.IsActive) { <span class="badge text-bg-success">@T("Yes", "نعم")</span> } else { <span class="badge text-bg-secondary">@T("No", "لا")</span> }</td>
                 <td class="text-end text-nowrap">
                     <form id="@fid" method="post" asp-action="SaveNationality" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save changes", "حفظ التعديلات")"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></form>
@@ -45,10 +45,10 @@
     <form id="nat-add" method="post" asp-action="SaveNationality" class="p-3 border-top">
         <div class="small fw-semibold mb-2"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add nationality", "إضافة جنسية")</div>
         <div class="row g-2 align-items-end">
-            <div class="col-md-2"><label class="form-label small">@T("Code", "الرمز")</label><input name="code" class="form-control form-control-sm" dir="ltr" placeholder="SA" maxlength="10" required /></div>
-            <div class="col-md-4"><label class="form-label small">@T("Arabic name", "الاسم بالعربية")</label><input id="NewNatAr" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="سعودي" required /></div>
-            <div class="col-md-3"><label class="form-label small">@T("English name", "الاسم بالإنجليزية")</label><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Saudi" data-translit-from="#NewNatAr" required /></div>
-            <div class="col-md-1"><label class="form-label small">#</label><input name="sortOrder" class="form-control form-control-sm" type="number" value="@Model.NextSortOrder" /></div>
+            <div class="col-md-2"><label class="form-label small" for="NewNatCode">@T("Code", "الرمز")</label><input id="NewNatCode" name="code" class="form-control form-control-sm" dir="ltr" placeholder="SA" maxlength="10" required /></div>
+            <div class="col-md-4"><label class="form-label small" for="NewNatAr">@T("Arabic name", "الاسم بالعربية")</label><input id="NewNatAr" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="سعودي" required /></div>
+            <div class="col-md-3"><label class="form-label small" for="NewNatEn">@T("English name", "الاسم بالإنجليزية")</label><input id="NewNatEn" name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Saudi" data-translit-from="#NewNatAr" required /></div>
+            <div class="col-md-1"><label class="form-label small" for="NewNatSort">#</label><input id="NewNatSort" name="sortOrder" class="form-control form-control-sm" type="number" value="@Model.NextSortOrder" aria-label="@T("Sort order", "الترتيب")" /></div>
             <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button></div>
         </div>
     </form>

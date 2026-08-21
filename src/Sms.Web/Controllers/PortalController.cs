@@ -49,6 +49,15 @@ namespace Sms.Web.Controllers
 
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
+        /// <summary>
+        /// BR-SEC-013 companion (WCAG 2.2.1): the layout's idle-warning dialog
+        /// extends the session with one authenticated round-trip — session
+        /// activity is refreshed by <c>SessionCookieEvents</c>/<c>ValidateSessionAsync</c>
+        /// on any authenticated request, so an empty 204 suffices.
+        /// </summary>
+        [HttpGet("ping")]
+        public IActionResult Ping() => NoContent();
+
         // ================================================================== My family
 
         [HttpGet("")]

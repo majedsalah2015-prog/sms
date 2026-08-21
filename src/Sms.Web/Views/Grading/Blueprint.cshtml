@@ -36,10 +36,10 @@
                         else
                         {
                             var fid = $"cmp{c.Id}";
-                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" /></td>
-                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" /></td>
-                            <td><input form="@fid" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.Weight.ToString(CultureInfo.InvariantCulture)" /></td>
-                            <td><input form="@fid" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.MaxScore.ToString(CultureInfo.InvariantCulture)" /></td>
+                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" aria-label="@T($"Name (Arabic) — {c.NameEn}", $"الاسم بالعربية — {c.NameAr}")" /></td>
+                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" aria-label="@T($"Name (English) — {c.NameEn}", $"الاسم بالإنجليزية — {c.NameAr}")" /></td>
+                            <td><input form="@fid" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.Weight.ToString(CultureInfo.InvariantCulture)" aria-label="@T($"Weight % — {c.NameEn}", $"الوزن % — {c.NameAr}")" /></td>
+                            <td><input form="@fid" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" value="@c.MaxScore.ToString(CultureInfo.InvariantCulture)" aria-label="@T($"Max score — {c.NameEn}", $"الدرجة القصوى — {c.NameAr}")" /></td>
                             <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditComponent" asp-route-id="@b.Id" asp-route-componentId="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form> <form method="post" asp-action="DeleteComponent" asp-route-id="@b.Id" asp-route-componentId="@c.Id" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove", "إزالة")" aria-label="@T("Remove", "إزالة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form></td>
                         }
                     </tr>
@@ -47,10 +47,10 @@
                 @if (!locked)
                 {
                     <tr class="table-light">
-                        <td><input form="newCmp" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="اختبار قصير" /></td>
-                        <td><input form="newCmp" name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Quiz" /></td>
-                        <td><input form="newCmp" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="@((100m - Model.WeightSum).ToString("0.##", CultureInfo.InvariantCulture))" /></td>
-                        <td><input form="newCmp" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="100" /></td>
+                        <td><input form="newCmp" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="اختبار قصير" aria-label="@T("Name (Arabic) — new component", "الاسم بالعربية — مكوّن جديد")" /></td>
+                        <td><input form="newCmp" name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Quiz" aria-label="@T("Name (English) — new component", "الاسم بالإنجليزية — مكوّن جديد")" /></td>
+                        <td><input form="newCmp" name="weight" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="@((100m - Model.WeightSum).ToString("0.##", CultureInfo.InvariantCulture))" aria-label="@T("Weight % — new component", "الوزن % — مكوّن جديد")" /></td>
+                        <td><input form="newCmp" name="maxScore" type="number" step="0.01" class="form-control form-control-sm" style="width:6rem" placeholder="100" aria-label="@T("Max score — new component", "الدرجة القصوى — مكوّن جديد")" /></td>
                         <td class="text-end"><form id="newCmp" method="post" asp-action="AddComponent" asp-route-id="@b.Id"><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Add component", "إضافة مكوّن")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form></td>
                     </tr>
                 }

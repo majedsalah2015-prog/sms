@@ -16,9 +16,11 @@
         @foreach (var l in Model.Lines)
         {
             var s = l.Student; var name = isRtl ? $"{s.FirstNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FamilyNameEn}";
+            var charges = l.Position.Charges.OrderBy(c => c.PostedAtUtc).ToList();
             var first = true;
-            foreach (var c in l.Position.Charges.OrderBy(c => c.PostedAtUtc)) { <tr><td>@(first ? name : "")</td><td><code>@c.ChargeNo</code></td><td>@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@c.GrossAmount.ToString("N2")</td></tr> first = false; }
-            <tr class="table-light"><td class="fw-semibold">@(first ? name : "")</td><td colspan="2" class="small text-muted">@T("gross", "الإجمالي") @l.Position.GrossCharges.ToString("N2") · @T("discounts", "الخصومات") @l.Position.Discounts.ToString("N2")</td><td class="text-end fw-semibold @(l.Position.Position > 0 ? "text-danger" : "text-success")">@l.Position.Position.ToString("N2") <span class="visually-hidden">@(l.Position.Position > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></td></tr>
+            @* th scope=rowgroup + rowspan keeps every invoice row programmatically tied to its child (WCAG 1.3.1) — rowspan covers the charge rows plus the summary row. *@
+            foreach (var c in charges) { <tr>@if (first) { <th scope="rowgroup" rowspan="@(charges.Count + 1)" class="fw-normal align-top">@name</th> }<td><code>@c.ChargeNo</code></td><td>@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@c.GrossAmount.ToString("N2")</td></tr> first = false; }
+            <tr class="table-light">@if (first) { <th scope="rowgroup" class="fw-semibold">@name</th> }<td colspan="2" class="small text-muted">@T("gross", "الإجمالي") @l.Position.GrossCharges.ToString("N2") · @T("discounts", "الخصومات") @l.Position.Discounts.ToString("N2")</td><td class="text-end fw-semibold @(l.Position.Position > 0 ? "text-danger" : "text-success")">@l.Position.Position.ToString("N2") <span class="visually-hidden">@(l.Position.Position > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></td></tr>
         }
         @if (Model.Lines.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-4">@T("No students linked to this account.", "لا طلاب مرتبطون بهذا الحساب.")</td></tr> }
         </tbody>

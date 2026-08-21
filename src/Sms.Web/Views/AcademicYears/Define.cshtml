@@ -13,13 +13,13 @@
     <form method="post" asp-action="Define" novalidate>
         <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
         <div class="row g-3 mb-3">
-            <div class="col-md-6"><label class="form-label">@T("Start date", "تاريخ البداية")</label><input asp-for="StartDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
-            <div class="col-md-6"><label class="form-label">@T("End date", "تاريخ النهاية")</label><input asp-for="EndDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+            <div class="col-md-6"><label class="form-label" asp-for="StartDate">@T("Start date", "تاريخ البداية") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="StartDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required aria-required="true" /></div>
+            <div class="col-md-6"><label class="form-label" asp-for="EndDate">@T("End date", "تاريخ النهاية") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="EndDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required aria-required="true" /></div>
         </div>
         <div class="row g-3 mb-3">
-            <div class="col-md-4"><label class="form-label">@T("Label (English)", "التسمية (إنجليزي)")</label><input asp-for="LabelEn" class="form-control" dir="ltr" placeholder="2027-2028" /></div>
-            <div class="col-md-4"><label class="form-label">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="٢٠٢٧-٢٠٢٨" /></div>
-            <div class="col-md-4"><label class="form-label">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
+            <div class="col-md-4"><label class="form-label" asp-for="LabelEn">@T("Label (English)", "التسمية (إنجليزي)")</label><input asp-for="LabelEn" class="form-control" dir="ltr" placeholder="2027-2028" /></div>
+            <div class="col-md-4"><label class="form-label" asp-for="LabelAr">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="٢٠٢٧-٢٠٢٨" /></div>
+            <div class="col-md-4"><label class="form-label" asp-for="HijriLabel">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
         </div>
         <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Create year", "إنشاء العام")</button>
         <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>

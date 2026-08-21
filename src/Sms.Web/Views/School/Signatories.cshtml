@@ -34,12 +34,12 @@
             <h2 class="h6">@T("Define signatory", "تعريف موقّع")</h2>
             <form method="post" asp-action="Signatories" novalidate>
                 <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
-                <div class="mb-2"><label class="form-label">@T("Document class", "فئة المستند")</label><select asp-for="DocumentClassCode" class="form-select">@foreach (var c in SignatoriesViewModel.DocumentClasses) { <option value="@c.Code">@(isRtl ? c.Ar : c.En)</option> }</select></div>
-                <div class="mb-2"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-                <div class="mb-2"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
-                <div class="mb-2"><label class="form-label">@T("Title (Arabic)", "المسمى (عربي)")</label><input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" /></div>
-                <div class="mb-2"><label class="form-label">@T("Title (English)", "المسمى (إنجليزي)")</label><input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" /></div>
-                <div class="mb-3"><label class="form-label">@T("Effective from", "ساري من")</label><input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
+                <div class="mb-2"><label class="form-label" asp-for="DocumentClassCode">@T("Document class", "فئة المستند")</label><select asp-for="DocumentClassCode" class="form-select">@foreach (var c in SignatoriesViewModel.DocumentClasses) { <option value="@c.Code">@(isRtl ? c.Ar : c.En)</option> }</select></div>
+                <div class="mb-2"><label class="form-label" asp-for="NameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
+                <div class="mb-2"><label class="form-label" asp-for="NameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+                <div class="mb-2"><label class="form-label" asp-for="TitleAr">@T("Title (Arabic)", "المسمى (عربي)")</label><input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" /></div>
+                <div class="mb-2"><label class="form-label" asp-for="TitleEn">@T("Title (English)", "المسمى (إنجليزي)")</label><input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" /></div>
+                <div class="mb-3"><label class="form-label" asp-for="EffectiveFrom">@T("Effective from", "ساري من")</label><input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
                 <button class="btn btn-primary w-100" type="submit"><i class="bi bi-pen me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
             </form>
         </div>

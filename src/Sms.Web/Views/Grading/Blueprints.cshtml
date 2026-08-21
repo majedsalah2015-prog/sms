@@ -23,9 +23,9 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per offering × term: components, weight sum = 100, scale, lock indicator.", "لكل مادة × فترة: المكوّنات، مجموع الأوزان = 100، السلم، مؤشر القفل.")</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2">
-            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
-            <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
-            <select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == tid)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select>
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
+            <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Grade", "الصف")">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
+            <select name="term" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Term", "الفترة")">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == tid)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select>
         </form>
         <partial name="_HelpModal" model="help" /></div></div>
 <partial name="_GradingNav" />
@@ -55,7 +55,7 @@ else
                         @if (r.Blueprint != null) { <a class="btn btn-sm btn-outline-primary" asp-action="Blueprint" asp-route-id="@r.Blueprint.Id"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Open", "فتح")</a> }
                         else if (r.Offering.IsAssessable && Model.Scales.Count > 0)
                         {
-                            <form method="post" asp-action="CreateBlueprint" asp-route-year="@yid" asp-route-profile="@pid" asp-route-term="@tid" class="d-inline-flex gap-1 align-items-center"><input type="hidden" name="offeringId" value="@r.Offering.Id" /><select name="scaleId" class="form-select form-select-sm" style="width:11rem">@foreach (var s in Model.Scales) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)@(s.IsLocked ? " 🔒" : "")</option> }</select><label class="small text-nowrap"><input type="checkbox" name="redistribute" value="true" class="form-check-input" /> @T("redistribute", "إعادة توزيع")</label><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Create blueprint", "إنشاء مخطط")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form>
+                            <form method="post" asp-action="CreateBlueprint" asp-route-year="@yid" asp-route-profile="@pid" asp-route-term="@tid" class="d-inline-flex gap-1 align-items-center"><input type="hidden" name="offeringId" value="@r.Offering.Id" /><select name="scaleId" class="form-select form-select-sm" style="width:11rem" aria-label="@T($"Grading scale — {r.Subject.Code}", $"سلم التقدير — {r.Subject.Code}")">@foreach (var s in Model.Scales) { <option value="@s.Id">@(isRtl ? s.NameAr : s.NameEn)@(s.IsLocked ? " 🔒" : "")</option> }</select><label class="small text-nowrap"><input type="checkbox" name="redistribute" value="true" class="form-check-input" /> @T("redistribute", "إعادة توزيع")</label><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Create blueprint", "إنشاء مخطط")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></form>
                         }
                     </td>
                 </tr>

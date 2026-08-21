@@ -35,7 +35,7 @@ else
                 <h2 class="h6 mb-2">@T("1 · Student", "1 · الطالب")</h2>
                 <form method="get">
                     <input type="hidden" name="year" value="@yid" />
-                    <select name="studentId" class="form-select" onchange="this.form.submit()" size="12">
+                    <select name="studentId" class="form-select" onchange="this.form.submit()" size="12" aria-label="@T("Student", "الطالب")">
                         <option value="">@T("— choose —", "— اختر —")</option>
                         @foreach (var o in Model.Students)
                         {
@@ -70,10 +70,10 @@ else
                             {
                                 <form method="post" asp-action="PostCharge" asp-route-year="@yid" class="d-grid gap-2">
                                     <input type="hidden" name="studentId" value="@sel.Id" /><input type="hidden" name="parentId" value="@defaultPayer?.Parent.Id" /><input type="hidden" name="mode" value="structure" />
-                                    <select name="categoryId" class="form-select form-select-sm" required>
+                                    <select name="categoryId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Fee category", "فئة الرسم")">
                                         @foreach (var (line, cat, charged) in Model.StructureLines) { <option value="@cat.Id" disabled="@charged">@(isRtl ? cat.NameAr : cat.NameEn) — @line.Amount.ToString("N2") @(charged ? T("(already charged)", "(مفوترة)") : "")</option> }
                                     </select>
-                                    <select name="sourceType" class="form-select form-select-sm"><option value="@ChargeSourceType.Registration">@FinanceLabels.ChargeSource(ChargeSourceType.Registration, isRtl)</option><option value="@ChargeSourceType.ReRegistration">@FinanceLabels.ChargeSource(ChargeSourceType.ReRegistration, isRtl)</option><option value="@ChargeSourceType.ServiceAssignment">@FinanceLabels.ChargeSource(ChargeSourceType.ServiceAssignment, isRtl)</option></select>
+                                    <select name="sourceType" class="form-select form-select-sm" aria-label="@T("Charge source", "مصدر الرسم")"><option value="@ChargeSourceType.Registration">@FinanceLabels.ChargeSource(ChargeSourceType.Registration, isRtl)</option><option value="@ChargeSourceType.ReRegistration">@FinanceLabels.ChargeSource(ChargeSourceType.ReRegistration, isRtl)</option><option value="@ChargeSourceType.ServiceAssignment">@FinanceLabels.ChargeSource(ChargeSourceType.ServiceAssignment, isRtl)</option></select>
                                     <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-receipt me-1" aria-hidden="true"></i>@T("Post from structure", "ترحيل من الهيكل")</button>
                                 </form>
                             }
@@ -84,9 +84,9 @@ else
                             <h2 class="h6 mb-2">@T("3b · Misc / manual charge", "3ب · رسم يدوي")</h2>
                             <form method="post" asp-action="PostCharge" asp-route-year="@yid" class="d-grid gap-2">
                                 <input type="hidden" name="studentId" value="@sel.Id" /><input type="hidden" name="parentId" value="@defaultPayer?.Parent.Id" /><input type="hidden" name="mode" value="manual" />
-                                <select name="categoryId" class="form-select form-select-sm" required><option value="">@T("Category", "الفئة")</option>@foreach (var c in Model.Categories) { <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn) @(c.VatRate == null ? "" : $"(+{(c.VatRate.Value * 100m):0.##}% VAT)")</option> }</select>
-                                <div class="input-group input-group-sm"><span class="input-group-text">@T("Net amount", "المبلغ الصافي")</span><input name="amount" type="number" step="0.01" min="0.01" class="form-control" required /></div>
-                                <input name="reason" class="form-control form-control-sm" placeholder="@T("Reason (mandatory, BR-FEE-003)", "السبب (إلزامي، BR-FEE-003)")" required />
+                                <select name="categoryId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Category", "الفئة")"><option value="">@T("Category", "الفئة")</option>@foreach (var c in Model.Categories) { <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn) @(c.VatRate == null ? "" : $"(+{(c.VatRate.Value * 100m):0.##}% VAT)")</option> }</select>
+                                <div class="input-group input-group-sm"><span class="input-group-text" id="nc-amount-lbl">@T("Net amount", "المبلغ الصافي")</span><input name="amount" type="number" step="0.01" min="0.01" class="form-control" required aria-required="true" aria-labelledby="nc-amount-lbl" /></div>
+                                <input name="reason" class="form-control form-control-sm" aria-label="@T("Reason", "السبب")" placeholder="@T("Reason (mandatory, BR-FEE-003)", "السبب (إلزامي، BR-FEE-003)")" required aria-required="true" />
                                 <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Post misc charge", "ترحيل رسم يدوي")</button>
                             </form>
                         </div>

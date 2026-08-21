@@ -52,7 +52,35 @@
         @RenderBody()
     </main>
     <footer class="text-center text-muted small pb-4">&copy; 2026 SMS &middot; <a asp-controller="Home" asp-action="Privacy">@(isRtl ? "الخصوصية" : "Privacy")</a> &middot; @(isRtl ? "تُعرض البيانات المنشورة فقط (BR-SEC-012)" : "Published data only (BR-SEC-012)")</footer>
+    @* BR-SEC-013 / WCAG 2.2.1: warn 2 minutes before the 15-minute idle sign-out and let the user extend with one click. *@
+    <div id="sms-idle-dialog" role="alertdialog" aria-modal="true" aria-labelledby="sms-idle-title" aria-describedby="sms-idle-text" class="position-fixed top-50 start-50 translate-middle bg-body border rounded shadow p-4 d-none" style="z-index:2000;max-width:22rem">
+        <h2 id="sms-idle-title" class="h6">@(isRtl ? "هل ما زلت هنا؟" : "Still there?")</h2>
+        <p id="sms-idle-text" class="small mb-3">@(isRtl ? "ستُسجَّل خروجك خلال دقيقتين تقريباً بسبب عدم النشاط (BR-SEC-013)." : "You will be signed out in about 2 minutes due to inactivity (BR-SEC-013).")</p>
+        <button type="button" id="sms-idle-stay" class="btn btn-primary btn-sm">@(isRtl ? "البقاء متصلاً" : "Stay signed in")</button>
+    </div>
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            var warnAfterMs = 13 * 60 * 1000; // IdleMinutes (15) minus a 2-minute warning window
+            var dialog = document.getElementById('sms-idle-dialog');
+            var stay = document.getElementById('sms-idle-stay');
+            if (!dialog || !stay) return;
+            var timer, lastFocus;
+            function arm() { clearTimeout(timer); timer = setTimeout(show, warnAfterMs); }
+            function show() { lastFocus = document.activeElement; dialog.classList.remove('d-none'); stay.focus(); }
+            function hide() { dialog.classList.add('d-none'); if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+            function extend() {
+                fetch('@Url.Action("Ping", "Portal")', { credentials: 'same-origin' }).then(function (r) {
+                    if (r.status === 204) { hide(); arm(); }
+                    else { location.reload(); } // session already expired server-side -> land on Login with the return URL
+                }).catch(function () { location.reload(); });
+            }
+            stay.addEventListener('click', extend);
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !dialog.classList.contains('d-none')) extend(); });
+            arm();
+        })();
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -31,7 +31,7 @@
                     <form method="post" asp-action="Toggle" class="d-inline-flex gap-1 align-items-center">
                         <input type="hidden" name="code" value="@f.Code" />
                         <input type="hidden" name="enabled" value="@(!on)" />
-                        <input name="reason" class="form-control form-control-sm" style="width:12rem" placeholder="@T("reason", "السبب")" />
+                        <input name="reason" id="reason-@f.Code" class="form-control form-control-sm" style="width:12rem" placeholder="@T("reason", "السبب")" aria-label="@T($"Reason — {f.Code}", $"السبب — {f.Code}")" />
                         <button type="submit" class="btn btn-sm @(on ? "btn-outline-danger" : "btn-outline-success")" @(blockers.Count > 0 ? "disabled" : "") title="@(blockers.Count > 0 ? T("Blocked by: ", "محجوب بسبب: ") + string.Join(", ", blockers.Select(Title)) : "")">
                             @(on ? T("Disable", "تعطيل") : T("Enable", "تفعيل"))
                         </button>

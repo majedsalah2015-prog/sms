@@ -53,8 +53,8 @@
                                     @if (Model.IsEditable)
                                     {
                                         <div class="d-flex flex-column align-items-center gap-1">
-                                            <input name="score_@key" type="number" step="0.01" min="0" max="@comp.MaxScore" class="form-control form-control-sm text-center" style="width:5.5rem" value="@(e.Score?.ToString(CultureInfo.InvariantCulture))" dir="ltr" @(e.IsAbsent || e.IsExempt ? "disabled" : "") />
-                                            <div class="d-flex gap-2 small text-nowrap"><label><input type="checkbox" class="form-check-input flag" name="absent_@key" value="true" checked="@e.IsAbsent" /> @T("abs", "غ")</label><label><input type="checkbox" class="form-check-input flag" name="exempt_@key" value="true" checked="@e.IsExempt" /> @T("exempt", "معفى")</label></div>
+                                            <input name="score_@key" type="number" step="0.01" min="0" max="@comp.MaxScore" class="form-control form-control-sm text-center" style="width:5.5rem" value="@(e.Score?.ToString(CultureInfo.InvariantCulture))" dir="ltr" aria-label="@T($"Score — {Name(r.Student)}, {comp.NameEn}", $"الدرجة — {Name(r.Student)}، {comp.NameAr}")" @(e.IsAbsent || e.IsExempt ? "disabled" : "") />
+                                            <div class="d-flex gap-2 small text-nowrap"><label><input type="checkbox" class="form-check-input flag" name="absent_@key" value="true" checked="@e.IsAbsent" aria-label="@T("Absent", "غائب")" /> @T("abs", "غ")</label><label><input type="checkbox" class="form-check-input flag" name="exempt_@key" value="true" checked="@e.IsExempt" aria-label="@T("Exempt", "معفى")" /> @T("exempt", "معفى")</label></div>
                                         </div>
                                     }
                                     else
@@ -91,8 +91,8 @@
             {
                 <hr />
                 <form method="post" asp-action="CorrectMarksheet" asp-route-id="@s.Id" class="d-grid gap-2">
-                    <label class="form-label small mb-0">@T("Post-publication correction (WF-08) — reason mandatory", "تصحيح بعد النشر (WF-08) — السبب إلزامي")</label>
-                    <input name="reason" class="form-control form-control-sm" required placeholder="@T("reason", "السبب")" />
+                    <label class="form-label small mb-0" for="corr-reason">@T("Post-publication correction (WF-08) — reason mandatory", "تصحيح بعد النشر (WF-08) — السبب إلزامي") <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input id="corr-reason" name="reason" class="form-control form-control-sm" required aria-required="true" placeholder="@T("reason", "السبب")" />
                     <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>@T("Reopen as Draft", "إعادة فتح كمسودة")</button>
                 </form>
             }
