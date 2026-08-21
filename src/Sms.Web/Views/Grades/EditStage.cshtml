@@ -17,7 +17,7 @@
         <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
         <div class="row g-3 mb-3">
             <div class="col-md-6"><label class="form-label">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-            <div class="col-md-6"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+            <div class="col-md-6"><label class="form-label">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" data-translit-from="#NameAr" data-translit-mode="term" /></div>
         </div>
         <div class="row g-3 mb-3">
             <div class="col-md-4"><label class="form-label">@T("Order", "الترتيب")</label><input asp-for="Order" class="form-control" type="number" min="1" /></div>

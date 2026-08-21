@@ -1,5 +1,14 @@
-// Arabic → English name transliteration (client-side convenience).
-// Usage: <input data-translit-from="#FirstNameAr" /> on an English field.
+// Arabic → English filling of the second half of a bilingual pair.
+//
+// Two jobs, because a person and a thing need opposite treatments. A person's
+// name is transliterated — "خالد" is Khalid and never anything else. A thing's
+// name is translated — "الصف الثالث" is Grade 3, and transliterating it to
+// "Alsaf Althalth" would put a string in the English column that no English
+// reader can use and no report can group by.
+//
+// Usage: <input data-translit-from="#FirstNameAr" /> on an English field,
+// adding data-translit-mode="term" where the field names a thing rather than
+// a person.
 // While the source Arabic field is typed into, the English field is filled
 // automatically; as soon as a human edits the English field itself the
 // auto-fill stops for that field (data-translit-manual="1"). Rule-based with
@@ -121,15 +130,116 @@
 
     window.smsTransliterate = transliterate;
 
+    // ---------------------------------------------------------------- terms
+    //
+    // Structural vocabulary: stages, grades, sections, and the words that
+    // surround them. Small and closed on purpose — a school's ladder uses the
+    // same two dozen phrases everywhere, so an exact match handles almost every
+    // real entry and the patterns below handle the rest.
+
+    var ORDINALS = {
+        'الأول': 1, 'الاول': 1, 'أول': 1, 'اول': 1, 'الأولى': 1, 'الاولى': 1, 'أولى': 1, 'اولى': 1, 'الحادي': 1,
+        'الثاني': 2, 'ثاني': 2, 'الثانية': 2, 'ثانية': 2,
+        'الثالث': 3, 'ثالث': 3, 'الثالثة': 3,
+        'الرابع': 4, 'رابع': 4, 'الرابعة': 4,
+        'الخامس': 5, 'خامس': 5, 'الخامسة': 5,
+        'السادس': 6, 'سادس': 6, 'السادسة': 6,
+        'السابع': 7, 'سابع': 7, 'السابعة': 7,
+        'الثامن': 8, 'ثامن': 8, 'الثامنة': 8,
+        'التاسع': 9, 'تاسع': 9, 'التاسعة': 9,
+        'العاشر': 10, 'عاشر': 10, 'العاشرة': 10
+    };
+
+    var TERMS = {
+        // stages
+        'رياض الأطفال': 'Kindergarten', 'رياض الاطفال': 'Kindergarten', 'الروضة': 'Kindergarten', 'روضة': 'Kindergarten',
+        'التمهيدي': 'Preschool', 'تمهيدي': 'Preschool',
+        'المرحلة الابتدائية': 'Elementary Stage', 'الابتدائية': 'Elementary', 'ابتدائية': 'Elementary', 'ابتدائي': 'Elementary',
+        'المرحلة المتوسطة': 'Intermediate Stage', 'المتوسطة': 'Intermediate', 'متوسطة': 'Intermediate', 'متوسط': 'Intermediate',
+        'المرحلة الإعدادية': 'Preparatory Stage', 'المرحلة الاعدادية': 'Preparatory Stage',
+        'الإعدادية': 'Preparatory', 'الاعدادية': 'Preparatory', 'إعدادية': 'Preparatory', 'اعدادية': 'Preparatory',
+        'المرحلة الثانوية': 'Secondary Stage', 'الثانوية': 'Secondary', 'ثانوية': 'Secondary', 'ثانوي': 'Secondary',
+        'المرحلة الأساسية': 'Basic Stage', 'المرحلة الاساسية': 'Basic Stage', 'الأساسية': 'Basic', 'الاساسية': 'Basic', 'أساسية': 'Basic', 'اساسية': 'Basic',
+
+        // the words the ladder is built from
+        'المرحلة': 'Stage', 'مرحلة': 'Stage', 'الصف': 'Grade', 'صف': 'Grade',
+        'الشعبة': 'Section', 'شعبة': 'Section', 'الفصل': 'Class', 'فصل': 'Class',
+        'القسم': 'Department', 'قسم': 'Department', 'المسار': 'Track', 'مسار': 'Track',
+
+        // streams a secondary ladder splits into
+        'علمي': 'Science', 'العلمي': 'Science', 'أدبي': 'Literary', 'الأدبي': 'Literary', 'ادبي': 'Literary',
+        'تجاري': 'Commercial', 'التجاري': 'Commercial', 'صناعي': 'Industrial', 'الصناعي': 'Industrial',
+        'شرعي': 'Sharia', 'الشرعي': 'Sharia', 'تقني': 'Technical', 'التقني': 'Technical',
+
+        // qualifiers that show up beside them
+        'بنين': 'Boys', 'البنين': 'Boys', 'بنات': 'Girls', 'البنات': 'Girls',
+        'مختلط': 'Mixed', 'المختلط': 'Mixed', 'ذكور': 'Boys', 'إناث': 'Girls', 'اناث': 'Girls',
+        'صباحي': 'Morning', 'الصباحي': 'Morning', 'مسائي': 'Evening', 'المسائي': 'Evening'
+    };
+
+    function normalize(text) {
+        return String(text || '')
+            .replace(/[ً-ْـ]/g, '')   // harakat and tatweel: decoration, never meaning
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    // "الثاني عشر" is one ordinal written as two words, so the teens are read
+    // before anything else — otherwise "عشر" is dropped and grade 12 becomes 2.
+    function readOrdinal(words, i) {
+        var first = ORDINALS[words[i]];
+        if (first === undefined) { return null; }
+        var next = words[i + 1];
+        if (next === 'عشر' || next === 'عشرة') {
+            return { value: first === 1 ? 11 : first + 10, length: 2 };
+        }
+        return { value: first, length: 1 };
+    }
+
+    function translateTerm(text) {
+        var whole = normalize(text);
+        if (!whole) { return ''; }
+        if (TERMS[whole]) { return TERMS[whole]; }
+
+        var words = whole.split(' ');
+        var out = [];
+        for (var i = 0; i < words.length; i++) {
+            // Longest phrase first: "المرحلة الابتدائية" beats "المرحلة" + "الابتدائية",
+            // which would read "Stage Elementary".
+            var matched = false;
+            for (var take = Math.min(3, words.length - i); take >= 2; take--) {
+                var phrase = words.slice(i, i + take).join(' ');
+                if (TERMS[phrase]) { out.push(TERMS[phrase]); i += take - 1; matched = true; break; }
+            }
+            if (matched) { continue; }
+
+            var ordinal = readOrdinal(words, i);
+            if (ordinal) { out.push(String(ordinal.value)); i += ordinal.length - 1; continue; }
+
+            // A number already written in digits stays as it is, in Western digits.
+            var digits = words[i].replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); });
+            if (/^\d+$/.test(digits)) { out.push(digits); continue; }
+
+            // Unknown word: transliterate rather than drop it. A name nobody
+            // catalogued still has to come out as something a reader recognises.
+            out.push(TERMS[words[i]] || word(words[i]));
+        }
+
+        return out.join(' ');
+    }
+
+    window.smsTranslateTerm = translateTerm;
+
     function wire(target) {
         var sel = target.getAttribute('data-translit-from');
         var source = sel ? document.querySelector(sel) : null;
         if (!source) { return; }
         var applying = false;
+        var render = target.getAttribute('data-translit-mode') === 'term' ? translateTerm : transliterate;
         source.addEventListener('input', function () {
             if (target.getAttribute('data-translit-manual') === '1') { return; }
             applying = true;
-            target.value = transliterate(source.value);
+            target.value = render(source.value);
             target.dispatchEvent(new Event('input', { bubbles: true }));
             applying = false;
         });
