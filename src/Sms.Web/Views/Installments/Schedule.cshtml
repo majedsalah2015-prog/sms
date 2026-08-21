@@ -1,0 +1,179 @@
+@using System.Globalization
+@using Sms.Domain.Installments
+@model ScheduleDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Schedule", "الجدول");
+    ViewData["Breadcrumb"] = T("Installment plans / Schedule", "خطط التقسيط / الجدول");
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var today = DateTime.UtcNow.Date;
+    var help = new HelpPanelViewModel
+    {
+        Id = "sch-help", Title = T("Schedule — help", "الجدول — مساعدة"),
+        Intro = T("One student's plan in full, including superseded installments kept for history. Reducing the schedule spreads a credit note or discount backwards from the last open installment; paid portions never move (BR-INS-003).", "خطة طالب واحد كاملة، بما فيها الأقساط المُستبدَلة المحفوظة للتاريخ. تخفيض الجدول يوزّع الإشعار الدائن أو الخصم رجوعاً من آخر قسط مفتوح؛ والأجزاء المسدَّدة لا تتحرّك (BR-INS-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Reduce", "تخفيض"), T("Use when a credit note or discount lowered what this student owes. Future installments absorb it first, then last-to-first.", "استخدمه حين يخفّض إشعار دائن أو خصم ما يدين به الطالب. تمتصّه الأقساط المستقبلية أولاً، ثم من الأخير للأول.")),
+            new HelpPanelViewModel.Item(T("Reschedule", "إعادة الجدولة"), T("Proposes a brand-new plan for the unpaid remainder. It must cover that remainder exactly, and it takes a decision before it becomes live.", "يقترح خطة جديدة كلياً للمتبقّي غير المسدَّد. يجب أن يغطّي المتبقّي تماماً، ولا يسري إلا بعد قرار.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@FinanceLabels.StudentName(Model.Student, isRtl)</h1>
+        <p class="text-muted mb-0">
+            @(isRtl ? Model.Template.NameAr : Model.Template.NameEn)
+            @if (Model.Payer != null) { <text>· @Model.Payer.Label(isRtl)</text> }
+            @if (Model.Assignment.IsException) { <span class="badge text-bg-warning ms-1">@T("Exception", "استثناء")</span> }
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a class="btn btn-sm btn-outline-secondary" asp-action="Family" asp-route-payerId="@Model.Assignment.PayerId"><i class="bi bi-arrow-@(isRtl ? "right" : "left")" aria-hidden="true"></i> @T("Back to family", "رجوع للأسرة")</a>
+    <a class="btn btn-sm btn-outline-primary" asp-action="Reschedule" asp-route-id="@Model.Assignment.Id"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> @T("Reschedule…", "إعادة جدولة…")</a>
+    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="modal" data-bs-target="#reduceModal"><i class="bi bi-dash-circle" aria-hidden="true"></i> @T("Reduce schedule…", "تخفيض الجدول…")</button>
+    <span class="ms-auto badge text-bg-danger fs-6 align-self-center">@T("Unpaid remainder:", "المتبقّي:") @Model.UnpaidRemainder.ToString("N2")</span>
+</div>
+
+<div class="sms-card mb-3">
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Installment schedule", "جدول الأقساط")</caption>
+        <thead><tr>
+            <th scope="col" class="text-center">#</th><th scope="col">@T("Due", "الاستحقاق")</th>
+            <th scope="col" class="text-end">@T("Amount", "المبلغ")</th><th scope="col" class="text-end">@T("Paid", "المسدَّد")</th>
+            <th scope="col" class="text-end">@T("Remaining", "المتبقّي")</th>
+            <th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr class="@(r.View.Status == InstallmentStatus.Overdue ? "table-danger" : r.View.Status == InstallmentStatus.Rescheduled ? "text-muted" : "")">
+                <td class="text-center">@r.View.SequenceNumber</td>
+                <td class="text-nowrap">@r.View.DueDate.ToString("yyyy-MM-dd")</td>
+                <td class="text-end">@r.View.Amount.ToString("N2")</td>
+                <td class="text-end">@r.View.Paid.ToString("N2")</td>
+                <td class="text-end">@((r.View.Amount - r.View.Paid).ToString("N2"))</td>
+                <td>
+                    <span class="badge @InstallmentLabels.StatusBadge(r.View.Status)">@InstallmentLabels.Status(r.View.Status, isRtl)</span>
+                    @if (r.OpenPromise != null) { <span class="badge text-bg-info ms-1" title="@T("Promised", "موعود") @r.OpenPromise.PromisedDate.ToString("yyyy-MM-dd")"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i> @r.OpenPromise.PromisedDate.ToString("MM-dd")</span> }
+                    @if (r.CoveringPdc != null) { <span class="badge text-bg-secondary ms-1"><i class="bi bi-bank" aria-hidden="true"></i> @r.CoveringPdc.ChequeNo</span> }
+                </td>
+                <td class="text-nowrap">
+                    @if (r.View.Status is InstallmentStatus.Overdue && r.OpenPromise == null)
+                    {
+                        <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="modal" data-bs-target="#p-@r.View.InstallmentId" title="@T("Record promise", "تسجيل وعد")"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i></button>
+                    }
+                    @if (!r.View.IsPdcCovered && Model.LivePdcs.Count > 0 && r.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff or InstallmentStatus.Rescheduled))
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#c-@r.View.InstallmentId" title="@T("Cover with cheque", "تغطية بشيك")"><i class="bi bi-bank" aria-hidden="true"></i></button>
+                    }
+                    @if (r.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff or InstallmentStatus.Rescheduled))
+                    {
+                        <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#w-@r.View.InstallmentId" title="@T("Write off", "شطب")"><i class="bi bi-eraser" aria-hidden="true"></i></button>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@if (Model.RescheduleCases.Count > 0)
+{
+    <div class="sms-card p-3 mb-3">
+        <h2 class="h6 mb-2">@T("Reschedule history", "سجل إعادة الجدولة")</h2>
+        <ul class="list-group list-group-flush">
+            @foreach (var c in Model.RescheduleCases)
+            {
+                <li class="list-group-item px-0 d-flex justify-content-between align-items-start">
+                    <span>
+                        <span class="badge @(c.Status == RescheduleCaseStatus.Approved ? "text-bg-success" : c.Status == RescheduleCaseStatus.Rejected ? "text-bg-secondary" : "text-bg-warning")">@InstallmentLabels.RescheduleStatus(c.Status, isRtl)</span>
+                        <span class="ms-2">@c.Reason</span>
+                        @if (c.RequiresPrincipal) { <span class="badge text-bg-dark ms-1">@T("Principal approval", "اعتماد المدير")</span> }
+                        @if (!string.IsNullOrWhiteSpace(c.DecisionReason)) { <span class="d-block small text-muted">@c.DecisionReason</span> }
+                    </span>
+                    <span class="small text-muted text-nowrap">@c.RemainderAmount.ToString("N2") · @c.ProposedAtUtc.ToString("yyyy-MM-dd")</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+<div class="modal fade" id="reduceModal" tabindex="-1" aria-labelledby="reduceModalLabel" aria-hidden="true">
+    <div class="modal-dialog"><div class="modal-content">
+        <form method="post" asp-action="Reduce" asp-route-id="@Model.Assignment.Id">
+            <div class="modal-header"><h3 class="modal-title h6" id="reduceModalLabel">@T("Reduce the schedule", "تخفيض الجدول")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+            <div class="modal-body">
+                <div class="mb-2"><label class="form-label small" for="reduction">@T("Reduction amount", "مبلغ التخفيض")</label>
+                    <input type="number" step="0.01" min="0.01" max="@Model.UnpaidRemainder.ToString("0.00", CultureInfo.InvariantCulture)" class="form-control form-control-sm" id="reduction" name="reduction" required /></div>
+                <div><label class="form-label small" for="reduceReason">@T("Reason", "السبب")</label>
+                    <input class="form-control form-control-sm" id="reduceReason" name="reason" required /></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-sm btn-warning" type="submit">@T("Reduce", "تخفيض")</button></div>
+        </form>
+    </div></div>
+</div>
+
+@foreach (var r in Model.Rows.Where(x => x.View.Status == InstallmentStatus.Overdue && x.OpenPromise == null))
+{
+    <div class="modal fade" id="p-@r.View.InstallmentId" tabindex="-1" aria-labelledby="pl-@r.View.InstallmentId" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <form method="post" asp-action="RecordPromise" asp-route-id="@r.View.InstallmentId">
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <div class="modal-header"><h3 class="modal-title h6" id="pl-@r.View.InstallmentId">@T("Record promise to pay", "تسجيل وعد بالسداد")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                <div class="modal-body">
+                    <div class="mb-2"><label class="form-label small" for="pdt-@r.View.InstallmentId">@T("Promised date", "التاريخ الموعود")</label>
+                        <input type="date" class="form-control form-control-sm" id="pdt-@r.View.InstallmentId" name="promisedDate" required min="@today.ToString("yyyy-MM-dd")" max="@today.AddDays(30).ToString("yyyy-MM-dd")" /></div>
+                    <div><label class="form-label small" for="pam-@r.View.InstallmentId">@T("Amount", "المبلغ")</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control form-control-sm" id="pam-@r.View.InstallmentId" name="amount" value="@((r.View.Amount - r.View.Paid).ToString("0.00", CultureInfo.InvariantCulture))" required /></div>
+                </div>
+                <div class="modal-footer"><button class="btn btn-sm btn-primary" type="submit">@T("Record", "تسجيل")</button></div>
+            </form>
+        </div></div>
+    </div>
+}
+
+@foreach (var r in Model.Rows.Where(x => !x.View.IsPdcCovered && Model.LivePdcs.Count > 0 && x.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff or InstallmentStatus.Rescheduled)))
+{
+    <div class="modal fade" id="c-@r.View.InstallmentId" tabindex="-1" aria-labelledby="cl-@r.View.InstallmentId" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <form method="post" asp-action="CoverWithPdc" asp-route-id="@r.View.InstallmentId">
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <div class="modal-header"><h3 class="modal-title h6" id="cl-@r.View.InstallmentId">@T("Cover with a cheque", "تغطية بشيك")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                <div class="modal-body">
+                    <label class="form-label small" for="cs-@r.View.InstallmentId">@T("Lodged cheque", "شيك مودَع")</label>
+                    <select class="form-select form-select-sm" id="cs-@r.View.InstallmentId" name="pdcId" required>
+                        @foreach (var p in Model.LivePdcs) { <option value="@p.Id">@p.ChequeNo · @p.Amount.ToString("N2") · @p.ChequeDate.ToString("yyyy-MM-dd")</option> }
+                    </select>
+                </div>
+                <div class="modal-footer"><button class="btn btn-sm btn-primary" type="submit">@T("Mark covered", "وسم كمغطّى")</button></div>
+            </form>
+        </div></div>
+    </div>
+}
+
+@foreach (var r in Model.Rows.Where(x => x.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff or InstallmentStatus.Rescheduled)))
+{
+    <div class="modal fade" id="w-@r.View.InstallmentId" tabindex="-1" aria-labelledby="wl-@r.View.InstallmentId" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <form method="post" asp-action="WriteOff" asp-route-id="@r.View.InstallmentId">
+                <input type="hidden" name="returnUrl" value="@returnUrl" />
+                <div class="modal-header"><h3 class="modal-title h6" id="wl-@r.View.InstallmentId">@T("Write off installment", "شطب القسط")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                <div class="modal-body">
+                    <div class="alert alert-warning small">@T("Writing off does not credit the charge. The receivable stays on the ledger until a credit note reverses it.", "الشطب لا يُنشئ إشعاراً دائناً. تبقى الذمة في الأستاذ حتى يعكسها إشعار دائن.")</div>
+                    <label class="form-label small" for="wr-@r.View.InstallmentId">@T("Reason (required)", "السبب (إلزامي)")</label>
+                    <input class="form-control form-control-sm" id="wr-@r.View.InstallmentId" name="reason" required />
+                </div>
+                <div class="modal-footer"><button class="btn btn-sm btn-danger" type="submit">@T("Write off", "شطب")</button></div>
+            </form>
+        </div></div>
+    </div>
+}

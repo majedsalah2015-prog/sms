@@ -1,0 +1,118 @@
+@using System.Globalization
+@model DunningConsoleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Dunning console", "لوحة المطالبات");
+    ViewData["Breadcrumb"] = T("Installment plans / Dunning", "خطط التقسيط / المطالبات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dun-help", Title = T("Dunning console — help", "لوحة المطالبات — مساعدة"),
+        Intro = T("The ladder walks every open installment and fires at most one step each — reminders before the due date, escalating notices after it. An open promise to pay holds the ladder until its date passes (BR-INS-008).", "يمرّ السلّم على كل قسط مفتوح ويُطلق خطوة واحدة على الأكثر لكلٍّ — تذكيرات قبل الاستحقاق، وإشعارات متصاعدة بعده. والوعد القائم بالسداد يوقف السلّم حتى يمرّ تاريخه (BR-INS-008)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Run the ladder", "تشغيل السلّم"), T("Evaluates promises first, then fires due steps and notifies the payer. Safe to run repeatedly: a step already fired for an installment is not fired again.", "يقيّم الوعود أولاً، ثم يُطلق الخطوات المستحقة ويُشعر الدافع. آمن للتكرار: الخطوة المُطلَقة لقسط لا تُطلق ثانية.")),
+            new HelpPanelViewModel.Item(T("Escalations", "التصعيدات"), T("The ladder's last rung. These need a human decision — a call, a reschedule, or a write-off — the system will not chase them further.", "الدرجة الأخيرة من السلّم. تحتاج قراراً بشرياً — اتصال، أو إعادة جدولة، أو شطب — ولن يلاحقها النظام أكثر.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Reminders, broken promises, and what needs a person.", "التذكيرات، والوعود المُخلَفة، وما يحتاج تدخّلاً بشرياً.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <form method="post" asp-action="RunDunning">
+        <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-megaphone" aria-hidden="true"></i> @T("Run dunning pass", "تشغيل جولة المطالبات")</button>
+    </form>
+    <form method="post" asp-action="EvaluatePromises">
+        <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i> @T("Evaluate promises", "تقييم الوعود")</button>
+    </form>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="sms-card p-3 mb-3">
+            <h2 class="h6 mb-2 text-danger"><i class="bi bi-exclamation-octagon" aria-hidden="true"></i> @T("Escalations", "التصعيدات") <span class="badge text-bg-danger">@Model.Escalations.Count</span></h2>
+            @if (Model.Escalations.Count == 0)
+            {
+                <p class="small text-muted mb-0">@T("Nothing escalated.", "لا تصعيدات.")</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var e in Model.Escalations)
+                    {
+                        <li class="list-group-item px-0">
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-semibold">@FinanceLabels.StudentName(e.Student, isRtl)</span>
+                                <span class="text-danger">@((e.View.Amount - e.View.Paid).ToString("N2"))</span>
+                            </div>
+                            <div class="small text-muted">
+                                @(e.Payer?.Label(isRtl) ?? "—") · @T("due", "استحقاق") @e.View.DueDate.ToString("yyyy-MM-dd")
+                                <a class="ms-1" asp-action="Schedule" asp-route-id="@e.Installment.PlanAssignmentId">@T("open", "فتح")</a>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-2"><i class="bi bi-hand-thumbs-down" aria-hidden="true"></i> @T("Broken promises", "الوعود المُخلَفة") <span class="badge text-bg-warning">@Model.BrokenPromises.Count</span></h2>
+            @if (Model.BrokenPromises.Count == 0)
+            {
+                <p class="small text-muted mb-0">@T("None.", "لا شيء.")</p>
+            }
+            else
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var b in Model.BrokenPromises)
+                    {
+                        <li class="list-group-item px-0 d-flex justify-content-between">
+                            <span>
+                                @FinanceLabels.StudentName(b.Student, isRtl)
+                                <span class="d-block small text-muted">@(b.Payer?.Label(isRtl) ?? "—") · @T("promised", "وُعد") @b.Promise.PromisedDate.ToString("yyyy-MM-dd")</span>
+                            </span>
+                            <span class="text-nowrap">@b.Promise.Amount.ToString("N2")</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="p-3 pb-0"><h2 class="h6 mb-0">@T("Recent dunning events", "أحدث أحداث المطالبة")</h2></div>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Dunning events", "أحداث المطالبة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Fired", "التوقيت")</th><th scope="col">@T("Step", "الخطوة")</th>
+                    <th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Payer", "الدافع")</th>
+                    <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Recent.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">@T("No dunning has run yet.", "لم تُشغَّل أي مطالبة بعد.")</td></tr>
+                }
+                @foreach (var e in Model.Recent)
+                {
+                    <tr>
+                        <td class="text-nowrap small">@e.Event.FiredAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            <span class="badge text-bg-light border">@InstallmentLabels.DunningStep(e.Event.Step, isRtl)</span>
+                            @if (e.Event.TriggeredByBrokenPromise) { <span class="badge text-bg-warning ms-1" title="@T("Triggered by a broken promise", "أُطلقت بسبب وعد مُخلَف")"><i class="bi bi-hand-thumbs-down" aria-hidden="true"></i></span> }
+                        </td>
+                        <td><a asp-action="Schedule" asp-route-id="@e.Assignment.Id">@FinanceLabels.StudentName(e.Student, isRtl)</a></td>
+                        <td class="small text-muted">@(e.Payer?.Label(isRtl) ?? "—")</td>
+                        <td class="text-end">@e.Installment.Amount.ToString("N2")</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+</div>

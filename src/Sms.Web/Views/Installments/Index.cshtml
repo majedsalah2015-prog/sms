@@ -1,0 +1,179 @@
+@using System.Globalization
+@using Sms.Domain.Installments
+@model TemplatesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Template designer", "مصمّم القوالب");
+    ViewData["Breadcrumb"] = T("Installment plans / Template designer", "خطط التقسيط / مصمّم القوالب");
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "tpl-help", Title = T("Template designer — help", "مصمّم القوالب — مساعدة"),
+        Intro = T("A template is a splitting rule, not a schedule. It says how a student's charges divide into installments and when each falls due; the schedule itself is generated per student on the Assignment console (BR-INS-001/002).", "القالب قاعدة تقسيم لا جدول. يحدّد كيف تنقسم رسوم الطالب إلى أقساط ومتى يستحق كل قسط؛ أما الجدول نفسه فيُولَّد لكل طالب في لوحة الإسناد (BR-INS-001/002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Splits must total 100%", "يجب أن تبلغ النسب 100%"), T("Every split needs a due-date rule: either an absolute date, or days offset from the year's start so one template serves several years.", "كل شريحة تحتاج قاعدة استحقاق: تاريخ مطلق، أو عدد أيام من بداية العام حتى يخدم القالب الواحد أعواماً عدة.")),
+            new HelpPanelViewModel.Item(T("Draft → Approved", "مسودة ← معتمد"), T("A draft can be edited freely but never assigned. Approving locks it for use; existing schedules are unaffected by later templates.", "المسودة قابلة للتعديل بحرية لكن لا تُسند. الاعتماد يتيح استخدامها؛ والجداول القائمة لا تتأثر بالقوالب اللاحقة.")),
+            new HelpPanelViewModel.Item(T("Fee category", "فئة الرسوم"), T("Leave blank to schedule all of the student's charges. Set it to split one category only — transport on its own plan, for instance.", "اتركها فارغة لجدولة كل رسوم الطالب. حدّدها لتقسيم فئة واحدة فقط — كالنقل بخطة مستقلة.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Define how charges split into installments, then approve for assignment.", "عرّف كيف تنقسم الرسوم إلى أقساط، ثم اعتمد القالب للإسناد.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<form method="get" class="d-flex gap-2 align-items-center mb-3">
+    <label for="year-pick" class="form-label mb-0 small text-muted">@T("Academic year", "العام الدراسي")</label>
+    <select id="year-pick" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+    </select>
+</form>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Plan templates", "قوالب الخطط")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Template", "القالب")</th>
+                    <th scope="col">@T("Category", "الفئة")</th>
+                    <th scope="col" class="text-center">@T("Splits", "الشرائح")</th>
+                    <th scope="col" class="text-end">@T("Down payment", "الدفعة المقدمة")</th>
+                    <th scope="col" class="text-center">@T("Grace", "السماح")</th>
+                    <th scope="col" class="text-center">@T("Assigned", "مُسنَد")</th>
+                    <th scope="col">@T("Status", "الحالة")</th>
+                    <th scope="col">@T("Actions", "الإجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">@T("No templates for this year yet.", "لا قوالب لهذا العام بعد.")</td></tr>
+                }
+                @foreach (var r in Model.Rows)
+                {
+                    <tr>
+                        <td>@(isRtl ? r.Template.NameAr : r.Template.NameEn)</td>
+                        <td class="small text-muted">@(r.Category == null ? T("All charges", "كل الرسوم") : (isRtl ? r.Category.NameAr : r.Category.NameEn))</td>
+                        <td class="text-center">@r.Template.Installments.Count</td>
+                        <td class="text-end">@(r.Template.DownPaymentPercent > 0 ? r.Template.DownPaymentPercent.ToString("0.##") + "%" : "—")</td>
+                        <td class="text-center">@(r.Template.GraceDays > 0 ? r.Template.GraceDays + " " + T("d", "ي") : "—")</td>
+                        <td class="text-center">@r.AssignmentCount</td>
+                        <td><span class="badge @(r.Template.Status == PlanTemplateStatus.Approved ? "text-bg-success" : "text-bg-warning")">@InstallmentLabels.TemplateStatus(r.Template.Status, isRtl)</span></td>
+                        <td>
+                            @if (r.Template.Status == PlanTemplateStatus.Draft)
+                            {
+                                <form method="post" asp-action="ApproveTemplate" asp-route-id="@r.Template.Id" asp-route-year="@yid" class="d-inline">
+                                    <button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")"><i class="bi bi-check2" aria-hidden="true"></i> @T("Approve", "اعتماد")</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <span class="text-muted small">—</span>
+                            }
+                        </td>
+                    </tr>
+                    @if (r.Template.Installments.Count > 0)
+                    {
+                        <tr class="sms-subrow"><td colspan="8" class="small text-muted">
+                            @foreach (var s in r.Template.Installments.OrderBy(x => x.SequenceNumber))
+                            {
+                                <span class="badge text-bg-light border me-1">
+                                    #@s.SequenceNumber · @s.SplitPercent.ToString("0.##")%
+                                    @if (s.DueDate != null) { <text>· @s.DueDate.Value.ToString("yyyy-MM-dd")</text> }
+                                    else if (s.OffsetDaysFromYearStart != null) { <text>· +@s.OffsetDaysFromYearStart @T("d", "ي")</text> }
+                                </span>
+                            }
+                        </td></tr>
+                    }
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("New template", "قالب جديد")</h2>
+            <form method="post" asp-action="CreateTemplate" id="tplForm">
+                <input type="hidden" name="academicYearId" value="@yid" />
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small" for="nameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input class="form-control form-control-sm" id="nameAr" name="nameAr" required dir="rtl" /></div>
+                    <div class="col-6"><label class="form-label small" for="nameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input class="form-control form-control-sm" id="nameEn" name="nameEn" required dir="ltr" /></div>
+                    <div class="col-12"><label class="form-label small" for="feeCategoryId">@T("Fee category", "فئة الرسوم")</label>
+                        <select class="form-select form-select-sm" id="feeCategoryId" name="feeCategoryId">
+                            <option value="">@T("All charges", "كل الرسوم")</option>
+                            @foreach (var c in Model.Categories) { <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn)</option> }
+                        </select>
+                    </div>
+                    <div class="col-6"><label class="form-label small" for="downPaymentPercent">@T("Down payment %", "الدفعة المقدمة %")</label><input type="number" step="0.01" min="0" max="100" value="0" class="form-control form-control-sm" id="downPaymentPercent" name="downPaymentPercent" /></div>
+                    <div class="col-6"><label class="form-label small" for="graceDays">@T("Grace days", "أيام السماح")</label><input type="number" min="0" value="0" class="form-control form-control-sm" id="graceDays" name="graceDays" /></div>
+                </div>
+
+                <hr />
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small fw-semibold">@T("Splits", "الشرائح")</span>
+                    <span class="small">@T("Total:", "المجموع:") <strong id="pctTotal">0</strong>%</span>
+                </div>
+                <div id="splitRows"></div>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="addSplit"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Add split", "إضافة شريحة")</button>
+
+                <div class="mt-3 d-grid">
+                    <button class="btn btn-primary" type="submit" id="saveTpl"><i class="bi bi-save" aria-hidden="true"></i> @T("Save draft", "حفظ كمسودة")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var rows = document.getElementById('splitRows');
+    var total = document.getElementById('pctTotal');
+    var save = document.getElementById('saveTpl');
+    var labels = {
+        pct: @Html.Raw(Json.Serialize(T("Percent", "النسبة"))),
+        date: @Html.Raw(Json.Serialize(T("Due date", "تاريخ الاستحقاق"))),
+        offset: @Html.Raw(Json.Serialize(T("or offset (days)", "أو إزاحة (أيام)"))),
+        remove: @Html.Raw(Json.Serialize(T("Remove", "حذف")))
+    };
+
+    function recalc() {
+        var sum = 0;
+        rows.querySelectorAll('input[name="percents"]').forEach(function (i) { sum += parseFloat(i.value) || 0; });
+        total.textContent = (Math.round(sum * 100) / 100).toString();
+        // The engine rejects anything but exactly 100 (BR-INS-001); saying so before the round trip is
+        // kinder than a red banner, but the server still decides.
+        var ok = Math.abs(sum - 100) < 0.005;
+        total.parentElement.classList.toggle('text-danger', !ok);
+        total.parentElement.classList.toggle('text-success', ok);
+        save.disabled = !ok;
+    }
+
+    function addRow(pct) {
+        var i = rows.children.length + 1;
+        var div = document.createElement('div');
+        div.className = 'row g-1 align-items-end mb-1';
+        div.innerHTML =
+            '<div class="col-3"><label class="form-label small mb-0">' + labels.pct + ' #' + i + '</label>' +
+            '<input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="percents" value="' + (pct || '') + '" /></div>' +
+            '<div class="col-4"><label class="form-label small mb-0">' + labels.date + '</label>' +
+            '<input type="date" class="form-control form-control-sm" name="dueDates" /></div>' +
+            '<div class="col-3"><label class="form-label small mb-0">' + labels.offset + '</label>' +
+            '<input type="number" min="0" class="form-control form-control-sm" name="offsets" /></div>' +
+            '<div class="col-2"><button type="button" class="btn btn-sm btn-outline-danger w-100" aria-label="' + labels.remove + '"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
+        div.querySelector('button').addEventListener('click', function () { div.remove(); recalc(); });
+        div.querySelector('input[name="percents"]').addEventListener('input', recalc);
+        rows.appendChild(div);
+        recalc();
+    }
+
+    document.getElementById('addSplit').addEventListener('click', function () { addRow(); });
+    addRow(50); addRow(50);
+})();
+</script>
+}

@@ -53,7 +53,7 @@ namespace Sms.Web.Navigation
 
             // Finance
             M("FEE", "19", "Fees", "الرسوم الدراسية", "bi-receipt", "finance", "E-303", "19-Fees.md", "Fees", "Index"),
-            M("INS", "20", "Installment Plans", "خطط التقسيط", "bi-calendar-check", "finance", "E-304", "20-Installment-Plans.md"),
+            M("INS", "20", "Installment Plans", "خطط التقسيط", "bi-calendar-check", "finance", "E-304", "20-Installment-Plans.md", "Installments", "Index"),
             M("PAY", "21", "Payments", "المدفوعات", "bi-cash-coin", "finance", "E-303", "21-Payments.md", "Payments", "Index"),
             M("DSC", "22", "Discounts", "الخصومات والمنح", "bi-percent", "finance", "E-304", "22-Discounts.md", "Discounts", "Index"),
 

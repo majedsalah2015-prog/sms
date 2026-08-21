@@ -1,0 +1,90 @@
+@using System.Globalization
+@using Sms.Domain.Installments
+@model RescheduleCasesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Reschedule cases", "طلبات إعادة الجدولة");
+    ViewData["Breadcrumb"] = T("Installment plans / Reschedule cases", "خطط التقسيط / طلبات إعادة الجدولة");
+    var help = new HelpPanelViewModel
+    {
+        Id = "cas-help", Title = T("Reschedule cases — help", "طلبات إعادة الجدولة — مساعدة"),
+        Intro = T("Proposals waiting on a decision. Approving supersedes the unpaid installments — they stay visible as history — and materialises the proposed ones (BR-INS-005).", "الاقتراحات المنتظرة للبتّ. الاعتماد يستبدل الأقساط غير المسدَّدة — وتبقى ظاهرة كتاريخ — ويُفعّل الأقساط المقترحة (BR-INS-005)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Principal approval", "اعتماد المدير"), T("Flagged automatically when the family has been rescheduled before, or the extension is long. It is a recorded routing decision, not an enforced chain.", "يُعلَّم تلقائياً حين تكون الأسرة قد أُعيدت جدولتها من قبل، أو حين يطول التمديد. قرار توجيه مسجَّل، لا سلسلة مفروضة.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Decide proposed reschedules.", "البتّ في اقتراحات إعادة الجدولة.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<form method="get" class="mb-3">
+    <label for="status" class="form-label small text-muted mb-0">@T("Status", "الحالة")</label>
+    <select id="status" name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="">@T("All", "الكل")</option>
+        @foreach (var s in Enum.GetValues<RescheduleCaseStatus>()) { <option value="@s" selected="@(Model.Filter == s)">@InstallmentLabels.RescheduleStatus(s, isRtl)</option> }
+    </select>
+</form>
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Reschedule cases", "طلبات إعادة الجدولة")</caption>
+        <thead><tr>
+            <th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Payer", "الدافع")</th><th scope="col">@T("Reason", "السبب")</th>
+            <th scope="col" class="text-end">@T("Remainder", "المتبقّي")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="6" class="text-center text-muted py-4">@T("No cases.", "لا طلبات.")</td></tr>
+        }
+        @foreach (var r in Model.Rows)
+        {
+            <tr>
+                <td><a asp-action="Schedule" asp-route-id="@r.Assignment.Id">@FinanceLabels.StudentName(r.Student, isRtl)</a></td>
+                <td class="small text-muted">@(r.Payer?.Label(isRtl) ?? "—")</td>
+                <td class="small">
+                    @r.Case.Reason
+                    @if (r.Case.RequiresPrincipal) { <span class="badge text-bg-dark ms-1">@T("Principal", "المدير")</span> }
+                    @if (!string.IsNullOrWhiteSpace(r.Case.DecisionReason)) { <span class="d-block text-muted">@r.Case.DecisionReason</span> }
+                </td>
+                <td class="text-end">@r.Case.RemainderAmount.ToString("N2")</td>
+                <td><span class="badge @(r.Case.Status == RescheduleCaseStatus.Approved ? "text-bg-success" : r.Case.Status == RescheduleCaseStatus.Rejected ? "text-bg-secondary" : "text-bg-warning")">@InstallmentLabels.RescheduleStatus(r.Case.Status, isRtl)</span></td>
+                <td class="text-nowrap">
+                    @if (r.Case.Status == RescheduleCaseStatus.Proposed)
+                    {
+                        <button class="btn btn-sm btn-outline-success" type="button" data-bs-toggle="modal" data-bs-target="#d-@r.Case.Id"><i class="bi bi-check2" aria-hidden="true"></i> @T("Decide", "البتّ")</button>
+                    }
+                    else { <span class="text-muted small">—</span> }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@foreach (var r in Model.Rows.Where(x => x.Case.Status == RescheduleCaseStatus.Proposed))
+{
+    <div class="modal fade" id="d-@r.Case.Id" tabindex="-1" aria-labelledby="dl-@r.Case.Id" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <form method="post" asp-action="DecideCase" asp-route-id="@r.Case.Id">
+                <div class="modal-header"><h3 class="modal-title h6" id="dl-@r.Case.Id">@T("Decide reschedule", "البتّ في إعادة الجدولة")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                <div class="modal-body">
+                    <p class="small text-muted mb-2">@FinanceLabels.StudentName(r.Student, isRtl) · @r.Case.RemainderAmount.ToString("N2")</p>
+                    <p class="small mb-2">@r.Case.Reason</p>
+                    <label class="form-label small" for="dr-@r.Case.Id">@T("Decision note", "ملاحظة القرار")</label>
+                    <input class="form-control form-control-sm" id="dr-@r.Case.Id" name="decisionReason" />
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-sm btn-outline-secondary" type="submit" name="approve" value="false">@T("Reject", "رفض")</button>
+                    <button class="btn btn-sm btn-success" type="submit" name="approve" value="true">@T("Approve", "اعتماد")</button>
+                </div>
+            </form>
+        </div></div>
+    </div>
+}

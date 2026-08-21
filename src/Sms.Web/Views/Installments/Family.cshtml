@@ -1,0 +1,152 @@
+@using System.Globalization
+@using Sms.Domain.Installments
+@model FamilyScheduleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Family schedule", "جدول الأسرة");
+    ViewData["Breadcrumb"] = T("Installment plans / Family schedule", "خطط التقسيط / جدول الأسرة");
+    var returnUrl = Context.Request.Path + Context.Request.QueryString;
+    var today = DateTime.UtcNow.Date;
+    var help = new HelpPanelViewModel
+    {
+        Id = "fam-help", Title = T("Family schedule — help", "جدول الأسرة — مساعدة"),
+        Intro = T("One payer, every child, every installment, in due-date order — the collection officer's working screen. Statuses are derived live from Module 21 allocations (BR-INS-007); nothing here stores a status.", "دافع واحد، وكل أبنائه، وكل الأقساط مرتبة بتاريخ الاستحقاق — شاشة عمل موظف التحصيل. الحالات تُشتق لحظياً من تخصيصات الوحدة 21 (BR-INS-007)؛ ولا شيء هنا يخزّن حالة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Promise to pay", "وعد بالسداد"), T("Only for an installment that is genuinely overdue, and only within the promise horizon. A promise pauses the dunning ladder until its date passes (BR-INS-006).", "فقط لقسط متأخر فعلاً، وضمن أفق الوعد. الوعد يوقف سلّم المطالبات حتى يمرّ تاريخه (BR-INS-006).")),
+            new HelpPanelViewModel.Item(T("Cheque cover", "تغطية بشيك"), T("Marks an installment as covered by a post-dated cheque already lodged by this payer. It is not a payment — the installment settles when the cheque clears (BR-INS-009).", "يوسم القسط كمغطّى بشيك آجل مودَع من هذا الدافع. ليس سداداً — يُسدَّد القسط عند تحصيل الشيك (BR-INS-009).")),
+            new HelpPanelViewModel.Item(T("Write off", "شطب"), T("Last resort, reason mandatory and audited. It does not credit the charge; the receivable stays until a credit note reverses it.", "الملاذ الأخير، والسبب إلزامي ومدقَّق. لا يُنشئ إشعاراً دائناً؛ وتبقى الذمة حتى يعكسها إشعار دائن.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Every installment a family owes, across all its children.", "كل قسط تدين به الأسرة، عبر جميع أبنائها.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <form method="get" class="d-flex gap-2 mb-2">
+            <input type="search" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("Parent / file no / student…", "ولي أمر / رقم ملف / طالب…")" aria-label="@T("Search payers", "بحث عن دافع")" />
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-search" aria-hidden="true"></i></button>
+        </form>
+        <div class="sms-card">
+            <ul class="list-group list-group-flush">
+                @if (Model.Matches.Count == 0)
+                {
+                    <li class="list-group-item text-muted small">@T("No payers matched.", "لا نتائج.")</li>
+                }
+                @foreach (var p in Model.Matches)
+                {
+                    var active = Model.Selected?.Payer.Id == p.Payer.Id;
+                    <li class="list-group-item @(active ? "active" : "")">
+                        <a class="d-block text-decoration-none @(active ? "text-white" : "")" asp-action="Family" asp-route-payerId="@p.Payer.Id" asp-route-q="@Model.Q">
+                            @p.Label(isRtl)
+                            <span class="d-block small @(active ? "text-white-50" : "text-muted")">@string.Join("، ", p.Children.Select(c => FinanceLabels.StudentName(c, isRtl)))</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        @if (Model.Selected == null)
+        {
+            <div class="sms-card p-4 text-center text-muted">@T("Choose a family to see its schedule.", "اختر أسرة لعرض جدولها.")</div>
+        }
+        else if (Model.Rows.Count == 0)
+        {
+            <div class="sms-card p-4 text-center text-muted">@T("This family has no installment plan yet.", "لا خطة تقسيط لهذه الأسرة بعد.")</div>
+        }
+        else
+        {
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="h6 mb-0">@Model.Selected.Label(isRtl)</h2>
+                <span class="badge text-bg-danger fs-6">@T("Outstanding:", "المستحق:") @Model.TotalOutstanding.ToString("N2")</span>
+            </div>
+            <div class="sms-card">
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Family installment schedule", "جدول أقساط الأسرة")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Due", "الاستحقاق")</th><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Plan", "الخطة")</th>
+                        <th scope="col" class="text-end">@T("Amount", "المبلغ")</th><th scope="col" class="text-end">@T("Paid", "المسدَّد")</th>
+                        <th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        var overdue = r.View.Status == InstallmentStatus.Overdue;
+                        <tr class="@(overdue ? "table-danger" : "")">
+                            <td class="text-nowrap">@r.View.DueDate.ToString("yyyy-MM-dd")</td>
+                            <td>@FinanceLabels.StudentName(r.Student, isRtl)</td>
+                            <td class="small text-muted">@(isRtl ? r.Template.NameAr : r.Template.NameEn) · #@r.View.SequenceNumber</td>
+                            <td class="text-end">@r.View.Amount.ToString("N2")</td>
+                            <td class="text-end">@r.View.Paid.ToString("N2")</td>
+                            <td>
+                                <span class="badge @InstallmentLabels.StatusBadge(r.View.Status)">@InstallmentLabels.Status(r.View.Status, isRtl)</span>
+                                @if (r.HasOpenPromise) { <span class="badge text-bg-info ms-1" title="@T("Open promise to pay", "وعد سداد قائم")"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i></span> }
+                                @if (r.CoveringPdc != null) { <span class="badge text-bg-secondary ms-1" title="@T("Covered by cheque", "مغطّى بشيك")"><i class="bi bi-bank" aria-hidden="true"></i> @r.CoveringPdc.ChequeNo</span> }
+                            </td>
+                            <td class="text-nowrap">
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Schedule" asp-route-id="@r.Assignment.Id" title="@T("Open schedule", "فتح الجدول")"><i class="bi bi-list-ul" aria-hidden="true"></i></a>
+                                @if (r.View.Status is InstallmentStatus.Overdue && !r.HasOpenPromise)
+                                {
+                                    <button class="btn btn-sm btn-outline-info" type="button" data-bs-toggle="modal" data-bs-target="#promise-@r.View.InstallmentId" title="@T("Record promise", "تسجيل وعد")"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i></button>
+                                }
+                                @if (!r.View.IsPdcCovered && Model.LivePdcs.Count > 0 && r.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff))
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#pdc-@r.View.InstallmentId" title="@T("Cover with cheque", "تغطية بشيك")"><i class="bi bi-bank" aria-hidden="true"></i></button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            </div>
+
+            @* Modals live outside the table so a row's markup stays a row. *@
+            @foreach (var r in Model.Rows.Where(x => x.View.Status == InstallmentStatus.Overdue && !x.HasOpenPromise))
+            {
+                <div class="modal fade" id="promise-@r.View.InstallmentId" tabindex="-1" aria-labelledby="promise-l-@r.View.InstallmentId" aria-hidden="true">
+                    <div class="modal-dialog"><div class="modal-content">
+                        <form method="post" asp-action="RecordPromise" asp-route-id="@r.View.InstallmentId">
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <div class="modal-header"><h3 class="modal-title h6" id="promise-l-@r.View.InstallmentId">@T("Record promise to pay", "تسجيل وعد بالسداد")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                            <div class="modal-body">
+                                <p class="small text-muted">@FinanceLabels.StudentName(r.Student, isRtl) · @T("Installment", "القسط") #@r.View.SequenceNumber · @T("Outstanding", "المستحق") @((r.View.Amount - r.View.Paid).ToString("N2"))</p>
+                                <div class="mb-2"><label class="form-label small" for="pd-@r.View.InstallmentId">@T("Promised date", "التاريخ الموعود")</label>
+                                    <input type="date" class="form-control form-control-sm" id="pd-@r.View.InstallmentId" name="promisedDate" required min="@today.ToString("yyyy-MM-dd")" max="@today.AddDays(30).ToString("yyyy-MM-dd")" /></div>
+                                <div><label class="form-label small" for="pa-@r.View.InstallmentId">@T("Amount", "المبلغ")</label>
+                                    <input type="number" step="0.01" min="0.01" class="form-control form-control-sm" id="pa-@r.View.InstallmentId" name="amount" value="@((r.View.Amount - r.View.Paid).ToString("0.00", CultureInfo.InvariantCulture))" required /></div>
+                            </div>
+                            <div class="modal-footer"><button class="btn btn-sm btn-primary" type="submit">@T("Record", "تسجيل")</button></div>
+                        </form>
+                    </div></div>
+                </div>
+            }
+
+            @foreach (var r in Model.Rows.Where(x => !x.View.IsPdcCovered && Model.LivePdcs.Count > 0 && x.View.Status is not (InstallmentStatus.Paid or InstallmentStatus.WrittenOff)))
+            {
+                <div class="modal fade" id="pdc-@r.View.InstallmentId" tabindex="-1" aria-labelledby="pdc-l-@r.View.InstallmentId" aria-hidden="true">
+                    <div class="modal-dialog"><div class="modal-content">
+                        <form method="post" asp-action="CoverWithPdc" asp-route-id="@r.View.InstallmentId">
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
+                            <div class="modal-header"><h3 class="modal-title h6" id="pdc-l-@r.View.InstallmentId">@T("Cover with a cheque", "تغطية بشيك")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                            <div class="modal-body">
+                                <label class="form-label small" for="pdcsel-@r.View.InstallmentId">@T("Lodged cheque", "شيك مودَع")</label>
+                                <select class="form-select form-select-sm" id="pdcsel-@r.View.InstallmentId" name="pdcId" required>
+                                    @foreach (var p in Model.LivePdcs) { <option value="@p.Id">@p.ChequeNo · @p.Amount.ToString("N2") · @p.ChequeDate.ToString("yyyy-MM-dd")</option> }
+                                </select>
+                            </div>
+                            <div class="modal-footer"><button class="btn btn-sm btn-primary" type="submit">@T("Mark covered", "وسم كمغطّى")</button></div>
+                        </form>
+                    </div></div>
+                </div>
+            }
+        }
+    </div>
+</div>

@@ -1,0 +1,132 @@
+@using System.Globalization
+@model AssignViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Assignment console", "لوحة الإسناد");
+    ViewData["Breadcrumb"] = T("Installment plans / Assignment", "خطط التقسيط / الإسناد");
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "asg-help", Title = T("Assignment console — help", "لوحة الإسناد — مساعدة"),
+        Intro = T("Assigning a template to a student generates the actual schedule from that student's posted charges, net of credit notes, for the selected year (BR-INS-002/004). Rounding lands in the last installment and due dates shift off non-working days.", "إسناد قالب لطالب يولّد الجدول الفعلي من رسومه المرحّلة، بعد خصم الإشعارات الدائنة، للعام المحدَّد (BR-INS-002/004). يقع الكسر في القسط الأخير، وتُزاح تواريخ الاستحقاق عن أيام العطل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Payer, not parent", "الدافع لا ولي الأمر"), T("The schedule is addressed to the payer: every dunning message and statement goes to them. Guardians marked financially responsible are listed first.", "الجدول موجَّه للدافع: كل رسالة مطالبة وكل كشف حساب يذهب إليه. أولياء الأمور المسؤولون مالياً مُدرَجون أولاً.")),
+            new HelpPanelViewModel.Item(T("Exception assignment", "إسناد استثنائي"), T("Use it when the plan departs from the template's own rules; a reason is mandatory and is kept on the assignment.", "استخدمه حين تخرج الخطة عن قواعد القالب؛ السبب إلزامي ويُحفظ على الإسناد.")),
+            new HelpPanelViewModel.Item(T("No charges yet?", "لا رسوم بعد؟"), T("Post the student's fees first — there is nothing to split until charges exist.", "رحّل رسوم الطالب أولاً — لا شيء يُقسَّم قبل وجود رسوم.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Generate a student's schedule from an approved template.", "ولّد جدول الطالب من قالب معتمد.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+<form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+    <div>
+        <label for="year-pick" class="form-label small text-muted mb-0">@T("Academic year", "العام الدراسي")</label>
+        <select id="year-pick" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+            @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+        </select>
+    </div>
+    <div>
+        <label for="student-pick" class="form-label small text-muted mb-0">@T("Student", "الطالب")</label>
+        <select id="student-pick" name="studentId" class="form-select form-select-sm" style="min-width:18rem" onchange="this.form.submit()">
+            <option value="">@T("— choose a student —", "— اختر طالباً —")</option>
+            @foreach (var s in Model.Students)
+            {
+                var name = FinanceLabels.StudentName(s.Student, isRtl);
+                var grade = s.Grade == null ? "" : " — " + (isRtl ? s.Grade.Name.NameAr : s.Grade.Name.NameEn);
+                <option value="@s.Student.Id" selected="@(Model.Selected?.Id == s.Student.Id)">@s.Student.StudentNo · @name@grade</option>
+            }
+        </select>
+    </div>
+</form>
+
+@if (Model.Selected == null)
+{
+    <div class="sms-card p-4 text-center text-muted">@T("Choose a student to assign a plan.", "اختر طالباً لإسناد خطة.")</div>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3">@T("Assign a plan", "إسناد خطة")</h2>
+                @if (Model.ApprovedTemplates.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0">@T("No approved template for this year. Approve one in the Template designer first.", "لا قالب معتمد لهذا العام. اعتمد قالباً في مصمّم القوالب أولاً.")</div>
+                }
+                else if (Model.Payers.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0">@T("This student has no linked guardian, so there is no payer to bill.", "لا ولي أمر مرتبط بهذا الطالب، فلا يوجد دافع تُوجَّه إليه الفاتورة.")</div>
+                }
+                else
+                {
+                    <form method="post" asp-action="AssignPlan" asp-route-year="@yid">
+                        <input type="hidden" name="studentId" value="@Model.Selected.Id" />
+                        <div class="mb-2">
+                            <label class="form-label small" for="payerId">@T("Payer", "الدافع")</label>
+                            <select class="form-select form-select-sm" id="payerId" name="payerId" required>
+                                @foreach (var p in Model.Payers.Where(x => x.Payer != null))
+                                {
+                                    var pname = FinanceLabels.ParentName(p.Parent, isRtl);
+                                    var tag = p.IsFinanciallyResponsible ? T(" (financially responsible)", " (مسؤول مالياً)") : "";
+                                    <option value="@p.Payer!.Id">@pname@tag</option>
+                                }
+                            </select>
+                            @if (!Model.Payers.Any(p => p.Payer != null))
+                            {
+                                <div class="form-text text-danger">@T("No payer record exists for this family yet — create one from the Fees screen.", "لا سجل دافع لهذه الأسرة بعد — أنشئه من شاشة الرسوم.")</div>
+                            }
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small" for="planTemplateId">@T("Template", "القالب")</label>
+                            <select class="form-select form-select-sm" id="planTemplateId" name="planTemplateId" required>
+                                @foreach (var t in Model.ApprovedTemplates) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }
+                            </select>
+                        </div>
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" value="true" id="isException" name="isException" onchange="document.getElementById('excWrap').hidden = !this.checked" />
+                            <label class="form-check-label small" for="isException">@T("Exception assignment", "إسناد استثنائي")</label>
+                        </div>
+                        <div class="mb-3" id="excWrap" hidden>
+                            <label class="form-label small" for="exceptionReason">@T("Reason (required for an exception)", "السبب (إلزامي للاستثناء)")</label>
+                            <input class="form-control form-control-sm" id="exceptionReason" name="exceptionReason" />
+                        </div>
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-calendar-plus" aria-hidden="true"></i> @T("Generate schedule", "توليد الجدول")</button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-3">@T("Existing plans this year", "الخطط القائمة هذا العام")</h2>
+                @if (Model.Existing.Count == 0)
+                {
+                    <p class="text-muted small mb-0">@T("None yet.", "لا شيء بعد.")</p>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var e in Model.Existing)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                <span>
+                                    @(isRtl ? e.Template.NameAr : e.Template.NameEn)
+                                    @if (e.Assignment.IsException) { <span class="badge text-bg-warning ms-1">@T("Exception", "استثناء")</span> }
+                                    @if (e.Assignment.RescheduleCount > 0) { <span class="badge text-bg-info ms-1">@T("Rescheduled", "أُعيدت جدولته") ×@e.Assignment.RescheduleCount</span> }
+                                </span>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Schedule" asp-route-id="@e.Assignment.Id">@T("Open", "فتح")</a>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+}

@@ -1,0 +1,123 @@
+@using System.Globalization
+@model RescheduleWizardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Reschedule", "إعادة الجدولة");
+    ViewData["Breadcrumb"] = T("Installment plans / Reschedule", "خطط التقسيط / إعادة الجدولة");
+    var help = new HelpPanelViewModel
+    {
+        Id = "rsc-help", Title = T("Reschedule — help", "إعادة الجدولة — مساعدة"),
+        Intro = T("A reschedule replaces the unpaid part of a plan with a new set of installments. The proposal must cover the remaining balance exactly — not more, not less — and nothing changes until it is decided (BR-INS-005).", "إعادة الجدولة تستبدل الجزء غير المسدَّد من الخطة بمجموعة أقساط جديدة. يجب أن يغطّي الاقتراح الرصيد المتبقّي تماماً — لا أكثر ولا أقل — ولا يتغيّر شيء حتى يُبتّ فيه (BR-INS-005)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Paid installments are untouched", "الأقساط المسدَّدة لا تُمسّ"), T("Only the unpaid remainder is rescheduled. Superseded installments stay in the schedule as history.", "يُعاد جدولة المتبقّي غير المسدَّد فقط. وتبقى الأقساط المُستبدَلة في الجدول كتاريخ.")),
+            new HelpPanelViewModel.Item(T("Extension limit", "حدّ التمديد"), T("Dates beyond the allowed extension window are refused, and a repeat reschedule routes to the principal.", "التواريخ خارج نافذة التمديد المسموحة تُرفض، وإعادة الجدولة المتكررة تُوجَّه لمدير المدرسة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@T("Reschedule", "إعادة الجدولة") — @FinanceLabels.StudentName(Model.Student, isRtl)</h1>
+        <p class="text-muted mb-0">@(isRtl ? Model.Template.NameAr : Model.Template.NameEn)@if (Model.Payer != null) { <text> · @Model.Payer.Label(isRtl)</text> }</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_InstallmentsNav" />
+
+@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
+
+@if (Model.Assignment.RescheduleCount > 0)
+{
+    <div class="alert alert-warning">@T("This family has already been rescheduled", "أُعيدت جدولة هذه الأسرة من قبل") @Model.Assignment.RescheduleCount @T("time(s) — the request will need principal approval.", "مرة — سيحتاج الطلب اعتماد مدير المدرسة.")</div>
+}
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-2">@T("Unpaid installments being replaced", "الأقساط غير المسدَّدة المستبدَلة")</h2>
+            <table class="table table-sm mb-2">
+                <caption class="visually-hidden">@T("Unpaid installments", "الأقساط غير المسدَّدة")</caption>
+                <thead><tr><th scope="col">#</th><th scope="col">@T("Due", "الاستحقاق")</th><th scope="col" class="text-end">@T("Remaining", "المتبقّي")</th></tr></thead>
+                <tbody>
+                @foreach (var u in Model.Unpaid)
+                {
+                    <tr><td>@u.SequenceNumber</td><td>@u.DueDate.ToString("yyyy-MM-dd")</td><td class="text-end">@((u.Amount - u.Paid).ToString("N2"))</td></tr>
+                }
+                </tbody>
+                <tfoot><tr class="fw-semibold"><td colspan="2">@T("Remainder", "المتبقّي")</td><td class="text-end">@Model.Remainder.ToString("N2")</td></tr></tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-2">@T("Proposed schedule", "الجدول المقترح")</h2>
+            <form method="post" asp-action="ProposeReschedule" asp-route-id="@Model.Assignment.Id" id="rscForm">
+                <div class="mb-2">
+                    <label class="form-label small" for="reason">@T("Reason", "السبب")</label>
+                    <input class="form-control form-control-sm" id="reason" name="reason" required />
+                </div>
+                <div id="propRows"></div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addProp"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Add installment", "إضافة قسط")</button>
+                    <span class="small">@T("Proposed total:", "إجمالي المقترح:") <strong id="propTotal">0.00</strong> / @Model.Remainder.ToString("N2")</span>
+                </div>
+                <div class="mt-3 d-grid">
+                    <button class="btn btn-primary" type="submit" id="submitProp"><i class="bi bi-send" aria-hidden="true"></i> @T("Propose reschedule", "تقديم الاقتراح")</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var remainder = @Html.Raw(Model.Remainder.ToString("0.00", CultureInfo.InvariantCulture));
+    var rows = document.getElementById('propRows');
+    var total = document.getElementById('propTotal');
+    var submit = document.getElementById('submitProp');
+    var labels = {
+        date: @Html.Raw(Json.Serialize(T("Due date", "تاريخ الاستحقاق"))),
+        amount: @Html.Raw(Json.Serialize(T("Amount", "المبلغ"))),
+        remove: @Html.Raw(Json.Serialize(T("Remove", "حذف")))
+    };
+
+    function recalc() {
+        var sum = 0;
+        rows.querySelectorAll('input[name="amounts"]').forEach(function (i) { sum += parseFloat(i.value) || 0; });
+        sum = Math.round(sum * 100) / 100;
+        total.textContent = sum.toFixed(2);
+        // BR-INS-005 wants the remainder covered exactly; the server enforces it, this just stops the
+        // officer discovering a two-riyal gap after a round trip.
+        var ok = Math.abs(sum - remainder) < 0.005;
+        total.parentElement.classList.toggle('text-danger', !ok);
+        total.parentElement.classList.toggle('text-success', ok);
+        submit.disabled = !ok;
+    }
+
+    function addRow(amount) {
+        var div = document.createElement('div');
+        div.className = 'row g-1 align-items-end mb-1';
+        div.innerHTML =
+            '<div class="col-6"><label class="form-label small mb-0">' + labels.date + '</label>' +
+            '<input type="date" class="form-control form-control-sm" name="dueDates" required /></div>' +
+            '<div class="col-4"><label class="form-label small mb-0">' + labels.amount + '</label>' +
+            '<input type="number" step="0.01" min="0.01" class="form-control form-control-sm" name="amounts" value="' + (amount || '') + '" required /></div>' +
+            '<div class="col-2"><button type="button" class="btn btn-sm btn-outline-danger w-100" aria-label="' + labels.remove + '"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
+        div.querySelector('button').addEventListener('click', function () { div.remove(); recalc(); });
+        div.querySelector('input[name="amounts"]').addEventListener('input', recalc);
+        rows.appendChild(div);
+        recalc();
+    }
+
+    document.getElementById('addProp').addEventListener('click', function () { addRow(); });
+    // Two even instalments is the commonest starting point; the officer edits from there.
+    var half = Math.round((remainder / 2) * 100) / 100;
+    addRow(half.toFixed(2));
+    addRow((Math.round((remainder - half) * 100) / 100).toFixed(2));
+})();
+</script>
+}
