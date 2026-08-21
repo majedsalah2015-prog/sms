@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sms.Web\Sms.Web.csproj" />
+    <ProjectReference Include="..\..\src\Sms.Erp.Bridge\Sms.Erp.Bridge.csproj" />
   </ItemGroup>
 
 </Project>

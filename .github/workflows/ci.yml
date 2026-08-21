@@ -10,9 +10,26 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # external/erp is the ERP 2028 accounting source, consumed as a
+          # submodule pinned to one commit. Without this the ERP projects in
+          # Sms.sln are absent and the solution does not restore.
+          submodules: true
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 5.0.x
+      - name: Verify the vendored ERP source is untouched
+        shell: bash
+        # The whole arrangement rests on external/erp being read-only here: a
+        # fix made in this repository would be invisible to the ERP product and
+        # lost on the next submodule bump. Accounting changes belong in the ERP
+        # repository, which both products then consume.
+        run: |
+          if [ -n "$(git -C external/erp status --porcelain)" ]; then
+            echo "::error::external/erp has local modifications. Make the change in the ERP repository and move the submodule pointer instead."
+            git -C external/erp status --short
+            exit 1
+          fi
       - name: Build
         run: dotnet build --configuration Release
       - name: Test (unit + architecture)

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <RootNamespace>Sms.Erp.Bridge</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The only two sides this project is allowed to see.
+
+      ERP2028.Modules.Accounting.Contracts — contracts ONLY. Not .Application,
+      not .Infrastructure, not .Domain. That is the same rule the ERP imposes on
+      its own modules (docs/Architecture/05-Dependency-Rules.md §3), and it is
+      what keeps this bridge from becoming a second, private coupling to
+      Accounting's internals. Its transitive closure is Application.Abstractions
+      + Common + SharedKernel and nothing else.
+
+      Sms.Application — where the ports live. The school defines the interface;
+      this project supplies the ERP-backed implementation. Sms.Application,
+      Sms.Domain and Sms.Infrastructure never reference anything ERP: delete this
+      project and the school is standalone again, unchanged.
+
+      The composition root (Sms.Web) is the one place allowed to reference
+      Accounting's .Application/.Infrastructure/.Web, because registering a
+      module and migrating its DbContext cannot be done through a contract.
+    -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Contracts\ERP2028.Modules.Accounting.Contracts.csproj" />
+    <ProjectReference Include="..\Sms.Application\Sms.Application.csproj" />
+  </ItemGroup>
+
+</Project>

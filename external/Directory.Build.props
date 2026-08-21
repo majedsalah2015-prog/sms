@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    This file exists to STOP inheritance, not to add anything.
+
+    MSBuild walks up from a project directory and uses the first
+    Directory.Build.props it finds. Without this file, every project under
+    external/erp would pick up the repository root's Directory.Build.props and
+    inherit TreatWarningsAsErrors=true — a standard this repository sets for its
+    own code and that the ERP codebase does not hold to (it builds with eight
+    warnings). Vendored source must build on its own terms; ours are not its to
+    satisfy.
+
+    To confirm this is in effect:
+      dotnet msbuild external/erp/src/.../SomeErpProject.csproj -pp:out.xml
+    and check that out.xml names THIS file, not the one at the repository root.
+
+    It deliberately does NOT import the parent. Nothing from the root props
+    should reach the submodule.
+
+    Do not add settings here that change how the ERP compiles. If the ERP needs
+    a build property, it belongs in the ERP repository.
+  -->
+  <PropertyGroup>
+    <!-- The 5.0 shared runtime is absent on the dev machines; same reason as the
+         root props. Harmless for libraries, required for anything executable. -->
+    <RollForward>LatestMajor</RollForward>
+  </PropertyGroup>
+</Project>
