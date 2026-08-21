@@ -21,6 +21,33 @@ namespace Sms.Application.Students
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
             CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// The mother's particulars and the family's social profile — a separate
+        /// operation from <see cref="UpdateStudentAsync"/>, not extra parameters on
+        /// it.
+        /// <para>
+        /// They are filled at a different time by a different person: identity comes
+        /// off the birth certificate at registration, this section off documents that
+        /// arrive over the following weeks, and often from the social worker rather
+        /// than the registrar. One signature covering both would be twenty-five
+        /// parameters where a caller correcting a surname has to restate the ration
+        /// card number, and would make "who changed the means assessment" unanswerable
+        /// from the shape of the call.
+        /// </para>
+        /// <para>
+        /// Every field is nullable and none is required. A registrar must be able to
+        /// record a student before the paperwork exists; the alternative is a blocked
+        /// enrolment or invented data, and the second is worse.
+        /// </para>
+        /// </summary>
+        Task<Student> UpdateSocialProfileAsync(
+            int studentId,
+            string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
+            ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
+            ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
+            string? placeOfBirth, int? familySize, int? birthOrder, int? neighbourhoodId,
+            CancellationToken cancellationToken = default);
+
         /// <summary>Corrects identity/ID fields; identity edits are T1 with a mandatory audit reason (BR-STU-002).</summary>
         Task<Student> UpdateStudentAsync(
             int studentId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,

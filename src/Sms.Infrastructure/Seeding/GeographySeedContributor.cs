@@ -111,6 +111,29 @@ namespace Sms.Infrastructure.Seeding
             ("75", "الشوكة", "Al-Shouka"),
         };
 
+        /// <summary>
+        /// The neighbourhoods of Gaza City — the only locality whose quarters the
+        /// school has to hand so far.
+        /// <para>
+        /// Seeded partially on purpose. The other 33 localities carry none, and the
+        /// picker simply offers no neighbourhood there: a student is recorded to
+        /// locality level, which is what the address actually says in most of the
+        /// Strip. Inventing quarter names to make the table look complete would put
+        /// places in the record that nobody uses.
+        /// </para>
+        /// </summary>
+        private static readonly (string AreaCode, string Ar, string En)[] Neighbourhoods =
+        {
+            // 60-01 is Gaza City — the first locality listed under governorate 60.
+            ("60-01", "حي الرمال", "Al-Rimal"),
+            ("60-01", "حي النصر", "Al-Nasr"),
+            ("60-01", "حي الشيخ رضوان", "Sheikh Radwan"),
+            ("60-01", "حي الزيتون", "Al-Zaytoun"),
+            ("60-01", "حي الشجاعية", "Al-Shujaiya"),
+            ("60-01", "حي التفاح", "Al-Tuffah"),
+            ("60-01", "حي الدرج", "Al-Daraj"),
+        };
+
         public async Task SeedAsync(CancellationToken cancellationToken = default)
         {
             var existing = await _db.Governorates.IgnoreQueryFilters()
@@ -192,12 +215,63 @@ namespace Sms.Infrastructure.Seeding
                 });
             }
 
+            if (added.Count > 0)
+            {
+                _db.ResidenceAreas.AddRange(added);
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
+            await SeedNeighbourhoodsAsync(cancellationToken);
+        }
+
+        private async Task SeedNeighbourhoodsAsync(CancellationToken cancellationToken)
+        {
+            var wanted = Neighbourhoods.Select(n => n.AreaCode).Distinct().ToList();
+            var areas = await _db.ResidenceAreas.IgnoreQueryFilters()
+                .Where(a => a.SchoolId == _db.CurrentSchoolId && wanted.Contains(a.Code))
+                .Select(a => new { a.Id, a.Code })
+                .ToDictionaryAsync(a => a.Code, a => a.Id, cancellationToken);
+
+            var areaIds = areas.Values.ToList();
+            var existing = await _db.Neighbourhoods.IgnoreQueryFilters()
+                .Where(n => areaIds.Contains(n.ResidenceAreaId))
+                .Select(n => n.Code)
+                .ToListAsync(cancellationToken);
+            var known = new HashSet<string>(existing);
+
+            var added = new List<Neighbourhood>();
+            var sequenceByArea = new Dictionary<string, int>();
+            foreach (var (areaCode, ar, en) in Neighbourhoods)
+            {
+                if (!areas.TryGetValue(areaCode, out var areaId))
+                {
+                    continue;
+                }
+
+                var sequence = sequenceByArea.TryGetValue(areaCode, out var n) ? n + 1 : 1;
+                sequenceByArea[areaCode] = sequence;
+
+                var code = $"{areaCode}-{sequence:D2}";
+                if (known.Contains(code))
+                {
+                    continue;
+                }
+
+                added.Add(new Neighbourhood
+                {
+                    ResidenceAreaId = areaId,
+                    Code = code,
+                    Name = new LocalizedName(ar, en),
+                    SortOrder = sequence * 10,
+                });
+            }
+
             if (added.Count == 0)
             {
                 return;
             }
 
-            _db.ResidenceAreas.AddRange(added);
+            _db.Neighbourhoods.AddRange(added);
             await _db.SaveChangesAsync(cancellationToken);
         }
     }

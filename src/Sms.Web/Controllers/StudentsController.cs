@@ -10,6 +10,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Students;
 using Sms.Domain.Common;
 using Sms.Domain.Sections;
+using Sms.Domain.Geography;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
@@ -153,6 +154,57 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
         }
 
+        [HttpPost("{id:int}/social")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UpdateSocialProfile(int id, StudentFormViewModel form)
+        {
+            try
+            {
+                // T1 with a mandatory reason, like the identity fields: each of these feeds a decision
+                // the school has to defend, and someone will be asked why it changed.
+                _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
+                await _students.UpdateSocialProfileAsync(
+                    id,
+                    form.MotherName, form.MotherNationalId, form.MotherOccupation, form.MotherEducationLookupId, form.MotherMobile,
+                    form.FatherStatus, form.MotherStatus, form.Religion,
+                    form.ResidencyStatus, form.FinancialStatus, form.RationCardNo,
+                    form.PlaceOfBirth, form.FamilySize, form.BirthOrder, form.NeighbourhoodId,
+                    HttpContext.RequestAborted);
+                TempData["Flash"] = T("Social profile updated.", "تم تحديث البيانات الاجتماعية.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+
+            return RedirectToAction(nameof(File), new { id, tab = "social" });
+        }
+
+        /// <summary>
+        /// The two lower levels of the residence picker, fetched as the one above
+        /// changes. A cascading picker is the only shape that works here: 34
+        /// localities across five governorates is already too many to scan, and the
+        /// neighbourhood list beneath them will be longer still.
+        /// </summary>
+        [HttpGet("residence/areas")]
+        public async Task<IActionResult> ResidenceAreas(int governorateId)
+        {
+            var areas = await _db.ResidenceAreas.AsNoTracking()
+                .Where(a => a.GovernorateId == governorateId)
+                .OrderBy(a => a.SortOrder)
+                .Select(a => new { id = a.Id, ar = a.Name.NameAr, en = a.Name.NameEn })
+                .ToListAsync();
+            return Json(areas);
+        }
+
+        [HttpGet("residence/neighbourhoods")]
+        public async Task<IActionResult> ResidenceNeighbourhoods(int areaId)
+        {
+            var hoods = await _db.Neighbourhoods.AsNoTracking()
+                .Where(n => n.ResidenceAreaId == areaId)
+                .OrderBy(n => n.SortOrder)
+                .Select(n => new { id = n.Id, ar = n.Name.NameAr, en = n.Name.NameEn })
+                .ToListAsync();
+            return Json(hoods);
+        }
+
         [HttpPost("{id:int}/status")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Status(int id, StudentStatus target, string? reason)
@@ -256,7 +308,7 @@ namespace Sms.Web.Controllers
             var audit = await _db.AuditEntries.AsNoTracking().Where(e => e.EntityType == nameof(Student) && e.EntityId == id).OrderByDescending(e => e.OccurredAtUtc).Take(100).ToListAsync();
             var allProfiles = await _db.GradeYearProfiles.AsNoTracking().ToListAsync();
 
-            return new StudentFileViewModel
+            var model = new StudentFileViewModel
             {
                 Student = s,
                 NationalityName = nats.FirstOrDefault(n => n.Id == s.NationalityLookupId) is var n && n != default ? (IsArabic ? n.Ar : n.En) : "?",
@@ -281,7 +333,49 @@ namespace Sms.Web.Controllers
                     ["charges"] = await _db.Charges.AsNoTracking().CountAsync(c => c.StudentId == id),
                     ["certificates"] = await _db.CertificateIssues.AsNoTracking().CountAsync(c => c.StudentId == id),
                 },
+                EducationLevels = await LookupAsync("EducationLevel"),
+                Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
             };
+
+            await FillResidenceAsync(model, s);
+            return model;
+        }
+
+        /// <summary>
+        /// Resolves the recorded neighbourhood back up to its locality and
+        /// governorate, for the picker's initial state and the one-line address
+        /// beside it.
+        /// <para>
+        /// Walked up rather than stored: the student holds the neighbourhood alone,
+        /// so the three levels cannot drift apart. The cost is two small reads on a
+        /// screen that is already reading a dozen — the alternative is three columns
+        /// that can disagree, which is the bug this shape exists to prevent.
+        /// </para>
+        /// </summary>
+        private async Task FillResidenceAsync(StudentFileViewModel model, Student s)
+        {
+            if (s.NeighbourhoodId is not int hoodId)
+            {
+                return;
+            }
+
+            var hood = await _db.Neighbourhoods.AsNoTracking().SingleOrDefaultAsync(n => n.Id == hoodId);
+            if (hood == null)
+            {
+                return;
+            }
+
+            var area = await _db.ResidenceAreas.AsNoTracking().SingleOrDefaultAsync(a => a.Id == hood.ResidenceAreaId);
+            var governorate = area == null ? null : await _db.Governorates.AsNoTracking().SingleOrDefaultAsync(g => g.Id == area.GovernorateId);
+
+            model.CurrentGovernorateId = governorate?.Id;
+            model.CurrentResidenceAreaId = area?.Id;
+            model.CurrentResidencePath = string.Join(
+                " ← ",
+                new[] { Name(governorate?.Name), Name(area?.Name), Name(hood.Name) }.Where(x => x != null));
+
+            string? Name(Sms.Domain.Common.LocalizedName? n)
+                => n == null ? null : (IsArabic ? n.NameAr : n.NameEn);
         }
 
         private async Task<StudentFormViewModel> BuildFormAsync(Student? s)

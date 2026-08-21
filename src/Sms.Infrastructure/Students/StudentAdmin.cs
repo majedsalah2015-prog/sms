@@ -79,6 +79,43 @@ namespace Sms.Infrastructure.Students
             return student;
         }
 
+        public async Task<Student> UpdateSocialProfileAsync(
+            int studentId,
+            string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
+            ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
+            ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
+            string? placeOfBirth, int? familySize, int? birthOrder, int? neighbourhoodId,
+            CancellationToken cancellationToken = default)
+        {
+            var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
+
+            // Blanks are stored as null, not as "". A social profile is read as "recorded or not" —
+            // an empty ration-card box means the school does not have the number, and "" would make
+            // that indistinguishable from a number of zero length in every later query.
+            student.MotherName = Blank(motherName);
+            student.MotherNationalId = Blank(motherNationalId);
+            student.MotherOccupation = Blank(motherOccupation);
+            student.MotherEducationLookupId = motherEducationLookupId;
+            student.MotherMobile = Blank(motherMobile);
+
+            student.FatherStatus = fatherStatus;
+            student.MotherStatus = motherStatus;
+            student.Religion = religion;
+            student.ResidencyStatus = residencyStatus;
+            student.FinancialStatus = financialStatus;
+            student.RationCardNo = Blank(rationCardNo);
+
+            student.PlaceOfBirth = Blank(placeOfBirth);
+            student.FamilySize = familySize;
+            student.BirthOrder = birthOrder;
+            student.NeighbourhoodId = neighbourhoodId;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return student;
+        }
+
+        private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
         public async Task ChangeStatusAsync(int studentId, StudentStatus newStatus, CancellationToken cancellationToken = default)
         {
             var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);

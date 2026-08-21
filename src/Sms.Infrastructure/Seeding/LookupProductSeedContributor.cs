@@ -46,6 +46,15 @@ namespace Sms.Infrastructure.Seeding
                 ("Father", "الأب", "Father"), ("Mother", "الأم", "Mother"), ("Guardian", "ولي أمر", "Guardian"),
                 ("Grandfather", "الجد", "Grandfather"), ("Grandmother", "الجدة", "Grandmother"), ("Other", "أخرى", "Other"));
 
+            // The mother's qualification on the student record. A lookup rather than an enum because
+            // what counts as a qualification is a local decision — a school in one system's catchment
+            // needs "Tawjihi", another needs "Secondary" — and this is the framework for exactly that.
+            await _lookups.DefineCategoryAsync("EducationLevel", LookupCategoryTier.ProductSeeded, "المؤهل العلمي", "Education Level", cancellationToken);
+            await SeedValues("EducationLevel", cancellationToken,
+                ("None", "بدون", "None"), ("Primary", "ابتدائي", "Primary"), ("Preparatory", "إعدادي", "Preparatory"),
+                ("Secondary", "ثانوي", "Secondary"), ("Diploma", "دبلوم", "Diploma"), ("Bachelor", "بكالوريوس", "Bachelor"),
+                ("Master", "ماجستير", "Master"), ("Doctorate", "دكتوراه", "Doctorate"));
+
             // E-101 / BR-SET-001 "ISO currencies" + BR-GLB-112: the wizard's currency
             // step and School.CurrencyCode validate against this product list.
             await _lookups.DefineCategoryAsync("Currency", LookupCategoryTier.ProductSeeded, "العملة", "Currency", cancellationToken);

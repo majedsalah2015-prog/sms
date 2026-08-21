@@ -5,6 +5,7 @@ using Sms.Domain.Grades;
 using Sms.Domain.Parents;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
+using Sms.Domain.Geography;
 using Sms.Domain.Students;
 
 namespace Sms.Web.Models
@@ -62,6 +63,50 @@ namespace Sms.Web.Models
 
         public string? Reason { get; set; }
 
+        // ---- mother's particulars + social profile (owner request, 2026-08-21) ----
+        // Nullable throughout: this is a section a registrar fills over time, often from a document
+        // that arrives after the student does. A required field here would block registration on
+        // paperwork the school does not have yet.
+
+        public string? MotherName { get; set; }
+
+        public string? MotherNationalId { get; set; }
+
+        public string? MotherOccupation { get; set; }
+
+        public int? MotherEducationLookupId { get; set; }
+
+        public string? MotherMobile { get; set; }
+
+        public ParentLifeStatus? FatherStatus { get; set; }
+
+        public ParentLifeStatus? MotherStatus { get; set; }
+
+        public Religion? Religion { get; set; }
+
+        public ResidencyStatus? ResidencyStatus { get; set; }
+
+        public FinancialStatus? FinancialStatus { get; set; }
+
+        public string? RationCardNo { get; set; }
+
+        public string? PlaceOfBirth { get; set; }
+
+        public int? FamilySize { get; set; }
+
+        public int? BirthOrder { get; set; }
+
+        /// <summary>
+        /// The two levels above the neighbourhood are posted so the cascading
+        /// picker can be re-rendered as the registrar left it when the form comes
+        /// back with an error. Only <see cref="NeighbourhoodId"/> is stored.
+        /// </summary>
+        public int? GovernorateId { get; set; }
+
+        public int? ResidenceAreaId { get; set; }
+
+        public int? NeighbourhoodId { get; set; }
+
         // register-time extras
         public int? GradeYearProfileId { get; set; }
 
@@ -105,6 +150,21 @@ namespace Sms.Web.Models
         public IReadOnlyList<(string Action, string? Field, string? Old, string? New, DateTime At, int Actor, string? Reason)> Audit { get; set; } = Array.Empty<(string, string?, string?, string?, DateTime, int, string?)>();
 
         public IReadOnlyList<Parent> Parents { get; set; } = Array.Empty<Parent>();
+
+        // ---- social profile tab ----
+
+        public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
+
+        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
+
+        /// <summary>Pre-selects the picker's top level when a neighbourhood is already recorded — found by walking up from it, never stored beside it.</summary>
+        public int? CurrentGovernorateId { get; set; }
+
+        /// <summary>The middle level, resolved the same way — so the picker reopens on all three without the browser guessing which locality owns the neighbourhood.</summary>
+        public int? CurrentResidenceAreaId { get; set; }
+
+        /// <summary>"غزة ← مدينة غزة ← حي الرمال" — the whole address on one line, so the reader is not left assembling it from three dropdowns.</summary>
+        public string? CurrentResidencePath { get; set; }
 
         public IReadOnlyList<(int Id, string Ar, string En)> Relationships { get; set; } = Array.Empty<(int, string, string)>();
 
