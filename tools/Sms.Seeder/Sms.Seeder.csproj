@@ -9,6 +9,19 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      This tool is the second composition root, so like Sms.Web it may name an ERP module's
+      .Application and .Infrastructure: registering a module and resolving its services cannot be
+      expressed through a contract. The GL mapping seed needs Accounting resolvable because it
+      creates accounts through Accounting's own write path rather than by touching acc.Accounts.
+    -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Application\ERP2028.Modules.Organization.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Infrastructure\ERP2028.Modules.Organization.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Application\ERP2028.Modules.Accounting.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Infrastructure\ERP2028.Modules.Accounting.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="5.0.0" />

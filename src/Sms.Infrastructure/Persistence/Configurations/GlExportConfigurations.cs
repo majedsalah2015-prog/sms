@@ -27,6 +27,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.BatchNo).HasMaxLength(30).IsRequired();
             builder.Property(x => x.ContentHash).HasMaxLength(64).IsRequired();
             builder.Property(x => x.VoidReason).HasMaxLength(500);
+            // 30 is the ledger's own cap on a document number (its DocumentSequence refuses longer).
+            builder.Property(x => x.PostedJournalNo).HasMaxLength(30);
+            builder.Property(x => x.ReversalJournalNo).HasMaxLength(30);
             builder.Property(x => x.TotalDebit).HasColumnType("decimal(18,2)");
             builder.Property(x => x.TotalCredit).HasColumnType("decimal(18,2)");
             builder.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.GlExportBatchId);

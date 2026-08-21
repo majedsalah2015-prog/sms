@@ -32,4 +32,25 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// The attached general ledger refused the batch (<c>IGlPostingPort</c>). Almost
+    /// always configuration rather than a fault — a closed accounting period, an
+    /// account code that is not postable, a fiscal year that does not exist yet —
+    /// so the ledger's own code and message are carried through verbatim instead of
+    /// being flattened into a generic failure the operator cannot act on.
+    /// </summary>
+    public class GlPostingRejectedException : InvalidOperationException
+    {
+        public GlPostingRejectedException(string batchNo, string errorCode, string errorMessage)
+            : base($"The ledger refused GL export batch {batchNo}: [{errorCode}] {errorMessage}")
+        {
+            BatchNo = batchNo;
+            ErrorCode = errorCode;
+        }
+
+        public string BatchNo { get; }
+
+        public string ErrorCode { get; }
+    }
 }

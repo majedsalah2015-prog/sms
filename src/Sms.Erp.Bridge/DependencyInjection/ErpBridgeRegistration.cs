@@ -1,7 +1,9 @@
 using ERP2028.Application.Abstractions.Identity;
 using ERP2028.Application.Abstractions.Time;
 using Microsoft.Extensions.DependencyInjection;
+using Sms.Erp.Bridge.GlPosting;
 using Sms.Erp.Bridge.Identity;
+using Sms.Application.GlExport;
 using Sms.Application.Security;
 using Sms.Erp.Bridge.Time;
 
@@ -37,6 +39,16 @@ namespace Sms.Erp.Bridge.DependencyInjection
 
             services.AddScoped<ICurrentUser, ErpCurrentUserAdapter>();
             services.AddScoped<IUserDirectory, ErpUserDirectoryAdapter>();
+
+            // The direction the other three do not go: this one lets the school reach the ledger,
+            // rather than letting the ledger reach the school. Registering it is what turns E-503's
+            // CSV export into a real posting — and not registering it leaves the CSV, which is a
+            // supported way to run (IGlPostingPort).
+            services.AddScoped<IGlPostingPort, ErpGlPostingAdapter>();
+
+            // Fills the mapping table from the ERP chart, so the first batch can be generated without
+            // an administrator transcribing account codes. Registered here and resolved by the seeder.
+            services.AddScoped<IGlAccountProvisioner, ErpGlAccountProvisioner>();
 
             return services;
         }

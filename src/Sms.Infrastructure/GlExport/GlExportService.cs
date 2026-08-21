@@ -27,13 +27,21 @@ namespace Sms.Infrastructure.GlExport
         private readonly INumberIssuer _numberIssuer;
         private readonly IClock _clock;
         private readonly IAuditContext _audit;
+        private readonly IGlPostingPort? _posting;
 
-        public GlExportService(AppDbContext db, INumberIssuer numberIssuer, IClock clock, IAuditContext audit)
+        /// <summary>
+        /// <paramref name="posting"/> is optional on purpose: a deployment with no
+        /// ledger attached registers none, and this service behaves exactly as it
+        /// did before — generate, balance, number, render CSV. That is the O3
+        /// fallback, not a degraded path.
+        /// </summary>
+        public GlExportService(AppDbContext db, INumberIssuer numberIssuer, IClock clock, IAuditContext audit, IGlPostingPort? posting = null)
         {
             _db = db;
             _numberIssuer = numberIssuer;
             _clock = clock;
             _audit = audit;
+            _posting = posting;
         }
 
         public async Task<GlAccountMapping> DefineMappingAsync(string key, string accountCode, string accountNameAr, string accountNameEn, CancellationToken cancellationToken = default)
@@ -144,6 +152,24 @@ namespace Sms.Infrastructure.GlExport
             batch.ContentHash = Hash(Render(batch));
             _db.GlExportBatches.Add(batch);
             await _db.SaveChangesAsync(cancellationToken);
+
+            // Saved before posting, deliberately. If the ledger refuses — a closed period, an account
+            // that is not postable — the batch still exists, still holds the period against a second
+            // attempt, and can be voided and regenerated once the configuration is fixed. Posting first
+            // and saving after would leave a ledger entry with no batch behind it, which is the one
+            // outcome that cannot be reconciled afterwards.
+            if (_posting != null)
+            {
+                var outcome = await _posting.PostBatchAsync(batch, cancellationToken);
+                if (!outcome.Success)
+                {
+                    throw new GlPostingRejectedException(batch.BatchNo, outcome.ErrorCode!, outcome.ErrorMessage!);
+                }
+
+                batch.PostedJournalNo = outcome.DocumentNumber;
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+
             return batch;
         }
 
@@ -159,6 +185,23 @@ namespace Sms.Infrastructure.GlExport
             if (batch.Status != GlExportBatchStatus.Generated)
             {
                 throw new GlBatchNotGeneratedException(glExportBatchId);
+            }
+
+            // A batch that reached the ledger cannot simply be marked void here: the entry it produced
+            // is immutable and still in the trial balance. The reversing entry has to land first, and
+            // if the ledger refuses it the batch stays Generated — because a voided batch frees its
+            // period for regeneration, and freeing it while the original entry still stands would
+            // double every figure in it.
+            if (_posting != null && batch.PostedJournalNo != null && batch.ReversalJournalNo == null)
+            {
+                await _db.Entry(batch).Collection(b => b.Lines).LoadAsync(cancellationToken);
+                var outcome = await _posting.ReverseBatchAsync(batch, reason, cancellationToken);
+                if (!outcome.Success)
+                {
+                    throw new GlPostingRejectedException(batch.BatchNo, outcome.ErrorCode!, outcome.ErrorMessage!);
+                }
+
+                batch.ReversalJournalNo = outcome.DocumentNumber;
             }
 
             _audit.Reason = reason;

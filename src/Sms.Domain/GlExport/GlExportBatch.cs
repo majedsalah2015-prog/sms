@@ -38,6 +38,21 @@ namespace Sms.Domain.GlExport
 
         public GlExportBatchStatus Status { get; set; } = GlExportBatchStatus.Generated;
 
+        /// <summary>
+        /// The general ledger's own document number for this batch, once it has
+        /// been posted through <c>IGlPostingPort</c> — e.g. <c>SY-2026-000042</c>.
+        /// Null when no ledger is attached to this deployment, which is the O3
+        /// fallback: the batch is still generated, balanced and exportable as CSV.
+        /// <para>
+        /// Kept here rather than inferred, because it is the only thread back from
+        /// a school period to the entry an accountant is looking at.
+        /// </para>
+        /// </summary>
+        public string? PostedJournalNo { get; set; }
+
+        /// <summary>The ledger's document number for the reversing entry, once the batch has been voided against a ledger. Null otherwise.</summary>
+        public string? ReversalJournalNo { get; set; }
+
         [RequiresAuditReason]
         public string? VoidReason { get; set; }
 
