@@ -127,7 +127,7 @@ namespace Sms.Infrastructure.Seeding
 
             var yearStart = new DateTime(2027, 9, 1);
             var yearEnd = new DateTime(2028, 6, 30);
-            var year = await _yearAdmin.DefineYearAsync("٢٠٢٧-٢٠٢٨", "2027-2028", "١٤٤٩هـ", yearStart, yearEnd, cancellationToken);
+            var year = await _yearAdmin.DefineYearAsync("2027-2028", "2027-2028", "1449هـ", yearStart, yearEnd, cancellationToken);
             await _yearAdmin.ActivateAsync(year.Id, cancellationToken);
             var profile = await _gradeAdmin.DefineGradeYearProfileAsync(
                 grade.Id, year.Id, GenderPolicy.Mixed, targetSections: 1, targetSectionSize: 25, cancellationToken: cancellationToken);

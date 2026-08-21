@@ -28,6 +28,26 @@ namespace Sms.Application.Schools
             int academicYearId, string labelAr, string labelEn, string hijriLabel, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Corrects a year's display labels, whatever else has happened to it.
+        /// <para>
+        /// Deliberately exempt from the no-enrollments rule that
+        /// <see cref="UpdateYearAsync"/> enforces. That rule protects the year's
+        /// <i>span</i>: semesters, terms, calendar days, timetables and attendance
+        /// all nest inside it, so moving its dates once students are enrolled
+        /// would move data underneath them. A label is a display string —
+        /// renaming "202" to "2026-2027" moves nothing and references nothing.
+        /// </para>
+        /// <para>
+        /// Without this, a typo in a year's name is permanent from the first
+        /// enrolment onward, which is how the operator meets it: the edit screen
+        /// simply refuses. Correcting a label is the most ordinary thing an
+        /// administrator does and it must not require deleting a year.
+        /// </para>
+        /// </summary>
+        Task<AcademicYear> RelabelYearAsync(
+            int academicYearId, string labelAr, string labelEn, string hijriLabel, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Hard-deletes a year (with its semesters/terms) that has no student enrollments and no
         /// other referencing data. Throws <see cref="Common.Exceptions.AcademicYearInUseException"/> otherwise.
         /// </summary>

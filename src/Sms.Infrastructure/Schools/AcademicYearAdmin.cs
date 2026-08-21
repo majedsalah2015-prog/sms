@@ -88,6 +88,21 @@ namespace Sms.Infrastructure.Schools
             return year;
         }
 
+        public async Task<AcademicYear> RelabelYearAsync(
+            int academicYearId, string labelAr, string labelEn, string hijriLabel, CancellationToken cancellationToken = default)
+        {
+            // No RequireNoEnrollmentsAsync, and no date validation: nothing here touches the span the
+            // rest of the schema nests inside. See the contract for why that exemption is the point of
+            // this method rather than an oversight in it.
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
+
+            year.LabelAr = labelAr;
+            year.LabelEn = labelEn;
+            year.HijriLabel = hijriLabel;
+            await _db.SaveChangesAsync(cancellationToken);
+            return year;
+        }
+
         public async Task DeleteYearAsync(int academicYearId, CancellationToken cancellationToken = default)
         {
             var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);

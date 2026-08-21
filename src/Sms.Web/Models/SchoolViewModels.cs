@@ -143,6 +143,16 @@ namespace Sms.Web.Models
         /// <summary>Optional audit reason for edits (T2 audit — not mandatory).</summary>
         public string? Reason { get; set; }
 
+        /// <summary>
+        /// Student enrolments in this year. Non-zero locks the dates — semesters,
+        /// terms, calendar days, timetables and attendance all nest inside the
+        /// span — while leaving the labels editable, since renaming a year moves
+        /// nothing.
+        /// </summary>
+        public int EnrolledCount { get; set; }
+
+        public bool DatesLocked => EnrolledCount > 0;
+
         public IReadOnlyList<Semester> Semesters { get; set; } = Array.Empty<Semester>();
 
         public IReadOnlyList<Term> Terms { get; set; } = Array.Empty<Term>();

@@ -8,19 +8,27 @@
     ViewData["Breadcrumb"] = T("Academic Years / Edit", "الأعوام الدراسية / تعديل");
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Allowed only while no student is enrolled in this year. Dates keep the 6–14 month span and no-overlap rules (BR-AYR-001); existing semesters must stay inside the new dates (BR-AYR-007). Labels are regenerated from the dates when left blank.", "مسموح فقط طالما لا يوجد طلاب مسجلون في هذا العام. تخضع التواريخ لقاعدة 6–14 شهراً وعدم التداخل (BR-AYR-001)؛ ويجب أن تبقى الفصول الحالية داخل التواريخ الجديدة (BR-AYR-007). تُولَّد التسميات من التواريخ إن تُركت فارغة.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Labels can always be corrected. Dates can be changed only while no student is enrolled, and then keep the 6–14 month span and no-overlap rules (BR-AYR-001), with existing semesters staying inside them (BR-AYR-007). Labels are regenerated from the dates when left blank.", "التسميات قابلة للتصحيح دائماً. أما التواريخ فلا تتغيّر إلا ما دام لا يوجد طلاب مسجلون، وتخضع حينها لقاعدة 6–14 شهراً وعدم التداخل (BR-AYR-001)، مع بقاء الفصول الحالية داخلها (BR-AYR-007). وتُولَّد التسميات من التواريخ إن تُركت فارغة.")</p></div></div>
 
 <div class="sms-card p-4" style="max-width:760px">
     <form method="post" asp-action="Edit" asp-route-id="@Model.YearId" novalidate>
         <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+        @if (Model.DatesLocked)
+        {
+            <div class="alert alert-info py-2 small" role="alert">
+                <i class="bi bi-lock" aria-hidden="true"></i>
+                @T($"The dates are locked: {Model.EnrolledCount} student enrollment(s) exist in this year. Semesters, timetables and attendance all sit inside this span, so moving it would move them. The labels can still be corrected.",
+                   $"التواريخ مقفلة: يوجد {Model.EnrolledCount} تسجيل طلاب في هذا العام. الفصول والجداول والحضور كلها داخل هذا المدى، فتحريكه يحرّكها. أما التسميات فتبقى قابلة للتصحيح.")
+            </div>
+        }
         <div class="row g-3 mb-3">
-            <div class="col-md-6"><label class="form-label" asp-for="StartDate">@T("Start date", "تاريخ البداية") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="StartDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required aria-required="true" /></div>
-            <div class="col-md-6"><label class="form-label" asp-for="EndDate">@T("End date", "تاريخ النهاية") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="EndDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required aria-required="true" /></div>
+            <div class="col-md-6"><label class="form-label" asp-for="StartDate">@T("Start date", "تاريخ البداية") @if (!Model.DatesLocked) { <span class="text-danger" aria-hidden="true">*</span> }</label><input asp-for="StartDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required="@(!Model.DatesLocked)" aria-required="@(!Model.DatesLocked)" disabled="@Model.DatesLocked" /></div>
+            <div class="col-md-6"><label class="form-label" asp-for="EndDate">@T("End date", "تاريخ النهاية") @if (!Model.DatesLocked) { <span class="text-danger" aria-hidden="true">*</span> }</label><input asp-for="EndDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" required="@(!Model.DatesLocked)" aria-required="@(!Model.DatesLocked)" disabled="@Model.DatesLocked" /></div>
         </div>
         <div class="row g-3 mb-3">
             <div class="col-md-4"><label class="form-label" asp-for="LabelEn">@T("Label (English)", "التسمية (إنجليزي)")</label><input asp-for="LabelEn" class="form-control" dir="ltr" placeholder="2027-2028" /></div>
-            <div class="col-md-4"><label class="form-label" asp-for="LabelAr">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="٢٠٢٧-٢٠٢٨" /></div>
-            <div class="col-md-4"><label class="form-label" asp-for="HijriLabel">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="١٤٤٩هـ" /></div>
+            <div class="col-md-4"><label class="form-label" asp-for="LabelAr">@T("Label (Arabic)", "التسمية (عربي)")</label><input asp-for="LabelAr" class="form-control" dir="rtl" placeholder="2027-2028" /></div>
+            <div class="col-md-4"><label class="form-label" asp-for="HijriLabel">@T("Hijri label", "التسمية الهجرية")</label><input asp-for="HijriLabel" class="form-control" dir="rtl" placeholder="1449هـ" /></div>
         </div>
         <div class="mb-3"><label class="form-label" asp-for="Reason">@T("Reason (optional, recorded in the audit trail)", "السبب (اختياري، يُسجَّل في سجل التدقيق)")</label><input asp-for="Reason" class="form-control" /></div>
         <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>

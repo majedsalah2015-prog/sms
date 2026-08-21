@@ -145,7 +145,7 @@ namespace Sms.Web.Controllers
 
                 // BR-AYR-001: label generated from dates when not supplied.
                 var labelEn = string.IsNullOrWhiteSpace(form.LabelEn) ? $"{form.StartDate.Value.Year}-{form.EndDate.Value.Year}" : form.LabelEn.Trim();
-                var labelAr = string.IsNullOrWhiteSpace(form.LabelAr) ? ToArabicDigits(labelEn) : form.LabelAr.Trim();
+                var labelAr = string.IsNullOrWhiteSpace(form.LabelAr) ? DefaultArabicLabel(labelEn) : form.LabelAr.Trim();
                 var hijri = string.IsNullOrWhiteSpace(form.HijriLabel) ? HijriLabelFor(form.StartDate.Value) : form.HijriLabel.Trim();
                 var year = await _years.DefineYearAsync(labelAr, labelEn, hijri, form.StartDate.Value, form.EndDate.Value);
                 TempData["Flash"] = T("Academic year created in Preparation.", "تم إنشاء العام الدراسي في مرحلة الإعداد.");
@@ -169,16 +169,15 @@ namespace Sms.Web.Controllers
                 return NotFound();
             }
 
+            // Enrollments lock the year's span, not its name. Turning the whole screen away made a typo
+            // in a year's label permanent from the first enrolment onward — the labels are shown on every
+            // screen in the product, and the only way out was deleting the year, which enrollments also
+            // forbid. The dates are what the rest of the schema nests inside, so those are what lock.
             var enrolled = await _db.Enrollments.CountAsync(e => e.AcademicYearId == id);
-            if (enrolled > 0)
-            {
-                TempData["Error"] = T($"This year cannot be edited: {enrolled} student enrollment(s) exist.", $"لا يمكن تعديل هذا العام: يوجد {enrolled} تسجيل طلاب.");
-                return RedirectToAction(nameof(Index));
-            }
 
             return View(new YearDefinitionViewModel
             {
-                YearId = id, Year = year,
+                YearId = id, Year = year, EnrolledCount = enrolled,
                 LabelAr = year.LabelAr, LabelEn = year.LabelEn, HijriLabel = year.HijriLabel, StartDate = year.StartDate, EndDate = year.EndDate,
             });
         }
@@ -193,21 +192,38 @@ namespace Sms.Web.Controllers
                 return NotFound();
             }
 
+            var enrolled = await _db.Enrollments.CountAsync(e => e.AcademicYearId == id);
             form.YearId = id;
             form.Year = year;
+            form.EnrolledCount = enrolled;
             try
             {
-                if (form.StartDate == null || form.EndDate == null)
+                // The dates the form posts are ignored when they are locked — the inputs are disabled, so
+                // a browser sends nothing for them anyway, and a hand-crafted request must not be able to
+                // move a span the screen refused to offer.
+                var start = enrolled > 0 ? year.StartDate : form.StartDate;
+                var end = enrolled > 0 ? year.EndDate : form.EndDate;
+                if (start == null || end == null)
                 {
                     throw new InvalidOperationException(T("Start and end dates are required.", "تاريخا البداية والنهاية مطلوبان."));
                 }
 
-                var labelEn = string.IsNullOrWhiteSpace(form.LabelEn) ? $"{form.StartDate.Value.Year}-{form.EndDate.Value.Year}" : form.LabelEn.Trim();
-                var labelAr = string.IsNullOrWhiteSpace(form.LabelAr) ? ToArabicDigits(labelEn) : form.LabelAr.Trim();
-                var hijri = string.IsNullOrWhiteSpace(form.HijriLabel) ? HijriLabelFor(form.StartDate.Value) : form.HijriLabel.Trim();
+                var labelEn = string.IsNullOrWhiteSpace(form.LabelEn) ? $"{start.Value.Year}-{end.Value.Year}" : form.LabelEn.Trim();
+                var labelAr = string.IsNullOrWhiteSpace(form.LabelAr) ? DefaultArabicLabel(labelEn) : form.LabelAr.Trim();
+                var hijri = string.IsNullOrWhiteSpace(form.HijriLabel) ? HijriLabelFor(start.Value) : form.HijriLabel.Trim();
                 _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
-                await _years.UpdateYearAsync(id, labelAr, labelEn, hijri, form.StartDate.Value, form.EndDate.Value);
-                TempData["Flash"] = T("Academic year updated.", "تم تحديث العام الدراسي.");
+
+                if (enrolled > 0)
+                {
+                    await _years.RelabelYearAsync(id, labelAr, labelEn, hijri);
+                    TempData["Flash"] = T("Academic year labels updated.", "تم تحديث تسميات العام الدراسي.");
+                }
+                else
+                {
+                    await _years.UpdateYearAsync(id, labelAr, labelEn, hijri, start.Value, end.Value);
+                    TempData["Flash"] = T("Academic year updated.", "تم تحديث العام الدراسي.");
+                }
+
                 return RedirectToAction(nameof(Index));
             }
             catch (InvalidOperationException ex)
@@ -310,13 +326,24 @@ namespace Sms.Web.Controllers
             };
         }
 
-        private static string ToArabicDigits(string s) => new(s.Select(c => c >= '0' && c <= '9' ? (char)('٠' + (c - '0')) : c).ToArray());
+        /// <summary>
+        /// The Arabic label defaults to the same Western digits as the English one.
+        /// <para>
+        /// This used to substitute Arabic-Indic digits (٢٠٢٦-٢٠٢٧). Owner decision,
+        /// 2026-08-21: numerals stay Western in both languages. doc/02 §6 already
+        /// called Arabic-Indic display "a UI preference, storage is invariant" —
+        /// this settles the preference, and settling it in one direction is what
+        /// keeps a year's name comparable, searchable and copyable between the two
+        /// interfaces instead of being two different strings.
+        /// </para>
+        /// </summary>
+        private static string DefaultArabicLabel(string labelEn) => labelEn;
 
-        /// <summary>Tabular Hijri year of the start date, e.g. "١٤٤٩هـ" (±1 day accuracy is documented; the label is editable).</summary>
+        /// <summary>Tabular Hijri year of the start date, e.g. "1449هـ" (±1 day accuracy is documented; the label is editable).</summary>
         private static string HijriLabelFor(DateTime start)
         {
             var hijri = new HijriCalendar();
-            return ToArabicDigits(hijri.GetYear(start).ToString(CultureInfo.InvariantCulture)) + "هـ";
+            return hijri.GetYear(start).ToString(CultureInfo.InvariantCulture) + "هـ";
         }
     }
 }
