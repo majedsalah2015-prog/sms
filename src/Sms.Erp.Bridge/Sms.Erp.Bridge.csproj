@@ -6,6 +6,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The ERP reads the signed-in principal off HttpContext, exactly as its own host does, so the
+         adapter that supplies its ICurrentUser needs IHttpContextAccessor. Keeping that adapter here
+         with the others is worth the framework reference: the seam is easier to reason about — and to
+         delete — when it is one project rather than one project plus pieces in the host. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!--
       The only two sides this project is allowed to see.
 

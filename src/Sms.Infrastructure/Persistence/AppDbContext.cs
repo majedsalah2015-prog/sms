@@ -56,7 +56,21 @@ namespace Sms.Infrastructure.Persistence
     /// </summary>
     public class AppDbContext : SmsDbContext
     {
-        public AppDbContext(DbContextOptions options, ITenantContext tenant, ICurrentUser currentUser, IClock clock, IAuditContext? auditContext = null)
+        /// <summary>
+        /// Takes the <b>typed</b> options, not the non-generic base type. Once the
+        /// host registers more than one <c>DbContext</c> — which it does since the
+        /// ERP's Accounting and Organization modules moved in
+        /// (docs/Integration/01-Embedded-Accounting-Plan.md §6.2) — EF Core refuses
+        /// to resolve a context whose constructor asks for a bare
+        /// <c>DbContextOptions</c>, because it cannot tell whose options those are.
+        /// With one context registered the ambiguity did not exist and the loose
+        /// parameter was harmless; it is not any more.
+        /// <para>
+        /// <see cref="SmsDbContext"/> keeps the non-generic parameter: it is the
+        /// shared base and is never registered or resolved on its own behalf.
+        /// </para>
+        /// </summary>
+        public AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext tenant, ICurrentUser currentUser, IClock clock, IAuditContext? auditContext = null)
             : base(options, tenant, currentUser, clock, auditContext)
         {
         }

@@ -3,6 +3,28 @@
   <ItemGroup>
     <ProjectReference Include="..\Sms.Application\Sms.Application.csproj" />
     <ProjectReference Include="..\Sms.Infrastructure\Sms.Infrastructure.csproj" />
+    <ProjectReference Include="..\Sms.Erp.Bridge\Sms.Erp.Bridge.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The composition root is the one place allowed to see an ERP module's
+      .Application / .Infrastructure / .Web, because registering a module and
+      migrating its DbContext cannot be expressed through a contract. Every
+      other project of this system reaches the ERP through Sms.Erp.Bridge, and
+      only through Accounting.Contracts — enforced by ErpBoundaryTests.
+
+      Organization is not optional: Accounting.Application injects
+      IBranchDirectory to validate the BranchCode on a posting line.
+      See docs/Integration/01-Embedded-Accounting-Plan.md §4.2.
+    -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Application\ERP2028.Modules.Organization.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Infrastructure\ERP2028.Modules.Organization.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Application\ERP2028.Modules.Accounting.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Infrastructure\ERP2028.Modules.Accounting.Infrastructure.csproj" />
+    <!-- The .Web projects (the Area controllers and views) are referenced in P3,
+         with the routing, layout and permission wiring that makes their screens
+         reachable. P2 stops at the modules running against the database. -->
   </ItemGroup>
 
   <ItemGroup>

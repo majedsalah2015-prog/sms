@@ -8,8 +8,28 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.SqlClient;
 using System.IO;
+using System.Linq;
 using Hangfire;
+// ERP 2028, hosted here as described in docs/Integration/01-Embedded-Accounting-Plan.md.
+// Only this file (the composition root) and Sms.Erp.Bridge may name an ERP2028 assembly.
+// Aliased rather than imported wholesale: ERP2028.Application.Abstractions.Identity also declares an
+// ICurrentUser, and this system's own ICurrentUser is registered a few lines above. Importing the
+// namespace makes that name ambiguous at the registration, which is exactly the kind of collision two
+// codebases sharing a process will keep producing — resolve it here, not by renaming either side.
+using IErpPermissionCatalog = ERP2028.Application.Abstractions.Identity.IPermissionCatalog;
+using ErpPermissionCatalog = ERP2028.Application.Abstractions.Identity.PermissionCatalog;
+using ERP2028.Infrastructure.Shared.Persistence;
+using ERP2028.Modules.Accounting.Application.DependencyInjection;
+using ERP2028.Modules.Accounting.Contracts.Permissions;
+using ERP2028.Modules.Accounting.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Accounting.Infrastructure.Seeding;
+using ERP2028.Modules.Organization.Application.DependencyInjection;
+using ERP2028.Modules.Organization.Contracts.Permissions;
+using ERP2028.Modules.Organization.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Organization.Infrastructure.Seeding;
+using Sms.Erp.Bridge.DependencyInjection;
 using Sms.Application.Activities;
 using Sms.Application.Admissions;
 using Sms.Application.Attachments;
@@ -601,6 +621,68 @@ namespace Sms.Web
             services.AddScoped<IAuditAdmin, AuditAdmin>();
             services.AddScoped<IBackupAdmin, BackupAdmin>();
             services.AddScoped<ISysAdmin, SysAdminService>();
+
+            AddEmbeddedAccounting(services);
+        }
+
+        /// <summary>
+        /// P2 of docs/Integration/01-Embedded-Accounting-Plan.md — hosts ERP 2028's
+        /// Accounting and Organization modules inside this application.
+        /// <para>
+        /// The modules are the same assemblies the ERP ships as a standalone
+        /// product, consumed from the <c>external/erp</c> submodule; this method is
+        /// a second composition root over them, not a copy of them. Everything
+        /// below is additive: no service registered above is replaced, and deleting
+        /// this method returns the system to a standalone school.
+        /// </para>
+        /// <para>
+        /// The four calls that are this host's own decisions rather than
+        /// adaptations — which database, which permissions exist — are here rather
+        /// than in the bridge, so they read next to the module registrations they
+        /// belong to.
+        /// </para>
+        /// </summary>
+        private void AddEmbeddedAccounting(IServiceCollection services)
+        {
+            var connectionString = Configuration.GetConnectionString("Sms");
+
+            // One connection per request, shared by every ERP module's DbContext.
+            // MARS is required because two contexts then read on one physical
+            // connection within a request; the configured string already asks for
+            // it, and this makes the requirement explicit rather than inherited.
+            //
+            // AppDbContext deliberately still opens its own connection. That costs
+            // cross-module atomicity — a school document and its journal entry
+            // commit separately — which is acceptable while posting is a periodic
+            // batch (plan §7.2 option b) and is the first thing to revisit if
+            // posting ever becomes per-document (§6.3).
+            var sharedConnectionString = new SqlConnectionStringBuilder(connectionString)
+            {
+                MultipleActiveResultSets = true
+            }.ConnectionString;
+            services.AddSharedRequestConnection(() => new SqlConnection(sharedConnectionString));
+
+            // This system's answers to the three things the ERP asks of a host.
+            services.AddErpHostAdapters();
+            services.AddScoped<IUserAccountDirectory, UserAccountDirectory>();
+
+            // Organization first — it is the ERP's foundation module and Accounting
+            // references its contracts. Order does not matter to the container; it
+            // matches the dependency direction and the migration order in Program.
+            services.AddOrganizationApplication();
+            services.AddOrganizationInfrastructure(connectionString);
+            services.Configure<OrganizationSeedOptions>(Configuration.GetSection(OrganizationSeedOptions.SectionName));
+
+            services.AddAccountingApplication();
+            services.AddAccountingInfrastructure(connectionString);
+            services.Configure<AccountingSeedOptions>(Configuration.GetSection(AccountingSeedOptions.SectionName));
+
+            // The catalog the ERP composes at its own composition root. Nothing in
+            // Accounting or Organization resolves it today — this system's Identity
+            // is its own — but it is the list a role screen will offer when the
+            // accounting permissions become grantable (P3).
+            services.AddSingleton<IErpPermissionCatalog>(new ErpPermissionCatalog(
+                OrganizationPermissions.All.Concat(AccountingPermissions.All)));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
