@@ -117,7 +117,10 @@
                     <span class="small">@T("Total:", "المجموع:") <strong id="pctTotal">0</strong>%</span>
                 </div>
                 <div id="splitRows"></div>
-                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="addSplit"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Add split", "إضافة شريحة")</button>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="addSplit"><i class="bi bi-plus-lg" aria-hidden="true"></i> @T("Add split", "إضافة شريحة")</button>
+                    <span id="splitHint" class="small text-muted" role="status" aria-live="polite"></span>
+                </div>
 
                 <div class="mt-3 d-grid">
                     <button class="btn btn-primary" type="submit" id="saveTpl"><i class="bi bi-save" aria-hidden="true"></i> @T("Save draft", "حفظ كمسودة")</button>
@@ -133,45 +136,125 @@
     var rows = document.getElementById('splitRows');
     var total = document.getElementById('pctTotal');
     var save = document.getElementById('saveTpl');
+    var hint = document.getElementById('splitHint');
     var labels = {
         pct: @Html.Raw(Json.Serialize(T("Percent", "النسبة"))),
+        rule: @Html.Raw(Json.Serialize(T("Due-date rule", "قاعدة الاستحقاق"))),
         date: @Html.Raw(Json.Serialize(T("Due date", "تاريخ الاستحقاق"))),
-        offset: @Html.Raw(Json.Serialize(T("or offset (days)", "أو إزاحة (أيام)"))),
-        remove: @Html.Raw(Json.Serialize(T("Remove", "حذف")))
+        offset: @Html.Raw(Json.Serialize(T("Days from year start", "أيام من بداية العام"))),
+        offsetDays: @Html.Raw(Json.Serialize(T("Days from year start", "أيام من بداية العام"))),
+        remove: @Html.Raw(Json.Serialize(T("Remove", "حذف"))),
+        needRule: @Html.Raw(Json.Serialize(T("Every split needs a date or an offset.", "كل شريحة تحتاج تاريخاً أو إزاحة."))),
+        remaining: @Html.Raw(Json.Serialize(T("remaining", "متبقٍ"))),
+        over: @Html.Raw(Json.Serialize(T("over", "زائد"))),
+        ready: @Html.Raw(Json.Serialize(T("Ready to save.", "جاهز للحفظ.")))
     };
+
+    // Both halves of BR-INS-001, checked together: the total, and every row carrying a rule. The server
+    // enforces both regardless — this only saves the operator a round trip that names a split number.
+    function validate() {
+        var missing = 0;
+        Array.prototype.forEach.call(rows.children, function (row) {
+            var pct = parseFloat(row.querySelector('input[name="percents"]').value) || 0;
+            if (pct <= 0) { return; }
+            var d = row.querySelector('input[name="dueDates"]').value;
+            var o = row.querySelector('input[name="offsets"]').value;
+            if (!d && !o) { missing++; }
+        });
+
+        var sum = 0;
+        rows.querySelectorAll('input[name="percents"]').forEach(function (i) { sum += parseFloat(i.value) || 0; });
+        sum = Math.round(sum * 100) / 100;
+        var balanced = Math.abs(sum - 100) < 0.005;
+
+        if (missing > 0) {
+            hint.textContent = labels.needRule;
+            hint.className = 'small text-danger';
+        } else if (!balanced) {
+            var diff = Math.round((100 - sum) * 100) / 100;
+            hint.textContent = diff > 0 ? (diff + '% ' + labels.remaining) : (Math.abs(diff) + '% ' + labels.over);
+            hint.className = 'small text-danger';
+        } else {
+            hint.textContent = labels.ready;
+            hint.className = 'small text-success';
+        }
+
+        save.disabled = !balanced || missing > 0;
+    }
 
     function recalc() {
         var sum = 0;
         rows.querySelectorAll('input[name="percents"]').forEach(function (i) { sum += parseFloat(i.value) || 0; });
         total.textContent = (Math.round(sum * 100) / 100).toString();
-        // The engine rejects anything but exactly 100 (BR-INS-001); saying so before the round trip is
-        // kinder than a red banner, but the server still decides.
         var ok = Math.abs(sum - 100) < 0.005;
         total.parentElement.classList.toggle('text-danger', !ok);
         total.parentElement.classList.toggle('text-success', ok);
-        save.disabled = !ok;
+        validate();
     }
 
-    function addRow(pct) {
-        var i = rows.children.length + 1;
+    // Each row picks ONE due-date rule. Two always-editable inputs let an operator fill neither, which
+    // BR-INS-001 refuses — and the refusal arrives after a round trip, naming a split number they have
+    // to count out by hand. A mode switch makes "neither" unreachable, and the disabled input is still
+    // posted (as empty) so the three arrays stay index-aligned on the server.
+    function addRow(pct, mode, value) {
+        var n = rows.children.length + 1;
+        var id = 'sp' + n + '-' + Math.random().toString(36).slice(2, 7);
         var div = document.createElement('div');
-        div.className = 'row g-1 align-items-end mb-1';
+        div.className = 'row g-1 align-items-end mb-2 pb-2 border-bottom';
         div.innerHTML =
-            '<div class="col-3"><label class="form-label small mb-0">' + labels.pct + ' #' + i + '</label>' +
-            '<input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" name="percents" value="' + (pct || '') + '" /></div>' +
-            '<div class="col-4"><label class="form-label small mb-0">' + labels.date + '</label>' +
-            '<input type="date" class="form-control form-control-sm" name="dueDates" /></div>' +
-            '<div class="col-3"><label class="form-label small mb-0">' + labels.offset + '</label>' +
-            '<input type="number" min="0" class="form-control form-control-sm" name="offsets" /></div>' +
-            '<div class="col-2"><button type="button" class="btn btn-sm btn-outline-danger w-100" aria-label="' + labels.remove + '"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
-        div.querySelector('button').addEventListener('click', function () { div.remove(); recalc(); });
+            '<div class="col-12 col-sm-3"><label class="form-label small mb-0" for="' + id + '-p">' + labels.pct + ' #' + n + '</label>' +
+            '<input type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" id="' + id + '-p" name="percents" value="' + (pct || '') + '" /></div>' +
+            '<div class="col-12 col-sm-3"><label class="form-label small mb-0" for="' + id + '-m">' + labels.rule + '</label>' +
+            '<select class="form-select form-select-sm" id="' + id + '-m" data-mode>' +
+            '<option value="date">' + labels.date + '</option><option value="offset">' + labels.offset + '</option></select></div>' +
+            '<div class="col-8 col-sm-4">' +
+            '<label class="form-label small mb-0" for="' + id + '-d" data-datelabel>' + labels.date + '</label>' +
+            '<input type="date" class="form-control form-control-sm" id="' + id + '-d" name="dueDates" aria-label="' + labels.date + '" />' +
+            '<label class="form-label small mb-0 d-none" for="' + id + '-o" data-offsetlabel>' + labels.offsetDays + '</label>' +
+            '<input type="number" min="0" step="1" class="form-control form-control-sm d-none" id="' + id + '-o" name="offsets" aria-label="' + labels.offsetDays + '" />' +
+            '</div>' +
+            '<div class="col-4 col-sm-2"><button type="button" class="btn btn-sm btn-outline-danger w-100" aria-label="' + labels.remove + '"><i class="bi bi-x-lg" aria-hidden="true"></i></button></div>';
+
+        var sel = div.querySelector('[data-mode]');
+        var dateInput = div.querySelector('input[name="dueDates"]');
+        var offsetInput = div.querySelector('input[name="offsets"]');
+        var dateLabel = div.querySelector('[data-datelabel]');
+        var offsetLabel = div.querySelector('[data-offsetlabel]');
+
+        function applyMode() {
+            var byDate = sel.value === 'date';
+            dateInput.classList.toggle('d-none', !byDate);
+            dateLabel.classList.toggle('d-none', !byDate);
+            offsetInput.classList.toggle('d-none', byDate);
+            offsetLabel.classList.toggle('d-none', byDate);
+            // Clear the hidden one so a value the operator can no longer see cannot reach the server.
+            if (byDate) { offsetInput.value = ''; } else { dateInput.value = ''; }
+            validate();
+        }
+
+        sel.addEventListener('change', applyMode);
+        div.querySelector('button').addEventListener('click', function () { div.remove(); renumber(); recalc(); });
         div.querySelector('input[name="percents"]').addEventListener('input', recalc);
+        dateInput.addEventListener('input', validate);
+        offsetInput.addEventListener('input', validate);
         rows.appendChild(div);
+
+        if (mode === 'offset') { sel.value = 'offset'; }
+        applyMode();
+        if (value) { (sel.value === 'date' ? dateInput : offsetInput).value = value; }
         recalc();
     }
 
+    // Split numbers are what the server names in an error, so they must match what the operator sees.
+    function renumber() {
+        Array.prototype.forEach.call(rows.children, function (row, i) {
+            var label = row.querySelector('label[for$="-p"]');
+            if (label) { label.textContent = labels.pct + ' #' + (i + 1); }
+        });
+    }
+
     document.getElementById('addSplit').addEventListener('click', function () { addRow(); });
-    addRow(50); addRow(50);
+    addRow(50, 'date'); addRow(50, 'date');
 })();
 </script>
 }

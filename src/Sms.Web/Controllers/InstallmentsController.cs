@@ -98,22 +98,51 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> CreateTemplate(
             int academicYearId, string nameAr, string nameEn, int? feeCategoryId,
             decimal downPaymentPercent, int graceDays,
-            decimal[] percents, DateTime?[] dueDates, int?[] offsets)
+            string[] percents, string[] dueDates, string[] offsets)
         {
-            // The designer posts three parallel arrays, one entry per split row. Empty trailing rows are
-            // dropped rather than rejected: a form that always shows a spare row would otherwise refuse
-            // every submission that did not fill it.
+            // Bound as strings, not as decimal[]/DateTime?[]/int?[], and that is not a style choice.
+            // Model binding drops an entry it cannot convert, so a row that fills only its date and a
+            // row that fills only its offset collapse into shorter arrays — and the second row's offset
+            // silently lands on the first row. The three arrays have to stay index-aligned with each
+            // other, which only holds if every posted field survives binding, empty ones included.
             var splits = new List<TemplateSplit>();
-            for (var i = 0; i < (percents?.Length ?? 0); i++)
+            var rowCount = percents?.Length ?? 0;
+            for (var i = 0; i < rowCount; i++)
             {
-                if (percents![i] <= 0m)
+                if (!decimal.TryParse(At(percents, i), NumberStyles.Number, CultureInfo.InvariantCulture, out var percent) || percent <= 0m)
                 {
+                    // A blank percentage means a spare row the operator never filled, not an error: the
+                    // designer always offers one more than is in use.
                     continue;
                 }
 
-                var due = dueDates != null && i < dueDates.Length ? dueDates[i] : null;
-                var offset = offsets != null && i < offsets.Length ? offsets[i] : null;
-                splits.Add(new TemplateSplit(percents[i], due, offset));
+                var due = DateTime.TryParse(At(dueDates, i), CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : (DateTime?)null;
+                var offset = int.TryParse(At(offsets, i), NumberStyles.Integer, CultureInfo.InvariantCulture, out var o) ? o : (int?)null;
+
+                if (due == null && offset == null)
+                {
+                    TempData["Error"] = T(
+                        $"Split #{splits.Count + 1} has no due-date rule: give it either a date or an offset in days from the start of the year (BR-INS-001).",
+                        $"الشريحة رقم {splits.Count + 1} بلا قاعدة استحقاق: امنحها تاريخاً أو عدد أيام من بداية العام (BR-INS-001).");
+                    return RedirectToAction(nameof(Index), new { year = academicYearId });
+                }
+
+                splits.Add(new TemplateSplit(percent, due, offset));
+            }
+
+            if (splits.Count == 0)
+            {
+                TempData["Error"] = T("Add at least one split before saving.", "أضف شريحة واحدة على الأقل قبل الحفظ.");
+                return RedirectToAction(nameof(Index), new { year = academicYearId });
+            }
+
+            var total = splits.Sum(s => s.Percent);
+            if (Math.Abs(total - 100m) > 0.005m)
+            {
+                TempData["Error"] = T(
+                    $"The splits total {total:0.##}%, not 100% (BR-INS-001).",
+                    $"مجموع الشرائح {total:0.##}% لا 100% (BR-INS-001).");
+                return RedirectToAction(nameof(Index), new { year = academicYearId });
             }
 
             try
@@ -123,13 +152,22 @@ namespace Sms.Web.Controllers
                     feeCategoryId, downPaymentPercent, graceDays, HttpContext.RequestAborted);
                 TempData["Flash"] = T("Plan template saved as a draft.", "حُفظ قالب الخطة كمسودة.");
             }
-            catch (InvalidTemplateSplitException ex)
+            catch (InvalidTemplateSplitException)
             {
-                TempData["Error"] = ex.Message;
+                // The engine's own message is English and written for a developer reading a stack trace.
+                // The checks above catch both of its cases first, so reaching here means a rule it holds
+                // and this screen does not — say so in the operator's language rather than leaking it.
+                TempData["Error"] = T(
+                    "The splits were refused: they must total 100% and each needs a due-date rule (BR-INS-001).",
+                    "رُفضت الشرائح: يجب أن يبلغ مجموعها 100% وأن تحمل كل شريحة قاعدة استحقاق (BR-INS-001).");
             }
 
             return RedirectToAction(nameof(Index), new { year = academicYearId });
         }
+
+        /// <summary>The i-th posted value, or null when the array is shorter — a row whose field the browser omitted entirely.</summary>
+        private static string? At(string[]? values, int index)
+            => values != null && index < values.Length ? values[index] : null;
 
         [HttpPost("templates/{id:int}/approve")]
         [ValidateAntiForgeryToken]
