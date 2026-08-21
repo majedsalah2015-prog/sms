@@ -112,7 +112,38 @@ namespace Sms.Web.Navigation
                 items.Add(group);
             }
 
+            items.Add(BuildAccountingGroup());
+
             return items;
+        }
+
+        /// <summary>
+        /// The embedded ERP accounting screens (docs/Integration/01-Embedded-Accounting-Plan.md §7).
+        /// They are not <see cref="ModuleInfo"/> entries because they are not this system's modules:
+        /// they have no BR document, no feature toggle, and no epic — they belong to a subsystem
+        /// hosted here, and modelling them as school modules would make the catalogue lie about what
+        /// this product contains.
+        /// <para>
+        /// Like every other entry, these are shown regardless of permission; the sidebar filters on
+        /// feature toggles only, and a screen the user cannot open refuses at the screen. That is the
+        /// existing behaviour of this shell, not a decision taken here.
+        /// </para>
+        /// </summary>
+        private static NavItem BuildAccountingGroup()
+        {
+            var group = new NavItem("accounting", "Accounting", "المحاسبة", "bi-calculator");
+
+            group.Items.Add(new NavItem("acc-accounts", "Chart of accounts", "دليل الحسابات", "bi-diagram-3", "Accounts", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-journal", "Journal entries", "القيود اليومية", "bi-journal-text", "JournalEntries", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-vouchers", "Manual vouchers", "السندات اليدوية", "bi-receipt", "ManualVouchers", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-ledger", "General ledger", "الأستاذ العام", "bi-book", "GeneralLedger", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-reports", "Financial reports", "التقارير المالية", "bi-graph-up", "FinancialReports", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-fiscal", "Fiscal years", "السنوات المالية", "bi-calendar-range", "FiscalYears", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-currencies", "Currencies", "العملات", "bi-cash-coin", "Currencies", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("acc-costcentres", "Cost centres", "مراكز التكلفة", "bi-pie-chart", "CostCentres", "Index", new { area = "Accounting" }));
+            group.Items.Add(new NavItem("org-branches", "Branches", "الفروع", "bi-building", "Branches", "Index", new { area = "Organization" }));
+
+            return group;
         }
 
         private static ModuleInfo M(string code, string number, string en, string ar, string icon, string group, string epic, string doc, string? screenController = null, string? screenAction = null) =>

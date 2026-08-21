@@ -449,3 +449,7 @@ $RECYCLE.BIN/
 /etoken.txt
 /cj.txt
 /ecj.txt
+
+# Copied from the ERP submodule on every build (Sms.Web.csproj, CopyErpTheme).
+# Committing it would make it a stale copy the moment the submodule moves.
+src/Sms.Web/wwwroot/css/erp-theme.css

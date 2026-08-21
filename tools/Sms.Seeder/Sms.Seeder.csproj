@@ -2,6 +2,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sms.Infrastructure\Sms.Infrastructure.csproj" />
+    <!-- For the ERP permission catalog. The seeder is what turns those names into sec.Permission
+         rows and the SYSADMIN grant, because seeding never runs from the web app
+         (docs/Integration/01-Embedded-Accounting-Plan.md §5.1). -->
+    <ProjectReference Include="..\..\src\Sms.Erp.Bridge\Sms.Erp.Bridge.csproj" />
   </ItemGroup>
 
   <ItemGroup>

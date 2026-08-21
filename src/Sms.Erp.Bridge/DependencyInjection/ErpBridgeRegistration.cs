@@ -2,6 +2,7 @@ using ERP2028.Application.Abstractions.Identity;
 using ERP2028.Application.Abstractions.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Sms.Erp.Bridge.Identity;
+using Sms.Application.Security;
 using Sms.Erp.Bridge.Time;
 
 namespace Sms.Erp.Bridge.DependencyInjection
@@ -37,6 +38,22 @@ namespace Sms.Erp.Bridge.DependencyInjection
             services.AddScoped<ICurrentUser, ErpCurrentUserAdapter>();
             services.AddScoped<IUserDirectory, ErpUserDirectoryAdapter>();
 
+            return services;
+        }
+
+        /// <summary>
+        /// Declares the ERP permission names to this system's catalogue, so they become grantable on
+        /// the ordinary role screen.
+        /// <para>
+        /// Separate from <see cref="AddErpHostAdapters"/> because the two have different callers. The
+        /// adapters are web-host services — the current user comes off an HTTP context. This one is
+        /// needed by the seeder tool, which has no request and must not be made to resolve services
+        /// that assume one. Both hosts call this; only the web host calls the other.
+        /// </para>
+        /// </summary>
+        public static IServiceCollection AddErpPermissionCatalog(this IServiceCollection services)
+        {
+            services.AddSingleton<IExternalPermissionCatalog, ErpPermissionCatalog>();
             return services;
         }
     }

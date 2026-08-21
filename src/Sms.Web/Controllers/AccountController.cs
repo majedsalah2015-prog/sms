@@ -15,6 +15,8 @@ using Sms.Domain.Security;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Web.Security;
+using ERP2028.Application.Abstractions.Identity;
+using Sms.Erp.Bridge.Identity;
 using IAuthenticationService = Sms.Application.Security.IAuthenticationService;
 
 namespace Sms.Web.Controllers
@@ -34,11 +36,13 @@ namespace Sms.Web.Controllers
 
         private readonly IAuthenticationService _auth;
         private readonly AppDbContext _db;
+        private readonly IPermissionService _permissions;
 
-        public AccountController(IAuthenticationService auth, AppDbContext db)
+        public AccountController(IAuthenticationService auth, AppDbContext db, IPermissionService permissions)
         {
             _auth = auth;
             _db = db;
+            _permissions = permissions;
         }
 
         [HttpGet]
@@ -224,6 +228,15 @@ namespace Sms.Web.Controllers
             {
                 claims.Add(new Claim(SmsClaimTypes.MustChangePassword, "1"));
             }
+
+            // The embedded ERP modules authorize by claim, not by a service call, so every accounting
+            // permission this account holds has to be on the principal before it is signed in. They are
+            // ordinary sec.RolePermission grants under the reserved "ERP" module code
+            // (IExternalPermissionCatalog); an account with none simply carries none, and every
+            // accounting screen denies it — the correct deny-by-default answer, not a gap to patch.
+            var erpPermissions = await _permissions.GetGrantedScreenCodesAsync(
+                account.Id, ErpPermissionCatalog.ErpModuleCode, ActionVerb.View, HttpContext.RequestAborted);
+            claims.AddRange(erpPermissions.Select(p => new Claim(AppClaimTypes.Permission, p)));
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(

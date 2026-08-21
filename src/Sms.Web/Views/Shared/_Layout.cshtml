@@ -17,6 +17,9 @@
     // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
     var erpUrl = Configuration["ExternalApps:ErpUrl"];
     var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";
+    // The embedded accounting modules render inside this same shell; their screens are the ones
+    // served from an MVC area, which no screen of this system uses.
+    var isErpArea = !string.IsNullOrEmpty(ViewContext.RouteData.Values["area"] as string);
 }
 <!DOCTYPE html>
 <html lang="@lang" dir="@dir">
@@ -28,6 +31,13 @@
     <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.min.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/lib/fonts/fonts.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (isErpArea)
+    {
+        // The embedded ERP modules' design system, loaded only on their own screens. Site-wide it
+        // would put two stylesheets in competition over the same Bootstrap components; scoped to the
+        // area, each subsystem's screens look like themselves and neither restyles the other.
+        <link rel="stylesheet" href="~/css/erp-theme.css" asp-append-version="true" />
+    }
 </head>
 <body>
     <a class="sms-skip-link" href="#sms-main">@(isRtl ? "تخطي إلى المحتوى" : "Skip to content")</a>

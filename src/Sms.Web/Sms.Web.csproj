@@ -22,9 +22,11 @@
     <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Infrastructure\ERP2028.Modules.Organization.Infrastructure.csproj" />
     <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Application\ERP2028.Modules.Accounting.Application.csproj" />
     <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Infrastructure\ERP2028.Modules.Accounting.Infrastructure.csproj" />
-    <!-- The .Web projects (the Area controllers and views) are referenced in P3,
-         with the routing, layout and permission wiring that makes their screens
-         reachable. P2 stops at the modules running against the database. -->
+    <!-- Razor class libraries: their Area controllers and compiled views are discovered through
+         AddApplicationPart in Startup, and their _ViewStart asks for a layout by name, so the
+         layout they render inside is this application's own. -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Web\ERP2028.Modules.Organization.Web.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Web\ERP2028.Modules.Accounting.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -40,5 +42,20 @@
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
   </PropertyGroup>
+
+  <!--
+    The ERP's design system, which its Tag Helpers emit class names against, so its screens are
+    styled when rendered here. Copied on every build rather than committed: a committed copy is a
+    stale copy the moment the submodule pointer moves, which is the exact failure P0 spent its time
+    undoing. The destination is git-ignored.
+
+    The file is plain, self-contained CSS — no @import, no url() — so it needs none of the ERP's
+    Vite pipeline. If that ever stops being true, this target is where it will break, loudly.
+  -->
+  <Target Name="CopyErpTheme" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="..\..\external\erp\src\Bootstrap\ERP2028.Web\Assets\css\erp-theme.css"
+          DestinationFiles="wwwroot\css\erp-theme.css"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

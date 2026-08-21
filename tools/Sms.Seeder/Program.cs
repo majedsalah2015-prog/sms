@@ -36,6 +36,7 @@ using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Notifications;
+using Sms.Erp.Bridge.DependencyInjection;
 using Sms.Infrastructure.Seeding;
 using Sms.Infrastructure.Setup;
 using Sms.Infrastructure.Sections;
@@ -107,6 +108,13 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
+
+            // The embedded ERP modules' permission names, catalogued as sec.Permission rows and
+            // granted to SYSADMIN, so an administrator can reach the accounting screens and hand the
+            // access on through the ordinary role screen.
+            services.AddErpPermissionCatalog();
+            services.AddScoped<ISeedContributor, ExternalPermissionSeedContributor>();
+
             services.AddScoped<SeedRunner>();
 
             using var provider = services.BuildServiceProvider();

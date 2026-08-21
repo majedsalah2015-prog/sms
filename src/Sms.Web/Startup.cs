@@ -25,10 +25,14 @@ using ERP2028.Modules.Accounting.Application.DependencyInjection;
 using ERP2028.Modules.Accounting.Contracts.Permissions;
 using ERP2028.Modules.Accounting.Infrastructure.DependencyInjection;
 using ERP2028.Modules.Accounting.Infrastructure.Seeding;
+using ERP2028.Modules.Accounting.Web.DependencyInjection;
 using ERP2028.Modules.Organization.Application.DependencyInjection;
 using ERP2028.Modules.Organization.Contracts.Permissions;
 using ERP2028.Modules.Organization.Infrastructure.DependencyInjection;
 using ERP2028.Modules.Organization.Infrastructure.Seeding;
+using ERP2028.Modules.Organization.Web.DependencyInjection;
+using ERP2028.Web.Shared.DependencyInjection;
+using ERP2028.Web.Shared.Navigation;
 using Sms.Erp.Bridge.DependencyInjection;
 using Sms.Application.Activities;
 using Sms.Application.Admissions;
@@ -68,6 +72,7 @@ using Sms.Application.Rollover;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
+using Sms.Application.Seeding;
 using Sms.Application.Statements;
 using Sms.Application.Store;
 using Sms.Application.Students;
@@ -118,6 +123,7 @@ using Sms.Infrastructure.Rollover;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Sections;
 using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Seeding;
 using Sms.Infrastructure.Statements;
 using Sms.Infrastructure.Store;
 using Sms.Infrastructure.Students;
@@ -148,7 +154,12 @@ namespace Sms.Web
                 options.Filters.Add<RequirePasswordChangeFilter>();
                 // BR-SEC-010: portal accounts never see staff URLs (404, not 403).
                 options.Filters.Add<Sms.Web.Security.PortalAreaFilter>();
-            });
+            })
+            // The embedded ERP modules ship their controllers and compiled views in Razor class
+            // libraries; MVC finds neither without being told the assemblies are part of this
+            // application (docs/Integration/01-Embedded-Accounting-Plan.md §7).
+            .AddApplicationPart(typeof(OrganizationWebRegistration).Assembly)
+            .AddApplicationPart(typeof(AccountingWebRegistration).Assembly);
 
             // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,
             // re-validated per request by SessionCookieEvents; a second, 5-minute
@@ -677,6 +688,23 @@ namespace Sms.Web
             services.AddAccountingInfrastructure(connectionString);
             services.Configure<AccountingSeedOptions>(Configuration.GetSection(AccountingSeedOptions.SectionName));
 
+            // ----- Presentation -----
+            // The modules' screens. Their [HasPermission] resolves through the ERP's own policy
+            // provider, which is safe to add here because it delegates every policy name that is not
+            // its "PERM:" convention — including this system's named policies and its fallback — to
+            // the default provider. It has to be registered after AddAuthorization above, which the
+            // call order in ConfigureServices gives us.
+            services.AddLocalization();
+            services.AddPermissionAuthorization();
+            services.AddErpNavigation();
+            services.AddOrganizationWeb();
+            services.AddAccountingWeb();
+
+            // Catalogued and granted by the Sms.Seeder tool, never here: seeding must not run as a
+            // side effect of the web app starting (the rule the lookup framework states above). The
+            // catalog itself is registered because sign-in reads the granted names to mint claims.
+            services.AddErpPermissionCatalog();
+
             // The catalog the ERP composes at its own composition root. Nothing in
             // Accounting or Organization resolves it today — this system's Identity
             // is its own — but it is the list a role screen will offer when the
@@ -725,6 +753,12 @@ namespace Sms.Web
 
             app.UseEndpoints(endpoints =>
             {
+                // Before the default route, and constrained by {area:exists}, so it matches only the
+                // areas the embedded ERP modules actually register and leaves every school URL alone.
+                endpoints.MapControllerRoute(
+                    name: "areas",
+                    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");

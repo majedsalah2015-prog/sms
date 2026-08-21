@@ -34,6 +34,9 @@
       module and migrating its DbContext cannot be done through a contract.
     -->
     <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Contracts\ERP2028.Modules.Accounting.Contracts.csproj" />
+    <!-- Contracts only, for the permission names Organization declares. Accounting already pulls this
+         in transitively; naming it is honest about the fact that this project reads from it. -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Contracts\ERP2028.Modules.Organization.Contracts.csproj" />
     <ProjectReference Include="..\Sms.Application\Sms.Application.csproj" />
   </ItemGroup>
 

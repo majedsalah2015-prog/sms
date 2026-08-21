@@ -50,6 +50,12 @@ namespace Sms.Infrastructure.Tests
 
             public Task<EffectiveScope?> GetEffectiveScopeAsync(string moduleCode, string screenCode, ActionVerb action, CancellationToken cancellationToken = default)
                 => Task.FromResult<EffectiveScope?>(new EffectiveScope());
+
+            // "Grant all" cannot enumerate what it grants — the caller asks which screen codes exist
+            // under a module, and this fake has no catalogue. Empty is the honest answer; no workflow
+            // test reads it.
+            public Task<IReadOnlyList<string>> GetGrantedScreenCodesAsync(int userAccountId, string moduleCode, ActionVerb action, CancellationToken cancellationToken = default)
+                => Task.FromResult<IReadOnlyList<string>>(new List<string>());
         }
 
         private sealed class CreateAccountEffect : IWorkflowFinalEffect

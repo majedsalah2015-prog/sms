@@ -63,7 +63,11 @@ namespace Sms.ArchitectureTests
                     "ERP2028.Modules.Accounting.Application",
                     "ERP2028.Modules.Accounting.Infrastructure",
                     "ERP2028.Modules.Accounting.Domain",
-                    "ERP2028.Modules.Accounting.Web")
+                    "ERP2028.Modules.Accounting.Web",
+                    "ERP2028.Modules.Organization.Application",
+                    "ERP2028.Modules.Organization.Infrastructure",
+                    "ERP2028.Modules.Organization.Domain",
+                    "ERP2028.Modules.Organization.Web")
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Failing(result));

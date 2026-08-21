@@ -40,6 +40,20 @@ namespace Sms.Infrastructure.Security
             return PermissionEvaluator.GetEffectiveScope(snapshots, moduleCode, screenCode, action);
         }
 
+        public async Task<IReadOnlyList<string>> GetGrantedScreenCodesAsync(int userAccountId, string moduleCode, ActionVerb action, CancellationToken cancellationToken = default)
+        {
+            // Not routed through LoadAsync: that caches for the ambient user, and this answers for an
+            // arbitrary one at sign-in, before there is an ambient user at all. The query filters still
+            // apply, so a revoked role or another school's assignment cannot leak a grant.
+            return await _db.RoleAssignments
+                .Where(a => a.UserAccountId == userAccountId)
+                .SelectMany(a => a.Role!.Permissions)
+                .Where(rp => rp.Permission!.ModuleCode == moduleCode && rp.Permission!.Action == action)
+                .Select(rp => rp.Permission!.ScreenCode)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+        }
+
         private async Task<IReadOnlyCollection<AssignmentSnapshot>> LoadAsync(CancellationToken cancellationToken)
         {
             if (_snapshots != null)
