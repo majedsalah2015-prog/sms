@@ -62,7 +62,7 @@ namespace Sms.Web.Navigation
             M("HLT", "24", "Health", "الصحة المدرسية", "bi-heart-pulse", "services", "E-502", "24-Health.md"),
             M("DIS", "25", "Discipline", "السلوك والانضباط", "bi-shield-exclamation", "services", "E-503", "25-Discipline.md"),
             M("LIB", "26", "Library", "المكتبة", "bi-book", "services", "E-601", "26-Library.md"),
-            M("CAF", "27", "Cafeteria", "المقصف", "bi-cup-hot", "services", "E-602", "27-Cafeteria.md"),
+            M("CAF", "27", "Cafeteria", "المقصف", "bi-cup-hot", "services", "E-602", "27-Cafeteria.md", "Cafeteria", "Index"),
             M("STO", "28", "School Store", "المتجر المدرسي", "bi-bag", "services", "E-603", "28-School-Store.md"),
             M("ACT", "29", "Activities", "الأنشطة", "bi-trophy", "services", "E-607", "29-Activities.md"),
 

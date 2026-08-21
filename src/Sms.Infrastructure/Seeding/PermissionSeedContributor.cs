@@ -35,6 +35,7 @@ namespace Sms.Infrastructure.Seeding
     /// </summary>
     public class PermissionSeedContributor : ISeedContributor
     {
+        private const string SystemAdministrator = "SYSADMIN";
         private const string AnyModule = "*";
         private const string AnyScreen = "*";
 
@@ -62,7 +63,7 @@ namespace Sms.Infrastructure.Seeding
         private static readonly Grant[] Matrix =
         {
             // The one role that can change what the roles themselves may do.
-            new("SYSADMIN", AnyModule, AnyScreen, null),
+            new(SystemAdministrator, AnyModule, AnyScreen, null),
 
             // Sees everything and decides anything; creates and edits nothing directly.
             // Approve only lands where a screen defines it, so this is narrower than it looks.
@@ -163,6 +164,7 @@ namespace Sms.Infrastructure.Seeding
             new("NURSE", ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, Read),
             new("LIBRARIAN", ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, Read),
             new("STOREKEEPER", ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, Read),
+            new("CAFETERIA_OPERATOR", ScreenCatalog.Modules.Cafeteria, AnyScreen, null),
             new("CAFETERIA_OPERATOR", ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, Read),
             new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, Read),
             new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, Read),
@@ -230,16 +232,31 @@ namespace Sms.Infrastructure.Seeding
 
             foreach (var roleCode in Matrix.Select(g => g.RoleCode).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                if (!roles.TryGetValue(roleCode, out var roleId) || rolesWithGrants.Contains(roleId))
+                if (!roles.TryGetValue(roleCode, out var roleId))
                 {
-                    // Either the template is absent (a school removed it) or the role already holds
-                    // school grants and is therefore curated. Neither is ours to overwrite.
+                    // The template is absent — a school removed it, which is theirs to do.
                     continue;
                 }
 
+                // The system administrator is topped up on every run, unlike every other role. It is
+                // the role that grants the others, so a permission it cannot reach is a permission
+                // nobody in the school can ever be given: a screen shipped after first provisioning
+                // would be invisible to the entire product, permanently and silently. Every other
+                // role keeps its curation, because revoking from a cashier is a decision and this is
+                // not.
+                var alwaysTopUp = string.Equals(roleCode, SystemAdministrator, StringComparison.OrdinalIgnoreCase);
+                if (rolesWithGrants.Contains(roleId) && !alwaysTopUp)
+                {
+                    continue;
+                }
+
+                var held = alwaysTopUp
+                    ? new HashSet<int>(await _db.RolePermissions.Where(rp => rp.RoleId == roleId).Select(rp => rp.PermissionId).ToListAsync(cancellationToken))
+                    : new HashSet<int>();
+
                 foreach (var key in Expand(roleCode))
                 {
-                    if (catalogued.TryGetValue(key, out var permission))
+                    if (catalogued.TryGetValue(key, out var permission) && !held.Contains(permission.Id))
                     {
                         _db.RolePermissions.Add(new RolePermission { RoleId = roleId, PermissionId = permission.Id });
                     }

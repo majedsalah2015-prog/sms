@@ -74,6 +74,7 @@ namespace Sms.Application.Security
             public const string Discounts = "DSC";
             public const string Reports = "RPT";
             public const string Dashboards = "DSH";
+            public const string Cafeteria = "CAF";
 
             /// <summary>The parent/student portal. Not a <c>ModuleCatalog</c> entry — it is an audience, not a module — but it needs its own permission space so a portal grant can never widen into a staff one.</summary>
             public const string Portal = "POR";
@@ -257,6 +258,11 @@ namespace Sms.Application.Security
             public const string Widgets = "Widgets";
         }
 
+        public static class Cafeteria
+        {
+            public const string Pos = "Pos";
+        }
+
         public static class Portal
         {
             public const string Home = "Home";
@@ -400,6 +406,8 @@ namespace Sms.Application.Security
             S(Modules.Dashboards, Dashboards.Layouts, "Layout templates", "قوالب اللوحات", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit),
             S(Modules.Dashboards, Dashboards.Widgets, "Widget catalog", "دليل الأدوات", ActionVerb.View, ActionVerb.Create, ActionVerb.Configure),
 
+            // ---- Cafeteria
+            S(Modules.Cafeteria, Cafeteria.Pos, "Cafeteria POS", "نقطة بيع المقصف", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),

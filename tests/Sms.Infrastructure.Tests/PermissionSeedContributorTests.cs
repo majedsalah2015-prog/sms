@@ -230,6 +230,44 @@ namespace Sms.Infrastructure.Tests
 
         [Fact]
         [BusinessRule("BR-GLB-070")]
+        public async Task A_permission_added_after_provisioning_still_reaches_the_system_administrator()
+        {
+            // The state a school reaches the moment anything grants SYSADMIN anything — the ERP's
+            // own permissions do it during the very first seeding run. Without the top-up, "already
+            // curated" would then stop every screen shipped afterwards from ever reaching the one
+            // role that grants the others: invisible to the whole product, permanently and silently.
+            using (var db = CreateContext())
+            {
+                await new RoleTemplateSeedContributor(db).SeedAsync();
+                var sysadmin = await db.Roles.SingleAsync(r => r.Code == "SYSADMIN");
+                var one = new Permission { ModuleCode = ScreenCatalog.Modules.Fees, ScreenCode = ScreenCatalog.Fees.Charges, Action = ActionVerb.View };
+                db.Permissions.Add(one);
+                await db.SaveChangesAsync();
+                db.RolePermissions.Add(new RolePermission { RoleId = sysadmin.Id, PermissionId = one.Id });
+                await db.SaveChangesAsync();
+            }
+
+            await SeedAsync();
+
+            using (var db = CreateContext())
+            {
+                var sysadmin = await db.Roles.SingleAsync(r => r.Code == "SYSADMIN");
+                var everything = await db.Permissions.Where(p => p.ModuleCode != ScreenCatalog.Modules.Portal).CountAsync();
+                var held = await db.RolePermissions.CountAsync(rp => rp.RoleId == sysadmin.Id);
+                Assert.Equal(everything, held);
+
+                // And still exactly once each — a top-up must not duplicate what is already there.
+                var duplicates = await db.RolePermissions
+                    .Where(rp => rp.RoleId == sysadmin.Id)
+                    .GroupBy(rp => rp.PermissionId)
+                    .Where(g => g.Count() > 1)
+                    .CountAsync();
+                Assert.Equal(0, duplicates);
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-070")]
         public async Task A_curated_role_is_never_re_seeded()
         {
             await SeedAsync();

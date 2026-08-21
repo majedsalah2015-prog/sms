@@ -10,7 +10,9 @@ using Sms.Application.Audit;
 using Sms.Application.Calendar;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
+using Sms.Application.Cafeteria;
 using Sms.Application.Fees;
+using Sms.Application.Health;
 using Sms.Application.Grades;
 using Sms.Application.Lookups;
 using Sms.Application.Numbering;
@@ -29,7 +31,9 @@ using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Calendar;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Cafeteria;
 using Sms.Infrastructure.Fees;
+using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Numbering;
@@ -110,6 +114,9 @@ namespace Sms.Seeder
             services.AddScoped<IStudentAdmin, StudentAdmin>();
             services.AddScoped<IAttendanceAdmin, AttendanceAdmin>();
             services.AddScoped<IFeeAdmin, FeeAdmin>();
+            services.AddScoped<ICafeteriaAdmin, CafeteriaAdmin>();
+            services.AddScoped<IHealthAdmin, HealthAdmin>();
+            services.AddScoped<INotificationPublisher, NotificationPublisher>();
 
             services.AddScoped<ISeedContributor, JobDefinitionSeedContributor>();
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
@@ -121,6 +128,7 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
+            services.AddScoped<ISeedContributor, CafeteriaDemoSeedContributor>();
 
             // The embedded ERP modules' permission names, catalogued as sec.Permission rows and
             // granted to SYSADMIN, so an administrator can reach the accounting screens and hand the

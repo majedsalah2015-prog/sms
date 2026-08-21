@@ -1,0 +1,410 @@
+@using System.Globalization
+@using Sms.Domain.Cafeteria
+@model CafeteriaPosViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Cafeteria counter", "كاشير المقصف");
+    ViewData["Breadcrumb"] = T("Cafeteria / Counter", "المقصف / الكاشير");
+    string Money(decimal v) => v.ToString("N2", CultureInfo.InvariantCulture);
+    string Name(string ar, string en) => isRtl ? ar : en;
+    var onMenu = new HashSet<int>(Model.TodaysMenuItemIds);
+    string NutritionBadge(NutritionClass n) => n switch
+    {
+        NutritionClass.Green => "text-bg-success",
+        NutritionClass.Amber => "text-bg-warning",
+        _ => "text-bg-danger",
+    };
+    var help = new HelpPanelViewModel
+    {
+        Id = "pos-help", Title = T("Counter — help", "الكاشير — مساعدة"),
+        Intro = T("Find the student, tap what they are buying, take the money. Every limit on this screen is enforced by the engine behind it, not by the screen — what you see here is the same answer arriving early enough to be useful.", "ابحث عن الطالب، والمس ما يشتريه، واقبض. وكل حدّ في هذه الشاشة يفرضه المحرّك خلفها لا الشاشة نفسها — وما تراه هنا هو الجواب ذاته يصلك مبكراً بما يكفي لتتصرف."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Allergies", "الحساسية"), T("A severe allergy shows in red beside the name. If the parent asked for a hard block the sale is refused outright; otherwise it warns, and selling anyway is a decision you take deliberately (BR-CAF-002).", "تظهر الحساسية الشديدة بالأحمر بجانب الاسم. فإن طلب ولي الأمر منعاً قاطعاً رُفض البيع تماماً؛ وإلا فهو تحذير، والبيع رغمه قرار تتخذه عن قصد (BR-CAF-002).")),
+            new HelpPanelViewModel.Item(T("Wallet, cash, or meal plan", "محفظة أو نقد أو اشتراك"), T("Cash needs an open till session of yours. The wallet may go as far as its overdraft allowance and no further. A meal plan redeems once a day within its cap (BR-CAF-003/004).", "النقد يتطلب جلسة صندوق مفتوحة باسمك. والمحفظة تمتد إلى حدّ السحب المسموح ولا تتجاوزه. والاشتراك يُستهلك مرة واحدة يومياً ضمن سقفه (BR-CAF-003/004).")),
+            new HelpPanelViewModel.Item(T("Voiding", "الإلغاء"), T("A sale can be voided while its till session is open, with a reason — the wallet and the stock both go back. After the session closes it is a refund, not a void (BR-CAF-009).", "يُلغى البيع ما دامت جلسة صندوقه مفتوحة، بسبب — فتعود القيمة إلى المحفظة والصنف إلى المخزون. وبعد إغلاق الجلسة يصبح استرداداً لا إلغاءً (BR-CAF-009).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Sell from the counter against a wallet, cash, or a meal plan.", "البيع من الكاشير مقابل محفظة أو نقد أو اشتراك وجبات.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<div class="row g-3">
+    <!-- ================================================== catalogue -->
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+                <input id="item-filter" class="form-control form-control-sm" style="max-width:16rem"
+                       placeholder="@T("Filter items…", "تصفية الأصناف…")" aria-label="@T("Filter items", "تصفية الأصناف")" />
+                <div class="btn-group btn-group-sm" role="group" aria-label="@T("Category", "الفئة")">
+                    <button type="button" class="btn btn-outline-secondary active js-cat" data-cat="">@T("All", "الكل")</button>
+                    @foreach (var c in Model.Categories)
+                    {
+                        <button type="button" class="btn btn-outline-secondary js-cat" data-cat="@c">@c</button>
+                    }
+                </div>
+                @if (onMenu.Count > 0)
+                {
+                    <div class="form-check form-switch ms-auto">
+                        <input class="form-check-input" type="checkbox" id="menu-only" checked />
+                        <label class="form-check-label small" for="menu-only">@T("Today's menu only", "قائمة اليوم فقط")</label>
+                    </div>
+                }
+            </div>
+
+            @if (Model.Items.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("No items are defined yet.", "لا توجد أصناف معرّفة بعد.")</p>
+            }
+            else
+            {
+                <div class="row row-cols-2 row-cols-md-3 row-cols-xl-4 g-2" id="item-grid">
+                    @foreach (var i in Model.Items)
+                    {
+                        <div class="col js-item"
+                             data-id="@i.Id"
+                             data-name="@Name(i.NameAr, i.NameEn)"
+                             data-price="@i.Price.ToString("0.00", CultureInfo.InvariantCulture)"
+                             data-cat="@i.Category"
+                             data-menu="@(onMenu.Count == 0 || onMenu.Contains(i.Id) ? "1" : "0")"
+                             data-allergens="@i.AllergenTags"
+                             data-search="@(i.NameAr + " " + i.NameEn + " " + i.Category)">
+                            <button type="button" class="btn btn-outline-secondary w-100 h-100 text-start p-2 js-add">
+                                <span class="d-flex justify-content-between align-items-start gap-1">
+                                    <span class="small fw-semibold">@Name(i.NameAr, i.NameEn)</span>
+                                    <span class="badge @NutritionBadge(i.NutritionClass)" title="@i.NutritionClass">&nbsp;</span>
+                                </span>
+                                <span class="d-block small text-muted">@i.Category</span>
+                                <span class="d-block fw-semibold"><bdi dir="ltr">@Money(i.Price)</bdi></span>
+                                @if (!string.IsNullOrWhiteSpace(i.AllergenTags))
+                                {
+                                    <span class="d-block small text-danger-emphasis"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> @i.AllergenTags</span>
+                                }
+                                @if (i.IsStaffOnly)
+                                {
+                                    <span class="badge text-bg-light border">@T("staff only", "للموظفين فقط")</span>
+                                }
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- ================================================== holder + basket -->
+    <div class="col-lg-5">
+        <div class="sms-card mb-3">
+            <form method="get" class="d-flex gap-2 align-items-end mb-2">
+                <div class="flex-grow-1">
+                    <label for="holder-q" class="form-label small text-muted">@T("Student or employee", "طالب أو موظف")</label>
+                    <input id="holder-q" name="q" class="form-control form-control-sm" autocomplete="off"
+                           placeholder="@T("Name or number…", "الاسم أو الرقم…")" />
+                </div>
+                <select name="kind" class="form-select form-select-sm" style="width:auto" aria-label="@T("Holder kind", "نوع الحامل")">
+                    <option value="@WalletHolderKind.Student" selected="@(Model.HolderKind == WalletHolderKind.Student)">@T("Student", "طالب")</option>
+                    <option value="@WalletHolderKind.Employee" selected="@(Model.HolderKind == WalletHolderKind.Employee)">@T("Employee", "موظف")</option>
+                </select>
+            </form>
+            <div id="holder-results" class="list-group list-group-flush small"></div>
+
+            @if (Model.Holder is { } h)
+            {
+                <div class="border rounded p-2 mt-2">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <div class="fw-semibold">@Name(h.NameAr, h.NameEn)</div>
+                            <div class="small text-muted"><bdi dir="ltr">@h.Code</bdi></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="small text-muted">@T("Wallet", "المحفظة")</div>
+                            <div class="fs-5 @(h.WalletBalance < 0 ? "text-danger" : "")"><bdi dir="ltr">@Money(h.WalletBalance)</bdi></div>
+                            @if (h.OverdraftAllowance > 0)
+                            {
+                                <div class="small text-muted">@T("spendable", "المتاح") <bdi dir="ltr">@Money(h.Spendable)</bdi></div>
+                            }
+                        </div>
+                    </div>
+
+                    @if (h.RemainingToday is { } remaining)
+                    {
+                        <div class="small mt-2 @(remaining <= 0 ? "text-danger fw-semibold" : "text-muted")">
+                            @T("Daily limit", "الحدّ اليومي"): <bdi dir="ltr">@Money(h.DailyLimit!.Value)</bdi> ·
+                            @T("spent", "أُنفق") <bdi dir="ltr">@Money(h.SpentToday)</bdi> ·
+                            @T("left", "المتبقي") <bdi dir="ltr">@Money(remaining)</bdi>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(h.Allergies))
+                    {
+                        <div class="alert alert-danger py-1 px-2 small mt-2 mb-0" role="alert">
+                            <i class="bi bi-exclamation-octagon-fill me-1" aria-hidden="true"></i>
+                            <strong>@T("Severe allergies", "حساسية شديدة"):</strong> @h.Allergies
+                            @if (h.AllergyHardBlock)
+                            {
+                                <span class="badge text-bg-danger ms-1">@T("hard block", "منع قاطع")</span>
+                            }
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(h.BlockedCategories))
+                    {
+                        <div class="small text-warning-emphasis mt-1">
+                            <i class="bi bi-slash-circle me-1" aria-hidden="true"></i>@T("Blocked", "ممنوع"): @h.BlockedCategories
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <p class="text-muted small mb-0 mt-2">@T("Find whoever is at the counter to see their wallet and their limits.", "ابحث عمّن يقف أمامك لترى محفظته وحدوده.")</p>
+            }
+        </div>
+
+        <div class="sms-card">
+            <h2 class="h6 mb-2">@T("Basket", "السلة")</h2>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-2 align-middle">
+                <caption class="visually-hidden">@T("Basket", "السلة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Item", "الصنف")</th>
+                    <th scope="col" class="text-end">@T("Qty", "الكمية")</th>
+                    <th scope="col" class="text-end">@T("Line", "الإجمالي")</th>
+                    <th scope="col"></th>
+                </tr></thead>
+                <tbody id="basket-body">
+                    <tr id="basket-empty"><td colspan="4" class="text-center text-muted py-3">@T("Tap an item to begin.", "المس صنفاً للبدء.")</td></tr>
+                </tbody>
+            </table></div>
+
+            <div class="d-flex justify-content-between align-items-baseline border-top pt-2">
+                <span class="text-muted">@T("Total", "الإجمالي")</span>
+                <span class="fs-4 fw-semibold"><bdi dir="ltr" id="basket-total">0.00</bdi></span>
+            </div>
+            <div class="small text-muted text-end" id="basket-vat-wrap" hidden>
+                @T("of which VAT", "منها ضريبة") <bdi dir="ltr" id="basket-vat">0.00</bdi>
+            </div>
+
+            <div id="allergy-warning" class="alert alert-warning py-2 px-2 small mt-2" role="alert" hidden>
+                <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+                <span id="allergy-warning-text"></span>
+                <div class="form-check mt-1">
+                    <input class="form-check-input" type="checkbox" id="confirm-allergy" />
+                    <label class="form-check-label" for="confirm-allergy">@T("Sell anyway — I have checked", "أبيع رغم ذلك — تحقّقتُ من الأمر")</label>
+                </div>
+            </div>
+
+            <form method="post" asp-action="Sell" id="sell-form" class="mt-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="kind" value="@Model.HolderKind" />
+                <input type="hidden" name="holderId" value="@(Model.Holder?.Id ?? 0)" />
+                <input type="hidden" name="lines" id="sell-lines" />
+                <input type="hidden" name="confirmAllergy" id="sell-confirm" value="false" />
+                <input type="hidden" name="tillSessionId" value="@(Model.OpenTill?.Id)" />
+
+                <div class="d-grid gap-2">
+                    <button type="submit" name="tender" value="@SaleTender.Wallet" class="btn btn-primary js-tender" disabled>
+                        <i class="bi bi-wallet2 me-1" aria-hidden="true"></i>@T("Wallet", "المحفظة")
+                    </button>
+                    <button type="submit" name="tender" value="@SaleTender.MealPlan" class="btn btn-outline-primary js-tender" disabled>
+                        <i class="bi bi-calendar-check me-1" aria-hidden="true"></i>@T("Meal plan", "اشتراك الوجبات")
+                    </button>
+                    @if (Model.OpenTill != null)
+                    {
+                        <button type="submit" name="tender" value="@SaleTender.Cash" class="btn btn-outline-secondary js-tender" disabled>
+                            <i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Cash", "نقداً") <span class="small text-muted">· @Model.OpenTill.TillCode</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <a class="btn btn-outline-secondary" asp-controller="Payments" asp-action="Till">
+                            <i class="bi bi-safe2 me-1" aria-hidden="true"></i>@T("Open a till to take cash", "افتح صندوقاً لقبض النقد")
+                        </a>
+                    }
+                </div>
+                @if (Model.Holder == null)
+                {
+                    <p class="small text-muted mt-2 mb-0">@T("Pick who is buying before taking payment.", "اختر المشتري قبل قبض الثمن.")</p>
+                }
+            </form>
+        </div>
+
+        @if (Model.RecentSales.Count > 0)
+        {
+            <div class="sms-card mt-3">
+                <h2 class="h6 mb-2">@T("Last sales", "آخر المبيعات")</h2>
+                <table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Last sales", "آخر المبيعات")</caption>
+                    <tbody>
+                    @foreach (var s in Model.RecentSales)
+                    {
+                        <tr class="@(s.Status == SaleStatus.Voided ? "text-muted text-decoration-line-through" : "")">
+                            <td class="small">@s.Holder</td>
+                            <td class="small text-muted">@s.Tender</td>
+                            <td class="text-end text-nowrap"><bdi dir="ltr">@Money(s.Total)</bdi></td>
+                            <td class="text-end">
+                                @if (s.Status != SaleStatus.Voided)
+                                {
+                                    <form method="post" asp-action="Void" asp-route-id="@s.Id" class="d-inline-flex gap-1">
+                                        @Html.AntiForgeryToken()
+                                        <input name="reason" class="form-control form-control-sm" style="width:8rem" placeholder="@T("reason", "السبب")" required />
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" title="@T("Void", "إلغاء")" aria-label="@T("Void sale", "إلغاء البيع")"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // The basket is the browser's. A counter is the one screen in this product where a round trip
+    // per tap is felt by somebody standing in a queue, and a half-built sale is not worth a table.
+    var basket = new Map();   // itemId -> { name, price, qty, allergens }
+    var holderAllergies = @Html.Raw(Json.Serialize(Model.Holder?.Allergies ?? ""));
+    var hardBlock = @(Model.Holder?.AllergyHardBlock == true ? "true" : "false");
+    var hasHolder = @(Model.Holder != null ? "true" : "false");
+
+    var body = document.getElementById('basket-body');
+    var empty = document.getElementById('basket-empty');
+    var totalEl = document.getElementById('basket-total');
+    var linesEl = document.getElementById('sell-lines');
+    var confirmEl = document.getElementById('sell-confirm');
+    var warnBox = document.getElementById('allergy-warning');
+    var warnText = document.getElementById('allergy-warning-text');
+    var confirmBox = document.getElementById('confirm-allergy');
+
+    function money(v) { return v.toFixed(2); }
+
+    function allergyClashes() {
+        if (!holderAllergies) { return []; }
+        var theirs = holderAllergies.toLowerCase().split(/[,;]/).map(function (s) { return s.trim(); }).filter(Boolean);
+        var hits = [];
+        basket.forEach(function (line) {
+            (line.allergens || '').toLowerCase().split(/[,;]/).forEach(function (tag) {
+                tag = tag.trim();
+                if (tag && theirs.indexOf(tag) >= 0 && hits.indexOf(tag) < 0) { hits.push(tag); }
+            });
+        });
+        return hits;
+    }
+
+    function render() {
+        body.querySelectorAll('tr[data-line]').forEach(function (tr) { tr.remove(); });
+        var total = 0;
+        basket.forEach(function (line, id) {
+            total += line.price * line.qty;
+            var tr = document.createElement('tr');
+            tr.setAttribute('data-line', id);
+            tr.innerHTML =
+                '<td class="small">' + line.name + '</td>' +
+                '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary js-dec">&minus;</button> ' +
+                '<span class="mx-1">' + line.qty + '</span>' +
+                '<button type="button" class="btn btn-sm btn-outline-secondary js-inc">+</button></td>' +
+                '<td class="text-end text-nowrap"><bdi dir="ltr">' + money(line.price * line.qty) + '</bdi></td>' +
+                '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger js-del" aria-label="remove">&times;</button></td>';
+            tr.querySelector('.js-inc').addEventListener('click', function () { line.qty += 1; render(); });
+            tr.querySelector('.js-dec').addEventListener('click', function () { line.qty -= 1; if (line.qty <= 0) { basket.delete(id); } render(); });
+            tr.querySelector('.js-del').addEventListener('click', function () { basket.delete(id); render(); });
+            body.appendChild(tr);
+        });
+
+        empty.hidden = basket.size > 0;
+        totalEl.textContent = money(total);
+        linesEl.value = Array.from(basket.entries()).map(function (e) { return e[0] + ':' + e[1].qty; }).join(',');
+
+        var hits = allergyClashes();
+        warnBox.hidden = hits.length === 0;
+        if (hits.length > 0) {
+            warnText.textContent = (hardBlock
+                ? '@T("This basket contains an allergen this student is hard-blocked from. The sale will be refused:", "تحتوي السلة على مُسبب حساسية ممنوع قطعياً على هذا الطالب. سيُرفض البيع:")'
+                : '@T("This basket contains an allergen this student reacts to:", "تحتوي السلة على مُسبب حساسية يتفاعل معه هذا الطالب:")') + ' ' + hits.join(', ');
+            confirmBox.parentElement.hidden = hardBlock;
+        }
+
+        var blocked = basket.size === 0 || !hasHolder || (hits.length > 0 && (hardBlock || !confirmBox.checked));
+        document.querySelectorAll('.js-tender').forEach(function (b) { b.disabled = blocked; });
+        confirmEl.value = confirmBox.checked ? 'true' : 'false';
+    }
+
+    confirmBox.addEventListener('change', render);
+
+    document.querySelectorAll('.js-item').forEach(function (card) {
+        card.querySelector('.js-add').addEventListener('click', function () {
+            var id = card.dataset.id;
+            var line = basket.get(id);
+            if (line) { line.qty += 1; }
+            else { basket.set(id, { name: card.dataset.name, price: parseFloat(card.dataset.price), qty: 1, allergens: card.dataset.allergens }); }
+            render();
+        });
+    });
+
+    // ---- catalogue filters
+    var filter = document.getElementById('item-filter');
+    var menuOnly = document.getElementById('menu-only');
+    var category = '';
+
+    function applyFilters() {
+        var term = (filter.value || '').trim().toLowerCase();
+        document.querySelectorAll('.js-item').forEach(function (card) {
+            var matchesTerm = !term || card.dataset.search.toLowerCase().indexOf(term) >= 0;
+            var matchesCat = !category || card.dataset.cat === category;
+            var matchesMenu = !menuOnly || !menuOnly.checked || card.dataset.menu === '1';
+            card.hidden = !(matchesTerm && matchesCat && matchesMenu);
+        });
+    }
+
+    filter.addEventListener('input', applyFilters);
+    if (menuOnly) { menuOnly.addEventListener('change', applyFilters); }
+    document.querySelectorAll('.js-cat').forEach(function (b) {
+        b.addEventListener('click', function () {
+            document.querySelectorAll('.js-cat').forEach(function (x) { x.classList.remove('active'); });
+            b.classList.add('active');
+            category = b.dataset.cat;
+            applyFilters();
+        });
+    });
+    applyFilters();
+
+    // ---- holder lookup
+    var q = document.getElementById('holder-q');
+    var results = document.getElementById('holder-results');
+    var kindSelect = document.querySelector('select[name="kind"]');
+    var timer = null;
+
+    q.addEventListener('input', function () {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(function () {
+            var term = q.value.trim();
+            if (term.length < 2) { results.innerHTML = ''; return; }
+            fetch('@Url.Action("Search")?q=' + encodeURIComponent(term) + '&kind=' + kindSelect.value)
+                .then(function (r) { return r.json(); })
+                .then(function (rows) {
+                    results.innerHTML = '';
+                    rows.forEach(function (row) {
+                        var a = document.createElement('a');
+                        a.className = 'list-group-item list-group-item-action py-1';
+                        a.href = '@Url.Action("Index")?holder=' + row.id + '&kind=' + kindSelect.value;
+                        a.textContent = (@(isRtl ? "true" : "false") ? row.nameAr : row.nameEn) + ' · ' + row.studentNo;
+                        results.appendChild(a);
+                    });
+                });
+        }, 200);
+    });
+
+    render();
+})();
+</script>
+}
