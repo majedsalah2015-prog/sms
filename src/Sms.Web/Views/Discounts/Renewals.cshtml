@@ -1,0 +1,173 @@
+@using System.Globalization
+@using Sms.Domain.Discounts
+@model RenewalQueueViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Renewal queue", "قائمة التجديد");
+    ViewData["Breadcrumb"] = T("Discounts / Renewal queue", "الخصومات / قائمة التجديد");
+    string Money(decimal v) => v.ToString("N2", CultureInfo.InvariantCulture);
+    string YearName(int? id) => Model.Years.FirstOrDefault(y => y.Id == id) is { } y ? (isRtl ? y.LabelAr : y.LabelEn) : "—";
+    string DecisionLabel(RenewalDecision d) => d switch
+    {
+        RenewalDecision.Pending => T("Pending", "بانتظار القرار"),
+        RenewalDecision.Approved => T("Approved", "معتمد"),
+        RenewalDecision.Adjusted => T("Adjusted", "معدَّل"),
+        _ => T("Dropped", "مُسقط"),
+    };
+    string DecisionBadge(RenewalDecision d) => d switch
+    {
+        RenewalDecision.Pending => "text-bg-warning",
+        RenewalDecision.Approved => "text-bg-success",
+        RenewalDecision.Adjusted => "text-bg-primary",
+        _ => "text-bg-secondary",
+    };
+    var pending = Model.Rows.Count(r => r.Item.Decision == RenewalDecision.Pending);
+    var help = new HelpPanelViewModel
+    {
+        Id = "renew-help", Title = T("Renewal queue — help", "قائمة التجديد — مساعدة"),
+        Intro = T("BR-DIS-007: a discount does not follow a student into the next year on its own. Every manual and scholarship grant of the closing year lands here as a decision to take — approve it as it was, adjust the value, or drop it. Nothing carries silently.", "BR-DIS-007: الخصم لا يتبع الطالب إلى العام التالي من تلقاء نفسه. فكل منحة يدوية أو دراسية في العام المنتهي تصل هنا كقرار يُتخذ — اعتماد كما هي، أو تعديل القيمة، أو إسقاطها. ولا شيء ينتقل بصمت."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Build then decide", "ابنِ ثم قرّر"), T("Building the queue reads the closing year's approved grants and creates one pending item per grant. Building again adds only what is missing — a decision already taken is never reset.", "بناء القائمة يقرأ منح العام المنتهي المعتمدة وينشئ بنداً معلّقاً لكل منحة. وإعادة البناء تضيف الناقص فقط — فالقرار المتَّخذ لا يُعاد ضبطه.")),
+            new HelpPanelViewModel.Item(T("Adjusted needs a value", "المعدَّل يحتاج قيمة"), T("Approve carries the prior value forward as it stands. Adjust needs the new basis value beside it, and that value is what the new year's grant is created with.", "الاعتماد ينقل القيمة السابقة كما هي. أما التعديل فيحتاج قيمة الأساس الجديدة بجانبه، وهي القيمة التي تُنشأ بها منحة العام الجديد.")),
+            new HelpPanelViewModel.Item(T("A decision creates a grant", "القرار يُنشئ منحة"), T("Approving or adjusting creates a real grant in the new year, which then goes through the ordinary approval route for its size (BR-DIS-003). The decision here is the renewal, not the approval.", "الاعتماد أو التعديل يُنشئ منحة فعلية في العام الجديد، تمرّ بعدها بمسار الاعتماد المعتاد بحسب حجمها (BR-DIS-003). فالقرار هنا تجديد لا اعتماد.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Which of last year's discounts continue, and at what value.", "أي خصومات العام الماضي تستمر، وبأي قيمة.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DiscountsNav" />
+
+<div class="sms-card mb-3">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label for="q-from" class="form-label small text-muted">@T("Closing year", "العام المنتهي")</label>
+            <select id="q-from" name="fromYear" class="form-select form-select-sm" style="width:auto">
+                <option value="">—</option>
+                @foreach (var y in Model.Years)
+                {
+                    <option value="@y.Id" selected="@(y.Id == Model.FromYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <label for="q-to" class="form-label small text-muted">@T("New year", "العام الجديد")</label>
+            <select id="q-to" name="toYear" class="form-select form-select-sm" style="width:auto">
+                <option value="">—</option>
+                @foreach (var y in Model.Years)
+                {
+                    <option value="@y.Id" selected="@(y.Id == Model.ToYearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-search me-1" aria-hidden="true"></i>@T("Show queue", "عرض القائمة")</button>
+        </div>
+    </form>
+
+    @if (Model.FromYearId != null && Model.ToYearId != null)
+    {
+        <hr />
+        <form method="post" asp-action="BuildRenewalQueue" class="d-flex align-items-center gap-2 flex-wrap">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="fromYear" value="@Model.FromYearId" />
+            <input type="hidden" name="toYear" value="@Model.ToYearId" />
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Build the queue", "بناء القائمة")
+            </button>
+            <span class="small text-muted">
+                @T($"Reads {YearName(Model.FromYearId)}'s approved grants into {YearName(Model.ToYearId)} as pending decisions.",
+                   $"يقرأ منح {YearName(Model.FromYearId)} المعتمدة إلى {YearName(Model.ToYearId)} كقرارات معلّقة.")
+            </span>
+        </form>
+    }
+</div>
+
+@if (Model.ToYearId == null)
+{
+    <div class="sms-card"><p class="text-muted mb-0">@T("Pick the new year to see its queue.", "اختر العام الجديد لعرض قائمته.")</p></div>
+    return;
+}
+
+@if (Model.Rows.Count == 0)
+{
+    <div class="sms-card">
+        <p class="text-muted mb-0">@T($"Nothing is queued for {YearName(Model.ToYearId)} yet.", $"لا شيء في قائمة {YearName(Model.ToYearId)} بعد.")</p>
+    </div>
+    return;
+}
+
+<div class="sms-card">
+    <div class="d-flex justify-content-between align-items-baseline mb-3">
+        <h2 class="h6 mb-0">@T($"Queue for {YearName(Model.ToYearId)}", $"قائمة {YearName(Model.ToYearId)}")</h2>
+        <span class="small @(pending > 0 ? "text-warning-emphasis" : "text-muted")">
+            @T($"{pending} of {Model.Rows.Count} awaiting a decision", $"{pending} من {Model.Rows.Count} بانتظار القرار")
+        </span>
+    </div>
+
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Renewal queue", "قائمة التجديد")</caption>
+        <thead><tr>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("Discount type", "نوع الخصم")</th>
+            <th scope="col" class="text-end">@T("Prior value", "القيمة السابقة")</th>
+            <th scope="col" class="text-end">@T("Applied last year", "المطبَّق العام الماضي")</th>
+            <th scope="col">@T("Decision", "القرار")</th>
+            <th scope="col" style="width:22rem"></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            var decided = r.Item.Decision != RenewalDecision.Pending;
+            <tr class="@(decided ? "text-muted" : "")">
+                <td>
+                    <a asp-controller="Students" asp-action="File" asp-route-id="@r.Student.Id">@DiscountLabels.StudentName(r.Student, isRtl)</a>
+                    <span class="text-muted small">· @r.Student.StudentNo</span>
+                </td>
+                <td class="small">@(isRtl ? r.Type.NameAr : r.Type.NameEn)</td>
+                <td class="text-end text-nowrap"><bdi dir="ltr">@Money(r.PriorGrant.BasisValue)</bdi></td>
+                <td class="text-end text-nowrap"><bdi dir="ltr">@Money(r.PriorGrant.AppliedAmount)</bdi></td>
+                <td>
+                    <span class="badge @DecisionBadge(r.Item.Decision)">@DecisionLabel(r.Item.Decision)</span>
+                    @if (r.Item.Decision == RenewalDecision.Adjusted && r.Item.AdjustedBasisValue is { } adj)
+                    {
+                        <span class="small text-muted ms-1"><bdi dir="ltr">@Money(adj)</bdi></span>
+                    }
+                </td>
+                <td class="text-end">
+                    @if (!decided)
+                    {
+                        <form method="post" asp-action="DecideRenewal" asp-route-id="@r.Item.Id" class="d-flex gap-1 justify-content-end align-items-center">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="fromYear" value="@Model.FromYearId" />
+                            <input type="hidden" name="toYear" value="@Model.ToYearId" />
+                            <input type="number" name="adjustedBasisValue" step="0.01" min="0" class="form-control form-control-sm" style="width:6.5rem"
+                                   placeholder="@T("value", "القيمة")" aria-label="@T($"Adjusted value for {DiscountLabels.StudentName(r.Student, isRtl)}", $"القيمة المعدَّلة لـ{DiscountLabels.StudentName(r.Student, isRtl)}")" />
+                            <button type="submit" name="decision" value="@RenewalDecision.Approved" class="btn btn-outline-success btn-sm" title="@T("Approve as-is", "اعتماد كما هي")">
+                                <i class="bi bi-check-lg" aria-hidden="true"></i><span class="visually-hidden">@T("Approve", "اعتماد")</span>
+                            </button>
+                            <button type="submit" name="decision" value="@RenewalDecision.Adjusted" class="btn btn-outline-primary btn-sm" title="@T("Adjust to the value on the left", "تعديل إلى القيمة المجاورة")">
+                                <i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">@T("Adjust", "تعديل")</span>
+                            </button>
+                            <button type="submit" name="decision" value="@RenewalDecision.Dropped" class="btn btn-outline-secondary btn-sm" title="@T("Drop — the discount does not continue", "إسقاط — الخصم لا يستمر")">
+                                <i class="bi bi-x-lg" aria-hidden="true"></i><span class="visually-hidden">@T("Drop", "إسقاط")</span>
+                            </button>
+                        </form>
+                    }
+                    else if (r.Item.NewGrantId is { } newId)
+                    {
+                        <span class="small">@T("New grant", "المنحة الجديدة") <bdi dir="ltr">#@newId</bdi></span>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>

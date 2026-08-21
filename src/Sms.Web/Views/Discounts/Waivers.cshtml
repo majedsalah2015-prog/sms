@@ -1,0 +1,193 @@
+@using System.Globalization
+@using Sms.Domain.Discounts
+@model WaiverDeskViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Waiver desk", "مكتب الإعفاءات");
+    ViewData["Breadcrumb"] = T("Discounts / Waiver desk", "الخصومات / مكتب الإعفاءات");
+    string Money(decimal v) => v.ToString("N2", CultureInfo.InvariantCulture);
+    string KindLabel(WaiverKind k) => k switch
+    {
+        WaiverKind.LateFee => T("Late fee", "غرامة تأخير"),
+        WaiverKind.BounceFee => T("Bounce fee", "غرامة ارتداد"),
+        _ => T("Miscellaneous", "أخرى"),
+    };
+    string StatusLabel(WaiverStatus s) => s switch
+    {
+        WaiverStatus.Proposed => T("Proposed", "مقترح"),
+        WaiverStatus.Approved => T("Approved", "معتمد"),
+        _ => T("Rejected", "مرفوض"),
+    };
+    string StatusBadge(WaiverStatus s) => s switch
+    {
+        WaiverStatus.Proposed => "text-bg-warning",
+        WaiverStatus.Approved => "text-bg-success",
+        _ => "text-bg-secondary",
+    };
+    string TierLabel(ApprovalTier t) => t switch
+    {
+        ApprovalTier.FinanceManager => T("Finance Manager", "المدير المالي"),
+        ApprovalTier.Principal => T("Principal", "المدير"),
+        ApprovalTier.Owner => T("Owner", "المالك"),
+        _ => T("Committee", "اللجنة"),
+    };
+    var proposed = Model.Rows.Count(r => r.Waiver.Status == WaiverStatus.Proposed);
+    var help = new HelpPanelViewModel
+    {
+        Id = "waiver-help", Title = T("Waiver desk — help", "مكتب الإعفاءات — مساعدة"),
+        Intro = T("BR-DIS-006: a waiver forgives part of a charge that already exists — a late fee, a bounced-cheque fee, a goodwill amount. It is not a discount: a discount is priced before the charge, a waiver is written off after it, and approving one issues a credit note against the charge.", "BR-DIS-006: الإعفاء يُسقط جزءاً من رسم قائم بالفعل — غرامة تأخير، أو غرامة ارتداد شيك، أو مبلغ مجاملة. وهو ليس خصماً: فالخصم يُسعَّر قبل الرسم، والإعفاء يُشطب بعده، واعتماده يُصدر إشعاراً دائناً على الرسم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Capped at the remainder", "محدود بالمتبقي"), T("A waiver can never exceed what is still open on the charge, so it cannot push a position negative. The search below shows that remainder beside each charge.", "لا يتجاوز الإعفاء ما تبقى مفتوحاً على الرسم، فلا يدفع الرصيد إلى السالب. والبحث أدناه يعرض ذلك المتبقي بجانب كل رسم.")),
+            new HelpPanelViewModel.Item(T("Who decides", "من يقرّر"), T("The amount routes the decision: up to the school's threshold it is the finance manager's, above it the principal's. The tier is fixed when the waiver is proposed and shown on its row.", "المبلغ يحدّد جهة القرار: حتى حدّ المدرسة فهو للمدير المالي، وفوقه للمدير. وتُثبَّت الجهة عند اقتراح الإعفاء وتظهر في سطره.")),
+            new HelpPanelViewModel.Item(T("Approving writes a credit note", "الاعتماد يكتب إشعاراً دائناً"), T("The credit note is what reduces the receivable and reaches the ledger. The waiver record is the decision and its reason; the credit note is the money.", "الإشعار الدائن هو ما يخفض الذمة ويصل إلى الأستاذ العام. وسجل الإعفاء هو القرار وسببه؛ أما المال فالإشعار.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Forgiving part of a charge that already exists.", "إسقاط جزء من رسم قائم بالفعل.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DiscountsNav" />
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Propose a waiver", "اقتراح إعفاء")</h2>
+
+            <form method="get" class="input-group input-group-sm mb-3">
+                <input name="chargeQ" class="form-control" value="@Model.ChargeQ" placeholder="@T("Charge number, student name or number", "رقم الفاتورة أو اسم الطالب أو رقمه")" aria-label="@T("Find a charge", "البحث عن رسم")" />
+                <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">@T("Search", "بحث")</span></button>
+            </form>
+
+            @if (!string.IsNullOrWhiteSpace(Model.ChargeQ) && Model.Matches.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("No open charge matches that.", "لا رسم مفتوح يطابق ذلك.")</p>
+            }
+
+            @foreach (var m in Model.Matches)
+            {
+                <div class="border rounded p-2 mb-2">
+                    <div class="d-flex justify-content-between align-items-baseline">
+                        <div>
+                            <a asp-controller="Fees" asp-action="Charge" asp-route-id="@m.Charge.Id"><bdi dir="ltr">@m.Charge.ChargeNo</bdi></a>
+                            <span class="small text-muted">· @DiscountLabels.StudentName(m.Student, isRtl)</span>
+                        </div>
+                        <span class="small">@T("open", "مفتوح") <bdi dir="ltr" class="fw-semibold">@Money(m.Remaining)</bdi></span>
+                    </div>
+                    <div class="small text-muted mb-2">@(isRtl ? m.Category.NameAr : m.Category.NameEn)</div>
+
+                    <form method="post" asp-action="ProposeWaiver" class="row g-1">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="chargeId" value="@m.Charge.Id" />
+                        <input type="hidden" name="chargeQ" value="@Model.ChargeQ" />
+                        <div class="col-4">
+                            <select name="kind" class="form-select form-select-sm" aria-label="@T("Waiver kind", "نوع الإعفاء")">
+                                @foreach (var k in Enum.GetValues<WaiverKind>())
+                                {
+                                    <option value="@k">@KindLabel(k)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <input name="amount" type="number" step="0.01" min="0.01" max="@m.Remaining.ToString("0.00", CultureInfo.InvariantCulture)" class="form-control form-control-sm"
+                                   placeholder="@T("amount", "المبلغ")" required aria-label="@T("Waiver amount", "مبلغ الإعفاء")" />
+                        </div>
+                        <div class="col-4">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">@T("Propose", "اقتراح")</button>
+                        </div>
+                        <div class="col-12">
+                            <input name="reason" class="form-control form-control-sm" required maxlength="500"
+                                   placeholder="@T("Reason (required)", "السبب (مطلوب)")" aria-label="@T("Waiver reason", "سبب الإعفاء")" />
+                        </div>
+                    </form>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <div class="d-flex justify-content-between align-items-baseline mb-3">
+                <h2 class="h6 mb-0">@T("Waivers", "الإعفاءات")</h2>
+                <span class="small @(proposed > 0 ? "text-warning-emphasis" : "text-muted")">@T($"{proposed} awaiting a decision", $"{proposed} بانتظار القرار")</span>
+            </div>
+
+            <form method="get" class="d-flex gap-2 align-items-center mb-3">
+                <input type="hidden" name="chargeQ" value="@Model.ChargeQ" />
+                <label for="w-status" class="form-label mb-0 small text-muted">@T("Status", "الحالة")</label>
+                <select id="w-status" name="status" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                    <option value="">@T("All", "الكل")</option>
+                    @foreach (var s in Enum.GetValues<WaiverStatus>())
+                    {
+                        <option value="@s" selected="@(Model.Status == s)">@StatusLabel(s)</option>
+                    }
+                </select>
+            </form>
+
+            @if (Model.Rows.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("No waivers yet.", "لا إعفاءات بعد.")</p>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Waivers", "الإعفاءات")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Charge", "الفاتورة")</th>
+                        <th scope="col">@T("Student", "الطالب")</th>
+                        <th scope="col">@T("Kind", "النوع")</th>
+                        <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                        <th scope="col">@T("Decides", "جهة القرار")</th>
+                        <th scope="col">@T("Status", "الحالة")</th>
+                        <th scope="col"></th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        <tr class="@(r.Waiver.Status == WaiverStatus.Rejected ? "text-muted" : "")">
+                            <td class="text-nowrap"><a asp-controller="Fees" asp-action="Charge" asp-route-id="@r.Charge.Id"><bdi dir="ltr">@r.Charge.ChargeNo</bdi></a></td>
+                            <td class="small">@DiscountLabels.StudentName(r.Student, isRtl)</td>
+                            <td class="small">@KindLabel(r.Waiver.Kind)</td>
+                            <td class="text-end text-nowrap"><bdi dir="ltr">@Money(r.Waiver.Amount)</bdi></td>
+                            <td class="small text-muted">@TierLabel(r.Waiver.RequiredTier)</td>
+                            <td>
+                                <span class="badge @StatusBadge(r.Waiver.Status)">@StatusLabel(r.Waiver.Status)</span>
+                                @if (r.Waiver.CreditNoteId is { } cn)
+                                {
+                                    <span class="small text-muted ms-1">@T("CN", "إشعار") <bdi dir="ltr">#@cn</bdi></span>
+                                }
+                            </td>
+                            <td class="text-end text-nowrap">
+                                @if (r.Waiver.Status == WaiverStatus.Proposed)
+                                {
+                                    <form method="post" asp-action="DecideWaiver" asp-route-id="@r.Waiver.Id" class="d-inline-flex gap-1">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" name="approve" value="true" class="btn btn-outline-success btn-sm" title="@T("Approve — issues the credit note", "اعتماد — يُصدر الإشعار الدائن")">
+                                            <i class="bi bi-check-lg" aria-hidden="true"></i><span class="visually-hidden">@T("Approve", "اعتماد")</span>
+                                        </button>
+                                        <button type="submit" name="approve" value="false" class="btn btn-outline-secondary btn-sm" title="@T("Reject", "رفض")">
+                                            <i class="bi bi-x-lg" aria-hidden="true"></i><span class="visually-hidden">@T("Reject", "رفض")</span>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                        @if (!string.IsNullOrWhiteSpace(r.Waiver.Reason))
+                        {
+                            <tr class="@(r.Waiver.Status == WaiverStatus.Rejected ? "text-muted" : "")">
+                                <td colspan="7" class="small text-muted pt-0 border-0">@r.Waiver.Reason</td>
+                            </tr>
+                        }
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+</div>

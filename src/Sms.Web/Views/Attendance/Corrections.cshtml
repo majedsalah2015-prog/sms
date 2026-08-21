@@ -17,7 +17,7 @@
         Items = new[]
         {
             new HelpPanelViewModel.Item(T("Why the reason is unavoidable", "لماذا السبب لا مفر منه"), T("AttendanceDay.Status is a reason-required field on a T1-audited record, so the save itself refuses to go through without one — this screen does not rely on a UI check.", "حالة يوم الحضور حقل يتطلب سبباً في سجل مُدقَّق من الفئة الأولى، فالحفظ نفسه يرفض المرور بدونه — والشاشة لا تعتمد على تحقق واجهة.")),
-            new HelpPanelViewModel.Item(T("Approval chain", "سلسلة الاعتماد"), T("The doc puts a P2 supervisor approval in front of a correction. This build applies the reason and the audit trail; the approval step itself is not enforced — role gating is not wired on these screens yet.", "تضع الوثيقة اعتماد مشرف P2 قبل التصحيح. هذا الإصدار يطبّق السبب وأثر التدقيق؛ أما خطوة الاعتماد فغير مفروضة — وضبط الصلاحيات غير مربوط بهذه الشاشات بعد.")),
+            new HelpPanelViewModel.Item(T("Approval chain", "سلسلة الاعتماد"), T("The doc puts a P2 supervisor approval in front of a correction. Correcting now needs the Corrections/Approve permission, so only a supervisor role reaches this screen; the two-person approval step itself is still not enforced.", "تضع الوثيقة اعتماد مشرف P2 قبل التصحيح. والتصحيح الآن يتطلب صلاحية اعتماد التصويبات، فلا يصل هذه الشاشة إلا دور مشرف؛ أما خطوة الاعتماد بشخصين فلا تزال غير مفروضة.")),
             new HelpPanelViewModel.Item(T("Unlocked rows", "الصفوف غير المقفلة"), T("Untick \"closed rows only\" to reach a day that has not been closed yet — though an open day is easier to fix on the capture sheet.", "أزل تحديد \"المقفلة فقط\" للوصول إلى يوم لم يُقفل بعد — مع أن اليوم المفتوح أسهل تعديلاً من كشف الرصد.")),
         },
     };

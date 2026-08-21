@@ -1,0 +1,262 @@
+@using System.Globalization
+@using Sms.Domain.Attendance
+@model AttendanceAnalyticsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Attendance analytics", "تحليلات الحضور");
+    ViewData["Breadcrumb"] = T("Attendance / Analytics", "الحضور / التحليلات");
+    ViewData["AttendanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    string Pct(decimal v) => v.ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    string N(int v) => v.ToString(CultureInfo.InvariantCulture);
+    string Day(System.DayOfWeek d) => isRtl
+        ? d switch { System.DayOfWeek.Sunday => "الأحد", System.DayOfWeek.Monday => "الاثنين", System.DayOfWeek.Tuesday => "الثلاثاء", System.DayOfWeek.Wednesday => "الأربعاء", System.DayOfWeek.Thursday => "الخميس", System.DayOfWeek.Friday => "الجمعة", _ => "السبت" }
+        : d.ToString();
+    // One scale for every bar on the page: a section at 70% has to look worse than one at 95%,
+    // and it does not if each bar is normalised against its own row.
+    string BarClass(decimal percent) => percent < Model.ChronicBelowPercent ? "bg-danger" : percent < 95m ? "bg-warning" : "bg-success";
+    var help = new HelpPanelViewModel
+    {
+        Id = "atd-analytics-help", Title = T("Analytics — help", "التحليلات — مساعدة"),
+        Intro = T("Everything here is counted from closed and open attendance days alike, over the period you pick. Nothing is stored: change the dates and the whole page is recomputed, so there is no snapshot to go stale.", "كل ما هنا محسوب من أيام الحضور المقفلة والمفتوحة معاً خلال الفترة المختارة. ولا شيء مخزَّن: غيّر التواريخ فتُعاد حوسبة الصفحة كلها، فلا لقطة تتقادم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("What counts as an absence", "ما الذي يُحسب غياباً"), T("Excused, unexcused, and medical leave all count against the percentage; late does not. Exempted days are excluded from the denominator, so an exemption never depresses a section's figure.", "الغياب بعذر وبدون عذر والإجازة المرضية كلها تُحسب على النسبة؛ أما التأخر فلا. والأيام المُعفاة مستثناة من المقام، فلا يخفض الإعفاء نسبة الشعبة.")),
+            new HelpPanelViewModel.Item(T("Chronic threshold", "حدّ الغياب المزمن"), T("The threshold is yours to set — 90% is the default the module doc uses. A student below it appears in the chronic list, ordered worst first.", "الحدّ لك أن تضبطه — و90% هو الافتراضي في وثيقة الوحدة. ومن كان دونه ظهر في قائمة المزمن، مرتَّباً من الأسوأ.")),
+            new HelpPanelViewModel.Item(T("Weekday pattern", "نمط أيام الأسبوع"), T("The day-of-week breakdown is what catches a pattern a total hides: a Sunday problem and a Thursday problem are different problems.", "توزيع أيام الأسبوع هو ما يكشف نمطاً يخفيه الإجمالي: مشكلة الأحد ومشكلة الخميس ليستا مشكلة واحدة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Who is missing school, when, and how often.", "من يتغيّب، ومتى، وكم مرة.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_AttendanceNav" />
+
+@if (Model.Year == null)
+{
+    <div class="sms-card"><p class="text-muted mb-0">@T("No academic year is available.", "لا يوجد عام دراسي متاح.")</p></div>
+    return;
+}
+
+<form method="get" class="row g-2 align-items-end mb-3">
+    <input type="hidden" name="year" value="@yid" />
+    <div class="col-auto">
+        <label for="f-term" class="form-label small text-muted">@T("Term", "الفصل")</label>
+        <select id="f-term" name="term" class="form-select form-select-sm" style="width:auto">
+            <option value="">@T("Custom range", "مدى مخصص")</option>
+            @foreach (var t in Model.Terms)
+            {
+                <option value="@t.Id" selected="@(t.Id == Model.TermId)">@(isRtl ? t.NameAr : t.NameEn)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label for="f-from" class="form-label small text-muted">@T("From", "من")</label>
+        <input type="date" id="f-from" name="from" class="form-control form-control-sm" value="@Model.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+    </div>
+    <div class="col-auto">
+        <label for="f-to" class="form-label small text-muted">@T("To", "إلى")</label>
+        <input type="date" id="f-to" name="to" class="form-control form-control-sm" value="@Model.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+    </div>
+    <div class="col-auto">
+        <label for="f-section" class="form-label small text-muted">@T("Section", "الشعبة")</label>
+        <select id="f-section" name="section" class="form-select form-select-sm" style="width:auto">
+            <option value="">@T("All sections", "كل الشعب")</option>
+            @foreach (var s in Model.AllSections)
+            {
+                <option value="@s.Section.Id" selected="@(s.Section.Id == Model.SectionId)">@(s.Grade == null ? "" : (isRtl ? s.Grade.Name.NameAr : s.Grade.Name.NameEn) + " / ")@(isRtl ? s.Section.NameAr : s.Section.NameEn)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label for="f-below" class="form-label small text-muted">@T("Chronic below", "مزمن دون")</label>
+        <div class="input-group input-group-sm" style="width:7rem">
+            <input type="number" id="f-below" name="below" class="form-control" step="0.5" min="0" max="100" value="@Model.ChronicBelowPercent.ToString("0.#", CultureInfo.InvariantCulture)" />
+            <span class="input-group-text">%</span>
+        </div>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1" aria-hidden="true"></i>@T("Apply", "تطبيق")</button>
+    </div>
+</form>
+
+@if (Model.TotalRecords == 0)
+{
+    <div class="sms-card">
+        <p class="text-muted mb-0">@T("No attendance was recorded in this period.", "لم يُرصد حضور في هذه الفترة.")</p>
+    </div>
+    return;
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Overall attendance", "الحضور الإجمالي")</div>
+            <div class="fs-3"><bdi dir="ltr">@Pct(Model.OverallPercent)</bdi></div>
+            <div class="progress mt-2" style="height:.4rem" role="img" aria-label="@Pct(Model.OverallPercent)">
+                <div class="progress-bar @BarClass(Model.OverallPercent)" style="width:@Model.OverallPercent.ToString("0.0", CultureInfo.InvariantCulture)%"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Day records", "سجلات الأيام")</div>
+            <div class="fs-3"><bdi dir="ltr">@N(Model.TotalRecords)</bdi></div>
+            <div class="small text-muted"><bdi dir="ltr">@Model.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) → @Model.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Chronic students", "طلاب غياب مزمن")</div>
+            <div class="fs-3 @(Model.Chronic.Count > 0 ? "text-danger" : "")"><bdi dir="ltr">@N(Model.Chronic.Count)</bdi></div>
+            <div class="small text-muted">@T($"below {Pct(Model.ChronicBelowPercent)}", $"دون {Pct(Model.ChronicBelowPercent)}")</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="sms-card h-100">
+            <div class="small text-muted">@T("Sections covered", "الشعب المشمولة")</div>
+            <div class="fs-3"><bdi dir="ltr">@N(Model.SectionStats.Count)</bdi></div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("By section — worst first", "حسب الشعبة — الأسوأ أولاً")</h2>
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("Attendance by section", "الحضور حسب الشعبة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Section", "الشعبة")</th>
+                    <th scope="col" class="text-end">@T("Records", "السجلات")</th>
+                    <th scope="col" class="text-end">@T("Absent", "غياب")</th>
+                    <th scope="col" class="text-end">@T("Unexcused", "بدون عذر")</th>
+                    <th scope="col" class="text-end">@T("Late", "تأخر")</th>
+                    <th scope="col" style="width:9rem">@T("Attendance", "نسبة الحضور")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var s in Model.SectionStats)
+                {
+                    <tr>
+                        <td class="text-nowrap">@(s.Grade == null ? "" : (isRtl ? s.Grade.Name.NameAr : s.Grade.Name.NameEn) + " / ")@(isRtl ? s.Section.NameAr : s.Section.NameEn)</td>
+                        <td class="text-end"><bdi dir="ltr">@N(s.Records)</bdi></td>
+                        <td class="text-end"><bdi dir="ltr">@N(s.Absent)</bdi></td>
+                        <td class="text-end @(s.Unexcused > 0 ? "text-danger" : "text-muted")"><bdi dir="ltr">@N(s.Unexcused)</bdi></td>
+                        <td class="text-end text-muted"><bdi dir="ltr">@N(s.Late)</bdi></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height:.4rem">
+                                    <div class="progress-bar @BarClass(s.Percent)" style="width:@s.Percent.ToString("0.0", CultureInfo.InvariantCulture)%"></div>
+                                </div>
+                                <span class="small text-nowrap"><bdi dir="ltr">@Pct(s.Percent)</bdi></span>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("By weekday", "حسب يوم الأسبوع")</h2>
+            <table class="table table-sm sms-table mb-0">
+                <caption class="visually-hidden">@T("Attendance by weekday", "الحضور حسب يوم الأسبوع")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Day", "اليوم")</th>
+                    <th scope="col" class="text-end">@T("Records", "السجلات")</th>
+                    <th scope="col" class="text-end">@T("Absent", "غياب")</th>
+                    <th scope="col" class="text-end">@T("Late", "تأخر")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var w in Model.Weekdays)
+                {
+                    <tr>
+                        <td>@Day(w.Day)</td>
+                        <td class="text-end"><bdi dir="ltr">@N(w.Records)</bdi></td>
+                        <td class="text-end"><bdi dir="ltr">@N(w.Absent)</bdi></td>
+                        <td class="text-end text-muted"><bdi dir="ltr">@N(w.Late)</bdi></td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mt-0">
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <h2 class="h6 mb-1">@T("Chronic absence", "الغياب المزمن")</h2>
+            <p class="small text-muted">@T($"Students below {Pct(Model.ChronicBelowPercent)} in this period. Fifty at most — narrow the range or the section to see past them.", $"الطلاب دون {Pct(Model.ChronicBelowPercent)} في هذه الفترة. خمسون كحد أقصى — ضيّق المدى أو الشعبة لتجاوزهم.")</p>
+            @if (Model.Chronic.Count == 0)
+            {
+                <p class="text-success small mb-0"><i class="bi bi-check-circle me-1" aria-hidden="true"></i>@T("Nobody is below the threshold.", "لا أحد دون الحدّ.")</p>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Chronic absence", "الغياب المزمن")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Student", "الطالب")</th>
+                        <th scope="col">@T("Section", "الشعبة")</th>
+                        <th scope="col" class="text-end">@T("Absent", "غياب")</th>
+                        <th scope="col" class="text-end">@T("Unexcused", "بدون عذر")</th>
+                        <th scope="col" class="text-end">@T("Attendance", "الحضور")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.Chronic)
+                    {
+                        <tr>
+                            <td><a asp-controller="Students" asp-action="File" asp-route-id="@s.Student.Id">@(AttendanceLabels.StudentName(s.Student, isRtl))</a></td>
+                            <td class="small text-muted text-nowrap">@(s.Grade == null ? "" : (isRtl ? s.Grade.Name.NameAr : s.Grade.Name.NameEn) + " / ")@(s.Section == null ? "—" : (isRtl ? s.Section.NameAr : s.Section.NameEn))</td>
+                            <td class="text-end"><bdi dir="ltr">@N(s.Absent)</bdi></td>
+                            <td class="text-end @(s.Unexcused > 0 ? "text-danger" : "text-muted")"><bdi dir="ltr">@N(s.Unexcused)</bdi></td>
+                            <td class="text-end fw-semibold"><bdi dir="ltr">@Pct(s.Percent)</bdi></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="sms-card">
+            <h2 class="h6 mb-1">@T("Most late arrivals", "الأكثر تأخراً")</h2>
+            <p class="small text-muted">@T("Lateness does not count against attendance, so these students can be well above the threshold and still need the conversation.", "التأخر لا يُحسب على نسبة الحضور، فقد يكون هؤلاء فوق الحدّ بكثير ويظلون بحاجة إلى الحديث.")</p>
+            @if (Model.LateLeaders.Count == 0)
+            {
+                <p class="text-muted small mb-0">@T("No late arrivals in this period.", "لا تأخر في هذه الفترة.")</p>
+            }
+            else
+            {
+                <table class="table table-sm sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T("Most late arrivals", "الأكثر تأخراً")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Student", "الطالب")</th>
+                        <th scope="col" class="text-end">@T("Late", "تأخر")</th>
+                        <th scope="col" class="text-end">@T("Attendance", "الحضور")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.LateLeaders)
+                    {
+                        <tr>
+                            <td><a asp-controller="Students" asp-action="File" asp-route-id="@s.Student.Id">@(AttendanceLabels.StudentName(s.Student, isRtl))</a></td>
+                            <td class="text-end fw-semibold"><bdi dir="ltr">@N(s.Late)</bdi></td>
+                            <td class="text-end text-muted"><bdi dir="ltr">@Pct(s.Percent)</bdi></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
