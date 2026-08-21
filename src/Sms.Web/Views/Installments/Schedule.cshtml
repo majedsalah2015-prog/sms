@@ -33,8 +33,6 @@
 </div>
 <partial name="_InstallmentsNav" />
 
-@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
-@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
 
 <div class="d-flex flex-wrap gap-2 mb-3">
     <a class="btn btn-sm btn-outline-secondary" asp-action="Family" asp-route-payerId="@Model.Assignment.PayerId"><i class="bi bi-arrow-@(isRtl ? "right" : "left")" aria-hidden="true"></i> @T("Back to family", "رجوع للأسرة")</a>

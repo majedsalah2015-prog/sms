@@ -23,8 +23,6 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Define how charges split into installments, then approve for assignment.", "عرّف كيف تنقسم الرسوم إلى أقساط، ثم اعتمد القالب للإسناد.")</p></div><partial name="_HelpModal" model="help" /></div>
 <partial name="_InstallmentsNav" />
 
-@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
-@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
 
 <form method="get" class="d-flex gap-2 align-items-center mb-3">
     <label for="year-pick" class="form-label mb-0 small text-muted">@T("Academic year", "العام الدراسي")</label>
@@ -78,7 +76,7 @@
                     </tr>
                     @if (r.Template.Installments.Count > 0)
                     {
-                        <tr class="sms-subrow"><td colspan="8" class="small text-muted">
+                        <tr class="table-light"><td colspan="8" class="small text-muted">
                             @foreach (var s in r.Template.Installments.OrderBy(x => x.SequenceNumber))
                             {
                                 <span class="badge text-bg-light border me-1">

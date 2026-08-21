@@ -24,8 +24,6 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Propose, approve, reject, and revoke discount grants.", "اقتراح المنح واعتمادها ورفضها وإلغاؤها.")</p></div><partial name="_HelpModal" model="help" /></div>
 <partial name="_DiscountsNav" />
 
-@if (TempData["Flash"] != null) { <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Flash"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
-@if (TempData["Error"] != null) { <div class="alert alert-danger alert-dismissible fade show" role="alert">@TempData["Error"] <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="@T("Close", "إغلاق")"></button></div> }
 
 <form id="batchApproveForm" method="post" asp-action="ApproveGrants" asp-route-year="@yid"></form>
 
