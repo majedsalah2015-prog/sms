@@ -1,0 +1,120 @@
+@using System.Globalization
+@model ParentPickerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var filterId = Model.Id + "-filter";
+    var buttonId = Model.Id + "-residence";
+    var countId = Model.Id + "-count";
+
+    // Back to whichever screen the picker is standing on, unless the caller named somewhere better.
+    var returnUrl = Model.ReturnUrl ?? (Context.Request.Path + Context.Request.QueryString);
+    var selectedHref = Model.SelectedId is int sel
+        ? Url.Action("Residence", "Parents", new { id = sel, returnUrl })
+        : null;
+}
+
+<div class="sms-parent-picker" data-parent-picker="@Model.Id">
+    @if (!string.IsNullOrWhiteSpace(Model.Label))
+    {
+        <label class="form-label small" for="@Model.Id">@Model.Label</label>
+    }
+    <div class="input-group input-group-sm mb-1">
+        <span class="input-group-text"><i class="bi bi-funnel" aria-hidden="true"></i></span>
+        <input id="@filterId" type="search" class="form-control" autocomplete="off"
+               placeholder="@T("name, file no. or mobile…", "الاسم أو رقم الملف أو الجوال…")"
+               aria-label="@T("Filter parents", "تصفية أولياء الأمور")" aria-controls="@Model.Id" />
+        @if (Model.ShowResidenceButton)
+        {
+            @* Residence lives on a page of its own: this button sits inside somebody else's form on
+               every screen that uses the picker, and a dialog with a second form inside the first is
+               not something a browser will parse. *@
+            <a id="@buttonId" class="btn btn-outline-secondary @(selectedHref == null ? "disabled" : "")"
+               href="@(selectedHref ?? "#")" aria-disabled="@(selectedHref == null ? "true" : "false")"
+               title="@T("Governorate, locality and quarter", "المحافظة والمنطقة والحي")">
+                <i class="bi bi-geo-alt" aria-hidden="true"></i>
+                <span class="d-none d-md-inline">@T("Residence", "السكن")</span>
+            </a>
+        }
+    </div>
+    <select id="@Model.Id" name="@Model.Name" class="form-select form-select-sm">
+        @if (Model.EmptyLabel != null)
+        {
+            <option value="">@Model.EmptyLabel</option>
+        }
+        @foreach (var p in Model.Parents)
+        {
+            <option value="@p.Id" selected="@(Model.SelectedId == p.Id)"
+                    data-search="@(p.ParentFileNo + " " + p.NameAr + " " + p.NameEn + " " + p.PrimaryMobile)">
+                @p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile
+            </option>
+        }
+    </select>
+    <div class="form-text d-none" id="@countId"></div>
+</div>
+
+<script>
+(function () {
+    var root = document.querySelector('[data-parent-picker="@Model.Id"]');
+    if (!root || root.dataset.wired) { return; }
+    root.dataset.wired = '1';
+
+    var select = document.getElementById('@Model.Id');
+    var filter = document.getElementById('@filterId');
+    var count = document.getElementById('@countId');
+    var button = document.getElementById('@buttonId');
+
+    // The options are taken out of the DOM once and rebuilt on every keystroke. Hiding options in
+    // place is what breaks: a hidden option is still selectable by keyboard in several browsers.
+    var all = Array.prototype.slice.call(select.options).map(function (o) {
+        return { value: o.value, text: o.textContent.trim(), search: (o.dataset.search || o.textContent).toLowerCase() };
+    });
+    var placeholder = all.length && all[0].value === '' ? all.shift() : null;
+
+    function render() {
+        var term = filter.value.trim().toLowerCase();
+        var chosen = select.value;
+        var matches = term ? all.filter(function (o) { return o.search.indexOf(term) >= 0; }) : all;
+
+        select.innerHTML = '';
+        if (placeholder) { select.appendChild(new Option(placeholder.text, '')); }
+        matches.forEach(function (o) { select.appendChild(new Option(o.text, o.value)); });
+
+        // A filter that silently drops the chosen parent would post a different one than the screen
+        // shows, so the choice is kept in the list whether or not it matches.
+        if (chosen && !matches.some(function (o) { return o.value === chosen; })) {
+            var kept = all.filter(function (o) { return o.value === chosen; })[0];
+            if (kept) { select.appendChild(new Option(kept.text, kept.value)); }
+        }
+        select.value = chosen;
+
+        if (term) {
+            count.textContent = '@T("matching", "مطابق"): ' + matches.length + ' / ' + all.length;
+            count.classList.remove('d-none');
+        } else {
+            count.classList.add('d-none');
+        }
+        syncButton();
+    }
+
+    var residenceRoot = '@Url.Content("~/parents")';
+    var residenceReturn = @Html.Raw(Json.Serialize(returnUrl));
+
+    function syncButton() {
+        if (!button) { return; }
+        if (select.value) {
+            button.href = residenceRoot + '/' + encodeURIComponent(select.value) + '/residence?returnUrl=' + encodeURIComponent(residenceReturn);
+            button.classList.remove('disabled');
+            button.setAttribute('aria-disabled', 'false');
+        } else {
+            button.href = '#';
+            button.classList.add('disabled');
+            button.setAttribute('aria-disabled', 'true');
+        }
+    }
+
+    filter.addEventListener('input', render);
+    select.addEventListener('change', syncButton);
+    syncButton();
+})();
+</script>

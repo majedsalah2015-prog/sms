@@ -57,6 +57,33 @@ namespace Sms.Infrastructure.Lookups
             return value;
         }
 
+        public async Task<LookupValue> EnsureValueAsync(
+            string categoryCode, string code, string nameAr, string nameEn, int sortOrder, CancellationToken cancellationToken = default)
+        {
+            var category = await _db.LookupCategories.SingleAsync(c => c.Code == categoryCode, cancellationToken);
+
+            // IgnoreQueryFilters: a deactivated value still holds its code, so re-adding it would fail
+            // on the unique index — and reviving it is exactly the overwrite this method exists to avoid.
+            var existing = await _db.LookupValues.IgnoreQueryFilters().SingleOrDefaultAsync(
+                v => v.LookupCategoryId == category.Id && v.Code == code, cancellationToken);
+            if (existing != null)
+            {
+                return existing;
+            }
+
+            var value = new LookupValue
+            {
+                LookupCategoryId = category.Id,
+                Code = code,
+                Name = new LocalizedName(nameAr, nameEn),
+                SortOrder = sortOrder,
+                IsActive = true,
+            };
+            _db.LookupValues.Add(value);
+            await _db.SaveChangesAsync(cancellationToken);
+            return value;
+        }
+
         public async Task DeactivateValueAsync(int lookupValueId, CancellationToken cancellationToken = default)
         {
             var value = await _db.LookupValues.SingleAsync(v => v.Id == lookupValueId, cancellationToken);

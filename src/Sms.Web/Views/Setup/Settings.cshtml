@@ -31,13 +31,35 @@
                     var rows = Model.Rows.Where(r => r.Key == d.Key).OrderBy(r => r.AcademicYearId.HasValue).ThenBy(r => r.AcademicYearId).ToList();
                     if (rows.Count == 0)
                     {
-                        <tr><td><code>@d.Key</code>@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</td><td class="text-muted">—</td><td class="text-muted small">@T("not set", "غير محدد")</td><td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-fragment="edit" asp-route-key="@d.Key">@T("Set", "تحديد")</a></td></tr>
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@SettingLabels.Name(d.Key, isRtl)@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</div>
+                                <code class="small text-muted" dir="ltr">@d.Key</code>
+                                @if (SettingLabels.Hint(d.Key, isRtl) is { } hint) { <div class="form-text mt-0">@hint</div> }
+                            </td>
+                            <td class="text-muted">—</td><td class="text-muted small">@T("not set", "غير محدد")</td>
+                            <td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-fragment="edit" asp-route-key="@d.Key">@T("Set", "تحديد")</a></td>
+                        </tr>
                     }
                     else
                     {
                         foreach (var r in rows)
                         {
-                            <tr><td><code>@d.Key</code>@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</td><td dir="ltr">@r.Value</td><td class="small">@YearLabel(r.AcademicYearId)</td><td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-route-key="@d.Key" asp-route-year="@r.AcademicYearId" asp-fragment="edit">@T("Edit", "تعديل")</a></td></tr>
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">@SettingLabels.Name(d.Key, isRtl)@if (d.YearVersionable) { <span class="badge text-bg-light border ms-1">@T("per-year", "سنوي")</span> }</div>
+                                    <code class="small text-muted" dir="ltr">@d.Key</code>
+                                    @if (SettingLabels.Hint(d.Key, isRtl) is { } hint) { <div class="form-text mt-0">@hint</div> }
+                                </td>
+                                @* The reader's form first, the stored form beneath it: an administrator
+                                   editing this has to know that "نعم" is the word "true" in the box. *@
+                                <td>
+                                    <div>@SettingLabels.Value(d.Key, r.Value, isRtl)</div>
+                                    @if (SettingLabels.IsTranslated(d.Key)) { <code class="small text-muted" dir="ltr">@r.Value</code> }
+                                </td>
+                                <td class="small">@YearLabel(r.AcademicYearId)</td>
+                                <td class="text-end"><a class="small" asp-action="Settings" asp-route-group="@Model.ActiveGroup" asp-route-key="@d.Key" asp-route-year="@r.AcademicYearId" asp-fragment="edit">@T("Edit", "تعديل")</a></td>
+                            </tr>
                         }
                     }
                 }
@@ -52,9 +74,16 @@
                 <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
                 <div class="mb-2"><label class="form-label" for="setting-key">@T("Key", "المفتاح")</label>
                     <select name="Key" id="setting-key" class="form-select">
-                        @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup)) { <option value="@d.Key" selected="@(d.Key == (Model.Key ?? Context.Request.Query["key"].ToString()))">@d.Key</option> }
+                        @foreach (var d in Model.Definitions.Where(x => x.Group == Model.ActiveGroup)) { <option value="@d.Key" selected="@(d.Key == (Model.Key ?? Context.Request.Query["key"].ToString()))">@SettingLabels.Name(d.Key, isRtl) — @d.Key</option> }
                     </select></div>
-                <div class="mb-2"><label class="form-label" for="setting-value">@T("Value", "القيمة")</label><input name="Value" id="setting-value" class="form-control" dir="ltr" value="@Model.Value" /></div>
+                @* The value is stored in the form the engine validates — English words, "true",
+                   day names. Offering that list is the difference between an administrator choosing
+                   a value and guessing one, so the accepted values are listed with what each means. *@
+                <div class="mb-2"><label class="form-label" for="setting-value">@T("Value", "القيمة")</label>
+                    <input name="Value" id="setting-value" class="form-control" dir="ltr" list="setting-options" value="@Model.Value" />
+                    <datalist id="setting-options"></datalist>
+                    <div class="form-text" id="setting-help"></div>
+                </div>
                 <div class="mb-2"><label class="form-label" for="setting-year">@T("Academic year (per-year keys only)", "العام الدراسي (للمفاتيح السنوية فقط)")</label>
                     <select name="AcademicYearId" id="setting-year" class="form-select"><option value="">@T("School default", "افتراضي المدرسة")</option>@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id.ToString() == Context.Request.Query["year"].ToString())">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></div>
                 <div class="mb-3"><label class="form-label" for="setting-reason">@T("Reason (required when editing an existing value)", "السبب (مطلوب عند تعديل قيمة قائمة)")</label><input name="Reason" id="setting-reason" class="form-control" value="@Model.Reason" /></div>
@@ -63,3 +92,45 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+(function () {
+    var key = document.getElementById('setting-key');
+    var options = document.getElementById('setting-options');
+    var help = document.getElementById('setting-help');
+    if (!key || !options || !help) { return; }
+
+    // key -> { options: [raw...], labels: {raw: reader's word}, hint: "" }
+    var CATALOGUE = @Html.Raw(Json.Serialize(
+        Model.Definitions.Where(x => x.Group == Model.ActiveGroup).ToDictionary(
+            d => d.Key,
+            d => new
+            {
+                options = SettingLabels.Options(d.Key),
+                labels = SettingLabels.Options(d.Key).ToDictionary(o => o, o => SettingLabels.Value(d.Key, o, isRtl)),
+                hint = SettingLabels.Hint(d.Key, isRtl),
+            })));
+
+    function render() {
+        var entry = CATALOGUE[key.value] || { options: [], labels: {}, hint: null };
+        options.innerHTML = '';
+        entry.options.forEach(function (raw) {
+            var option = document.createElement('option');
+            option.value = raw;
+            option.label = entry.labels[raw] || raw;
+            options.appendChild(option);
+        });
+
+        var accepted = entry.options.length
+            ? @Html.Raw(Json.Serialize(T("Accepted:", "المقبول:"))) + ' ' +
+              entry.options.map(function (raw) { return (entry.labels[raw] || raw) + ' (' + raw + ')'; }).join(' · ')
+            : '';
+        help.textContent = [entry.hint, accepted].filter(Boolean).join(' — ');
+    }
+
+    key.addEventListener('change', render);
+    render();
+})();
+</script>
+}

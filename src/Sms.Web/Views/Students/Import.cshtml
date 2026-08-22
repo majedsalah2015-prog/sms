@@ -1,0 +1,202 @@
+@using System.Globalization
+@model StudentImportViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Import from Access", "استيراد من أكسس");
+    ViewData["Breadcrumb"] = T("Students / Import", "الطلاب / استيراد");
+    var haveFile = !string.IsNullOrWhiteSpace(Model.Token);
+    var haveColumns = Model.Columns.Count > 0;
+    var help = new HelpPanelViewModel
+    {
+        Id = "stu-import-help", Title = T("Import — help", "الاستيراد — مساعدة"),
+        Intro = T("Seven fields are read from the old register and nothing else: the four parts of the name, date of birth, gender and the identity number. Nationality is chosen once here and given to every row.", "تُقرأ سبعة حقول من السجل القديم لا غير: أجزاء الاسم الأربعة وتاريخ الميلاد والجنس ورقم الهوية. أما الجنسية فتُختار هنا مرة وتُسنَد لكل صف."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Nothing is written until the last step", "لا يُكتَب شيء حتى الخطوة الأخيرة"), T("Uploading and previewing only read. The preview is produced by the very same code the import runs, so a row that looks right in it is a row that will go in — and one marked with a problem is one that will be skipped, counted and left behind in the old file.", "الرفع والمعاينة قراءة فقط. والمعاينة تنتجها الشيفرة ذاتها التي تنفّذ الاستيراد، فالسطر الذي يبدو صحيحاً فيها هو ما سيُكتَب — والمعلَّم بمشكلة يُتخطّى ويُحصى ويبقى في الملف القديم.")),
+            new HelpPanelViewModel.Item(T("Names go in twice", "الاسم يُخزَّن مرتين"), T("The model requires an English name as well as an Arabic one. The import stores the register's own text in both rather than transliterating: an invented spelling is harder to notice and harder to correct than an obviously untranslated one.", "يتطلب النموذج اسماً إنجليزياً كما يتطلب عربياً. والاستيراد يخزّن نص السجل نفسه في الاثنين بدل النقحرة: فالهجاء المخترَع أصعب ملاحظةً وأصعب تصحيحاً من نصٍّ ظاهر أنه لم يُترجَم.")),
+            new HelpPanelViewModel.Item(T("Dates and gender", "التواريخ والجنس"), T("Dates are read as year-first or day-first, and a cell nothing can read is a skipped row rather than a guessed birthday. Gender is read from ذكر/أنثى, M/F, or 1/2.", "تُقرأ التواريخ بصيغة السنة أولاً أو اليوم أولاً، والخلية غير المقروءة تعني سطراً متخطّى لا تاريخ ميلاد مخمَّناً. ويُقرأ الجنس من ذكر/أنثى أو M/F أو 1/2.")),
+            new HelpPanelViewModel.Item(T("If the server has no Access driver", "إن لم يكن على الخادم مشغّل أكسس"), T("Reading an .accdb needs Microsoft's Access Database Engine installed on the server, in the same bitness as the application. Without it the upload step says so plainly instead of failing silently.", "قراءة ملف accdb. تتطلب تثبيت Microsoft Access Database Engine على الخادم بالمعمارية نفسها للتطبيق. وبدونه تقول خطوة الرفع ذلك صراحةً بدل أن تفشل بصمت.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Name, father, grandfather, family, date of birth, gender, nationality and identity number — nothing else is read.", "الاسم والأب والجد والعائلة وتاريخ الميلاد والجنس والجنسية ورقم الهوية — ولا شيء غيرها يُقرأ.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i> @T("Students", "الطلاب")</a>
+    </div>
+</div>
+
+<!-- step 1 -->
+<div class="sms-card p-4 mb-3">
+    <h2 class="h6">@T("1 · The file", "١ · الملف")</h2>
+    <form method="post" asp-action="ImportUpload" enctype="multipart/form-data" class="row g-2 align-items-end">
+        <div class="col-md-6">
+            <label class="form-label small" for="register">@T("Access database (.mdb or .accdb)", "قاعدة بيانات أكسس (mdb. أو accdb.)")</label>
+            <input id="register" type="file" name="register" accept=".mdb,.accdb" class="form-control form-control-sm" required />
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>@T("Read it", "اقرأه")</button>
+        </div>
+        @if (haveFile)
+        {
+            <div class="col-md-3 small text-muted">@T("Loaded:", "المحمَّل:") <strong>@Model.OriginalFileName</strong></div>
+        }
+    </form>
+</div>
+
+@if (haveFile && Model.Tables.Count > 0)
+{
+    <!-- step 2 -->
+    <div class="sms-card p-4 mb-3">
+        <h2 class="h6">@T("2 · The table and its columns", "٢ · الجدول وأعمدته")</h2>
+        <form method="post" asp-action="ImportPreview">
+            <input type="hidden" asp-for="Token" />
+            <input type="hidden" asp-for="OriginalFileName" />
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-md-5">
+                    <label class="form-label small" asp-for="Table">@T("Table", "الجدول")</label>
+                    <select asp-for="Table" class="form-select form-select-sm" onchange="this.form.submit()">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                        @foreach (var t in Model.Tables)
+                        {
+                            <option value="@t" selected="@(t == Model.Table)">@t</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Read the table", "اقرأ الجدول")</button>
+                </div>
+            </div>
+
+            @if (haveColumns)
+            {
+                <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها.")</p>
+                <div class="row g-2">
+                    @{
+                        var fields = new (string Prop, string En, string Ar, string? Value)[]
+                        {
+                            ("FirstNameColumn", "First name", "الاسم الأول", Model.FirstNameColumn),
+                            ("FatherNameColumn", "Father's name", "اسم الأب", Model.FatherNameColumn),
+                            ("GrandfatherNameColumn", "Grandfather's name", "اسم الجد", Model.GrandfatherNameColumn),
+                            ("FamilyNameColumn", "Family name", "اسم العائلة", Model.FamilyNameColumn),
+                            ("FullNameColumn", "Whole name in one column", "الاسم كاملاً في عمود واحد", Model.FullNameColumn),
+                            ("DateOfBirthColumn", "Date of birth", "تاريخ الميلاد", Model.DateOfBirthColumn),
+                            ("GenderColumn", "Gender", "الجنس", Model.GenderColumn),
+                            ("IdNumberColumn", "Identity number", "رقم الهوية", Model.IdNumberColumn),
+                        };
+                    }
+                    @foreach (var f in fields)
+                    {
+                        <div class="col-md-3">
+                            <label class="form-label small" for="map-@f.Prop">@(isRtl ? f.Ar : f.En)</label>
+                            <select id="map-@f.Prop" name="@f.Prop" class="form-select form-select-sm">
+                                <option value="">@T("— none —", "— بلا —")</option>
+                                @foreach (var c in Model.Columns)
+                                {
+                                    <option value="@c" selected="@(c == f.Value)">@c</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                <div class="row g-2 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="NationalityLookupId">@T("Nationality for every row", "الجنسية لكل صف")</label>
+                        <select asp-for="NationalityLookupId" class="form-select form-select-sm">
+                            @foreach (var n in Model.Nationalities)
+                            {
+                                <option value="@n.Id" selected="@(n.Id == Model.NationalityLookupId)">@(isRtl ? n.Ar : n.En)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="IdTypeLookupId">@T("Identity document type", "نوع وثيقة الهوية")</label>
+                        <select asp-for="IdTypeLookupId" class="form-select form-select-sm">
+                            <option value="">@T("— none —", "— بلا —")</option>
+                            @foreach (var t in Model.IdTypes)
+                            {
+                                <option value="@t.Id" selected="@(t.Id == Model.IdTypeLookupId)">@(isRtl ? t.Ar : t.En)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3 align-self-end">
+                        <button type="submit" class="btn btn-sm btn-outline-primary w-100">@T("Preview", "معاينة")</button>
+                    </div>
+                </div>
+            }
+        </form>
+    </div>
+}
+
+@if (Model.Preview.Count > 0)
+{
+    <!-- step 3 -->
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("3 · What will be written", "٣ · ما الذي سيُكتَب")</h2>
+        <p class="small">
+            <span class="badge text-bg-success">@Model.ReadyRows</span> @T("ready", "جاهز") ·
+            <span class="badge text-bg-warning">@Model.SkippedRows</span> @T("will be skipped", "سيُتخطّى") ·
+            <span class="text-muted">@T("of", "من") @Model.TotalRows @T("rows", "صفاً")</span>
+        </p>
+
+        <div class="table-responsive mb-3">
+            <table class="table table-sm sms-table mb-0">
+                <caption class="visually-hidden">@T("Import preview", "معاينة الاستيراد")</caption>
+                <thead><tr>
+                    <th scope="col">#</th>
+                    <th scope="col">@T("First", "الأول")</th>
+                    <th scope="col">@T("Father", "الأب")</th>
+                    <th scope="col">@T("Grandfather", "الجد")</th>
+                    <th scope="col">@T("Family", "العائلة")</th>
+                    <th scope="col">@T("Born", "الميلاد")</th>
+                    <th scope="col">@T("Gender", "الجنس")</th>
+                    <th scope="col">@T("ID", "الهوية")</th>
+                    <th scope="col">@T("Problem", "المشكلة")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Preview)
+                {
+                    <tr class="@(r.Problem == null ? "" : "table-warning")">
+                        <td class="text-muted">@r.Number</td>
+                        <td>@r.FirstName</td><td>@r.FatherName</td><td>@r.GrandfatherName</td><td>@r.FamilyName</td>
+                        <td class="small"><bdi dir="ltr">@r.DateOfBirth</bdi></td>
+                        <td class="small">@(r.Gender == "F" ? T("Female", "أنثى") : r.Gender == "M" ? T("Male", "ذكر") : "—")</td>
+                        <td class="small"><bdi dir="ltr">@r.IdNumber</bdi></td>
+                        <td class="small text-danger">@r.Problem</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        @if (Model.TotalRows > Model.Preview.Count)
+        {
+            <p class="form-text">@T("Showing the first", "تُعرض أول") @Model.Preview.Count @T("rows; every row is checked, not only these.", "صفاً؛ وكل الصفوف مفحوصة لا هذه وحدها.")</p>
+        }
+
+        <form method="post" asp-action="ImportCommit" onsubmit="return confirm('@T("Import the ready rows?", "استيراد الصفوف الجاهزة؟")');">
+            <input type="hidden" asp-for="Token" />
+            <input type="hidden" asp-for="OriginalFileName" />
+            <input type="hidden" asp-for="Table" />
+            <input type="hidden" asp-for="FirstNameColumn" />
+            <input type="hidden" asp-for="FatherNameColumn" />
+            <input type="hidden" asp-for="GrandfatherNameColumn" />
+            <input type="hidden" asp-for="FamilyNameColumn" />
+            <input type="hidden" asp-for="FullNameColumn" />
+            <input type="hidden" asp-for="DateOfBirthColumn" />
+            <input type="hidden" asp-for="GenderColumn" />
+            <input type="hidden" asp-for="IdNumberColumn" />
+            <input type="hidden" asp-for="NationalityLookupId" />
+            <input type="hidden" asp-for="IdTypeLookupId" />
+            <button type="submit" class="btn btn-primary" @(Model.ReadyRows == 0 ? "disabled" : "")>
+                <i class="bi bi-database-add me-1" aria-hidden="true"></i>@T("Import", "استيراد") @Model.ReadyRows
+            </button>
+        </form>
+    </div>
+}

@@ -36,6 +36,20 @@
     <ul class="nav nav-tabs px-3 pt-2 flex-nowrap overflow-auto">@foreach (var t in tabs) { <li class="nav-item"><button class="nav-link text-nowrap @(Model.ActiveTab == t.Key ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button">@(isRtl ? t.Ar : t.En)@if (t.Count != null) { <span class="badge rounded-pill text-bg-light border ms-1">@t.Count</span> }</button></li> }</ul>
     <div class="tab-content p-4">
         <div class="tab-pane fade @Show("personal")" id="tab-personal">
+            @* The photograph sits beside the identity fields rather than inside their form: it is
+               uploaded on its own, and a file input inside the identity form would mean saving a
+               name change every time somebody wanted to replace a picture. *@
+            <div class="row g-4">
+            <div class="col-md-3 col-lg-2">
+                <partial name="_PhotoPanel" model="@(new PhotoPanelViewModel {
+                    Id = "student-photo", PersonName = name,
+                    HasPhoto = s.PhotoAttachmentId != null,
+                    PhotoUrl = Url.Action("Photo", "Students", new { id = s.Id }),
+                    UploadUrl = Url.Action("UploadPhoto", "Students", new { id = s.Id }),
+                    RemoveUrl = Url.Action("RemovePhoto", "Students", new { id = s.Id }),
+                    CanEdit = true })" />
+            </div>
+            <div class="col-md-9 col-lg-10">
             <form method="post" asp-action="Edit" asp-route-id="@s.Id">
                 <div class="sms-bilingual mb-3">
                     <div><label class="form-label small" for="stu-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="stu-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
@@ -51,7 +65,8 @@
                 </div>
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="stu-Reason">@T("Reason (required when identity fields change — BR-STU-002, T1)", "السبب (مطلوب عند تغيير حقول الهوية — BR-STU-002)")</label><input name="Reason" id="stu-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
             </form>
-            <div class="form-text mt-2">@T("Photo upload (BR-ATT rules) lands with the attachment screens.", "رفع الصورة يأتي مع شاشات المرفقات.")</div>
+            </div>
+            </div>
         </div>
         <div class="tab-pane fade @Show("guardians")" id="tab-guardians">
             <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Parents & guardians", "أولياء الأمور")</caption><thead><tr><th scope="col">@T("Parent", "ولي الأمر")</th><th scope="col">@T("Relationship", "القرابة")</th><th scope="col">@T("Primary", "أساسي")</th><th scope="col">@T("Financial", "مالي")</th><th scope="col">@T("Pickup", "استلام")</th><th scope="col">@T("Portal", "بوابة")</th><th scope="col">@T("Since", "منذ")</th><th scope="col"></th></tr></thead>
@@ -60,7 +75,7 @@
                 @if (Model.Guardians.Count == 0) { <tr><td colspan="8" class="text-center text-warning-emphasis py-3">@T("No guardian linked — at least one financially-responsible parent is required (BR-GLB-004).", "لا ولي أمر مرتبط — يلزم ولي أمر مسؤول مالياً واحد على الأقل (BR-GLB-004).")</td></tr> }</tbody></table>
             @if (Model.PastGuardians.Count > 0) { <div class="small text-muted mb-3">@T("Past links:", "روابط سابقة:") @string.Join(" · ", Model.PastGuardians.Select(g => $"{(isRtl ? g.Parent.NameAr : g.Parent.NameEn)} ({g.Link.EffectiveFromUtc:yyyy-MM-dd} → {g.Link.EffectiveToUtc:yyyy-MM-dd})"))</div> }
             <form method="post" asp-action="LinkGuardian" asp-route-id="@s.Id" class="row g-2 align-items-end">
-                <div class="col-md-4"><label class="form-label small" for="link-parentId">@T("Parent", "ولي الأمر")</label><select name="parentId" id="link-parentId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Parents) { <option value="@p.Id">@p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile</option> }</select></div>
+                <div class="col-md-4"><partial name="_ParentPicker" model="@(new ParentPickerViewModel { Id = "link-parentId", Name = "parentId", Label = T("Parent", "ولي الأمر"), Parents = Model.Parents })" /></div>
                 <div class="col-md-2"><label class="form-label small" for="link-relationshipId">@T("Relationship", "القرابة")</label><select name="relationshipId" id="link-relationshipId" class="form-select form-select-sm">@foreach (var r in Model.Relationships) { <option value="@r.Id">@(isRtl ? r.Ar : r.En)</option> }</select></div>
                 <div class="col-md-4 d-flex flex-wrap gap-2 small"><label><input type="checkbox" name="isPrimary" value="true" class="form-check-input" checked /> @T("primary", "أساسي")</label><label><input type="checkbox" name="isFinancial" value="true" class="form-check-input" checked /> @T("financial", "مالي")</label><label><input type="checkbox" name="isPickup" value="true" class="form-check-input" checked /> @T("pickup", "استلام")</label><label><input type="checkbox" name="isPortal" value="true" class="form-check-input" checked /> @T("portal", "بوابة")</label></div>
                 <div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>@T("Link", "ربط")</button></div>
@@ -133,27 +148,9 @@
                     </div>
                 </div>
 
-                <h3 class="h6 mt-3">@T("Residence", "السكن")</h3>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-3"><label class="form-label small" for="so-Governorate">@T("Governorate", "المحافظة")</label>
-                        <select id="so-Governorate" class="form-select form-select-sm" aria-label="@T("Governorate", "المحافظة")">
-                            <option value="">@T("— choose —", "— اختر —")</option>
-                            @foreach (var g in Model.Governorates) { <option value="@g.Id" selected="@(Model.CurrentGovernorateId == g.Id)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }
-                        </select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label small" for="so-Area">@T("Locality", "المحلية")</label>
-                        <select id="so-Area" class="form-select form-select-sm" aria-label="@T("Locality", "المحلية")"><option value="">@T("— choose —", "— اختر —")</option></select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label small" for="so-Neighbourhood">@T("Neighbourhood", "الحي")</label>
-                        <select name="NeighbourhoodId" id="so-Neighbourhood" class="form-select form-select-sm">
-                            <option value="">@T("— none recorded —", "— لا يوجد —")</option>
-                        </select>
-                        <div class="form-text">@T("Only Gaza City has quarters recorded; elsewhere the locality is the address.", "الأحياء مسجَّلة لمدينة غزة فقط؛ وفي غيرها المحلية هي العنوان.")</div>
-                    </div>
-                    <div class="col-md-3 align-self-end">
-                        <span class="small text-muted">@T("Current:", "الحالي:") <strong>@(Model.CurrentResidencePath ?? T("not recorded", "غير مسجَّل"))</strong></span>
-                    </div>
-                </div>
+                @* Residence moved to the parent file: where a family lives is the family's fact, and
+                   keeping a copy per child meant three siblings could disagree about one address.
+                   The guardians tab is one click away, and the picker lives there. *@
 
                 <div class="mb-3"><label class="form-label small" for="so-Reason">@T("Reason (recorded in the audit trail)", "السبب (يُسجَّل في سجل التدقيق)")</label><input name="Reason" id="so-Reason" class="form-control form-control-sm" /></div>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-save" aria-hidden="true"></i> @T("Save social profile", "حفظ البيانات الاجتماعية")</button>
@@ -180,59 +177,3 @@
     </div>
 </div>
 
-@section Scripts {
-<script>
-(function () {
-    var gov = document.getElementById('so-Governorate');
-    var area = document.getElementById('so-Area');
-    var hood = document.getElementById('so-Neighbourhood');
-    if (!gov || !area || !hood) { return; }
-
-    var currentNeighbourhood = @Html.Raw(Json.Serialize(Model.Student.NeighbourhoodId));
-    var labels = {
-        choose: @Html.Raw(Json.Serialize(T("— choose —", "— اختر —"))),
-        none: @Html.Raw(Json.Serialize(T("— none recorded —", "— لا يوجد —")))
-    };
-    var isRtl = @Html.Raw(Json.Serialize(isRtl));
-
-    function fill(select, rows, placeholder, selectedId) {
-        select.innerHTML = '';
-        var blank = document.createElement('option');
-        blank.value = '';
-        blank.textContent = placeholder;
-        select.appendChild(blank);
-        rows.forEach(function (r) {
-            var o = document.createElement('option');
-            o.value = r.id;
-            o.textContent = isRtl ? r.ar : r.en;
-            if (selectedId && r.id === selectedId) { o.selected = true; }
-            select.appendChild(o);
-        });
-    }
-
-    async function loadAreas(governorateId, selectAreaId) {
-        if (!governorateId) { fill(area, [], labels.choose); fill(hood, [], labels.none); return; }
-        var rows = await fetch('/students/residence/areas?governorateId=' + governorateId).then(function (r) { return r.json(); });
-        fill(area, rows, labels.choose, selectAreaId);
-        await loadHoods(area.value, currentNeighbourhood);
-    }
-
-    async function loadHoods(areaId, selectHoodId) {
-        if (!areaId) { fill(hood, [], labels.none); return; }
-        var rows = await fetch('/students/residence/neighbourhoods?areaId=' + areaId).then(function (r) { return r.json(); });
-        // Most localities have no quarters recorded, and that is the address: the placeholder says
-        // "none recorded" rather than "choose", so a blank selection reads as complete, not skipped.
-        fill(hood, rows, labels.none, selectHoodId);
-    }
-
-    gov.addEventListener('change', function () { currentNeighbourhood = null; loadAreas(gov.value, null); });
-    area.addEventListener('change', function () { currentNeighbourhood = null; loadHoods(area.value, null); });
-
-    // Reopen on what is already recorded. All three levels were resolved server-side by walking up
-    // from the stored neighbourhood, so the browser restores them instead of guessing which locality
-    // owns it.
-    var currentArea = @Html.Raw(Json.Serialize(Model.CurrentResidenceAreaId));
-    if (gov.value) { loadAreas(gov.value, currentArea); }
-})();
-</script>
-}

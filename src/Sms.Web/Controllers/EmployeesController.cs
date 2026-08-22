@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
@@ -39,14 +40,16 @@ namespace Sms.Web.Controllers
         private readonly AppDbContext _db;
         private readonly IAuditContext _audit;
         private readonly IClock _clock;
+        private readonly Sms.Web.Services.PersonPhotoService _photos;
 
-        public EmployeesController(IEmployeeAdmin employees, ITeacherAdmin teachers, AppDbContext db, IAuditContext audit, IClock clock)
+        public EmployeesController(IEmployeeAdmin employees, ITeacherAdmin teachers, AppDbContext db, IAuditContext audit, IClock clock, Sms.Web.Services.PersonPhotoService photos)
         {
             _employees = employees;
             _teachers = teachers;
             _db = db;
             _audit = audit;
             _clock = clock;
+            _photos = photos;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -133,6 +136,68 @@ namespace Sms.Web.Controllers
             if (m == null) return NotFound();
             m.ActiveTab = tab ?? "personal";
             return View(m);
+        }
+
+        // ------------------------------------------------------------------ photograph
+        //
+        // The same slot the student file uses, on the same pipeline: one photo per person, replaced
+        // by re-uploading rather than accumulating, and served from its own action so a browser can
+        // cache it instead of receiving it inside every page.
+
+        [HttpGet("{id:int}/photo")]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.View)]
+        public async Task<IActionResult> Photo(int id)
+        {
+            var photoId = await _db.Employees.IgnoreQueryFilters().AsNoTracking()
+                .Where(e => e.Id == id && e.SchoolId == _db.CurrentSchoolId)
+                .Select(e => e.PhotoAttachmentId)
+                .SingleOrDefaultAsync();
+
+            var photo = await _photos.ReadAsync(photoId, HttpContext.RequestAborted);
+            if (photo == null) { return NotFound(); }
+
+            return File(photo.Value.Content, photo.Value.ContentType);
+        }
+
+        [HttpPost("{id:int}/photo")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
+        public async Task<IActionResult> UploadPhoto(int id, IFormFile? photo)
+        {
+            try
+            {
+                var employee = await _db.Employees.SingleOrDefaultAsync(e => e.Id == id);
+                if (employee == null) return NotFound();
+
+                employee.PhotoAttachmentId = await _photos.SaveAsync(
+                    photo!, "Employee", id, ScreenCatalog.Modules.Employees, HttpContext.RequestAborted);
+                await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                TempData["Flash"] = T("Photo updated.", "تم تحديث الصورة.");
+            }
+            // Specific first: the policy exception derives from InvalidOperationException, and its
+            // own message names a rule where the uploader needs a plain fact.
+            catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException)
+            {
+                TempData["Error"] = T("That file is not an acceptable photo.", "هذا الملف ليس صورة مقبولة.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+
+            return RedirectToAction(nameof(File), new { id, tab = "personal" });
+        }
+
+        [HttpPost("{id:int}/photo/remove")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
+        public async Task<IActionResult> RemovePhoto(int id)
+        {
+            var employee = await _db.Employees.SingleOrDefaultAsync(e => e.Id == id);
+            if (employee == null) return NotFound();
+
+            // Pointer cleared, file kept: doc 10 does not delete while the owning record lives.
+            employee.PhotoAttachmentId = null;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
+            TempData["Flash"] = T("Photo removed.", "تمت إزالة الصورة.");
+            return RedirectToAction(nameof(File), new { id, tab = "personal" });
         }
 
         [HttpPost("{id:int}/edit")]

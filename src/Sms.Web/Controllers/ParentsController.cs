@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Parents;
+using Sms.Domain.Common;
 using Sms.Domain.Parents;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
@@ -32,12 +33,14 @@ namespace Sms.Web.Controllers
         private readonly IParentAdmin _parents;
         private readonly AppDbContext _db;
         private readonly IAuditContext _audit;
+        private readonly IPermissionService _permissions;
 
-        public ParentsController(IParentAdmin parents, AppDbContext db, IAuditContext audit)
+        public ParentsController(IParentAdmin parents, AppDbContext db, IAuditContext audit, IPermissionService permissions)
         {
             _parents = parents;
             _db = db;
             _audit = audit;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -79,7 +82,10 @@ namespace Sms.Web.Controllers
 
         [HttpGet("new")]
         [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.Directory, ActionVerb.Create)]
-        public IActionResult Register() => View(new ParentFormViewModel());
+        public async Task<IActionResult> Register() => View(new ParentFormViewModel
+        {
+            Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
+        });
 
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
@@ -93,10 +99,20 @@ namespace Sms.Web.Controllers
                 var dup = await _db.Parents.AsNoTracking().FirstOrDefaultAsync(p => p.PrimaryMobile == mobile);
                 if (dup != null) throw new InvalidOperationException(T($"A parent with this mobile already exists ({dup.ParentFileNo}) — open that file instead (BR-PAR-002).", $"يوجد ولي أمر بهذا الجوال ({dup.ParentFileNo}) — افتح ملفه بدلاً من الإنشاء (BR-PAR-002)."));
                 var p = await _parents.RegisterParentAsync(form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage);
+                if (form.ResidenceAreaId != null)
+                {
+                    await _parents.SetResidenceAsync(p.Id, form.ResidenceAreaId, form.NeighbourhoodId);
+                }
+
                 TempData["Flash"] = T($"Parent {p.ParentFileNo} created.", $"تم إنشاء ولي الأمر {p.ParentFileNo}.");
                 return RedirectToAction(nameof(File), new { id = p.Id });
             }
-            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View(form); }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, ex.Message);
+                form.Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync();
+                return View(form);
+            }
         }
 
         [HttpGet("{id:int}")]
@@ -139,6 +155,7 @@ namespace Sms.Web.Controllers
             return View(new ParentFileViewModel
             {
                 Parent = p, ActiveTab = tab ?? "identity", FamilyStatement = statement,
+                ResidencePath = (await ResidencePathAsync(p)).Path,
                 Children = links.Where(l => l.EffectiveToUtc == null).Select(C).ToList(),
                 PastChildren = links.Where(l => l.EffectiveToUtc != null).Select(C).ToList(),
                 PossibleDuplicates = dups, PortalUserName = portal,
@@ -162,6 +179,109 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
             return RedirectToAction(nameof(File), new { id, tab = "identity" });
+        }
+
+        // ------------------------------------------------------------------ residence
+        //
+        // The picker that edits this sits beside every parent dropdown in the product rather than only
+        // on the parent file, because the moment somebody notices the address is wrong is the moment
+        // they are choosing that parent for something else. These four endpoints are what it talks to.
+
+        /// <summary>
+        /// Walks the residence hierarchy up from what the parent actually stores — the locality and,
+        /// where there is one, the quarter — and returns the governorate it lands on with the three
+        /// levels joined for reading.
+        /// </summary>
+        private async Task<(int? GovernorateId, string? Path)> ResidencePathAsync(Parent parent)
+        {
+            var area = parent.ResidenceAreaId is int areaId
+                ? await _db.ResidenceAreas.AsNoTracking().SingleOrDefaultAsync(a => a.Id == areaId)
+                : null;
+            var hood = parent.NeighbourhoodId is int hoodId
+                ? await _db.Neighbourhoods.AsNoTracking().SingleOrDefaultAsync(n => n.Id == hoodId)
+                : null;
+            var governorate = area == null
+                ? null
+                : await _db.Governorates.AsNoTracking().SingleOrDefaultAsync(g => g.Id == area.GovernorateId);
+
+            static string? Nm(LocalizedName? n) => n == null ? null : (IsArabic ? n.NameAr : n.NameEn);
+            var path = string.Join(" · ", new[] { Nm(governorate?.Name), Nm(area?.Name), Nm(hood?.Name) }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            return (governorate?.Id, string.IsNullOrWhiteSpace(path) ? null : path);
+        }
+
+        /// <summary>The localities of one governorate, fetched as the level above it changes.</summary>
+        [HttpGet("residence/areas")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
+        public async Task<IActionResult> ResidenceAreas(int governorateId)
+        {
+            var areas = await _db.ResidenceAreas.AsNoTracking()
+                .Where(a => a.GovernorateId == governorateId)
+                .OrderBy(a => a.SortOrder)
+                .Select(a => new { id = a.Id, ar = a.Name.NameAr, en = a.Name.NameEn })
+                .ToListAsync();
+            return Json(areas);
+        }
+
+        /// <summary>The quarters of one locality — empty for most of them, which is not an error.</summary>
+        [HttpGet("residence/neighbourhoods")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
+        public async Task<IActionResult> ResidenceNeighbourhoods(int areaId)
+        {
+            var hoods = await _db.Neighbourhoods.AsNoTracking()
+                .Where(n => n.ResidenceAreaId == areaId)
+                .OrderBy(n => n.SortOrder)
+                .Select(n => new { id = n.Id, ar = n.Name.NameAr, en = n.Name.NameEn })
+                .ToListAsync();
+            return Json(hoods);
+        }
+
+        /// <summary>
+        /// Where one parent lives, on a page of its own rather than in a dialog: the picker button sits
+        /// inside somebody else's form on four screens, and a dialog carrying a second form inside the
+        /// first is not something a browser will parse.
+        /// </summary>
+        [HttpGet("{id:int}/residence")]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
+        public async Task<IActionResult> Residence(int id, string? returnUrl = null)
+        {
+            var parent = await _db.Parents.IgnoreQueryFilters().AsNoTracking()
+                .SingleOrDefaultAsync(p => p.Id == id && p.SchoolId == _db.CurrentSchoolId);
+            if (parent == null) return NotFound();
+
+            // The governorate is not stored — it is walked up to, which is the whole point of keeping a
+            // hierarchy rather than three loose fields that can drift apart.
+            var (governorateId, path) = await ResidencePathAsync(parent);
+
+            return View(new ParentResidenceViewModel
+            {
+                Parent = parent,
+                Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
+                CurrentGovernorateId = governorateId,
+                CurrentAreaId = parent.ResidenceAreaId,
+                CurrentNeighbourhoodId = parent.NeighbourhoodId,
+                CurrentPath = path,
+                ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null,
+                CanEdit = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.Edit, HttpContext.RequestAborted),
+            });
+        }
+
+        [HttpPost("{id:int}/residence")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.Edit)]
+        public async Task<IActionResult> SaveResidence(int id, int? residenceAreaId, int? neighbourhoodId, string? reason, string? returnUrl)
+        {
+            try
+            {
+                _audit.Reason = string.IsNullOrWhiteSpace(reason) ? null : reason;
+                await _parents.SetResidenceAsync(id, residenceAreaId, neighbourhoodId);
+                TempData["Flash"] = T("Residence updated.", "تم تحديث السكن.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+
+            // Back where the editing started: the picker lives on four other screens, and being
+            // returned to the parent file from a half-finished admission form is its own small loss.
+            return Url.IsLocalUrl(returnUrl) ? Redirect(returnUrl!) : RedirectToAction(nameof(File), new { id, tab = "identity" });
         }
 
         [HttpPost("{id:int}/delete")]

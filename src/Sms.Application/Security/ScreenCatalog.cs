@@ -76,6 +76,12 @@ namespace Sms.Application.Security
             public const string Dashboards = "DSH";
             public const string Cafeteria = "CAF";
 
+            /// <summary>Module 23. School transport: the fleet, the routes, who rides, and today's trips.</summary>
+            public const string Transport = "TRN";
+
+            /// <summary>Module 36. The screens that decide what every other screen may be reached by.</summary>
+            public const string SystemAdministration = "SYS";
+
             /// <summary>The parent/student portal. Not a <c>ModuleCatalog</c> entry — it is an audience, not a module — but it needs its own permission space so a portal grant can never widen into a staff one.</summary>
             public const string Portal = "POR";
         }
@@ -263,6 +269,36 @@ namespace Sms.Application.Security
             public const string Pos = "Pos";
         }
 
+        public static class Transport
+        {
+            /// <summary>The buses and their expiry-tracked documents (BR-TRN-001).</summary>
+            public const string Fleet = "Fleet";
+
+            /// <summary>Drivers and attendants, with the licences trip-opening validates (BR-TRN-002).</summary>
+            public const string Staff = "Staff";
+
+            /// <summary>Routes and their ordered stops (BR-TRN-003).</summary>
+            public const string Routes = "Routes";
+
+            /// <summary>Who rides, on which stops, and what it charges them (BR-TRN-004/007/008).</summary>
+            public const string Subscriptions = "Subscriptions";
+
+            /// <summary>Today's trips: open, board, alight, close (BR-TRN-005/006).</summary>
+            public const string Trips = "Trips";
+
+            /// <summary>The safety register — a child not boarded, not collected, or handed to the wrong person (BR-TRN-005/006/009).</summary>
+            public const string Safety = "Safety";
+        }
+
+        public static class SystemAdministration
+        {
+            /// <summary>The role designer: which permissions each role carries.</summary>
+            public const string Roles = "Roles";
+
+            /// <summary>Who holds which role.</summary>
+            public const string UserRoles = "UserRoles";
+        }
+
         public static class Portal
         {
             public const string Home = "Home";
@@ -285,7 +321,10 @@ namespace Sms.Application.Security
             S(Modules.Setup, Setup.Lookups, "Lookup lists", "القوائم المرجعية", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
             S(Modules.Setup, Setup.Nationalities, "Nationalities", "الجنسيات", Crud),
             S(Modules.Setup, Setup.Features, "Feature toggles", "مفاتيح الميزات", ActionVerb.View, ActionVerb.Configure),
-            S(Modules.Setup, Setup.ContentPack, "Content pack", "حزمة المحتوى", ReadOnly),
+            // Configure, not Edit: changing what a country imposes is the same shape of act as the
+            // wizard and the settings hub beside it, and the pack was read-only here only because
+            // nothing could yet write one.
+            S(Modules.Setup, Setup.ContentPack, "Content pack", "حزمة المحتوى", ActionVerb.View, ActionVerb.Configure),
 
             // ---- School
             S(Modules.Schools, Schools.Profile, "School profile", "ملف المدرسة", ActionVerb.View, ActionVerb.Edit),
@@ -408,6 +447,39 @@ namespace Sms.Application.Security
 
             // ---- Cafeteria
             S(Modules.Cafeteria, Cafeteria.Pos, "Cafeteria POS", "نقطة بيع المقصف", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+
+            // ---- Transport
+            //
+            // Post, not Create, opens a trip: opening one is running an engine — it builds the day's
+            // roster from the active subscriptions and refuses an unroadworthy bus or an ineligible
+            // driver — and the person allowed to run the morning is not always the person allowed to
+            // design a route. Approve is the Principal's unroadworthy override and the arrears
+            // suspension, both of which are decisions someone else has to make.
+            S(Modules.Transport, Transport.Fleet, "Fleet and documents", "الحافلات والوثائق",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Transport, Transport.Staff, "Drivers and attendants", "السائقون والمرافقون",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Transport, Transport.Routes, "Routes and stops", "المسارات والمحطات",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Transport, Transport.Subscriptions, "Transport subscriptions", "اشتراكات النقل",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
+            S(Modules.Transport, Transport.Trips, "Trip console", "لوحة الرحلات",
+                ActionVerb.View, ActionVerb.Post, ActionVerb.Edit, ActionVerb.Approve),
+            S(Modules.Transport, Transport.Safety, "Safety register", "سجل السلامة",
+                ActionVerb.View, ActionVerb.Approve),
+
+            // ---- System administration
+            //
+            // Configure, not Edit, is the verb that changes what a role may do: Edit renames a role
+            // and adjusts its 2FA and session policy, which is administration; Configure changes the
+            // system's own shape, which is what a permission grant is. They are separate so that
+            // "may rename roles" and "may widen them" can be given to different people — and because
+            // Configure on this one screen is the permission that can reach every other permission,
+            // which makes it the one worth being able to withhold on its own.
+            S(Modules.SystemAdministration, SystemAdministration.Roles, "Roles and permissions", "الأدوار والصلاحيات",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Configure),
+            S(Modules.SystemAdministration, SystemAdministration.UserRoles, "User role assignments", "إسناد الأدوار للمستخدمين",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),

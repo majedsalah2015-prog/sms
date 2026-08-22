@@ -3,6 +3,7 @@
 @using Sms.Application.Setup
 @inject ISystemSetupAdmin SetupAdmin
 @inject Sms.Web.Navigation.ModuleVisibility Visibility
+@inject Sms.Web.Navigation.ErpNavigationSource ErpNavigation
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     var culture = CultureInfo.CurrentUICulture;
@@ -24,10 +25,15 @@
     }
     var canExportToLedger = await Visibility.CanSeeScreenAsync(
         Sms.Application.Security.ScreenCatalog.Modules.Fees, Sms.Application.Security.ScreenCatalog.Fees.GlExport);
+    // The embedded ERP's own sidebar, one group per module, nested inside the accounting section.
+    // Filtered by the ERP against the erp.permission claims this principal carries, so a user
+    // granted nothing accounting-related sees no accounting section at all.
+    var erpGroups = ErpNavigation.BuildGroupsFor(User);
     var sidebar = ModuleCatalog.BuildSidebar(
         m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code],
         m => visibleModules.Contains(m.Code),
-        canExportToLedger);
+        canExportToLedger,
+        erpGroups);
     // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
     var erpUrl = Configuration["ExternalApps:ErpUrl"];
     var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";

@@ -8,14 +8,30 @@
     var yid = Model.Year?.Id; var pid = Model.Profile?.ProfileId;
     var over = Model.TotalPeriods > Model.AvailableSlots;
     var pct = Model.AvailableSlots == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Model.TotalPeriods / Model.AvailableSlots));
+    var help = new HelpPanelViewModel
+    {
+        Id = "sub-plan-help", Title = T("Curriculum plan — help", "الخطة الدراسية — مساعدة"),
+        Intro = T("What one grade teaches in one year: each subject with its periods a week. The three pickers at the top choose the year, the grade, and how many slots the timetable actually has to give — change any of them and the page follows.", "ما يدرسه صف واحد في عام واحد: كل مادة وحصصها في الأسبوع. والقوائم الثلاث في الأعلى تختار العام والصف وعدد الحصص التي يملكها الجدول فعلاً — غيّر أياً منها تتبعك الصفحة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The period total is a real limit", "مجموع الحصص حدّ حقيقي"), T("The bar compares what the plan asks for against the slots a week holds. Going over is refused, not warned about (BR-SUB-005) — a plan that does not fit is a timetable that cannot be built, and it is cheaper to discover here.", "يقارن الشريط ما تطلبه الخطة بالحصص التي يتّسع لها الأسبوع. والتجاوز يُرفَض ولا يُحذَّر منه فقط (BR-SUB-005) — فالخطة التي لا تتّسع جدولٌ لا يمكن بناؤه، واكتشاف ذلك هنا أرخص.")),
+            new HelpPanelViewModel.Item(T("Offerings are end-dated, never removed", "المواد تُنهى بتاريخ ولا تُحذف"), T("Dropping a subject mid-year means giving it an end date (BR-SUB-004). Marks, timetables and reports already point at that offering, and deleting it would take last term's records with it.", "إسقاط مادة أثناء العام يعني إعطاءها تاريخ انتهاء (BR-SUB-004). فالعلامات والجداول والتقارير تشير إلى تلك الحصة، وحذفها يأخذ سجلات الفصل الماضي معه.")),
+            new HelpPanelViewModel.Item(T("Assessable and GPA weight", "قابلة للتقييم ووزن المعدل"), T("An assessable subject appears in the gradebook and on the report card; the weight is what it counts for in the average. An activity subject is usually carried at weight zero rather than left out, so it still shows on the card.", "المادة القابلة للتقييم تظهر في سجل العلامات وكشف الدرجات؛ والوزن هو ما تُحسب به في المعدل. ومادة النشاط تُحمَل عادة بوزن صفر بدل استبعادها، فتظل ظاهرة في الكشف.")),
+            new HelpPanelViewModel.Item(T("Elective groups", "المجموعات الاختيارية"), T("Subjects sharing an elective group tag are the alternatives a student picks one of. Tag them identically or the group is not a group — the tag is the only thing that ties them together.", "المواد التي تشترك في وسم مجموعة اختيارية هي البدائل التي يختار الطالب واحدة منها. فوسِمها بالنص ذاته وإلا لم تكن المجموعة مجموعة — فالوسم هو ما يربطها وحده.")),
+            new HelpPanelViewModel.Item(T("Copying last year's plan", "نسخ خطة العام الماضي"), T("Copying brings the offerings of another grade-year across as new ones effective from today; it never touches what is already here. Start from the closest plan you have and edit the differences.", "النسخ يجلب مواد صف سنوي آخر كمواد جديدة تسري من اليوم؛ ولا يمسّ ما هو قائم هنا. ابدأ من أقرب خطة لديك ثم عدّل الفروق.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade-year: subject, periods/week, assessable, GPA weight, elective group; the period total must fit the timetable's available slots (BR-SUB-005). Offerings are end-dated, never removed (BR-SUB-004).", "لكل صف سنوي: المادة، الحصص أسبوعياً، قابلة للتقييم، وزن المعدل، مجموعة اختيارية؛ يجب أن يتسع مجموع الحصص في الجدول (BR-SUB-005). المواد تُنهى بتاريخ ولا تُحذف (BR-SUB-004).")</p></div>
+    <div class="d-flex gap-2 align-items-center">
     <form method="get" class="d-flex gap-2 align-items-center">
         <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
         <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
         <label class="small text-muted text-nowrap">@T("slots/wk", "حصص/أسبوع")</label><input name="slots" type="number" class="form-control form-control-sm" style="width:5rem" value="@Model.AvailableSlots" onchange="this.form.submit()" />
-    </form></div>
+    </form>
+    <partial name="_HelpModal" model="help" />
+    </div></div>
 <partial name="_SubjectsNav" />
 
 @if (Model.Profile == null)

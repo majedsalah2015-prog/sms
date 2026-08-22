@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Reflection;
 using NetArchTest.Rules;
 using Xunit;
@@ -48,8 +49,20 @@ namespace Sms.ArchitectureTests
         }
 
         /// <summary>
-        /// The bridge may see <c>Accounting.Contracts</c> and nothing else of
-        /// the module — the same rule the ERP imposes on its own modules
+        /// Every ERP module this system hosts. The bridge may see each one's
+        /// <c>.Contracts</c> and nothing else of it; the composition root
+        /// (<c>Sms.Web</c>) is the only project allowed the other three layers,
+        /// because registering a module and migrating its DbContext cannot be
+        /// expressed through a contract.
+        /// </summary>
+        private static readonly string[] HostedModules =
+        {
+            "Organization", "Accounting", "Inventory", "Purchasing", "Sales", "Cash", "Partners",
+        };
+
+        /// <summary>
+        /// The bridge may see a module's <c>.Contracts</c> and nothing else of
+        /// it — the same rule the ERP imposes on its own modules
         /// (its docs/Architecture/05-Dependency-Rules.md §3). Reaching into
         /// <c>.Application</c> or <c>.Infrastructure</c> for "just one service"
         /// is how a contract seam turns into a coupling.
@@ -57,17 +70,14 @@ namespace Sms.ArchitectureTests
         [Fact]
         public void Bridge_reaches_the_ERP_only_through_contracts()
         {
+            var forbidden = HostedModules
+                .SelectMany(module => new[] { "Application", "Infrastructure", "Domain", "Web" }
+                    .Select(layer => $"ERP2028.Modules.{module}.{layer}"))
+                .ToArray();
+
             var result = Types.InAssembly(Bridge)
                 .ShouldNot()
-                .HaveDependencyOnAny(
-                    "ERP2028.Modules.Accounting.Application",
-                    "ERP2028.Modules.Accounting.Infrastructure",
-                    "ERP2028.Modules.Accounting.Domain",
-                    "ERP2028.Modules.Accounting.Web",
-                    "ERP2028.Modules.Organization.Application",
-                    "ERP2028.Modules.Organization.Infrastructure",
-                    "ERP2028.Modules.Organization.Domain",
-                    "ERP2028.Modules.Organization.Web")
+                .HaveDependencyOnAny(forbidden)
                 .GetResult();
 
             Assert.True(result.IsSuccessful, Failing(result));

@@ -18,7 +18,14 @@ namespace Sms.Application.Common.Exceptions
         public InvalidSettingValueException(string key, string reason)
             : base($"Invalid value for setting '{key}': {reason}.")
         {
+            Key = key;
         }
+
+        /// <summary>
+        /// Which setting was refused. The message stays English because a log entry should read the
+        /// same everywhere; a screen that has to say this in Arabic needs the key, not the sentence.
+        /// </summary>
+        public string Key { get; }
     }
 
     /// <summary>BR-SET-005: only year-versionable keys may be pinned to an academic year, and a financial value can't be pinned to a year that has already ended (doc §9 "effective date ≥ today").</summary>

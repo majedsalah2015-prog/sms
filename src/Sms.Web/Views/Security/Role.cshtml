@@ -1,0 +1,127 @@
+@using System.Globalization
+@using Sms.Application.Security
+@using Sms.Web.Navigation
+@model Sms.Application.Security.RoleDetail
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var role = Model.Role;
+    ViewData["Title"] = isRtl ? role.NameAr : role.NameEn;
+    ViewData["Breadcrumb"] = T("System administration / Roles / ", "إدارة النظام / الأدوار / ") + ViewData["Title"];
+
+    // Grouped by module so the grid reads as the product does. The module's own bilingual title
+    // comes from ModuleCatalog where it has one — SYS, POR and the like are catalogue-only codes.
+    var byModule = Model.Screens.GroupBy(s => s.ModuleCode).ToList();
+    string ModuleTitle(string code) =>
+        ModuleCatalog.Find(code) is { } m ? (isRtl ? m.TitleAr : m.TitleEn) : code;
+    string VerbLabel(Sms.Domain.Security.ActionVerb v) => Sms.Web.Models.Labels.Verb(v, isRtl);
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">
+            @ViewData["Title"] <code class="fs-6 text-muted">@role.Code</code>
+            @if (role.CanAdministerPermissions)
+            {
+                <span class="badge text-bg-warning ms-1"><i class="bi bi-key-fill" aria-hidden="true"></i> @T("can change permissions", "يعدّل الصلاحيات")</span>
+            }
+        </h1>
+        <p class="text-muted mb-0">
+            @role.GrantCount @T("permissions", "صلاحية") · @role.HolderCount @T("holders", "حاملاً")
+        </p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("All roles", "كل الأدوار")</a>
+</div>
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success" role="alert">@message</div>
+}
+
+<h2 class="sms-section-title">@T("Role properties", "خصائص الدور")</h2>
+<div class="sms-card p-3 mb-4">
+    <form method="post" asp-action="Update" asp-route-id="@role.Id" class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="ar">@T("Name (Arabic)", "الاسم بالعربية")</label>
+            <input id="ar" name="nameAr" class="form-control" value="@role.NameAr" required />
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="en">@T("Name (English)", "الاسم بالإنجليزية")</label>
+            <input id="en" name="nameEn" class="form-control" value="@role.NameEn" required />
+        </div>
+        <input type="hidden" name="code" value="@role.Code" />
+        <div class="col-6 col-md-2 form-check ms-2">
+            <input class="form-check-input" type="checkbox" id="tfa" name="requireTwoFactor" value="true" checked="@role.RequireTwoFactor" />
+            <label class="form-check-label" for="tfa">@T("Require 2FA", "تحقق ثنائي")</label>
+        </div>
+        <div class="col-6 col-md-2 form-check">
+            <input class="form-check-input" type="checkbox" id="single" name="enforceSingleSession" value="true" checked="@role.EnforceSingleSession" />
+            <label class="form-check-label" for="single">@T("Single session", "جلسة واحدة")</label>
+        </div>
+        <div class="col-12 col-md-2">
+            <button type="submit" class="btn btn-primary w-100">@T("Save", "حفظ")</button>
+        </div>
+    </form>
+</div>
+
+<h2 class="sms-section-title">@T("Permissions", "الصلاحيات")</h2>
+<form method="post" asp-action="SetPermissions" asp-route-id="@role.Id">
+    <div class="alert alert-secondary d-flex justify-content-between align-items-center">
+        <span class="small mb-0">
+            @T("Every box on this page is submitted together — an unticked box is a revoked permission.",
+               "كل المربعات في هذه الصفحة تُرسَل معاً — المربع غير المؤشَّر يعني صلاحية مسحوبة.")
+        </span>
+        <span class="d-flex gap-2">
+            <input name="reason" class="form-control form-control-sm" style="width:14rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+            <button type="submit" class="btn btn-primary btn-sm">@T("Save permissions", "حفظ الصلاحيات")</button>
+        </span>
+    </div>
+
+    @foreach (var module in byModule)
+    {
+        <div class="sms-card mb-3">
+            <div class="p-2 border-bottom fw-semibold">@ModuleTitle(module.Key) <code class="text-muted small">@module.Key</code></div>
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@ModuleTitle(module.Key)</caption>
+                <thead><tr><th scope="col">@T("Screen", "الشاشة")</th><th scope="col">@T("Actions", "الإجراءات")</th></tr></thead>
+                <tbody>
+                @foreach (var screen in module)
+                {
+                    <tr>
+                        <td class="fw-semibold">
+                            @(isRtl ? screen.TitleAr : screen.TitleEn)
+                            <div class="small text-muted"><code>@screen.ScreenCode</code></div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-3">
+                                @foreach (var verb in screen.AvailableVerbs)
+                                {
+                                    var id = $"p-{screen.ModuleCode}-{screen.ScreenCode}-{verb}";
+                                    @* Encoded by the same type that decodes it, so the two cannot drift. *@
+                                    var value = Sms.Web.Security.PermissionGrid.Value(screen.ModuleCode, screen.ScreenCode, verb);
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="@id" name="granted" value="@value"
+                                               checked="@screen.GrantedVerbs.Contains(verb)" />
+                                        <label class="form-check-label" for="@id">@VerbLabel(verb)</label>
+                                    </div>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    }
+
+    @* A second submit at the foot of a long grid — but only one reason field in the form, at the
+       top: two inputs of the same name would post two values and the model binder would take the
+       first, which is the one the person did not fill in. *@
+    <div class="d-flex gap-2 mb-4">
+        <button type="submit" class="btn btn-primary btn-sm">@T("Save permissions", "حفظ الصلاحيات")</button>
+    </div>
+</form>

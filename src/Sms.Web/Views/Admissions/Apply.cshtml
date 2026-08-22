@@ -35,7 +35,7 @@
             <div class="sms-card p-4">
                 <h2 class="h6 mb-3">@T("Family (BR-GLB-004)", "الأسرة (BR-GLB-004)")</h2>
                 <div class="row g-3">
-                    <div class="col-md-6"><label class="form-label small" asp-for="ParentId">@T("Existing parent", "ولي أمر موجود")</label><select asp-for="ParentId" class="form-select form-select-sm"><option value="">@T("— none / create below —", "— لا شيء / أنشئ أدناه —")</option>@foreach (var p in Model.Parents) { <option value="@p.Id">@p.ParentFileNo · @(isRtl ? p.NameAr : p.NameEn) · @p.PrimaryMobile</option> }</select></div>
+                    <div class="col-md-6"><partial name="_ParentPicker" model="@(new ParentPickerViewModel { Id = "apply-parent", Name = "ParentId", Label = T("Existing parent", "ولي أمر موجود"), SelectedId = Model.ParentId, Parents = Model.Parents, EmptyLabel = T("— none / create below —", "— لا شيء / أنشئ أدناه —") })" /></div>
                     <div class="col-md-6"><label class="form-label small" asp-for="NewParentMobile">@T("…or new parent — mobile (dedup key)", "…أو ولي أمر جديد — الجوال (مفتاح التكرار)")</label><input asp-for="NewParentMobile" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" /></div>
                     <div class="col-md-4"><input asp-for="NewParentNameAr" class="form-control form-control-sm" dir="rtl" placeholder="اسم ولي الأمر (عربي)" aria-label="@T("New parent name (Arabic)", "اسم ولي الأمر الجديد (عربي)")" /></div>
                     <div class="col-md-4"><input asp-for="NewParentNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#NewParentNameAr" placeholder="Parent name (English)" aria-label="@T("New parent name (English)", "اسم ولي الأمر الجديد (إنجليزي)")" /></div>

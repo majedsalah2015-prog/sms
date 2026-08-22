@@ -1,0 +1,154 @@
+@using System.Globalization
+@using Sms.Application.Transport
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model FleetViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Fleet and documents", "الحافلات والوثائق");
+    ViewData["Breadcrumb"] = T("Transport / Fleet", "النقل المدرسي / الحافلات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-fleet-help", Title = T("Fleet and documents — help", "الحافلات والوثائق — مساعدة"),
+        Intro = T("Three documents are mandatory for every bus — registration, insurance and the safety inspection. The table shows each one's expiry date, and a date in red is already past.", "لكل حافلة ثلاث وثائق إلزامية — الاستمارة والتأمين وفحص السلامة. ويعرض الجدول تاريخ انتهاء كل منها، والتاريخ الأحمر منتهٍ فعلاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Register a bus", "تسجيل حافلة"), T("Plate, seats, type and the licence class the bus needs. The seat count is the hard cap on a route's subscriptions (BR-TRN-003), and the licence class is checked against the driver when a route is staffed (BR-TRN-002) — both are easier to get right here than to correct later.", "اللوحة والمقاعد والنوع وفئة الرخصة التي تتطلبها الحافلة. عدد المقاعد هو السقف الصارم لاشتراكات المسار (BR-TRN-003)، وفئة الرخصة تُطابَق مع السائق عند إسناد المسار (BR-TRN-002) — وضبطهما هنا أسهل من تصحيحهما لاحقاً.")),
+            new HelpPanelViewModel.Item(T("Renewing a document", "تجديد وثيقة"), T("Pick the document, enter the new expiry, Renew. A renewal is a new record rather than an edit: the latest expiry per kind is the one shown, and what was valid on any past day is still there to be read.", "اختر الوثيقة وأدخل تاريخ الانتهاء الجديد ثم «تجديد». التجديد سجلّ جديد لا تعديل: يُعرض أحدث تاريخ انتهاء لكل نوع، ويبقى ما كان سارياً في أي يوم مضى قابلاً للمراجعة.")),
+            new HelpPanelViewModel.Item(T("Grounded buses", "الحافلات الموقوفة"), T("A red \"grounded\" badge means a document is missing or expired, and the engine refuses to open a trip on that bus (BR-TRN-001). Roadworthiness is worked out from the dates on the day and never stored, so a certificate that expires tonight stops the bus tomorrow on its own. Only a Principal-level override moves it, and only in an emergency.", "شارة «موقوفة» الحمراء تعني وثيقة ناقصة أو منتهية، والمحرّك يرفض فتح رحلة على تلك الحافلة (BR-TRN-001). والصلاحية تُحسَب من التواريخ في يومها ولا تُخزَّن، فالوثيقة التي تنتهي الليلة توقف الحافلة غداً وحدها. ولا يتجاوز ذلك إلا تفويض بمستوى المدير، وفي الطوارئ فقط.")),
+            new HelpPanelViewModel.Item(T("Withdrawing a bus", "تعطيل حافلة"), T("Withdrawal takes a reason and is audited. The button stays disabled while routes are still assigned to the bus — move those routes to another bus first, so no route is left without one.", "التعطيل يتطلب سبباً ويُسجَّل في التدقيق. ويبقى الزر معطّلاً ما دامت هناك مسارات مُسنَدة إلى الحافلة — انقل تلك المسارات إلى حافلة أخرى أولاً كي لا يبقى مسار بلا حافلة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("A bus may not open a trip while any of its three documents is missing or expired (BR-TRN-001). Roadworthiness is worked out from the dates on the day, never stored — so a certificate that expires tonight stops the bus tomorrow without anyone remembering to flip a switch.",
+               "لا تُفتَح رحلة على حافلة تنقصها إحدى وثائقها الثلاث أو انتهت (BR-TRN-001). الصلاحية تُحسَب من التواريخ في يومها ولا تُخزَّن — فالوثيقة التي تنتهي الليلة توقف الحافلة غداً بلا أن يتذكّر أحد.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_TransportNav" />
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("Plate", "اللوحة")</th>
+            <th scope="col">@T("Type", "النوع")</th>
+            <th scope="col" class="text-center">@T("Seats", "المقاعد")</th>
+            <th scope="col">@T("Licence needed", "الرخصة المطلوبة")</th>
+            @foreach (var kind in RoadworthinessEvaluator.MandatoryKinds)
+            {
+                <th scope="col">@TransportLabels.DocumentKind(kind, isRtl)</th>
+            }
+            <th scope="col" class="text-center">@T("Routes", "المسارات")</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var row in Model.Buses)
+        {
+            <tr class="@(row.Bus.IsActive ? "" : "text-muted")">
+                <td class="fw-semibold">
+                    @row.Bus.PlateNo
+                    @if (!row.IsRoadworthy)
+                    {
+                        <span class="badge text-bg-danger ms-1" title="@T("Cannot open a trip", "لا يمكن فتح رحلة")">
+                            <i class="bi bi-exclamation-triangle" aria-hidden="true"></i> @T("grounded", "موقوفة")
+                        </span>
+                    }
+                    @if (!row.Bus.IsActive)
+                    {
+                        <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّلة")</span>
+                    }
+                </td>
+                <td>@TransportLabels.BusType(row.Bus.Type, isRtl)</td>
+                <td class="text-center">@row.Bus.Capacity</td>
+                <td>@TransportLabels.LicenseClass(row.Bus.RequiredLicenseClass, isRtl)</td>
+                @foreach (var kind in RoadworthinessEvaluator.MandatoryKinds)
+                {
+                    <td>
+                        @if (row.Documents.TryGetValue(kind, out var expiry))
+                        {
+                            var expired = expiry.Date < Model.Today;
+                            <span class="@(expired ? "text-danger fw-semibold" : "")">@expiry.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
+                        }
+                        else
+                        {
+                            <span class="text-danger">@T("missing", "غير مسجَّلة")</span>
+                        }
+                    </td>
+                }
+                <td class="text-center">@row.RouteCount</td>
+                <td class="text-end">
+                    <form method="post" asp-action="RecordDocument" asp-route-id="@row.Bus.Id" class="d-inline-flex gap-1 align-items-center flex-wrap justify-content-end">
+                        <label class="visually-hidden" for="kind-@row.Bus.Id">@T("Document", "الوثيقة")</label>
+                        <select id="kind-@row.Bus.Id" name="kind" class="form-select form-select-sm" style="width:9rem">
+                            @foreach (var kind in RoadworthinessEvaluator.MandatoryKinds)
+                            {
+                                <option value="@kind">@TransportLabels.DocumentKind(kind, isRtl)</option>
+                            }
+                        </select>
+                        <label class="visually-hidden" for="exp-@row.Bus.Id">@T("Expiry", "تاريخ الانتهاء")</label>
+                        <input id="exp-@row.Bus.Id" type="date" name="expiryDate" class="form-control form-control-sm" style="width:9.5rem" required />
+                        <button type="submit" class="btn btn-sm btn-outline-primary">@T("Renew", "تجديد")</button>
+                    </form>
+                    @if (row.Bus.IsActive)
+                    {
+                        <form method="post" asp-action="DeactivateBus" asp-route-id="@row.Bus.Id" class="d-inline-flex gap-1 mt-1">
+                            <input name="reason" class="form-control form-control-sm" style="width:8rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger" @(row.RouteCount > 0 ? "disabled" : "")>@T("Withdraw", "تعطيل")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Buses.Count == 0)
+        {
+            <tr><td colspan="9" class="text-muted text-center py-4">@T("No buses yet.", "لا توجد حافلات بعد.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<h2 class="sms-section-title">@T("Register a bus", "تسجيل حافلة")</h2>
+<div class="sms-card p-3">
+    <form method="post" asp-action="RegisterBus" class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="plate">@T("Plate number", "رقم اللوحة")</label>
+            <input id="plate" name="plateNo" class="form-control" required />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="cap">@T("Seats", "عدد المقاعد")</label>
+            <input id="cap" name="capacity" type="number" min="1" class="form-control" required />
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="btype">@T("Type", "النوع")</label>
+            <select id="btype" name="type" class="form-select">
+                @foreach (BusType t in Enum.GetValues(typeof(BusType)))
+                {
+                    <option value="@t">@TransportLabels.BusType(t, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="lclass">@T("Licence needed", "الرخصة المطلوبة")</label>
+            <select id="lclass" name="requiredLicenseClass" class="form-select">
+                @foreach (LicenseClass c in Enum.GetValues(typeof(LicenseClass)))
+                {
+                    <option value="@c" selected="@(c == LicenseClass.Medium)">@TransportLabels.LicenseClass(c, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <button type="submit" class="btn btn-primary w-100">@T("Add", "إضافة")</button>
+        </div>
+    </form>
+</div>

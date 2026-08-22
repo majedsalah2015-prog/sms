@@ -15,6 +15,9 @@ namespace Sms.Web.Models
 
         public sealed record SaleRow(int Id, string Holder, SaleTender Tender, decimal Total, decimal VatAmount, SaleStatus Status, DateTime AtUtc);
 
+        /// <summary>One line in the pick list: enough to recognise a person in a queue, and nothing the counter does not read.</summary>
+        public sealed record HolderRow(int Id, string Code, string NameAr, string NameEn);
+
         /// <summary>
         /// Everything the operator needs before ringing anything up. Assembled on the server because
         /// the pieces come from four modules — the wallet, the spend control, the day's sales, and
@@ -65,6 +68,19 @@ namespace Sms.Web.Models
         public WalletHolderKind HolderKind { get; set; } = WalletHolderKind.Student;
 
         public HolderCard? Holder { get; set; }
+
+        /// <summary>
+        /// The pick list under the filter box — students or employees, whichever kind is selected.
+        /// It is rendered by the server rather than waiting for a keystroke: an operator who does not
+        /// know the number should still see who there is, and the list works with script switched off.
+        /// </summary>
+        public IReadOnlyList<HolderRow> HolderList { get; set; } = Array.Empty<HolderRow>();
+
+        /// <summary>The filter term the list was built with, kept so it survives picking somebody.</summary>
+        public string? HolderQuery { get; set; }
+
+        /// <summary>True when more rows matched than the list shows, which is a prompt to narrow the filter.</summary>
+        public bool HolderListTruncated { get; set; }
 
         /// <summary>This cashier's own open session. Cash tender needs one (BR-CAF-007); wallet and meal plan do not.</summary>
         public TillSession? OpenTill { get; set; }

@@ -84,7 +84,7 @@ namespace Sms.Infrastructure.Students
             string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
             ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
             ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
-            string? placeOfBirth, int? familySize, int? birthOrder, int? neighbourhoodId,
+            string? placeOfBirth, int? familySize, int? birthOrder,
             CancellationToken cancellationToken = default)
         {
             var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
@@ -108,7 +108,6 @@ namespace Sms.Infrastructure.Students
             student.PlaceOfBirth = Blank(placeOfBirth);
             student.FamilySize = familySize;
             student.BirthOrder = birthOrder;
-            student.NeighbourhoodId = neighbourhoodId;
 
             await _db.SaveChangesAsync(cancellationToken);
             return student;

@@ -89,7 +89,7 @@ namespace Sms.Infrastructure.Seeding
             for (var i = 0; i < values.Length; i++)
             {
                 var (code, ar, en) = values[i];
-                await _lookups.DefineValueAsync(categoryCode, code, ar, en, sortOrder: i + 1, cancellationToken);
+                await _lookups.EnsureValueAsync(categoryCode, code, ar, en, sortOrder: i + 1, cancellationToken);
             }
         }
     }

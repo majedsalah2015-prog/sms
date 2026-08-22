@@ -1,0 +1,182 @@
+@using System.Globalization
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model SubscriptionsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Transport subscriptions", "اشتراكات النقل");
+    ViewData["Breadcrumb"] = T("Transport / Subscriptions", "النقل المدرسي / الاشتراكات");
+
+    string StopText(int? stopId)
+    {
+        if (stopId is not { } id) { return "—"; }
+        var stop = Model.Stops.FirstOrDefault(s => s.Id == id);
+        return stop == null ? $"#{id}" : $"{stop.RouteNo} · {stop.Name(isRtl)} · {stop.ScheduledTime:hh\\:mm}";
+    }
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-subs-help", Title = T("Subscriptions — help", "الاشتراكات — مساعدة"),
+        Intro = T("Who rides this year, from which stop, and what that costs. A student may hold one live subscription at a time — a second is refused rather than added alongside.", "من يركب هذا العام، ومن أي محطة، وبكم. وللطالب اشتراك حيّ واحد في كل وقت — والثاني يُرفَض ولا يُضاف بجانبه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Subscribing posts the charge", "الاشتراك يُنشئ الرسم"), T("The charge is priced by the morning stop's zone — or the afternoon stop's when there is no morning one — and posted to the payer you name (BR-TRN-004). Pro-rating a mid-year start is not built yet: the full structure amount is posted, so a family joining in March is worth a look before the invoice goes out.", "يُسعَّر الرسم بمنطقة محطة الصباح — أو محطة المساء إن لم تكن هناك محطة صباح — ويُقيَّد على الدافع الذي تسمّيه (BR-TRN-004). أما تقسيط البدء في منتصف العام فغير مبني بعد: يُقيَّد مبلغ الهيكل كاملاً، فالأسرة التي تلتحق في مارس تستحق مراجعة قبل صدور الفاتورة.")),
+            new HelpPanelViewModel.Item(T("Morning and afternoon may differ", "الصباح والمساء قد يختلفان"), T("The two stops are chosen separately and either may be left empty — a child dropped at school by the family and taken home by the bus subscribes to the afternoon stop only. Both dates must fall inside the academic year.", "تُختار المحطتان على حدة وقد تُترك إحداهما فارغة — فالطفل الذي توصله أسرته صباحاً وتعيده الحافلة يشترك في محطة المساء وحدها. ويجب أن يقع التاريخان داخل العام الدراسي.")),
+            new HelpPanelViewModel.Item(T("A full route waitlists", "المسار المكتمل يُدرِج في الانتظار"), T("If either stop's route is already at its bus's capacity the subscription is saved as waitlisted and no charge is posted at all — nobody is billed for a seat they do not have (BR-TRN-003).", "إن كان مسار إحدى المحطتين قد بلغ سعة حافلته حُفِظ الاشتراك في قائمة الانتظار ولم يُنشأ رسم البتة — فلا يُحاسَب أحد على مقعد لا يملكه (BR-TRN-003).")),
+            new HelpPanelViewModel.Item(T("Ending against suspending", "الإنهاء مقابل الإيقاف"), T("Ending records the leaving date and drops any waitlist claim; a charge already posted is settled on the fees screens, not here. Suspension is the arrears measure — effective-dated, reason-required, notified to the family — and it is refused outright while the student is aboard a trip in progress (BR-TRN-008).", "الإنهاء يسجّل تاريخ المغادرة ويُسقط أي حق في قائمة الانتظار؛ أما الرسم المُنشَأ فتتم تسويته في شاشات الرسوم لا هنا. والإيقاف إجراء المتأخرات — بتاريخ سريان وسبب وإخطار للأسرة — ويُرفَض رفضاً تاماً ما دام الطالب على متن رحلة جارية (BR-TRN-008).")),
+            new HelpPanelViewModel.Item(T("May leave the bus unaccompanied", "يُسمح له بالنزول دون مرافق"), T("This is the family's standing consent, and it is what the afternoon handover check reads. Leave it off and the attendant must name the adult who received the child, matched against the authorised pickup list (BR-TRN-006).", "هذا إذن الأسرة الدائم، وهو ما يقرأه فحص التسليم مساءً. اتركه غير مؤشَّر فيلزم المرافقَ أن يسمّي البالغ الذي استلم الطفل، ويُطابَق مع قائمة المصرّح لهم بالاستلام (BR-TRN-006).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Subscribing posts the zone-priced transport charge for the pick-up stop; moving a stop to a different zone re-prices it with a credit note and a new charge (BR-TRN-004/007). A route at capacity waitlists instead of charging.",
+               "الاشتراك يُنشئ رسم النقل بسعر منطقة محطة الصعود؛ ونقل المحطة إلى منطقة أخرى يُعيد التسعير بإشعار دائن ورسم جديد (BR-TRN-004/007). والمسار المكتمل يُدرِج في قائمة الانتظار بدل أن يُحاسِب.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_TransportNav" />
+
+<form method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-12 col-md-3">
+        <label class="form-label" for="q">@T("Student", "الطالب")</label>
+        <input id="q" name="q" value="@Model.Search" class="form-control" placeholder="@T("number or name", "الرقم أو الاسم")" />
+    </div>
+    <div class="col-6 col-md-3">
+        <label class="form-label" for="st">@T("Status", "الحالة")</label>
+        <select id="st" name="status" class="form-select">
+            <option value="">@T("all but ended", "الكل عدا المنتهي")</option>
+            @foreach (TransportSubscriptionStatus s in Enum.GetValues(typeof(TransportSubscriptionStatus)))
+            {
+                <option value="@s" selected="@(Model.Status == s)">@TransportLabels.SubscriptionStatus(s, isRtl)</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-2"><button type="submit" class="btn btn-outline-secondary w-100">@T("Filter", "تصفية")</button></div>
+</form>
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("AM stop", "محطة الصباح")</th>
+            <th scope="col">@T("PM stop", "محطة المساء")</th>
+            <th scope="col">@T("From", "من")</th>
+            <th scope="col">@T("Status", "الحالة")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var sub in Model.Subscriptions)
+        {
+            var student = Model.Students.TryGetValue(sub.StudentId, out var s) ? s : null;
+            <tr>
+                <td class="fw-semibold">
+                    @(student?.Name(isRtl) ?? $"#{sub.StudentId}")
+                    <div class="small text-muted">@student?.StudentNo</div>
+                </td>
+                <td class="small">@StopText(sub.AmRouteStopId)</td>
+                <td class="small">@StopText(sub.PmRouteStopId)</td>
+                <td class="small">@sub.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                <td>
+                    <span class="badge @(sub.Status switch {
+                        TransportSubscriptionStatus.Active => "text-bg-success",
+                        TransportSubscriptionStatus.Suspended => "text-bg-warning",
+                        TransportSubscriptionStatus.Waitlisted => "text-bg-info",
+                        _ => "text-bg-secondary" })">@TransportLabels.SubscriptionStatus(sub.Status, isRtl)</span>
+                    @if (sub.SuspendedEffectiveDate is { } eff)
+                    {
+                        <div class="small text-muted">@T("from", "من") @eff.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</div>
+                    }
+                </td>
+                <td class="text-end">
+                    @if (sub.Status == TransportSubscriptionStatus.Active)
+                    {
+                        <div class="d-flex flex-column gap-1 align-items-end">
+                            <form method="post" asp-action="EndSubscription" asp-route-id="@sub.Id" class="d-inline-flex gap-1">
+                                <input type="date" name="endDate" class="form-control form-control-sm" style="width:9rem" required aria-label="@T("End date", "تاريخ الإنهاء")" />
+                                <input name="reason" class="form-control form-control-sm" style="width:7rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">@T("End", "إنهاء")</button>
+                            </form>
+                            <form method="post" asp-action="SuspendSubscription" asp-route-id="@sub.Id" class="d-inline-flex gap-1">
+                                <input type="date" name="effectiveDate" class="form-control form-control-sm" style="width:9rem" required aria-label="@T("Effective date", "تاريخ السريان")" />
+                                <input name="reason" class="form-control form-control-sm" style="width:7rem" placeholder="@T("reason", "السبب")" required aria-label="@T("Reason", "السبب")" />
+                                <button type="submit" class="btn btn-sm btn-outline-warning">@T("Suspend", "إيقاف")</button>
+                            </form>
+                        </div>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Subscriptions.Count == 0)
+        {
+            <tr><td colspan="6" class="text-muted text-center py-4">@T("No subscriptions match.", "لا اشتراكات مطابقة.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<h2 class="sms-section-title">@T("Subscribe a student", "اشتراك طالب")</h2>
+<div class="sms-card p-3">
+    @if (Model.Stops.Count == 0)
+    {
+        <p class="text-muted mb-0">
+            @T("There are no stops to subscribe to yet — design a route first.", "لا توجد محطات للاشتراك فيها — صمِّم مساراً أولاً.")
+            <a asp-action="Routes">@T("Routes", "المسارات")</a>
+        </p>
+    }
+    else
+    {
+        <form method="post" asp-action="Subscribe" class="row g-2 align-items-end">
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="stu">@T("Student id", "رقم الطالب")</label>
+                <input id="stu" name="studentId" type="number" class="form-control" required />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="payer">@T("Payer id", "رقم الدافع")</label>
+                <input id="payer" name="payerId" type="number" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="am">@T("AM stop", "محطة الصباح")</label>
+                <select id="am" name="amRouteStopId" class="form-select">
+                    <option value="">@T("none", "بلا")</option>
+                    @foreach (var stop in Model.Stops.Where(s => s.Direction == RouteDirection.Am))
+                    {
+                        <option value="@stop.Id">@stop.RouteNo · @stop.Name(isRtl) · @stop.ScheduledTime.ToString(@"hh\:mm", CultureInfo.InvariantCulture)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-12 col-md-3">
+                <label class="form-label" for="pm">@T("PM stop", "محطة المساء")</label>
+                <select id="pm" name="pmRouteStopId" class="form-select">
+                    <option value="">@T("none", "بلا")</option>
+                    @foreach (var stop in Model.Stops.Where(s => s.Direction == RouteDirection.Pm))
+                    {
+                        <option value="@stop.Id">@stop.RouteNo · @stop.Name(isRtl) · @stop.ScheduledTime.ToString(@"hh\:mm", CultureInfo.InvariantCulture)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="from">@T("From", "من")</label>
+                <input id="from" name="startDate" type="date" class="form-control" required />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="to">@T("To", "إلى")</label>
+                <input id="to" name="endDate" type="date" class="form-control" />
+            </div>
+            <div class="col-12 col-md-3 form-check ms-2">
+                <input class="form-check-input" type="checkbox" id="self" name="isSelfReleaseAllowed" value="true" />
+                <label class="form-check-label" for="self">
+                    @T("May leave the bus unaccompanied", "يُسمح له بالنزول دون مرافق")
+                </label>
+            </div>
+            <div class="col-6 col-md-2"><button type="submit" class="btn btn-primary w-100">@T("Subscribe", "اشتراك")</button></div>
+        </form>
+    }
+</div>

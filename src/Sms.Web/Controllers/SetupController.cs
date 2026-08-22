@@ -324,11 +324,30 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                // The engine's message is English by design (it is what the log will read). A refusal
+                // shown to an Arabic-speaking administrator is rebuilt from the key instead, naming the
+                // setting and listing what it would have accepted.
+                ModelState.AddModelError(string.Empty, ex is Sms.Application.Common.Exceptions.InvalidSettingValueException invalid
+                    ? RefusalMessage(invalid.Key)
+                    : UserMessage.For(ex, IsArabic));
                 var model = await BuildSettingsAsync(group);
                 model.Key = form.Key; model.Value = form.Value; model.AcademicYearId = form.AcademicYearId; model.Reason = form.Reason;
                 return View(model);
             }
+        }
+
+        /// <summary>The refusal, plus the list of values that would have been accepted — the half a reader actually needs.</summary>
+        private static string RefusalMessage(string key)
+        {
+            var options = SettingLabels.Options(key);
+            var refused = UserMessage.For(new Sms.Application.Common.Exceptions.InvalidSettingValueException(key, string.Empty), IsArabic);
+            if (options.Length == 0)
+            {
+                return refused;
+            }
+
+            var accepted = string.Join(" · ", options.Select(o => $"{SettingLabels.Value(key, o, IsArabic)} ({o})"));
+            return refused + " " + T("Accepted: ", "المقبول: ") + accepted;
         }
 
         private async Task<SettingsHubViewModel> BuildSettingsAsync(string group) => new()
@@ -380,6 +399,94 @@ namespace Sms.Web.Controllers
             var bound = await _setup.GetBoundCountryPackAsync();
             ViewData["AllPacks"] = await _db.CountryPacks.AsNoTracking().OrderBy(p => p.Code).ThenByDescending(p => p.Version).ToListAsync();
             return View(bound);
+        }
+
+        /// <summary>
+        /// The bound pack's own values, opened for editing. The pack is product data rather than the
+        /// school's, so editing one that a school is already bound to does not overwrite it: the engine
+        /// retires the current version and writes version+1, and this screen then rebinds the school to
+        /// what it just wrote — otherwise the edit would be saved and the school would go on resolving
+        /// the old numbers.
+        /// </summary>
+        [HttpGet("pack/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.ContentPack, ActionVerb.Configure)]
+        public async Task<IActionResult> EditPack()
+        {
+            var pack = await _setup.GetBoundCountryPackAsync();
+            if (pack == null)
+            {
+                TempData["Error"] = T("No country pack is bound yet.", "لم تُربط حزمة دولة بعد.");
+                return RedirectToAction(nameof(Pack));
+            }
+
+            return View(new CountryPackFormViewModel
+            {
+                Code = pack.Code,
+                Version = pack.Version,
+                NameAr = pack.Name.NameAr,
+                NameEn = pack.Name.NameEn,
+                CountryIsoCode = pack.CountryIsoCode,
+                DefaultCurrencyCode = pack.DefaultCurrencyCode,
+                DefaultTimeZoneId = pack.DefaultTimeZoneId,
+                VatPercent = pack.DefaultVatRate * 100m,
+                HijriDisplayDefault = pack.HijriDisplayDefault,
+                RequiredIdTypeCodes = pack.RequiredIdTypeCodes,
+                AuditRetentionYearsMinimum = pack.AuditRetentionYearsMinimum,
+                StatutoryReportCodes = pack.StatutoryReportCodes,
+                DefaultWorkingDays = pack.DefaultWorkingDays,
+            });
+        }
+
+        [HttpPost("pack/edit")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.ContentPack, ActionVerb.Configure)]
+        public async Task<IActionResult> EditPack(CountryPackFormViewModel form)
+        {
+            try
+            {
+                Require(form.Code, T("Code", "الرمز"));
+                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)"));
+                Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+
+                var days = new List<DayOfWeek>();
+                foreach (var code in SettingKeys.SplitCodes(form.DefaultWorkingDays ?? string.Empty))
+                {
+                    if (!Enum.TryParse<DayOfWeek>(code, true, out var day))
+                    {
+                        throw new InvalidOperationException(T($"'{code}' is not a day of week.", $"«{code}» ليس يوماً من أيام الأسبوع."));
+                    }
+
+                    days.Add(day);
+                }
+
+                if (form.VatPercent < 0 || form.VatPercent > 100)
+                {
+                    throw new InvalidOperationException(T("VAT must be between 0 and 100 percent.", "الضريبة بين 0 و100 بالمئة."));
+                }
+
+                var definition = new CountryPackDefinition(
+                    form.Code!.Trim(), form.NameAr!.Trim(), form.NameEn!.Trim(), (form.CountryIsoCode ?? string.Empty).Trim().ToUpperInvariant(),
+                    (form.DefaultCurrencyCode ?? string.Empty).Trim().ToUpperInvariant(), (form.DefaultTimeZoneId ?? string.Empty).Trim(),
+                    form.VatPercent / 100m, form.HijriDisplayDefault,
+                    SettingKeys.SplitCodes(form.RequiredIdTypeCodes ?? string.Empty),
+                    form.AuditRetentionYearsMinimum,
+                    SettingKeys.SplitCodes(form.StatutoryReportCodes ?? string.Empty),
+                    days);
+
+                _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
+                var saved = await _setup.DefineCountryPackAsync(definition);
+
+                // The write may have produced a new version; the school has to be moved onto it or the
+                // edit is invisible to everything that reads the pack (BR-SET-004).
+                await _setup.BindCountryPackAsync(saved.Code, form.Reason);
+                TempData["Flash"] = T($"Country pack saved as v{saved.Version}.", $"حُفظت حزمة الدولة كإصدار {saved.Version}.");
+                return RedirectToAction(nameof(Pack));
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = ex.Message;
+                return View(form);
+            }
         }
 
         // ------------------------------------------------------------------

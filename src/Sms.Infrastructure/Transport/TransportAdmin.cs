@@ -78,7 +78,52 @@ namespace Sms.Infrastructure.Transport
             return staff;
         }
 
+        public async Task UpdateStaffAsync(
+            int staffId, string displayName, string? licenseNo = null, LicenseClass? licenseClass = null,
+            DateTime? licenseExpiryDate = null, CancellationToken cancellationToken = default)
+        {
+            var staff = await _db.TransportStaff.SingleAsync(s => s.Id == staffId, cancellationToken);
+
+            // Kind, EmployeeId and ContractorName are deliberately not touched: a driver record that
+            // became an attendant record, or moved to a different person, would silently rewrite the
+            // history of every route and trip that names it.
+            staff.DisplayName = displayName;
+            staff.LicenseNo = licenseNo;
+            staff.LicenseClass = licenseClass;
+            staff.LicenseExpiryDate = licenseExpiryDate?.Date;
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         // ------------------------------------------------------------------ routes
+
+        public async Task ReassignRouteCrewAsync(
+            int routeId, int busId, int driverId, int? attendantId = null, CancellationToken cancellationToken = default)
+        {
+            var route = await _db.Routes.SingleAsync(r => r.Id == routeId, cancellationToken);
+            var bus = await _db.Buses.SingleAsync(b => b.Id == busId, cancellationToken);
+            var driver = await _db.TransportStaff.SingleAsync(s => s.Id == driverId, cancellationToken);
+
+            // The same eligibility check trip-opening makes, made here instead: a route whose standing
+            // driver cannot legally drive its standing bus is a refusal waiting for tomorrow morning.
+            if (!DriverEligibilityEvaluator.CanDrive(
+                    driver.LicenseClass, driver.LicenseExpiryDate, bus.RequiredLicenseClass, _clock.UtcNow.Date))
+            {
+                throw new DriverNotEligibleException(driverId, busId);
+            }
+
+            var riders = await CountActiveRidersAsync(route, cancellationToken);
+            if (riders > bus.Capacity)
+            {
+                throw new RouteCapacityExceededException(routeId, riders, bus.Capacity);
+            }
+
+            route.BusId = busId;
+            route.DriverId = driverId;
+            route.AttendantId = attendantId;
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
 
         public async Task<Route> DefineRouteAsync(
             string nameAr, string nameEn, RouteDirection direction, int busId, int driverId, IReadOnlyList<RouteStopInput> stops,

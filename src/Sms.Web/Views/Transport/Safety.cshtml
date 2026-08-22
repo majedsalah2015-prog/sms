@@ -1,0 +1,124 @@
+@using System.Globalization
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model SafetyViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Safety register", "سجل السلامة");
+    ViewData["Breadcrumb"] = T("Transport / Safety", "النقل المدرسي / السلامة");
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-safety-help", Title = T("Safety register — help", "سجل السلامة — مساعدة"),
+        Intro = T("The register nobody types into. Every row was written by the system at the moment something went wrong, which is what makes it worth reading.", "السجل الذي لا يكتب فيه أحد. كل سطر كتبه النظام لحظة وقوع الخلل، وهذا ما يجعله جديراً بالقراءة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("What lands here", "ما الذي يصل هنا"), T("A child who did not board in the morning; one nobody collected in the afternoon; a handover attempted to somebody not on the authorised list; a trip still open the next day; and a grounded bus sent out on a Principal's override.", "طفل لم يصعد صباحاً؛ وآخر لم يستلمه أحد مساءً؛ ومحاولة تسليم لغير المدرَجين في قائمة المصرّح لهم؛ ورحلة ما زالت مفتوحة في اليوم التالي؛ وحافلة موقوفة خرجت بتجاوز من المدير.")),
+            new HelpPanelViewModel.Item(T("Open against escalated", "مفتوح مقابل مُصعَّد"), T("Some events arrive already escalated because they cannot wait for the next working morning — a child not collected, and a trip left open overnight. The filter defaults to both, which is the list somebody is meant to be working through.", "بعض الأحداث تصل مُصعَّدة أصلاً لأنها لا تحتمل الانتظار إلى صباح العمل التالي — طفل لم يُستلَم، ورحلة بقيت مفتوحة ليلاً. والمرشِّح يبدأ بالحالتين معاً، وهي القائمة التي يُفترض أن يعمل عليها أحد.")),
+            new HelpPanelViewModel.Item(T("Resolving does not remove", "المعالجة لا تحذف"), T("What you write is what was done about it, and the row stays with the time it was resolved beside it. Safety events are audited at the highest class the system has (BR-TRN-009) — nothing here is edited away later.", "ما تكتبه هو ما جرى بشأنه، ويبقى السطر ومعه وقت معالجته. وأحداث السلامة مُدقَّقة بأعلى فئة في النظام (BR-TRN-009) — فلا شيء هنا يُمحى لاحقاً بتعديل.")),
+            new HelpPanelViewModel.Item(T("Following one back", "تتبّع الحدث"), T("The trip number is a link to that trip's roster, where the events behind the row — who boarded, who did not, what the attendant recorded — are in order.", "رقم الرحلة رابط إلى كشف تلك الرحلة، حيث ترد بالترتيب الوقائع التي وراء السطر — من صعد ومن لم يصعد وما سجّله المرافق.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Every row here was written by the system, not typed by anyone: a child who did not board, one who was not collected, a handover to somebody not authorised, a trip left open overnight, or a grounded bus sent out on a Principal's override. Resolving one records what was done about it — it does not remove it.",
+               "كل سطر هنا كتبه النظام لا أحد: طفل لم يصعد، أو لم يُستلَم، أو سُلِّم لغير مُصرَّح له، أو رحلة بقيت مفتوحة، أو حافلة موقوفة خرجت بتجاوز من المدير. ومعالجة السطر تسجّل ما جرى بشأنه ولا تحذفه.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_TransportNav" />
+
+<form method="get" class="mb-3 d-flex gap-2 align-items-end" style="max-width:22rem">
+    <div class="flex-grow-1">
+        <label class="form-label" for="state">@T("State", "الحالة")</label>
+        <select id="state" name="state" class="form-select">
+            <option value="">@T("open and escalated", "المفتوح والمُصعَّد")</option>
+            @foreach (SafetyEventState s in Enum.GetValues(typeof(SafetyEventState)))
+            {
+                <option value="@s" selected="@(Model.State == s)">@TransportLabels.SafetyState(s, isRtl)</option>
+            }
+        </select>
+    </div>
+    <button type="submit" class="btn btn-outline-secondary">@T("Filter", "تصفية")</button>
+</form>
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("When", "متى")</th>
+            <th scope="col">@T("What", "ماذا")</th>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("Trip", "الرحلة")</th>
+            <th scope="col">@T("State", "الحالة")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var e in Model.Events)
+        {
+            var student = e.StudentId is { } sid && Model.Students.TryGetValue(sid, out var s) ? s : null;
+            <tr>
+                <td class="small">@e.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                <td class="fw-semibold">
+                    @TransportLabels.SafetyKind(e.Kind, isRtl)
+                    @if (!string.IsNullOrWhiteSpace(e.Note))
+                    {
+                        <div class="small text-muted fw-normal">@e.Note</div>
+                    }
+                </td>
+                <td class="small">
+                    @if (student != null)
+                    {
+                        @student.Name(isRtl)
+                        <div class="text-muted">@student.StudentNo</div>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </td>
+                <td class="small">
+                    @if (e.TripId is { } tid)
+                    {
+                        <a asp-action="Trip" asp-route-id="@tid">#@tid</a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </td>
+                <td>
+                    <span class="badge @(e.State switch {
+                        SafetyEventState.Open => "text-bg-danger",
+                        SafetyEventState.Escalated => "text-bg-warning",
+                        _ => "text-bg-success" })">@TransportLabels.SafetyState(e.State, isRtl)</span>
+                </td>
+                <td class="text-end">
+                    @if (e.State != SafetyEventState.Resolved)
+                    {
+                        <form method="post" asp-action="ResolveSafetyEvent" asp-route-id="@e.Id" class="d-inline-flex gap-1">
+                            <input name="resolution" class="form-control form-control-sm" style="width:14rem" required
+                                   placeholder="@T("what was done", "ما الذي جرى")" aria-label="@T("Resolution", "المعالجة")" />
+                            <button type="submit" class="btn btn-sm btn-outline-success">@T("Resolve", "معالجة")</button>
+                        </form>
+                    }
+                    else if (e.ResolvedAtUtc is { } at)
+                    {
+                        <span class="small text-muted">@at.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</span>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Events.Count == 0)
+        {
+            <tr><td colspan="6" class="text-muted text-center py-4">@T("Nothing to answer for.", "لا شيء يستدعي المعالجة.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

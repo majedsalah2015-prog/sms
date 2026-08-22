@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using Sms.Web.Navigation;
+
 namespace Sms.Web.Models
 {
     /// <summary>
@@ -8,6 +11,14 @@ namespace Sms.Web.Models
     /// </summary>
     public sealed class HomeDashboardViewModel
     {
+        /// <summary>
+        /// The departments this user may enter — the page's main content. Empty for an account with
+        /// no screen permissions at all, which the view answers with a plain explanation rather than
+        /// a blank page.
+        /// </summary>
+        public IReadOnlyList<WorkspaceBuilder.VisibleWorkspace> Workspaces { get; set; } =
+            new List<WorkspaceBuilder.VisibleWorkspace>();
+
         public string? SchoolNameEn { get; set; }
 
         public string? SchoolNameAr { get; set; }
@@ -27,8 +38,6 @@ namespace Sms.Web.Models
         public int Sections { get; set; }
 
         public int Parents { get; set; }
-
-        public int AuditEntries { get; set; }
 
         public bool HasSchool => SchoolNameEn != null;
     }

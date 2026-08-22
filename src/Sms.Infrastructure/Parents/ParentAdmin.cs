@@ -32,6 +32,31 @@ namespace Sms.Infrastructure.Parents
             return parent;
         }
 
+        public async Task SetResidenceAsync(int parentId, int? residenceAreaId, int? neighbourhoodId, CancellationToken cancellationToken = default)
+        {
+            var parent = await _db.Parents.SingleAsync(p => p.Id == parentId, cancellationToken);
+
+            // A quarter without its locality is not a place, and a quarter belonging to a different
+            // locality is a worse record than none: neither is stored.
+            if (neighbourhoodId is int hoodId)
+            {
+                if (residenceAreaId is not int areaId)
+                {
+                    throw new System.InvalidOperationException("A neighbourhood cannot be recorded without the locality it belongs to.");
+                }
+
+                var belongs = await _db.Neighbourhoods.AnyAsync(n => n.Id == hoodId && n.ResidenceAreaId == areaId, cancellationToken);
+                if (!belongs)
+                {
+                    throw new System.InvalidOperationException("That neighbourhood does not belong to the chosen locality.");
+                }
+            }
+
+            parent.ResidenceAreaId = residenceAreaId;
+            parent.NeighbourhoodId = residenceAreaId == null ? null : neighbourhoodId;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<Parent> RegisterParentAsync(
             string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
             string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default)

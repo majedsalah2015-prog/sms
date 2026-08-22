@@ -22,10 +22,83 @@
                     <div class="col-md-4"><label class="form-label small" asp-for="Email">@T("Email", "البريد")</label><input asp-for="Email" type="email" class="form-control form-control-sm" dir="ltr" /></div>
                     <div class="col-md-3"><label class="form-label small" asp-for="OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input asp-for="OccupationEmployer" class="form-control form-control-sm" /></div>
                     <div class="col-md-2"><label class="form-label small" asp-for="PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select asp-for="PreferredLanguage" class="form-select form-select-sm"><option value="ar">العربية</option><option value="en">English</option></select></div>
-                    <div class="col-12"><label class="form-label small" asp-for="Address">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" /></div>
+                    <div class="col-12"><label class="form-label small" asp-for="Address">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" placeholder="@T("street, building, landmark", "الشارع والعمارة وعلامة مميزة")" /></div>
+                </div>
+
+                @* Where the family lives belongs to the family, so it is recorded once here rather
+                   than once per child. The address line above still says which house. *@
+                <h3 class="h6 mt-4">@T("Residence", "السكن")</h3>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label small" for="res-gov">@T("Governorate", "المحافظة")</label>
+                        <select id="res-gov" class="form-select form-select-sm" aria-label="@T("Governorate", "المحافظة")">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                            @foreach (var g in Model.Governorates)
+                            {
+                                <option value="@g.Id">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small" asp-for="ResidenceAreaId">@T("Locality", "المنطقة")</label>
+                        <select asp-for="ResidenceAreaId" id="res-area" class="form-select form-select-sm">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small" asp-for="NeighbourhoodId">@T("Quarter", "الحي")</label>
+                        <select asp-for="NeighbourhoodId" id="res-hood" class="form-select form-select-sm">
+                            <option value="">@T("— none recorded —", "— لا يوجد —")</option>
+                        </select>
+                        <div class="form-text">@T("Only some localities have quarters recorded.", "الأحياء مسجَّلة لبعض المناطق فقط.")</div>
+                    </div>
                 </div>
             </div>
         </div>
         <div class="col-xl-4"><div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("Create", "إنشاء")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a><div class="form-text mt-3">@T("Link children from the Student file → Parents & guardians tab (relationship + flags, BR-STU-003).", "اربط الأبناء من ملف الطالب → تبويب أولياء الأمور (القرابة والأعلام، BR-STU-003).")</div></div></div>
     </div>
 </form>
+
+@section Scripts {
+<script>
+(function () {
+    var gov = document.getElementById('res-gov');
+    var area = document.getElementById('res-area');
+    var hood = document.getElementById('res-hood');
+    if (!gov || !area || !hood) { return; }
+    var isRtl = @Html.Raw(Json.Serialize(isRtl));
+    var labels = {
+        choose: @Html.Raw(Json.Serialize(T("— choose —", "— اختر —"))),
+        none: @Html.Raw(Json.Serialize(T("— none recorded —", "— لا يوجد —")))
+    };
+
+    function fill(select, rows, placeholder) {
+        select.innerHTML = '';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = placeholder;
+        select.appendChild(blank);
+        rows.forEach(function (r) {
+            var o = document.createElement('option');
+            o.value = r.id;
+            o.textContent = isRtl ? r.ar : r.en;
+            select.appendChild(o);
+        });
+    }
+
+    gov.addEventListener('change', function () {
+        if (!gov.value) { fill(area, [], labels.choose); fill(hood, [], labels.none); return; }
+        fetch('@Url.Content("~/parents/residence/areas")?governorateId=' + gov.value)
+            .then(function (r) { return r.json(); })
+            .then(function (rows) { fill(area, rows, labels.choose); fill(hood, [], labels.none); });
+    });
+
+    area.addEventListener('change', function () {
+        if (!area.value) { fill(hood, [], labels.none); return; }
+        fetch('@Url.Content("~/parents/residence/neighbourhoods")?areaId=' + area.value)
+            .then(function (r) { return r.json(); })
+            .then(function (rows) { fill(hood, rows, labels.none); });
+    });
+})();
+</script>
+}

@@ -36,7 +36,15 @@
                     <div class="col-md-4"><label class="form-label small" for="par-Email">@T("Email", "البريد")</label><input name="Email" id="par-Email" type="email" class="form-control form-control-sm" dir="ltr" value="@p.Email" /></div>
                     <div class="col-md-3"><label class="form-label small" for="par-OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input name="OccupationEmployer" id="par-OccupationEmployer" class="form-control form-control-sm" value="@p.OccupationEmployer" /></div>
                     <div class="col-md-2"><label class="form-label small" for="par-PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select name="PreferredLanguage" id="par-PreferredLanguage" class="form-select form-select-sm"><option value="ar" selected="@(p.PreferredLanguage == "ar")">العربية</option><option value="en" selected="@(p.PreferredLanguage == "en")">English</option></select></div>
-                    <div class="col-12"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@p.Address" /></div>
+                    <div class="col-md-8"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@p.Address" /></div>
+                    @* The hierarchy is edited on its own page — three dependent pickers do not belong
+                       inside a form whose Save means something else. *@
+                    <div class="col-md-4"><label class="form-label small" for="par-residence">@T("Residence", "السكن")</label>
+                        <div class="d-flex gap-2 align-items-center">
+                            <span id="par-residence" class="form-control form-control-sm bg-light text-truncate" title="@Model.ResidencePath">@(Model.ResidencePath ?? T("not recorded", "غير مسجَّل"))</span>
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="Residence" asp-route-id="@p.Id"><i class="bi bi-geo-alt" aria-hidden="true"></i> @T("Edit", "تعديل")</a>
+                        </div>
+                    </div>
                 </div>
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="par-Reason">@T("Reason (required when the name changes — T1)", "السبب (مطلوب عند تغيير الاسم — T1)")</label><input name="Reason" id="par-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
             </form>

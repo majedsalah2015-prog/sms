@@ -11,6 +11,17 @@ namespace Sms.Application.Common.Exceptions
         public MissingAuditReasonException(string entityType, string fieldName)
             : base($"Changing '{entityType}.{fieldName}' requires a reason (audit tier T1).")
         {
+            EntityType = entityType;
+            FieldName = fieldName;
         }
+
+        /// <summary>
+        /// What was being changed, exposed so a screen can say it in the reader's language. The
+        /// message itself stays English — it is what the log reads, and a log should read the same
+        /// in every deployment.
+        /// </summary>
+        public string EntityType { get; }
+
+        public string FieldName { get; }
     }
 }

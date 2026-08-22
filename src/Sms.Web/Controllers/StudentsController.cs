@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
@@ -33,7 +34,7 @@ namespace Sms.Web.Controllers
     /// wizard / ID-card batch / portal profile are deferred with them.
     /// </summary>
     [Route("students")]
-    public class StudentsController : Controller
+    public partial class StudentsController : Controller
     {
         private readonly IStudentAdmin _students;
         private readonly AppDbContext _db;
@@ -41,8 +42,9 @@ namespace Sms.Web.Controllers
         private readonly IClock _clock;
         private readonly IWorkingYearContext _workingYear;
         private readonly IPermissionService _permissions;
+        private readonly Sms.Web.Services.PersonPhotoService _photos;
 
-        public StudentsController(IStudentAdmin students, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions)
+        public StudentsController(IStudentAdmin students, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions, Sms.Web.Services.PersonPhotoService photos)
         {
             _students = students;
             _db = db;
@@ -50,6 +52,7 @@ namespace Sms.Web.Controllers
             _clock = clock;
             _workingYear = workingYear;
             _permissions = permissions;
+            _photos = photos;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -193,7 +196,7 @@ namespace Sms.Web.Controllers
                     form.MotherName, form.MotherNationalId, form.MotherOccupation, form.MotherEducationLookupId, form.MotherMobile,
                     form.FatherStatus, form.MotherStatus, form.Religion,
                     form.ResidencyStatus, form.FinancialStatus, form.RationCardNo,
-                    form.PlaceOfBirth, form.FamilySize, form.BirthOrder, form.NeighbourhoodId,
+                    form.PlaceOfBirth, form.FamilySize, form.BirthOrder,
                     HttpContext.RequestAborted);
                 TempData["Flash"] = T("Social profile updated.", "تم تحديث البيانات الاجتماعية.");
             }
@@ -202,34 +205,67 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(File), new { id, tab = "social" });
         }
 
-        /// <summary>
-        /// The two lower levels of the residence picker, fetched as the one above
-        /// changes. A cascading picker is the only shape that works here: 34
-        /// localities across five governorates is already too many to scan, and the
-        /// neighbourhood list beneath them will be longer still.
-        /// </summary>
-        [HttpGet("residence/areas")]
-        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View)]
-        public async Task<IActionResult> ResidenceAreas(int governorateId)
+        // ------------------------------------------------------------------ photograph
+        //
+        // Served from an action rather than written into the page as a data URI: a photo is the one
+        // piece of a student's file that a browser can cache on its own, and inlining it would put a
+        // face into every HTML response whether or not anyone was looking at it.
+
+        [HttpGet("{id:int}/photo")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View)]
+        public async Task<IActionResult> Photo(int id)
         {
-            var areas = await _db.ResidenceAreas.AsNoTracking()
-                .Where(a => a.GovernorateId == governorateId)
-                .OrderBy(a => a.SortOrder)
-                .Select(a => new { id = a.Id, ar = a.Name.NameAr, en = a.Name.NameEn })
-                .ToListAsync();
-            return Json(areas);
+            var photoId = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.Id == id && s.SchoolId == _db.CurrentSchoolId)
+                .Select(s => s.PhotoAttachmentId)
+                .SingleOrDefaultAsync();
+
+            var photo = await _photos.ReadAsync(photoId, HttpContext.RequestAborted);
+            if (photo == null) { return NotFound(); }
+
+            return File(photo.Value.Content, photo.Value.ContentType);
         }
 
-        [HttpGet("residence/neighbourhoods")]
-        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View)]
-        public async Task<IActionResult> ResidenceNeighbourhoods(int areaId)
+        [HttpPost("{id:int}/photo")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Edit)]
+        public async Task<IActionResult> UploadPhoto(int id, IFormFile? photo)
         {
-            var hoods = await _db.Neighbourhoods.AsNoTracking()
-                .Where(n => n.ResidenceAreaId == areaId)
-                .OrderBy(n => n.SortOrder)
-                .Select(n => new { id = n.Id, ar = n.Name.NameAr, en = n.Name.NameEn })
-                .ToListAsync();
-            return Json(hoods);
+            try
+            {
+                var student = await _db.Students.SingleOrDefaultAsync(s => s.Id == id);
+                if (student == null) { return NotFound(); }
+
+                student.PhotoAttachmentId = await _photos.SaveAsync(
+                    photo!, "Student", id, ScreenCatalog.Modules.Students, HttpContext.RequestAborted);
+                await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                TempData["Flash"] = T("Photo updated.", "تم تحديث الصورة.");
+            }
+            // The policy exception is an InvalidOperationException, so it has to be caught first or
+            // its own message — which names a rule rather than a fact — is what reaches the screen.
+            catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException)
+            {
+                TempData["Error"] = T("That file is not an acceptable photo.", "هذا الملف ليس صورة مقبولة.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+
+            return RedirectToAction(nameof(File), new { id, tab = "personal" });
+        }
+
+        [HttpPost("{id:int}/photo/remove")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Edit)]
+        public async Task<IActionResult> RemovePhoto(int id)
+        {
+            var student = await _db.Students.SingleOrDefaultAsync(s => s.Id == id);
+            if (student == null) { return NotFound(); }
+
+            // The pointer is cleared; the attachment itself stays, because doc 10 does not delete
+            // files while the record that owned them exists (BR-ATT-007).
+            student.PhotoAttachmentId = null;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
+            TempData["Flash"] = T("Photo removed.", "تمت إزالة الصورة.");
+            return RedirectToAction(nameof(File), new { id, tab = "personal" });
         }
 
         [HttpPost("{id:int}/status")]
@@ -367,49 +403,11 @@ namespace Sms.Web.Controllers
                     ["certificates"] = await _db.CertificateIssues.AsNoTracking().CountAsync(c => c.StudentId == id),
                 },
                 EducationLevels = await LookupAsync("EducationLevel"),
-                Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
             };
 
-            await FillResidenceAsync(model, s);
             return model;
         }
 
-        /// <summary>
-        /// Resolves the recorded neighbourhood back up to its locality and
-        /// governorate, for the picker's initial state and the one-line address
-        /// beside it.
-        /// <para>
-        /// Walked up rather than stored: the student holds the neighbourhood alone,
-        /// so the three levels cannot drift apart. The cost is two small reads on a
-        /// screen that is already reading a dozen — the alternative is three columns
-        /// that can disagree, which is the bug this shape exists to prevent.
-        /// </para>
-        /// </summary>
-        private async Task FillResidenceAsync(StudentFileViewModel model, Student s)
-        {
-            if (s.NeighbourhoodId is not int hoodId)
-            {
-                return;
-            }
-
-            var hood = await _db.Neighbourhoods.AsNoTracking().SingleOrDefaultAsync(n => n.Id == hoodId);
-            if (hood == null)
-            {
-                return;
-            }
-
-            var area = await _db.ResidenceAreas.AsNoTracking().SingleOrDefaultAsync(a => a.Id == hood.ResidenceAreaId);
-            var governorate = area == null ? null : await _db.Governorates.AsNoTracking().SingleOrDefaultAsync(g => g.Id == area.GovernorateId);
-
-            model.CurrentGovernorateId = governorate?.Id;
-            model.CurrentResidenceAreaId = area?.Id;
-            model.CurrentResidencePath = string.Join(
-                " ← ",
-                new[] { Name(governorate?.Name), Name(area?.Name), Name(hood.Name) }.Where(x => x != null));
-
-            string? Name(Sms.Domain.Common.LocalizedName? n)
-                => n == null ? null : (IsArabic ? n.NameAr : n.NameEn);
-        }
 
         private async Task<StudentFormViewModel> BuildFormAsync(Student? s)
         {

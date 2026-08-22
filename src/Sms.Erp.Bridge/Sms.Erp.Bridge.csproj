@@ -37,6 +37,14 @@
     <!-- Contracts only, for the permission names Organization declares. Accounting already pulls this
          in transitively; naming it is honest about the fact that this project reads from it. -->
     <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Contracts\ERP2028.Modules.Organization.Contracts.csproj" />
+    <!-- Contracts only, again, and for one reason only: ErpPermissionCatalog declares these modules'
+         permissions to this system's role screen. A module hosted here whose permissions are not in
+         that list is a set of screens nobody but SYSADMIN can ever be given. -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Inventory\ERP2028.Modules.Inventory.Contracts\ERP2028.Modules.Inventory.Contracts.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Purchasing\ERP2028.Modules.Purchasing.Contracts\ERP2028.Modules.Purchasing.Contracts.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Sales\ERP2028.Modules.Sales.Contracts\ERP2028.Modules.Sales.Contracts.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Cash\ERP2028.Modules.Cash.Contracts\ERP2028.Modules.Cash.Contracts.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Partners\ERP2028.Modules.Partners.Contracts\ERP2028.Modules.Partners.Contracts.csproj" />
     <ProjectReference Include="..\Sms.Application\Sms.Application.csproj" />
   </ItemGroup>
 

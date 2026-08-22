@@ -15,9 +15,11 @@ namespace Sms.Erp.Bridge.DependencyInjection
     /// <para>
     /// The list is deliberately short, and that is the finding worth keeping: the
     /// ERP asks its host for a clock, the current user, and a way to name users.
-    /// Everything else it brings with it. <c>IFileStore</c> and
-    /// <c>ISupportAgentDirectory</c> are not registered because neither the
-    /// Accounting nor the Organization module resolves them; registering
+    /// Everything else it brings with it — including <c>IFileStore</c>, which Cash
+    /// and Inventory do resolve but which needs no adapter: the ERP ships a
+    /// local-disk implementation its own host uses, and this one registers the same
+    /// one (<c>AddLocalFileStore</c> in Startup). <c>ISupportAgentDirectory</c> is
+    /// still absent because no module hosted here resolves it, and registering
     /// abstractions nobody asks for would only hide, later, which ones actually
     /// matter.
     /// </para>

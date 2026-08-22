@@ -108,4 +108,17 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// BR-TRN-003: a route may not be moved onto a bus with fewer seats than it already carries.
+    /// Refused rather than waitlisting the overflow — the riders are already subscribed and already
+    /// charged, and turning some of them back into applicants is not a reassignment.
+    /// </summary>
+    public class RouteCapacityExceededException : InvalidOperationException
+    {
+        public RouteCapacityExceededException(int routeId, int riders, int capacity)
+            : base($"Route {routeId} carries {riders} rider(s); the chosen bus seats {capacity} (BR-TRN-003).")
+        {
+        }
+    }
 }

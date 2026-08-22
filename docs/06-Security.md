@@ -93,9 +93,18 @@ A role assignment carries scope dimensions; empty dimension = all within the low
 | BR-SEC-023 | All traffic over TLS 1.2+; attachments served through permission-checked endpoints, never direct file URLs. |
 | BR-SEC-024 | Personal data at rest: database-level encryption (TDE or equivalent) for cloud offering; on-prem documented as deployment requirement. |
 
-## 8. Screens (System Administration module will own these)
+## 8. Screens (System Administration module owns these)
 
 Users list & lifecycle · Role designer (permission tree with action columns) · Role assignment with scope picker · Permission matrix report · Security audit viewer · Password/2FA policy settings · Session policy settings · Account provisioning batches (parents/students).
+
+**Built (2026-08-22):** the role designer and role assignment, at `/security` and `/security/users` (`SecurityController` over `ISecurityAdmin`). The designer offers `ScreenCatalog` itself rather than the `sec.Permission` rows, so a screen added in a release is grantable on deploy without waiting for a seeder run.
+
+Two things worth knowing before changing them:
+
+- **The verbs are split on purpose.** `Edit` renames a role and sets its 2FA/session policy; `Configure` changes the grants. `SYS/Roles/Configure` is the permission that can reach every other permission in the product, which is what makes it worth being able to withhold on its own.
+- **The service refuses to remove the last permission administrator** — narrowing a role, deactivating one, or revoking an assignment all check the state the change *would* produce. There is no way back from that state inside the product: the screen that would undo it is the screen the change just closed. The rule is "do not remove the last one", not "there must always be one", so a database where nobody administers yet can still be bootstrapped.
+
+**Still deferred:** the users list and account lifecycle (create/deactivate an account, reset a password), the scope picker on an assignment (`sec.ScopeGrant` is written by nothing yet), the permission-matrix report, and the security audit viewer.
 
 ## 9. Future enhancements
 

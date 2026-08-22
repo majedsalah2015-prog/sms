@@ -453,3 +453,16 @@ $RECYCLE.BIN/
 # Copied from the ERP submodule on every build (Sms.Web.csproj, CopyErpTheme).
 # Committing it would make it a stale copy the moment the submodule moves.
 src/Sms.Web/wwwroot/css/erp-theme.css
+
+# Copied from the ERP submodule on every build (Sms.Web.csproj, CopyErpScripts),
+# for the same reason as the theme above. Named one by one so a script the ERP
+# stops shipping shows up as a build failure rather than as a silent orphan here.
+src/Sms.Web/wwwroot/js/erp-calculator.js
+src/Sms.Web/wwwroot/js/erp-label-designer.js
+src/Sms.Web/wwwroot/js/erp-label-print.js
+src/Sms.Web/wwwroot/js/erp-scale-scan.js
+src/Sms.Web/wwwroot/js/pos-till.js
+
+# The embedded ERP's uploaded files (FileStore:RootPath) — voucher scans and label
+# artwork a user attached. Data, not source; it must never reach a commit.
+src/Sms.Web/App_Data/

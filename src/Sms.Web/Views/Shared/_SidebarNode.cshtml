@@ -1,0 +1,52 @@
+@using System.Globalization
+@using Sms.Web.Navigation
+@model SidebarNode
+@*
+    One sidebar entry: a link, or a collapsible group that renders its children through this same
+    partial one level deeper. Written recursively rather than as two or three unrolled levels because
+    the depth is not this system's to fix — the accounting section's contents come from the embedded
+    ERP's own menu, and an unrolled renderer would silently drop whatever sat past the last level it
+    happened to spell out.
+*@
+@{
+    var item = Model.Item;
+    var depth = Model.Depth;
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var routeValues = ViewContext.RouteData.Values;
+    var indent = depth > 0 ? $" sms-nav-link--depth{depth}" : string.Empty;
+}
+
+@if (!item.HasChildren)
+{
+    var active = NavLinks.IsActive(item, routeValues);
+    // A root-relative URL is resolved against the application's base path; anything else (an absolute
+    // one) is already complete and is emitted as given.
+    var href = item.Url is { } explicitUrl
+        ? (explicitUrl.StartsWith("/") ? Url.Content("~" + explicitUrl) : explicitUrl)
+        : Url.Action(item.Action, item.Controller, NavLinks.RouteValuesFor(item)) ?? "#";
+    <a class="sms-nav-link@(indent) @(active ? "active" : "")" aria-current="@(active ? "page" : null)" href="@href" title="@item.Title(isRtl)">
+        <i class="sms-nav-icon bi @item.Icon" aria-hidden="true"></i>
+        <span class="sms-nav-label">@item.Title(isRtl)</span>
+    </a>
+}
+else
+{
+    var groupActive = NavLinks.IsBranchActive(item, routeValues);
+    var collapseId = $"nav-{item.Key}";
+    <div class="sms-nav-group @(groupActive ? "is-active" : "")">
+        <button class="sms-nav-link@(indent)" type="button" data-bs-toggle="collapse"
+                data-bs-target="#@collapseId" aria-expanded="@(groupActive ? "true" : "false")" aria-controls="@collapseId" title="@item.Title(isRtl)">
+            <i class="sms-nav-icon bi @item.Icon" aria-hidden="true"></i>
+            <span class="sms-nav-label">@item.Title(isRtl)</span>
+            <i class="sms-nav-caret bi bi-chevron-down" aria-hidden="true"></i>
+        </button>
+        <div class="collapse @(groupActive ? "show" : "")" id="@collapseId">
+            <div class="sms-nav-group__items">
+                @foreach (var child in item.Items)
+                {
+                    @await Html.PartialAsync("_SidebarNode", new SidebarNode(child, depth + 1))
+                }
+            </div>
+        </div>
+    </div>
+}

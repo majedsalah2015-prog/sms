@@ -4388,6 +4388,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<int>("NationalityLookupId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("PhotoAttachmentId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("PrimaryIdExpiry")
                         .HasColumnType("datetime2");
 
@@ -8738,6 +8741,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("NeighbourhoodId")
+                        .HasColumnType("int");
+
                     b.Property<string>("OccupationEmployer")
                         .HasColumnType("nvarchar(max)");
 
@@ -8755,6 +8761,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<int?>("ResidenceAreaId")
+                        .HasColumnType("int");
+
                     b.Property<int>("SchoolId")
                         .HasColumnType("int");
 
@@ -8762,6 +8771,10 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ResidenceAreaId")
+                        .HasDatabaseName("IX_Parent_ResidenceArea")
+                        .HasFilter("[ResidenceAreaId] IS NOT NULL");
 
                     b.HasIndex("SchoolId", "ParentFileNo")
                         .IsUnique();
@@ -11669,9 +11682,6 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<int>("NationalityLookupId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("NeighbourhoodId")
-                        .HasColumnType("int");
-
                     b.Property<int?>("PhotoAttachmentId")
                         .HasColumnType("int");
 
@@ -11714,10 +11724,6 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("NeighbourhoodId")
-                        .HasDatabaseName("IX_Student_Neighbourhood")
-                        .HasFilter("[NeighbourhoodId] IS NOT NULL");
 
                     b.HasIndex("SchoolId", "StudentNo")
                         .IsUnique();

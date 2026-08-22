@@ -127,10 +127,8 @@ namespace Sms.Domain.Students
         /// <summary>ترتيب الطالب بين الأبناء, 1 = eldest.</summary>
         public int? BirthOrder { get; set; }
 
-        /// <summary>
-        /// حي السكن — the neighbourhood only. Its area and governorate are reached
-        /// by walking up <c>Geography</c>, so the three can never disagree.
-        /// </summary>
-        public int? NeighbourhoodId { get; set; }
+        // Residence (governorate → locality → quarter) lives on Parent, not here. Where a family
+        // lives is the family's fact: a copy per child let three siblings disagree about one
+        // address, and nothing in the product could say which of them was right.
     }
 }

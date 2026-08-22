@@ -1,0 +1,96 @@
+@using System.Globalization
+@model Sms.Web.Models.UserRoleListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("User role assignments", "إسناد الأدوار للمستخدمين");
+    ViewData["Breadcrumb"] = T("System administration / User roles", "إدارة النظام / أدوار المستخدمين");
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Permissions reach a person only through a role. An account with no role can sign in and reach nothing.",
+               "الصلاحيات تصل الشخص عبر الدور فقط. الحساب بلا دور يستطيع الدخول ولا يصل إلى شيء.")
+        </p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Index">
+        <i class="bi bi-shield-lock" aria-hidden="true"></i> @T("Roles", "الأدوار")
+    </a>
+</div>
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+<form method="get" class="mb-3 d-flex gap-2" style="max-width:26rem">
+    <label class="visually-hidden" for="q">@T("Search accounts", "بحث في الحسابات")</label>
+    <input id="q" name="q" value="@Model.Search" class="form-control" placeholder="@T("Search by user name", "بحث باسم المستخدم")" />
+    <button type="submit" class="btn btn-outline-secondary">@T("Search", "بحث")</button>
+</form>
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("Account", "الحساب")</th>
+            <th scope="col">@T("Type", "النوع")</th>
+            <th scope="col">@T("Roles", "الأدوار")</th>
+            <th scope="col">@T("Assign", "إسناد")</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var user in Model.Users)
+        {
+            <tr class="@(user.IsActive ? "" : "text-muted")">
+                <td class="fw-semibold">
+                    @user.UserName
+                    @if (!user.IsActive)
+                    {
+                        <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّل")</span>
+                    }
+                </td>
+                <td class="small">@user.AccountType</td>
+                <td>
+                    @if (user.Roles.Count == 0)
+                    {
+                        <span class="text-muted small">@T("none", "لا شيء")</span>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-1">
+                            @foreach (var role in user.Roles)
+                            {
+                                <form method="post" asp-action="Revoke" asp-route-userAccountId="@user.UserAccountId" asp-route-roleId="@role.RoleId" asp-route-q="@Model.Search" class="d-inline">
+                                    <span class="badge @(role.CanAdministerPermissions ? "text-bg-warning" : "text-bg-light border") d-inline-flex align-items-center gap-1">
+                                        @(isRtl ? role.NameAr : role.NameEn)
+                                        <button type="submit" class="btn btn-link btn-sm p-0 lh-1 text-reset"
+                                                title="@T("Revoke", "سحب")" aria-label="@T($"Revoke {role.Code}", $"سحب {role.Code}")">
+                                            <i class="bi bi-x" aria-hidden="true"></i>
+                                        </button>
+                                    </span>
+                                </form>
+                            }
+                        </div>
+                    }
+                </td>
+                <td>
+                    <form method="post" asp-action="Assign" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search" class="d-flex gap-1">
+                        <label class="visually-hidden" for="role-@user.UserAccountId">@T("Role", "الدور")</label>
+                        <select id="role-@user.UserAccountId" name="roleId" class="form-select form-select-sm" style="width:14rem">
+                            @foreach (var role in Model.Roles.Where(r => r.IsActive && user.Roles.All(h => h.RoleId != r.Id)))
+                            {
+                                <option value="@role.Id">@(isRtl ? role.NameAr : role.NameEn)</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">@T("Assign", "إسناد")</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>

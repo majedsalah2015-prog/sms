@@ -1,0 +1,139 @@
+@using System.Globalization
+@model ParentResidenceViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var name = isRtl ? Model.Parent.NameAr : Model.Parent.NameEn;
+    ViewData["Title"] = T("Residence", "السكن");
+    ViewData["Breadcrumb"] = T("Parents / ", "أولياء الأمور / ") + Model.Parent.ParentFileNo + T(" / Residence", " / السكن");
+    var back = Model.ReturnUrl ?? Url.Action("File", new { id = Model.Parent.Id, tab = "identity" });
+    var help = new HelpPanelViewModel
+    {
+        Id = "par-residence-help", Title = T("Residence — help", "السكن — مساعدة"),
+        Intro = T("Three levels, narrowing downwards: governorate, then the locality inside it, then the quarter inside that where one is recorded.", "ثلاثة مستويات تضيق نزولاً: المحافظة، ثم المنطقة داخلها، ثم الحي داخلها حيث يكون مسجَّلاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A blank quarter is not a gap", "الحي الفارغ ليس نقصاً"), T("Most localities have no quarters recorded at all, and there the locality is the address. Leave it on \"none recorded\" and the residence is complete.", "أكثر المناطق لا أحياء مسجَّلة لها أصلاً، وفيها المنطقة هي العنوان. اتركه على «لا يوجد» ويكون السكن مكتملاً.")),
+            new HelpPanelViewModel.Item(T("Why it is not free text", "لماذا ليس نصاً حراً"), T("Typed by hand, one locality becomes five spellings across five screens and \"every family in this governorate\" stops being a question anyone can answer. The street and building still belong in the address line on the parent file.", "بالكتابة اليدوية تصير المنطقة الواحدة خمس هجاءات في خمس شاشات، ويتوقف سؤال «كل أسرة في هذه المحافظة» عن كونه سؤالاً يُجاب. أما الشارع والعمارة فمكانهما سطر العنوان في ملف ولي الأمر.")),
+            new HelpPanelViewModel.Item(T("The governorate is not stored", "المحافظة لا تُخزَّن"), T("Only the locality and the quarter are kept; the governorate is reached by walking up from the locality, so the two can never end up disagreeing with each other.", "لا يُحفَظ إلا المنطقة والحي؛ والمحافظة يُصعَد إليها من المنطقة، فلا يمكن أن يتناقض أحدهما مع الآخر.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            <strong>@name</strong> · <bdi dir="ltr">@Model.Parent.ParentFileNo</bdi> · <bdi dir="ltr">@Model.Parent.PrimaryMobile</bdi>
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+        <a class="btn btn-outline-secondary btn-sm" href="@back"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("Back", "رجوع")</a>
+    </div>
+</div>
+
+<div class="sms-card p-3" style="max-width:52rem">
+    <p class="small text-muted">
+        @T("Recorded now:", "المسجَّل الآن:")
+        <strong>@(Model.CurrentPath ?? T("nothing", "لا شيء"))</strong>
+    </p>
+
+    <form method="post" asp-action="SaveResidence" asp-route-id="@Model.Parent.Id">
+        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+        <fieldset disabled="@(!Model.CanEdit)">
+            <div class="row g-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label small" for="res-gov">@T("Governorate", "المحافظة")</label>
+                    <select id="res-gov" class="form-select form-select-sm" aria-label="@T("Governorate", "المحافظة")">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                        @foreach (var g in Model.Governorates)
+                        {
+                            <option value="@g.Id" selected="@(Model.CurrentGovernorateId == g.Id)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                        }
+                    </select>
+                    <div class="form-text">@T("Not stored — it is walked up to from the locality.", "لا تُخزَّن — بل يُصعَد إليها من المنطقة.")</div>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label small" for="res-area">@T("Locality", "المنطقة")</label>
+                    <select id="res-area" name="residenceAreaId" class="form-select form-select-sm">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label small" for="res-hood">@T("Quarter", "الحي")</label>
+                    <select id="res-hood" name="neighbourhoodId" class="form-select form-select-sm">
+                        <option value="">@T("— none recorded —", "— لا يوجد —")</option>
+                    </select>
+                    <div class="form-text">@T("Only some localities have quarters; elsewhere the locality is the address.", "الأحياء مسجَّلة لبعض المناطق فقط؛ وفي غيرها المنطقة هي العنوان.")</div>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label small" for="res-reason">@T("Reason", "السبب")</label>
+                    <input id="res-reason" name="reason" class="form-control form-control-sm" placeholder="@T("optional — kept on the audit line", "اختياري — يُحفَظ في سطر التدقيق")" />
+                </div>
+            </div>
+
+            <div class="mt-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">@T("Save", "حفظ")</button>
+                <a class="btn btn-outline-secondary btn-sm" href="@back">@T("Cancel", "إلغاء")</a>
+            </div>
+        </fieldset>
+    </form>
+
+    @if (!Model.CanEdit)
+    {
+        <p class="small text-muted mt-3 mb-0">@T("You may read this but not change it.", "يمكنك قراءة هذا دون تعديله.")</p>
+    }
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    var gov = document.getElementById('res-gov');
+    var area = document.getElementById('res-area');
+    var hood = document.getElementById('res-hood');
+    var isRtl = @Html.Raw(Json.Serialize(isRtl));
+    var labels = {
+        choose: @Html.Raw(Json.Serialize(T("— choose —", "— اختر —"))),
+        none: @Html.Raw(Json.Serialize(T("— none recorded —", "— لا يوجد —")))
+    };
+
+    function fill(select, rows, placeholder, selectedId) {
+        select.innerHTML = '';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = placeholder;
+        select.appendChild(blank);
+        rows.forEach(function (r) {
+            var o = document.createElement('option');
+            o.value = r.id;
+            o.textContent = isRtl ? r.ar : r.en;
+            if (selectedId && r.id === selectedId) { o.selected = true; }
+            select.appendChild(o);
+        });
+    }
+
+    async function loadAreas(governorateId, selectAreaId) {
+        if (!governorateId) { fill(area, [], labels.choose); fill(hood, [], labels.none); return; }
+        var rows = await fetch('@Url.Content("~/parents/residence/areas")?governorateId=' + governorateId).then(function (r) { return r.json(); });
+        fill(area, rows, labels.choose, selectAreaId);
+        await loadHoods(area.value, currentHood);
+    }
+
+    async function loadHoods(areaId, selectHoodId) {
+        if (!areaId) { fill(hood, [], labels.none); return; }
+        var rows = await fetch('@Url.Content("~/parents/residence/neighbourhoods")?areaId=' + areaId).then(function (r) { return r.json(); });
+        fill(hood, rows, labels.none, selectHoodId);
+    }
+
+    gov.addEventListener('change', function () { currentHood = null; loadAreas(gov.value, null); });
+    area.addEventListener('change', function () { currentHood = null; loadHoods(area.value, null); });
+
+    // Reopen on what is already recorded: all three levels were resolved server-side by walking up
+    // from the stored locality, so the browser restores them rather than guessing.
+    var currentHood = @Html.Raw(Json.Serialize(Model.CurrentNeighbourhoodId));
+    var currentArea = @Html.Raw(Json.Serialize(Model.CurrentAreaId));
+    if (gov.value) { loadAreas(gov.value, currentArea); }
+})();
+</script>
+}

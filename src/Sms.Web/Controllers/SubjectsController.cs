@@ -91,6 +91,53 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { tab = "catalog" });
         }
 
+        /// <summary>
+        /// Loads a whole stage's subject list at once. A school opening on Sunday should not have to
+        /// type nine rows before it can build a timetable, and the nine rows are the same nine rows in
+        /// every primary school.
+        /// <para>
+        /// A code that already exists is left exactly as it is — the pack never renames or
+        /// recategorises anything — so pressing the button twice changes nothing, and a school that
+        /// teaches two stages can load both packs on top of each other.
+        /// </para>
+        /// </summary>
+        [HttpPost("subject/stage-pack")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Subjects_, ActionVerb.Create)]
+        public async Task<IActionResult> AddStagePack(string? stage)
+        {
+            var pack = SubjectStagePacks.For(stage);
+            if (pack.Count == 0)
+            {
+                TempData["Error"] = T("Unknown stage.", "مرحلة غير معروفة.");
+                return RedirectToAction(nameof(Index), new { tab = "catalog" });
+            }
+
+            // Deactivated subjects still hold their code, so they count as present: re-adding one would
+            // be refused by the engine anyway, and silently reviving it is not this button's decision.
+            var taken = await _db.Subjects.IgnoreQueryFilters().Select(s => s.Code).ToListAsync();
+            var existing = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+
+            var added = 0;
+            var skipped = 0;
+            foreach (var row in pack)
+            {
+                if (existing.Contains(row.Code)) { skipped++; continue; }
+                try
+                {
+                    await _subjects.DefineSubjectAsync(row.Code, row.NameAr, row.NameEn, row.Category);
+                    added++;
+                }
+                catch (Sms.Application.Common.Exceptions.DuplicateSubjectCodeException) { skipped++; }
+            }
+
+            var label = SubjectStagePacks.Label(stage!, IsArabic);
+            TempData["Flash"] = added == 0
+                ? T($"{label}: every subject in the pack already exists — nothing added.", $"{label}: كل مواد الحزمة موجودة — لم يُضَف شيء.")
+                : T($"{label}: {added} subject(s) added, {skipped} already existed.", $"{label}: أُضيفت {added} مادة، و{skipped} كانت موجودة.");
+            return RedirectToAction(nameof(Index), new { tab = "catalog" });
+        }
+
         [HttpPost("department")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.Departments, ActionVerb.Create)]

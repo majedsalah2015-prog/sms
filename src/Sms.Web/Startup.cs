@@ -21,17 +21,43 @@ using Hangfire;
 // codebases sharing a process will keep producing — resolve it here, not by renaming either side.
 using IErpPermissionCatalog = ERP2028.Application.Abstractions.Identity.IPermissionCatalog;
 using ErpPermissionCatalog = ERP2028.Application.Abstractions.Identity.PermissionCatalog;
+using ERP2028.Infrastructure.Shared.Files;
 using ERP2028.Infrastructure.Shared.Persistence;
 using ERP2028.Modules.Accounting.Application.DependencyInjection;
 using ERP2028.Modules.Accounting.Contracts.Permissions;
 using ERP2028.Modules.Accounting.Infrastructure.DependencyInjection;
 using ERP2028.Modules.Accounting.Infrastructure.Seeding;
 using ERP2028.Modules.Accounting.Web.DependencyInjection;
+using ERP2028.Modules.Cash.Application.DependencyInjection;
+using ERP2028.Modules.Cash.Contracts.Permissions;
+using ERP2028.Modules.Cash.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Cash.Infrastructure.Seeding;
+using ERP2028.Modules.Cash.Web.DependencyInjection;
+using ERP2028.Modules.Inventory.Application.DependencyInjection;
+using ERP2028.Modules.Inventory.Contracts.Permissions;
+using ERP2028.Modules.Inventory.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Inventory.Infrastructure.Seeding;
+using ERP2028.Modules.Inventory.Web.DependencyInjection;
 using ERP2028.Modules.Organization.Application.DependencyInjection;
 using ERP2028.Modules.Organization.Contracts.Permissions;
 using ERP2028.Modules.Organization.Infrastructure.DependencyInjection;
 using ERP2028.Modules.Organization.Infrastructure.Seeding;
 using ERP2028.Modules.Organization.Web.DependencyInjection;
+using ERP2028.Modules.Partners.Application.DependencyInjection;
+using ERP2028.Modules.Partners.Contracts.Permissions;
+using ERP2028.Modules.Partners.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Partners.Infrastructure.Seeding;
+using ERP2028.Modules.Partners.Web.DependencyInjection;
+using ERP2028.Modules.Purchasing.Application.DependencyInjection;
+using ERP2028.Modules.Purchasing.Contracts.Permissions;
+using ERP2028.Modules.Purchasing.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Purchasing.Infrastructure.Seeding;
+using ERP2028.Modules.Purchasing.Web.DependencyInjection;
+using ERP2028.Modules.Sales.Application.DependencyInjection;
+using ERP2028.Modules.Sales.Contracts.Permissions;
+using ERP2028.Modules.Sales.Infrastructure.DependencyInjection;
+using ERP2028.Modules.Sales.Infrastructure.Seeding;
+using ERP2028.Modules.Sales.Web.DependencyInjection;
 using ERP2028.Web.Shared.DependencyInjection;
 using ERP2028.Web.Shared.Navigation;
 using Sms.Erp.Bridge.DependencyInjection;
@@ -140,12 +166,20 @@ namespace Sms.Web
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public Startup(IConfiguration configuration, IWebHostEnvironment environment)
         {
             Configuration = configuration;
+            Environment = environment;
         }
 
         public IConfiguration Configuration { get; }
+
+        /// <summary>
+        /// Needed by the embedded ERP's file store, which resolves a relative upload root against the
+        /// content root rather than the process's working directory — those differ between running
+        /// from an IDE, from the CLI, and as a service.
+        /// </summary>
+        public IWebHostEnvironment Environment { get; }
 
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
@@ -161,7 +195,12 @@ namespace Sms.Web
             // libraries; MVC finds neither without being told the assemblies are part of this
             // application (docs/Integration/01-Embedded-Accounting-Plan.md §7).
             .AddApplicationPart(typeof(OrganizationWebRegistration).Assembly)
-            .AddApplicationPart(typeof(AccountingWebRegistration).Assembly);
+            .AddApplicationPart(typeof(AccountingWebRegistration).Assembly)
+            .AddApplicationPart(typeof(InventoryWebRegistration).Assembly)
+            .AddApplicationPart(typeof(PurchasingWebRegistration).Assembly)
+            .AddApplicationPart(typeof(SalesWebRegistration).Assembly)
+            .AddApplicationPart(typeof(CashWebRegistration).Assembly)
+            .AddApplicationPart(typeof(PartnersWebRegistration).Assembly);
 
             // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,
             // re-validated per request by SessionCookieEvents; a second, 5-minute
@@ -210,9 +249,19 @@ namespace Sms.Web
                 options.UseSqlServer(Configuration.GetConnectionString("Sms")));
             services.AddScoped<IPermissionService, PermissionService>();
 
+            // Module 36's role designer — the screen that changes what every other screen may be
+            // reached by (doc 06 §4). Reads and writes the same sec.Role/RolePermission rows the
+            // seeder provisions and PermissionService evaluates.
+            services.AddScoped<ISecurityAdmin, SecurityAdmin>();
+
             // Reads the same grants the screen filter reads, so the menu and the screens agree about
             // what this user can open. Scoped: it caches its answer for the request.
             services.AddScoped<Sms.Web.Navigation.ModuleVisibility>();
+
+            // The landing page's departments (doc/DesignSystem/05 — "what is my job", beside the
+            // sidebar's "what does this product contain"). Scoped for the same reason: it asks the
+            // permission service about every screen it lists, and that answer is cached per request.
+            services.AddScoped<Sms.Web.Navigation.WorkspaceBuilder>();
 
             // E-003 authentication slice (doc 06 §3, BR-SEC-001..004). The
             // cookie/session wiring that consumes this (login screen, real
@@ -258,6 +307,7 @@ namespace Sms.Web
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
             services.AddScoped<IAttachmentService, AttachmentService>();
             services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
+            services.AddScoped<Sms.Web.Services.PersonPhotoService>();
 
             // E-010 lookup framework (BR-SET-001/002/007). The seeder harness
             // (SeedRunner + ISeedContributor implementations) is registered in
@@ -697,6 +747,38 @@ namespace Sms.Web
             services.AddAccountingInfrastructure(connectionString);
             services.Configure<AccountingSeedOptions>(Configuration.GetSection(AccountingSeedOptions.SectionName));
 
+            // The operational modules, in the ERP host's own order — the order their contracts
+            // point in, so a module is registered after everything it reads. The container does
+            // not care; the migration order in Program does, and keeping one order for both means
+            // there is only one to get wrong.
+            services.AddInventoryApplication();
+            services.AddInventoryInfrastructure(connectionString);
+            services.Configure<InventorySeedOptions>(Configuration.GetSection(InventorySeedOptions.SectionName));
+
+            services.AddPurchasingApplication();
+            services.AddPurchasingInfrastructure(connectionString);
+            services.Configure<PurchasingSeedOptions>(Configuration.GetSection(PurchasingSeedOptions.SectionName));
+
+            services.AddSalesApplication();
+            services.AddSalesInfrastructure(connectionString);
+            services.Configure<SalesSeedOptions>(Configuration.GetSection(SalesSeedOptions.SectionName));
+
+            services.AddCashApplication();
+            services.AddCashInfrastructure(connectionString);
+            services.Configure<CashSeedOptions>(Configuration.GetSection(CashSeedOptions.SectionName));
+
+            services.AddPartnersApplication();
+            services.AddPartnersInfrastructure(connectionString);
+            services.Configure<PartnersSeedOptions>(Configuration.GetSection(PartnersSeedOptions.SectionName));
+
+            // The fourth thing the ERP asks of a host, needed only now: Cash attaches a scan of the
+            // cheque or the deposit slip to a voucher, and Inventory keeps the artwork a label
+            // template prints. Neither module learns where the bytes go — the store derives the path,
+            // which is what makes a traversal attack unrepresentable rather than merely guarded
+            // against. The root comes from the FileStore configuration section and is resolved
+            // against this application's content root.
+            services.AddLocalFileStore(Configuration, Environment.ContentRootPath);
+
             // ----- Presentation -----
             // The modules' screens. Their [HasPermission] resolves through the ERP's own policy
             // provider, which is safe to add here because it delegates every policy name that is not
@@ -706,8 +788,16 @@ namespace Sms.Web
             services.AddLocalization();
             services.AddPermissionAuthorization();
             services.AddErpNavigation();
+            // The shell reads the ERP's composed menu through this and nests it under the accounting
+            // section. Scoped, because INavigationMenu is.
+            services.AddScoped<Sms.Web.Navigation.ErpNavigationSource>();
             services.AddOrganizationWeb();
             services.AddAccountingWeb();
+            services.AddInventoryWeb();
+            services.AddPurchasingWeb();
+            services.AddSalesWeb();
+            services.AddCashWeb();
+            services.AddPartnersWeb();
 
             // Catalogued and granted by the Sms.Seeder tool, never here: seeding must not run as a
             // side effect of the web app starting (the rule the lookup framework states above). The
@@ -715,11 +805,19 @@ namespace Sms.Web
             services.AddErpPermissionCatalog();
 
             // The catalog the ERP composes at its own composition root. Nothing in
-            // Accounting or Organization resolves it today — this system's Identity
-            // is its own — but it is the list a role screen will offer when the
-            // accounting permissions become grantable (P3).
+            // the hosted modules resolves it today — this system's Identity is its
+            // own — but it is the list a role screen will offer when the accounting
+            // permissions become grantable (P3). It must name the same modules as
+            // Sms.Erp.Bridge's ErpPermissionCatalog, which is what this system's
+            // role screen actually reads.
             services.AddSingleton<IErpPermissionCatalog>(new ErpPermissionCatalog(
-                OrganizationPermissions.All.Concat(AccountingPermissions.All)));
+                OrganizationPermissions.All
+                    .Concat(AccountingPermissions.All)
+                    .Concat(InventoryPermissions.All)
+                    .Concat(PurchasingPermissions.All)
+                    .Concat(SalesPermissions.All)
+                    .Concat(CashPermissions.All)
+                    .Concat(PartnersPermissions.All)));
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

@@ -21,7 +21,7 @@
                 {
                     <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(c.Id == Model.Selected?.Id ? "active" : "")" aria-current="@(c.Id == Model.Selected?.Id ? "true" : null)" asp-action="Lookups" asp-route-category="@c.Code">
                         <span>@(isRtl ? c.Name.NameAr : c.Name.NameEn)<br /><code class="small">@c.Code</code></span>
-                        <span class="badge rounded-pill @(c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-light border" : "text-bg-primary")" title="@c.Tier">@(c.Tier == LookupCategoryTier.ProductSeeded ? T("product", "منتج") : T("school", "مدرسة"))</span>
+                        <span class="badge rounded-pill @(c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-light border" : "text-bg-primary")" title="@(c.Tier == LookupCategoryTier.ProductSeeded ? T("Product-seeded — read only (BR-SET-001)", "مزوَّدة من المنتج — للقراءة فقط (BR-SET-001)") : T("School-managed — you add and deactivate the values", "تديرها المدرسة — أنتم من يضيف القيم ويعطّلها"))">@(c.Tier == LookupCategoryTier.ProductSeeded ? T("product", "منتج") : T("school", "مدرسة"))</span>
                     </a>
                 }
             </div>
@@ -51,7 +51,7 @@
                     {
                         <tr class="@(v.IsActive ? "" : "text-muted")">
                             <td>@v.SortOrder</td><td><code>@v.Code</code></td><td dir="rtl">@v.Name.NameAr</td><td dir="ltr">@v.Name.NameEn</td>
-                            <td>@(v.IsActive ? "✓" : "—")</td>
+                            <td><span title="@(v.IsActive ? T("Active", "فعّال") : T("Inactive", "معطَّل"))">@(v.IsActive ? "✓" : "—")</span></td>
                             <td class="text-end">
                                 @if (!readOnly && v.IsActive)
                                 {

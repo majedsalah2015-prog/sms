@@ -27,6 +27,41 @@
          layout they render inside is this application's own. -->
     <ProjectReference Include="..\..\external\erp\src\Modules\Organization\ERP2028.Modules.Organization.Web\ERP2028.Modules.Organization.Web.csproj" />
     <ProjectReference Include="..\..\external\erp\src\Modules\Accounting\ERP2028.Modules.Accounting.Web\ERP2028.Modules.Accounting.Web.csproj" />
+
+    <!--
+      The operational modules: stores, buying, selling, the till, and the money that
+      moves against them. Same three layers each, for the same reason as above.
+
+      Partners is here because Cash needs it, not because a school does: Cash's
+      voucher drafts resolve Partners' directory to name the counterparty on an
+      owner's-account voucher, so registering Cash without Partners produces a
+      container that resolves until the first voucher is drafted. Its own screens
+      come along with it — a module that is running and reachable but hidden from the
+      menu is a worse lie than one entry a school will not use.
+
+      Inventory, Purchasing, Sales and Cash reference each other's .Contracts only,
+      so this list is five modules, not a graph: adding one changes nothing here
+      except its own three lines.
+    -->
+    <ProjectReference Include="..\..\external\erp\src\Modules\Inventory\ERP2028.Modules.Inventory.Application\ERP2028.Modules.Inventory.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Inventory\ERP2028.Modules.Inventory.Infrastructure\ERP2028.Modules.Inventory.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Inventory\ERP2028.Modules.Inventory.Web\ERP2028.Modules.Inventory.Web.csproj" />
+
+    <ProjectReference Include="..\..\external\erp\src\Modules\Purchasing\ERP2028.Modules.Purchasing.Application\ERP2028.Modules.Purchasing.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Purchasing\ERP2028.Modules.Purchasing.Infrastructure\ERP2028.Modules.Purchasing.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Purchasing\ERP2028.Modules.Purchasing.Web\ERP2028.Modules.Purchasing.Web.csproj" />
+
+    <ProjectReference Include="..\..\external\erp\src\Modules\Sales\ERP2028.Modules.Sales.Application\ERP2028.Modules.Sales.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Sales\ERP2028.Modules.Sales.Infrastructure\ERP2028.Modules.Sales.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Sales\ERP2028.Modules.Sales.Web\ERP2028.Modules.Sales.Web.csproj" />
+
+    <ProjectReference Include="..\..\external\erp\src\Modules\Cash\ERP2028.Modules.Cash.Application\ERP2028.Modules.Cash.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Cash\ERP2028.Modules.Cash.Infrastructure\ERP2028.Modules.Cash.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Cash\ERP2028.Modules.Cash.Web\ERP2028.Modules.Cash.Web.csproj" />
+
+    <ProjectReference Include="..\..\external\erp\src\Modules\Partners\ERP2028.Modules.Partners.Application\ERP2028.Modules.Partners.Application.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Partners\ERP2028.Modules.Partners.Infrastructure\ERP2028.Modules.Partners.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\external\erp\src\Modules\Partners\ERP2028.Modules.Partners.Web\ERP2028.Modules.Partners.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,6 +72,12 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!--
+      Reading a school's old Access register on the way in (StudentImport). ODBC rather than OLEDB
+      deliberately: the machine this runs on has the ACE ODBC driver registered and no ACE OLEDB
+      provider at all, and ODBC is the one of the two that Linux could also serve one day.
+    -->
+    <PackageReference Include="System.Data.Odbc" Version="5.0.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -56,6 +97,29 @@
     <Copy SourceFiles="..\..\external\erp\src\Bootstrap\ERP2028.Web\Assets\css\erp-theme.css"
           DestinationFiles="wwwroot\css\erp-theme.css"
           SkipUnchangedFiles="true" />
+  </Target>
+
+  <!--
+    The five scripts the embedded modules' views ask for by absolute path. They live in the ERP
+    host's wwwroot rather than in the module that uses them, so hosting the module here without
+    them gives a screen that renders and does nothing — the till takes no payment, the label
+    designer has no canvas.
+
+    Copied, git-ignored and enumerated for the same reasons as the theme above: an itemised list
+    breaks loudly when a script is renamed upstream, where a wildcard would quietly start shipping
+    whatever else the ERP host happens to keep in that folder (its chat and notification scripts,
+    which belong to a module this system does not host).
+  -->
+  <ItemGroup>
+    <ErpScript Include="..\..\external\erp\src\Bootstrap\ERP2028.Web\wwwroot\js\erp-calculator.js" />
+    <ErpScript Include="..\..\external\erp\src\Bootstrap\ERP2028.Web\wwwroot\js\erp-label-designer.js" />
+    <ErpScript Include="..\..\external\erp\src\Bootstrap\ERP2028.Web\wwwroot\js\erp-label-print.js" />
+    <ErpScript Include="..\..\external\erp\src\Bootstrap\ERP2028.Web\wwwroot\js\erp-scale-scan.js" />
+    <ErpScript Include="..\..\external\erp\src\Bootstrap\ERP2028.Web\wwwroot\js\pos-till.js" />
+  </ItemGroup>
+
+  <Target Name="CopyErpScripts" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="@(ErpScript)" DestinationFolder="wwwroot\js" SkipUnchangedFiles="true" />
   </Target>
 
 </Project>

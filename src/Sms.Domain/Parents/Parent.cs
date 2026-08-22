@@ -33,7 +33,22 @@ namespace Sms.Domain.Parents
 
         public string? Email { get; set; }
 
+        /// <summary>The line that says which house. The residence hierarchy below says which place.</summary>
         public string? Address { get; set; }
+
+        /// <summary>
+        /// منطقة — the locality level of the residence hierarchy (governorate → area → neighbourhood),
+        /// with the governorate reached by walking up from it so the two can never disagree.
+        /// <para>
+        /// Two levels are kept here where <c>Student</c> keeps only the neighbourhood, because most
+        /// localities have no quarters recorded at all: pointing solely at a neighbourhood would leave
+        /// every family outside Gaza City with no residence that could be recorded.
+        /// </para>
+        /// </summary>
+        public int? ResidenceAreaId { get; set; }
+
+        /// <summary>حي — the quarter inside <see cref="ResidenceAreaId"/>, where that locality has any.</summary>
+        public int? NeighbourhoodId { get; set; }
 
         public string? OccupationEmployer { get; set; }
 

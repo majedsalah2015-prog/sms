@@ -40,5 +40,27 @@ namespace Sms.Web.Models
             GenderPolicy.Girls => arabic ? "بنات" : "Girls",
             _ => arabic ? "مختلط" : "Mixed",
         };
+
+        /// <summary>
+        /// The permission verbs (doc 06 §4.1) as the role designer prints them. The English is the
+        /// enum name deliberately — an administrator reading a permission here should see the same
+        /// word the catalogue and the <c>[RequirePermission]</c> attributes use, so a support answer
+        /// and the screen agree.
+        /// </summary>
+        public static string Verb(Sms.Domain.Security.ActionVerb v, bool arabic) => !arabic ? v.ToString() : v switch
+        {
+            Sms.Domain.Security.ActionVerb.View => "عرض",
+            Sms.Domain.Security.ActionVerb.Create => "إضافة",
+            Sms.Domain.Security.ActionVerb.Edit => "تعديل",
+            Sms.Domain.Security.ActionVerb.Deactivate => "تعطيل",
+            Sms.Domain.Security.ActionVerb.Submit => "رفع",
+            Sms.Domain.Security.ActionVerb.Approve => "اعتماد",
+            Sms.Domain.Security.ActionVerb.Post => "ترحيل",
+            Sms.Domain.Security.ActionVerb.Print => "طباعة",
+            Sms.Domain.Security.ActionVerb.Export => "تصدير",
+            Sms.Domain.Security.ActionVerb.Import => "استيراد",
+            Sms.Domain.Security.ActionVerb.Configure => "ضبط",
+            _ => v.ToString(),
+        };
     }
 }

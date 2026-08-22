@@ -45,7 +45,7 @@ namespace Sms.Application.Students
             string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
             ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
             ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
-            string? placeOfBirth, int? familySize, int? birthOrder, int? neighbourhoodId,
+            string? placeOfBirth, int? familySize, int? birthOrder,
             CancellationToken cancellationToken = default);
 
         /// <summary>Corrects identity/ID fields; identity edits are T1 with a mandatory audit reason (BR-STU-002).</summary>

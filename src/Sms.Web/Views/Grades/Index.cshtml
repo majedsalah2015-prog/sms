@@ -92,16 +92,19 @@
             <form method="post" asp-action="DefineStage" asp-route-year="@yid">
                 <div class="mb-2"><label asp-for="StageNameAr" class="form-label small mb-1">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="StageNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" /></div>
                 <div class="mb-2"><label asp-for="StageNameEn" class="form-label small mb-1">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="StageNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#StageNameAr" data-translit-mode="term" placeholder="Elementary Stage" required aria-required="true" /></div>
-                <div class="row g-2 mb-2"><div class="col-5"><label asp-for="StageOrder" class="form-label small mb-1">@T("Order", "الترتيب")</label><input asp-for="StageOrder" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-7"><label asp-for="StageGender" class="form-label small mb-1">@T("Gender", "الجنس")</label><select asp-for="StageGender" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div></div>
+                <div class="row g-2 mb-2"><div class="col-5"><label asp-for="StageOrder" class="form-label small mb-1">@T("Order", "الترتيب")</label><input asp-for="StageOrder" class="form-control form-control-sm" type="number" min="1" value="@(Model.StageOrder ?? Model.Stages.Count + 1)" /></div><div class="col-7"><label asp-for="StageGender" class="form-label small mb-1">@T("Gender", "الجنس")</label><select asp-for="StageGender" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div></div>
                 <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create stage", "إنشاء مرحلة")</button>
             </form>
         </div>
         <div class="sms-card p-3 mb-3">
             <h2 class="h6">@T("New grade", "صف جديد")</h2>
             <form method="post" asp-action="DefineGrade" asp-route-year="@yid">
-                <div class="mb-2"><label asp-for="GradeStageId" class="form-label small mb-1">@T("Stage", "المرحلة") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="GradeStageId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— stage —", "— المرحلة —")</option>@foreach (var s in Model.Stages) { <option value="@s.Stage.Id">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</option> }</select></div>
-                <div class="row g-2 mb-2"><div class="col-4"><label asp-for="GradeCode" class="form-label small mb-1">@T("Code", "الرمز") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="GradeCode" class="form-control form-control-sm" dir="ltr" placeholder="G1" required aria-required="true" /></div><div class="col-8"><label asp-for="GradeNameEn" class="form-label small mb-1">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="GradeNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#GradeNameAr" data-translit-mode="term" placeholder="Grade 1" required aria-required="true" /></div></div>
+                @* Arabic first, then the two fields it fills. Typing into an English field is what
+                   switches its auto-fill off, so putting it before its own source made entering a
+                   grade the one order in which the automation could not help. *@
+                <div class="mb-2"><label asp-for="GradeStageId" class="form-label small mb-1">@T("Stage", "المرحلة") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="GradeStageId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— stage —", "— المرحلة —")</option>@foreach (var s in Model.Stages) { <option value="@s.Stage.Id" data-next-order="@(s.Grades.Count == 0 ? 1 : s.Grades.Max(g => g.Grade.SequenceOrder) + 1)">@(isRtl ? s.Stage.Name.NameAr : s.Stage.Name.NameEn)</option> }</select></div>
                 <div class="mb-2"><label asp-for="GradeNameAr" class="form-label small mb-1">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="GradeNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الصف الأول" required aria-required="true" /></div>
+                <div class="row g-2 mb-2"><div class="col-8"><label asp-for="GradeNameEn" class="form-label small mb-1">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="GradeNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#GradeNameAr" data-translit-mode="term" placeholder="Grade 1" required aria-required="true" /></div><div class="col-4"><label asp-for="GradeCode" class="form-label small mb-1">@T("Code", "الرمز") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="GradeCode" class="form-control form-control-sm" dir="ltr" placeholder="G1" required aria-required="true" /></div></div>
                 <div class="row g-2 mb-2"><div class="col-4"><label asp-for="GradeOrder" class="form-label small mb-1">@T("Order", "الترتيب")</label><input asp-for="GradeOrder" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-8"><label asp-for="PromotionTargetId" class="form-label small mb-1">@T("Promotes to", "يرفَّع إلى")</label><select asp-for="PromotionTargetId" class="form-select form-select-sm"><option value="">@T("promotes to…", "يرفَّع إلى…")</option>@foreach (var o in Model.AllGrades) { <option value="@o.Id">@o.Code @(isRtl ? o.Name.NameAr : o.Name.NameEn)</option> }</select></div></div>
                 <div class="form-check mb-2"><input asp-for="IsGraduating" class="form-check-input" /><label asp-for="IsGraduating" class="form-check-label small">@T("Graduating grade", "صف تخرج")</label></div>
                 <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create grade", "إنشاء صف")</button>
@@ -128,4 +131,36 @@
 
 @section Scripts {
 <script>function seatMath(){var a=+document.getElementById('TargetSections').value||0,b=+document.getElementById('TargetSectionSize').value||0;document.getElementById('seats').textContent=a*b;}</script>
+<script>
+(function () {
+    // Two fields nobody should have to think about while adding a grade: the code,
+    // which is the grade's number with a G in front of it, and the order, which is
+    // the next free place in the stage that was just chosen. Both stop suggesting
+    // the moment a human types in them — a suggestion that overwrites is a bug.
+    var stage = document.getElementById('GradeStageId');
+    var nameEn = document.getElementById('GradeNameEn');
+    var code = document.getElementById('GradeCode');
+    var order = document.getElementById('GradeOrder');
+    if (!stage || !nameEn || !code || !order) { return; }
+
+    function guard(el) {
+        el.addEventListener('input', function () { el.dataset.touched = el.value ? '1' : ''; });
+        if (el.value) { el.dataset.touched = '1'; }
+    }
+    guard(code);
+    guard(order);
+
+    nameEn.addEventListener('input', function () {
+        if (code.dataset.touched) { return; }
+        var n = (nameEn.value.match(/\d+/) || [])[0];
+        code.value = n ? 'G' + n : '';
+    });
+
+    stage.addEventListener('change', function () {
+        if (order.dataset.touched) { return; }
+        var picked = stage.options[stage.selectedIndex];
+        order.value = picked && picked.dataset.nextOrder ? picked.dataset.nextOrder : '';
+    });
+})();
+</script>
 }

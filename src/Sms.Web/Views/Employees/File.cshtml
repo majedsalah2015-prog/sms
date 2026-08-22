@@ -31,6 +31,18 @@
     <ul class="nav nav-tabs px-3 pt-2 flex-nowrap overflow-auto">@foreach (var t in tabs) { <li class="nav-item"><button class="nav-link text-nowrap @(Model.ActiveTab == t.Key ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button">@(isRtl ? t.Ar : t.En)@if (t.Count != null) { <span class="badge rounded-pill text-bg-light border ms-1">@t.Count</span> }</button></li> }</ul>
     <div class="tab-content p-4">
         <div class="tab-pane fade @Show("personal")" id="tab-personal">
+            @* Uploaded on its own rather than inside the identity form, which needs a reason to save. *@
+            <div class="row g-4">
+            <div class="col-md-3 col-lg-2">
+                <partial name="_PhotoPanel" model="@(new PhotoPanelViewModel {
+                    Id = "employee-photo", PersonName = name,
+                    HasPhoto = e.PhotoAttachmentId != null,
+                    PhotoUrl = Url.Action("Photo", "Employees", new { id = e.Id }),
+                    UploadUrl = Url.Action("UploadPhoto", "Employees", new { id = e.Id }),
+                    RemoveUrl = Url.Action("RemovePhoto", "Employees", new { id = e.Id }),
+                    CanEdit = true })" />
+            </div>
+            <div class="col-md-9 col-lg-10">
             <form method="post" asp-action="Edit" asp-route-id="@e.Id">
                 <div class="sms-bilingual mb-3">
                     <div><label class="form-label small" for="emp-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="emp-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
@@ -47,6 +59,8 @@
                 </div>
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="emp-Reason">@T("Reason (required when name fields change — BR-EMP-001, T1)", "السبب (مطلوب عند تغيير حقول الاسم — BR-EMP-001)")</label><input name="Reason" id="emp-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
             </form>
+            </div>
+            </div>
         </div>
 
         <div class="tab-pane fade @Show("position")" id="tab-position">

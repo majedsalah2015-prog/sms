@@ -1,0 +1,178 @@
+@using System.Globalization
+@using Sms.Application.Transport
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model TripDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var trip = Model.Trip;
+    var isAm = trip.Direction == RouteDirection.Am;
+    var routeName = Model.Route == null ? $"#{trip.RouteId}" : $"{Model.Route.RouteNo} — {(isRtl ? Model.Route.NameAr : Model.Route.NameEn)}";
+    ViewData["Title"] = routeName;
+    ViewData["Breadcrumb"] = T("Transport / Trips / ", "النقل المدرسي / الرحلات / ") + routeName;
+    var live = trip.Status == TripStatus.InProgress;
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-trip-help", Title = T("Trip roster — help", "كشف الرحلة — مساعدة"),
+        Intro = T("Every child on this route today, and one tap to say what became of each. Each button is its own form post, so nothing here waits for script to load on a phone at the kerb.", "كل طفل على هذا المسار اليوم، ولمسة واحدة لبيان ما جرى لكل منهم. وكل زر نموذج مستقل يُرسَل، فلا شيء هنا ينتظر تحميل سكربت على هاتف عند الرصيف."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A yellow row is unfinished", "السطر الأصفر لم يُنجَز"), T("Rows stay highlighted until the child is accounted for one way or another — boarded and alighted, declared absent, or recorded as not boarded. The trip will not close while any row is still yellow.", "تبقى السطور مظلَّلة حتى يُسجَّل مصير الطفل بوجه من الوجوه — صعد ونزل، أو أُعلِن غيابه، أو سُجِّل أنه لم يصعد. ولن تُغلَق الرحلة وسطر واحد ما زال أصفر.")),
+            new HelpPanelViewModel.Item(T("Absent against not boarded", "غائب مقابل لم يصعد"), T("\"Absent\" is the family telling you in advance and it is quiet. \"Not boarded\" is a child who should have been at the stop and was not: it notifies the family immediately as an urgent message that ignores quiet hours, and opens a safety event (BR-TRN-005). Do not use one for the other.", "«غائب» أن تُخبرك الأسرة مسبقاً، وهو هادئ. أما «لم يصعد» فطفل كان يُفترض وجوده على المحطة فلم يكن: يُخطِر الأسرة فوراً برسالة عاجلة تتجاوز ساعات الهدوء، ويفتح حدث سلامة (BR-TRN-005). فلا تستخدم أحدهما مكان الآخر.")),
+            new HelpPanelViewModel.Item(T("Who received the child", "من استلم الطفل"), T("On the afternoon run the name you type is matched against that student's pickup-authorised guardians and emergency contacts, in Arabic or English (BR-TRN-006). A name that does not match is refused — and the attempt itself is written to the safety register. A child whose family allows self-release needs no name.", "في رحلة المساء يُطابَق الاسم الذي تكتبه مع أولياء أمر الطالب المصرّح لهم بالاستلام وجهات اتصال الطوارئ، بالعربية أو الإنجليزية (BR-TRN-006). والاسم غير المطابق يُرفَض — وتُكتَب المحاولة نفسها في سجل السلامة. أما من أذنت أسرته بنزوله وحده فلا يحتاج اسماً.")),
+            new HelpPanelViewModel.Item(T("Not collected", "لم يُستلَم"), T("Nobody came for the child at the afternoon stop. It goes to the safety register already escalated, not merely open — this is the one that has to reach a supervisor while the bus is still there.", "لم يأتِ أحد لاستلام الطفل عند محطة المساء. يذهب إلى سجل السلامة مُصعَّداً لا مفتوحاً فحسب — فهذا ما يجب أن يبلغ المشرف والحافلة ما زالت واقفة.")),
+            new HelpPanelViewModel.Item(T("The sweep", "التفقّد"), T("The tick box is the walk down the aisle, and the trip will not close without it even when every child on the roster is accounted for. A trip left open past its own day is escalated overnight as a safety event.", "خانة التأشير هي المشي بين المقاعد، ولن تُغلَق الرحلة بدونها ولو سُجِّل مصير كل طفل في الكشف. والرحلة التي تبقى مفتوحة بعد يومها تُصعَّد ليلاً كحدث سلامة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@routeName</h1>
+        <p class="text-muted mb-0">
+            @trip.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ·
+            @TransportLabels.Direction(trip.Direction, isRtl) ·
+            <span class="badge @(trip.Status switch {
+                TripStatus.InProgress => "text-bg-primary",
+                TripStatus.Closed => "text-bg-success",
+                _ => "text-bg-danger" })">@TransportLabels.TripStatus(trip.Status, isRtl)</span>
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Trips" asp-route-date="@trip.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> @T("All trips", "كل الرحلات")
+        </a>
+    </div>
+</div>
+
+<partial name="_TransportNav" />
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Roster", "كشف الرحلة")</caption>
+        <thead><tr>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("So far", "ما جرى")</th>
+            <th scope="col">@T("Record", "تسجيل")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var row in Model.Roster)
+        {
+            var resolved = TripCloseEvaluator.IsResolved(row.Events);
+            <tr class="@(resolved ? "" : "table-warning")">
+                <td class="fw-semibold">
+                    @row.Label.Name(isRtl)
+                    <div class="small text-muted">
+                        @row.Label.StudentNo
+                        @if (row.IsSelfReleaseAllowed)
+                        {
+                            <span class="badge text-bg-light border ms-1">@T("may leave alone", "ينزل وحده")</span>
+                        }
+                    </div>
+                </td>
+                <td class="small">
+                    @if (row.Events.Count == 0)
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                    else
+                    {
+                        foreach (var e in row.Events)
+                        {
+                            <span class="badge text-bg-light border me-1">@TransportLabels.TripEvent(e, isRtl)</span>
+                        }
+                    }
+                </td>
+                <td>
+                    @if (live)
+                    {
+                        <div class="d-flex flex-wrap gap-1">
+                            @* One form per button rather than one form with a radio: at 07:00 on a
+                               phone, a single tap has to be the whole interaction. *@
+                            @if (!row.HasBoarded)
+                            {
+                                <form method="post" asp-action="LogTripEvent" asp-route-id="@trip.Id" class="d-inline">
+                                    <input type="hidden" name="studentId" value="@row.StudentId" />
+                                    <input type="hidden" name="tripEvent" value="@TripLogEvent.Boarded" />
+                                    <button type="submit" class="btn btn-sm btn-success">@T("Boarded", "صعد")</button>
+                                </form>
+                                <form method="post" asp-action="LogTripEvent" asp-route-id="@trip.Id" class="d-inline">
+                                    <input type="hidden" name="studentId" value="@row.StudentId" />
+                                    <input type="hidden" name="tripEvent" value="@TripLogEvent.AbsentDeclared" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Absent", "غائب")</button>
+                                </form>
+                                @if (isAm)
+                                {
+                                    <form method="post" asp-action="LogTripEvent" asp-route-id="@trip.Id" class="d-inline">
+                                        <input type="hidden" name="studentId" value="@row.StudentId" />
+                                        <input type="hidden" name="tripEvent" value="@TripLogEvent.NotBoarded" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                title="@T("Notifies the family immediately", "يُخطِر الأسرة فوراً")">@T("Not boarded", "لم يصعد")</button>
+                                    </form>
+                                }
+                            }
+                            else
+                            {
+                                <form method="post" asp-action="LogTripEvent" asp-route-id="@trip.Id" class="d-inline-flex gap-1 align-items-center">
+                                    <input type="hidden" name="studentId" value="@row.StudentId" />
+                                    <input type="hidden" name="tripEvent" value="@TripLogEvent.Alighted" />
+                                    @if (!isAm)
+                                    {
+                                        @* BR-TRN-006: on the way home, who took the child is the record
+                                           that matters, and the engine checks it against the authorised
+                                           pickup list unless the family allows self-release. *@
+                                        <input type="hidden" name="handoverRequired" value="true" />
+                                        <input name="receivedByName" class="form-control form-control-sm" style="width:11rem"
+                                               placeholder="@T("received by", "استلمه")"
+                                               aria-label="@T("Received by", "استلمه")" />
+                                    }
+                                    <button type="submit" class="btn btn-sm btn-success">@T("Alighted", "نزل")</button>
+                                </form>
+                                @if (!isAm)
+                                {
+                                    <form method="post" asp-action="LogTripEvent" asp-route-id="@trip.Id" class="d-inline">
+                                        <input type="hidden" name="studentId" value="@row.StudentId" />
+                                        <input type="hidden" name="tripEvent" value="@TripLogEvent.NotCollected" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                title="@T("Escalates to the supervisor", "يُصعَّد إلى المشرف")">@T("Not collected", "لم يُستلَم")</button>
+                                    </form>
+                                }
+                            }
+                        </div>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Roster.Count == 0)
+        {
+            <tr><td colspan="3" class="text-muted text-center py-4">@T("Nobody is subscribed on this route today.", "لا مشترِك على هذا المسار اليوم.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@if (live)
+{
+    <div class="sms-card p-3 mt-3">
+        <form method="post" asp-action="CloseTrip" asp-route-id="@trip.Id" class="d-flex flex-wrap gap-3 align-items-center">
+            <div class="form-check">
+                @* Not a formality: the sweep is the walk down the aisle, and the trip will not close
+                   without it even when every child on the roster is accounted for. *@
+                <input class="form-check-input" type="checkbox" id="sweep" name="sweepConfirmed" value="true" required />
+                <label class="form-check-label" for="sweep">
+                    @T("I have walked the bus and it is empty", "تفقّدت الحافلة وهي خالية")
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary" @(Model.Unresolved > 0 ? "disabled" : "")>@T("Close trip", "إغلاق الرحلة")</button>
+            @if (Model.Unresolved > 0)
+            {
+                <span class="text-warning-emphasis small">
+                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                    @T($"{Model.Unresolved} student(s) still unaccounted for.", $"ما زال {Model.Unresolved} طالباً دون تسجيل.")
+                </span>
+            }
+        </form>
+    </div>
+}

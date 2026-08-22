@@ -25,10 +25,35 @@ namespace Sms.Application.Transport
             TransportStaffKind kind, string displayName, int? employeeId = null, string? contractorName = null,
             string? licenseNo = null, LicenseClass? licenseClass = null, DateTime? licenseExpiryDate = null, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Corrects a driver's or attendant's own details — above all a renewed licence, which is a
+        /// new expiry on the same person rather than a second person. Kind and the employee/contractor
+        /// link do not change: which of the two a record is, and who it is, are what everything else
+        /// points at.
+        /// </summary>
+        Task UpdateStaffAsync(
+            int staffId, string displayName, string? licenseNo = null, LicenseClass? licenseClass = null,
+            DateTime? licenseExpiryDate = null, CancellationToken cancellationToken = default);
+
         /// <summary>BR-TRN-003: stop times must be sequential (<see cref="Common.Exceptions.StopTimesNotSequentialException"/>); route number from doc 08 "RTE".</summary>
         Task<Route> DefineRouteAsync(
             string nameAr, string nameEn, RouteDirection direction, int busId, int driverId, IReadOnlyList<RouteStopInput> stops,
             int? attendantId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Reassigns a route's standing bus and crew — a bus off the road for a week, a driver who
+        /// left. Distinct from a per-trip substitution (BR-TRN-002), which changes one morning and
+        /// leaves the route alone.
+        /// <para>
+        /// The new bus's capacity must still hold the route's current riders, and the new driver must
+        /// be licensed for it — the same two checks trip-opening makes, applied here so the refusal
+        /// arrives while somebody is choosing rather than at 07:00 tomorrow. Throws
+        /// <see cref="Common.Exceptions.DriverNotEligibleException"/> or
+        /// <see cref="Common.Exceptions.RouteCapacityExceededException"/>.
+        /// </para>
+        /// </summary>
+        Task ReassignRouteCrewAsync(
+            int routeId, int busId, int driverId, int? attendantId = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// BR-TRN-004: subscribes the student's working-year enrollment; posts the zone-priced transport charge for the AM (else PM)

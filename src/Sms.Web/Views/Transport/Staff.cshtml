@@ -1,0 +1,170 @@
+@using System.Globalization
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model TransportStaffViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Drivers and attendants", "السائقون والمرافقون");
+    ViewData["Breadcrumb"] = T("Transport / Drivers", "النقل المدرسي / السائقون");
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-staff-help", Title = T("Drivers and attendants — help", "السائقون والمرافقون — مساعدة"),
+        Intro = T("Everyone who rides with the children in a working capacity, whether the school employs them or a contractor supplies them.", "كل من يركب مع الأطفال بصفة عمل، سواء وظّفته المدرسة أو وفّره متعاقد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The licence decides what may be driven", "الرخصة تُحدِّد ما يمكن قيادته"), T("A driver opens a trip only on a bus whose required class is no higher than their own, and only while the licence is unexpired (BR-TRN-002). An expired one is badged in red here and refused at the trip console — the badge is the warning, the refusal is the rule. An attendant needs no licence at all.", "لا يفتح السائق رحلة إلا على حافلة فئتها المطلوبة ليست أعلى من فئته، وما دامت رخصته سارية (BR-TRN-002). والمنتهية تُوسَم هنا بالأحمر وتُرفَض في لوحة الرحلات — فالوسم تنبيه والرفض هو القاعدة. أما المرافق فلا يحتاج رخصة أصلاً.")),
+            new HelpPanelViewModel.Item(T("Renewing a licence", "تجديد الرخصة"), T("Type the new number, class and expiry on the person's own row and save. A renewal edits this person rather than adding another: the routes and trips that name them mean the same human being.", "اكتب الرقم والفئة وتاريخ الانتهاء الجديدة في سطر الشخص نفسه واحفظ. فالتجديد يعدّل هذا الشخص ولا يضيف آخر: والمسارات والرحلات التي تسمّيه تعني الإنسان ذاته.")),
+            new HelpPanelViewModel.Item(T("Employee or contractor", "موظف أو متعاقد"), T("Give an employee id to tie the record to an HR file, or a contractor name when the bus comes with its own crew. The licence rules are identical either way — a contractor is not a lighter standard, only a lighter record.", "أعطِ رقم موظف لربط السجل بملف الموارد البشرية، أو اسم جهة التعاقد حين تأتي الحافلة بطاقمها. وقواعد الرخصة واحدة في الحالتين — فالمتعاقد ليس معياراً أخفّ بل سجلاً أخفّ.")),
+            new HelpPanelViewModel.Item(T("Deactivating", "التعطيل"), T("Needs a reason, and stays disabled while routes still name this person. Reassign those routes to somebody else first, so no route is left without a driver.", "يتطلب سبباً، ويبقى معطّلاً ما دامت مسارات تسمّي هذا الشخص. أعد إسناد تلك المسارات إلى غيره أولاً، كي لا يبقى مسار بلا سائق.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("A driver may open a trip only on a bus whose required licence class is no higher than theirs, and only while that licence is unexpired (BR-TRN-002). An attendant needs no licence. Either may be an employee or a contractor.",
+               "لا يفتح السائق رحلة إلا على حافلة رخصتها المطلوبة ليست أعلى من رخصته، وما دامت سارية (BR-TRN-002). المرافق لا يحتاج رخصة. وكلاهما قد يكون موظفاً أو متعاقداً.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_TransportNav" />
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("Name", "الاسم")</th>
+            <th scope="col">@T("Role", "الصفة")</th>
+            <th scope="col">@T("Engagement", "الارتباط")</th>
+            <th scope="col">@T("Licence", "الرخصة")</th>
+            <th scope="col">@T("Class", "الفئة")</th>
+            <th scope="col">@T("Expires", "تنتهي")</th>
+            <th scope="col" class="text-center">@T("Routes", "المسارات")</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var person in Model.Staff)
+        {
+            var routes = Model.RouteCountByStaffId.TryGetValue(person.Id, out var n) ? n : 0;
+            var expired = person.LicenseExpiryDate is { } exp && exp.Date < Model.Today;
+            <tr class="@(person.IsActive ? "" : "text-muted")">
+                <td class="fw-semibold">
+                    @person.DisplayName
+                    @if (expired)
+                    {
+                        <span class="badge text-bg-danger ms-1">@T("licence expired", "رخصة منتهية")</span>
+                    }
+                    @if (!person.IsActive)
+                    {
+                        <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّل")</span>
+                    }
+                </td>
+                <td>@TransportLabels.StaffKind(person.Kind, isRtl)</td>
+                <td class="small">
+                    @if (person.EmployeeId is { } eid)
+                    {
+                        <a asp-controller="Employees" asp-action="File" asp-route-id="@eid" asp-area="">@T("employee", "موظف") #@eid</a>
+                    }
+                    else
+                    {
+                        @(person.ContractorName ?? T("contractor", "متعاقد"))
+                    }
+                </td>
+                <td class="small">@(person.LicenseNo ?? "—")</td>
+                <td class="small">@(person.LicenseClass is { } lc ? TransportLabels.LicenseClass(lc, isRtl) : "—")</td>
+                <td class="small @(expired ? "text-danger fw-semibold" : "")">
+                    @(person.LicenseExpiryDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")
+                </td>
+                <td class="text-center">@routes</td>
+                <td class="text-end">
+                    <div class="d-flex flex-column gap-1 align-items-end">
+                        @* Renewing a licence edits this person rather than adding another: the routes
+                           and trips that name them mean the same human being. *@
+                        <form method="post" asp-action="UpdateStaff" asp-route-id="@person.Id" class="d-inline-flex gap-1 flex-wrap justify-content-end">
+                            <input name="displayName" value="@person.DisplayName" class="form-control form-control-sm" style="width:9rem" required aria-label="@T("Name", "الاسم")" />
+                            <input name="licenseNo" value="@person.LicenseNo" class="form-control form-control-sm" style="width:7rem" placeholder="@T("licence", "الرخصة")" aria-label="@T("Licence number", "رقم الرخصة")" />
+                            <select name="licenseClass" class="form-select form-select-sm" style="width:7rem" aria-label="@T("Licence class", "فئة الرخصة")">
+                                <option value="">@T("none", "بلا")</option>
+                                @foreach (LicenseClass c in Enum.GetValues(typeof(LicenseClass)))
+                                {
+                                    <option value="@c" selected="@(person.LicenseClass == c)">@TransportLabels.LicenseClass(c, isRtl)</option>
+                                }
+                            </select>
+                            <input type="date" name="licenseExpiryDate" class="form-control form-control-sm" style="width:9rem"
+                                   value="@(person.LicenseExpiryDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))"
+                                   aria-label="@T("Licence expiry", "انتهاء الرخصة")" />
+                            <button type="submit" class="btn btn-sm btn-outline-primary">@T("Save", "حفظ")</button>
+                        </form>
+                        @if (person.IsActive)
+                        {
+                            <form method="post" asp-action="DeactivateStaff" asp-route-id="@person.Id" class="d-inline-flex gap-1">
+                                <input name="reason" class="form-control form-control-sm" style="width:8rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger" @(routes > 0 ? "disabled" : "")>@T("Deactivate", "تعطيل")</button>
+                            </form>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+        @if (Model.Staff.Count == 0)
+        {
+            <tr><td colspan="8" class="text-muted text-center py-4">@T("Nobody registered yet.", "لم يُسجَّل أحد بعد.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<h2 class="sms-section-title">@T("Register a driver or attendant", "تسجيل سائق أو مرافق")</h2>
+<div class="sms-card p-3">
+    <form method="post" asp-action="RegisterStaff" class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="kind">@T("Role", "الصفة")</label>
+            <select id="kind" name="kind" class="form-select">
+                @foreach (TransportStaffKind k in Enum.GetValues(typeof(TransportStaffKind)))
+                {
+                    <option value="@k">@TransportLabels.StaffKind(k, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="name">@T("Display name", "الاسم")</label>
+            <input id="name" name="displayName" class="form-control" required />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="emp">@T("Employee id", "رقم الموظف")</label>
+            <input id="emp" name="employeeId" type="number" class="form-control" placeholder="@T("optional", "اختياري")" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="contractor">@T("Contractor", "جهة التعاقد")</label>
+            <input id="contractor" name="contractorName" class="form-control" placeholder="@T("optional", "اختياري")" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="lno">@T("Licence no.", "رقم الرخصة")</label>
+            <input id="lno" name="licenseNo" class="form-control" />
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="lcls">@T("Licence class", "فئة الرخصة")</label>
+            <select id="lcls" name="licenseClass" class="form-select">
+                <option value="">@T("none", "بلا")</option>
+                @foreach (LicenseClass c in Enum.GetValues(typeof(LicenseClass)))
+                {
+                    <option value="@c">@TransportLabels.LicenseClass(c, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="lexp">@T("Licence expiry", "انتهاء الرخصة")</label>
+            <input id="lexp" name="licenseExpiryDate" type="date" class="form-control" />
+        </div>
+        <div class="col-6 col-md-2">
+            <button type="submit" class="btn btn-primary w-100">@T("Add", "إضافة")</button>
+        </div>
+    </form>
+</div>

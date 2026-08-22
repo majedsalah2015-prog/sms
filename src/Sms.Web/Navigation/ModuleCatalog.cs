@@ -58,7 +58,7 @@ namespace Sms.Web.Navigation
             M("DSC", "22", "Discounts", "الخصومات والمنح", "bi-percent", "finance", "E-304", "22-Discounts.md", "Discounts", "Index"),
 
             // Services
-            M("TRN", "23", "Transportation", "النقل المدرسي", "bi-bus-front", "services", "E-501", "23-Transportation.md"),
+            M("TRN", "23", "Transportation", "النقل المدرسي", "bi-bus-front", "services", "E-501", "23-Transportation.md", "Transport", "Index"),
             M("HLT", "24", "Health", "الصحة المدرسية", "bi-heart-pulse", "services", "E-502", "24-Health.md"),
             M("DIS", "25", "Discipline", "السلوك والانضباط", "bi-shield-exclamation", "services", "E-503", "25-Discipline.md"),
             M("LIB", "26", "Library", "المكتبة", "bi-book", "services", "E-601", "26-Library.md"),
@@ -73,7 +73,7 @@ namespace Sms.Web.Navigation
             M("NTF", "33", "Notifications", "الإشعارات", "bi-bell", "platform", "E-703", "33-Notifications.md"),
             M("AUD", "34", "Audit", "التدقيق", "bi-clipboard-data", "platform", "E-704", "34-Audit.md"),
             M("BAK", "35", "Backup", "النسخ الاحتياطي", "bi-hdd-stack", "platform", "E-704", "35-Backup.md"),
-            M("SYS", "36", "System Administration", "إدارة النظام", "bi-gear", "platform", "E-704", "36-System-Administration.md"),
+            M("SYS", "36", "System Administration", "إدارة النظام", "bi-gear", "platform", "E-704", "36-System-Administration.md", "Security", "Index"),
         };
 
         private static readonly (string Key, string TitleEn, string TitleAr, string Icon)[] Groups =
@@ -99,7 +99,10 @@ namespace Sms.Web.Navigation
         /// either filter goes with it, so nobody is shown a heading over nothing.
         /// </summary>
         public static IReadOnlyList<NavItem> BuildSidebar(
-            Func<ModuleInfo, bool>? isVisible = null, Func<ModuleInfo, bool>? isPermitted = null, bool canExportToLedger = true)
+            Func<ModuleInfo, bool>? isVisible = null,
+            Func<ModuleInfo, bool>? isPermitted = null,
+            bool canExportToLedger = true,
+            IReadOnlyList<NavItem>? erpGroups = null)
         {
             var items = new List<NavItem>
             {
@@ -122,24 +125,35 @@ namespace Sms.Web.Navigation
                 }
             }
 
-            items.Add(BuildAccountingGroup(canExportToLedger));
+            var accounting = BuildAccountingGroup(canExportToLedger, erpGroups);
+            if (accounting.HasChildren)
+            {
+                items.Add(accounting);
+            }
 
             return items;
         }
 
         /// <summary>
-        /// The embedded ERP accounting screens (docs/Integration/01-Embedded-Accounting-Plan.md §7).
-        /// They are not <see cref="ModuleInfo"/> entries because they are not this system's modules:
-        /// they have no BR document, no feature toggle, and no epic — they belong to a subsystem
-        /// hosted here, and modelling them as school modules would make the catalogue lie about what
-        /// this product contains.
+        /// The accounting section: this system's GL export seam, and under it every screen the
+        /// embedded ERP publishes — stores, buying, selling, the till, and the money that moves
+        /// against them (docs/Integration/01-Embedded-Accounting-Plan.md §7).
         /// <para>
-        /// The ERP's own entries below are shown regardless of permission: each of those screens
-        /// enforces its own on arrival, and this system does not hold their catalogue to filter by.
-        /// The GL export entry is this system's, so it is filtered like any other screen of ours.
+        /// The ERP's screens are not <see cref="ModuleInfo"/> entries because they are not this
+        /// system's modules: they have no BR document, no feature toggle, and no epic — they belong
+        /// to a subsystem hosted here, and modelling them as school modules would make the catalogue
+        /// lie about what this product contains. They arrive as ready-made groups from
+        /// <see cref="ErpNavigationSource"/>, which reads the ERP's own navigation providers, so this
+        /// file never lists an ERP screen and can never go stale against one.
+        /// </para>
+        /// <para>
+        /// One accounting section rather than seven top-level ones is the shape the owner asked for:
+        /// the school's own menu keeps its length, and everything financial is reached by opening one
+        /// entry. It costs a third level of nesting, which is why <c>_Sidebar.cshtml</c> renders
+        /// groups within groups.
         /// </para>
         /// </summary>
-        private static NavItem BuildAccountingGroup(bool canExportToLedger)
+        private static NavItem BuildAccountingGroup(bool canExportToLedger, IReadOnlyList<NavItem>? erpGroups)
         {
             var group = new NavItem("accounting", "Accounting", "المحاسبة", "bi-calculator");
 
@@ -150,15 +164,10 @@ namespace Sms.Web.Navigation
                 group.Items.Add(new NavItem("acc-glexport", "GL export", "الترحيل المحاسبي", "bi-arrow-left-right", "GlExport", "Index"));
             }
 
-            group.Items.Add(new NavItem("acc-accounts", "Chart of accounts", "دليل الحسابات", "bi-diagram-3", "Accounts", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-journal", "Journal entries", "القيود اليومية", "bi-journal-text", "JournalEntries", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-vouchers", "Manual vouchers", "السندات اليدوية", "bi-receipt", "ManualVouchers", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-ledger", "General ledger", "الأستاذ العام", "bi-book", "GeneralLedger", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-reports", "Financial reports", "التقارير المالية", "bi-graph-up", "FinancialReports", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-fiscal", "Fiscal years", "السنوات المالية", "bi-calendar-range", "FiscalYears", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-currencies", "Currencies", "العملات", "bi-cash-coin", "Currencies", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("acc-costcentres", "Cost centres", "مراكز التكلفة", "bi-pie-chart", "CostCentres", "Index", new { area = "Accounting" }));
-            group.Items.Add(new NavItem("org-branches", "Branches", "الفروع", "bi-building", "Branches", "Index", new { area = "Organization" }));
+            if (erpGroups != null)
+            {
+                group.Items.AddRange(erpGroups);
+            }
 
             return group;
         }

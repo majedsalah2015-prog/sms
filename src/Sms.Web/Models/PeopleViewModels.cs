@@ -96,17 +96,6 @@ namespace Sms.Web.Models
 
         public int? BirthOrder { get; set; }
 
-        /// <summary>
-        /// The two levels above the neighbourhood are posted so the cascading
-        /// picker can be re-rendered as the registrar left it when the form comes
-        /// back with an error. Only <see cref="NeighbourhoodId"/> is stored.
-        /// </summary>
-        public int? GovernorateId { get; set; }
-
-        public int? ResidenceAreaId { get; set; }
-
-        public int? NeighbourhoodId { get; set; }
-
         // register-time extras
         public int? GradeYearProfileId { get; set; }
 
@@ -155,16 +144,7 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
 
-        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
-
-        /// <summary>Pre-selects the picker's top level when a neighbourhood is already recorded — found by walking up from it, never stored beside it.</summary>
-        public int? CurrentGovernorateId { get; set; }
-
-        /// <summary>The middle level, resolved the same way — so the picker reopens on all three without the browser guessing which locality owns the neighbourhood.</summary>
-        public int? CurrentResidenceAreaId { get; set; }
-
-        /// <summary>"غزة ← مدينة غزة ← حي الرمال" — the whole address on one line, so the reader is not left assembling it from three dropdowns.</summary>
-        public string? CurrentResidencePath { get; set; }
+        // Residence is the family's, so it is read and edited on the parent file rather than here.
 
         public IReadOnlyList<(int Id, string Ar, string En)> Relationships { get; set; } = Array.Empty<(int, string, string)>();
 
@@ -223,6 +203,15 @@ namespace Sms.Web.Models
 
         public string PreferredLanguage { get; set; } = "ar";
 
+        /// <summary>منطقة — recorded on the family, not once per child.</summary>
+        public int? ResidenceAreaId { get; set; }
+
+        /// <summary>حي — only where the locality has quarters recorded.</summary>
+        public int? NeighbourhoodId { get; set; }
+
+        /// <summary>Top level of the residence picker; the lower two are fetched as it changes.</summary>
+        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
+
         public string? Reason { get; set; }
     }
 
@@ -245,6 +234,9 @@ namespace Sms.Web.Models
         public string ActiveTab { get; set; } = "identity";
 
         public IReadOnlyList<FamilyStatementLine> FamilyStatement { get; set; } = Array.Empty<FamilyStatementLine>();
+
+        /// <summary>Governorate · locality · quarter, joined for reading; null when nothing is recorded.</summary>
+        public string? ResidencePath { get; set; }
     }
 
     public sealed class DedupWorkbenchViewModel
@@ -253,10 +245,94 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<Pair> Pairs { get; set; } = Array.Empty<Pair>();
     }
+
+    /// <summary>
+    /// Backing model for <c>Views/Shared/_ParentPicker.cshtml</c>: the one parent dropdown used
+    /// everywhere a parent is chosen — a filter box over the list, and a button through to that
+    /// parent's residence.
+    /// <para>
+    /// A partial rather than four near-identical selects, because the list is the same list on all
+    /// four screens and the day it grows past a screenful it has to stop being scrollable on all four
+    /// at once.
+    /// </para>
+    /// </summary>
+    public sealed class ParentPickerViewModel
+    {
+        /// <summary>Posted field name — it differs by screen (<c>ParentId</c>, <c>parentId</c>).</summary>
+        public string Name { get; set; } = "parentId";
+
+        /// <summary>DOM id of the select; must be unique per page.</summary>
+        public string Id { get; set; } = "parent-picker";
+
+        public string? Label { get; set; }
+
+        public int? SelectedId { get; set; }
+
+        public IReadOnlyList<Parent> Parents { get; set; } = Array.Empty<Parent>();
+
+        /// <summary>Caption of the leading empty option. Null renders no empty option at all.</summary>
+        public string? EmptyLabel { get; set; } = "—";
+
+        /// <summary>Where the residence editor should come back to. Null falls back to the parent file.</summary>
+        public string? ReturnUrl { get; set; }
+
+        /// <summary>Hides the residence button — for screens where the picker is only being read.</summary>
+        public bool ShowResidenceButton { get; set; } = true;
+    }
+
+    /// <summary>The residence editor reached from the picker's button (governorate → locality → quarter).</summary>
+    public sealed class ParentResidenceViewModel
+    {
+        public Parent Parent { get; set; } = null!;
+
+        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
+
+        /// <summary>Walked up from the stored locality, never stored beside it.</summary>
+        public int? CurrentGovernorateId { get; set; }
+
+        public int? CurrentAreaId { get; set; }
+
+        public int? CurrentNeighbourhoodId { get; set; }
+
+        /// <summary>The three levels joined for reading, or null when nothing is recorded.</summary>
+        public string? CurrentPath { get; set; }
+
+        public string? ReturnUrl { get; set; }
+
+        public bool CanEdit { get; set; }
+    }
 }
 
 namespace Sms.Web.Models
 {
     /// <summary>doc/Modules/11 §8.2 "Family statement": consolidated finance read-through per child (posted charges only, BR-SEC-012-style scoping; discounts shown separately per BR-DIS-010).</summary>
     public sealed record FamilyStatementLine(Sms.Domain.Students.Student Student, decimal Gross, decimal CreditNotes, decimal Discounts, decimal Paid, decimal Position, int ChargeCount);
+}
+
+namespace Sms.Web.Models
+{
+    /// <summary>
+    /// Backing model for <c>Views/Shared/_PhotoPanel.cshtml</c>: the one photograph a person's file
+    /// carries, with its upload and remove actions. Students and staff use the same panel because
+    /// the thing on screen is the same thing — a face, a frame, and two buttons.
+    /// </summary>
+    public sealed class PhotoPanelViewModel
+    {
+        /// <summary>DOM id prefix; must be unique per page.</summary>
+        public string Id { get; set; } = "photo";
+
+        /// <summary>Named in the image's alt text, so a screen reader says whose face it is.</summary>
+        public string PersonName { get; set; } = string.Empty;
+
+        public bool HasPhoto { get; set; }
+
+        public string? PhotoUrl { get; set; }
+
+        public string? UploadUrl { get; set; }
+
+        public string? RemoveUrl { get; set; }
+
+        /// <summary>False renders the frame alone — the portal shows a photo, it does not set one.</summary>
+        public bool CanEdit { get; set; }
+    }
 }

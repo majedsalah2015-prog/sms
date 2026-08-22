@@ -5,18 +5,23 @@
 @inject Sms.Web.Navigation.ModuleVisibility Visibility
 @model Sms.Web.Models.HomeDashboardViewModel
 @{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
+    ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
+    string T(string en, string ar) => isRtl ? ar : en;
+
+    // The full module list still lives on this page, one disclosure below the departments. The
+    // departments are how the work is organised; the modules are what the product contains, and a
+    // person looking for something the departments do not name must still be able to find it.
     var featureStates = await SetupAdmin.GetFeatureStatesAsync();
-    // The tiles are the sidebar in another shape, so they hide for the same two reasons it does:
-    // the feature is off, or this user cannot open a single screen of the module (BR-SEC-010).
     var visibleModules = new HashSet<string>();
     foreach (var mod in ModuleCatalog.Modules)
     {
         if (await Visibility.CanSeeAsync(mod.Code)) { visibleModules.Add(mod.Code); }
     }
-    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
-    ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
-    ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
-    string T(string en, string ar) => isRtl ? ar : en;
+    var modules = ModuleCatalog.Modules
+        .Where(x => (FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]) && visibleModules.Contains(x.Code))
+        .ToList();
 }
 
 <div class="sms-page-head">
@@ -39,42 +44,97 @@
     </div>
 </div>
 
-<div class="row g-3 mb-4">
-    @{
-        var tiles = new (string Icon, string En, string Ar, int Value, string Code)[]
+@if (Model.Workspaces.Count == 0)
+{
+    @* An account with no screen permission at all. It says so plainly rather than showing an empty
+       grid, because the two look identical and mean very different things. *@
+    <div class="sms-card p-4">
+        <h2 class="h5 mb-2">@T("Nothing is assigned to you yet", "لم يُسنَد إليك شيء بعد")</h2>
+        <p class="text-muted mb-0">
+            @T("Your account holds no screen permissions. Ask an administrator to assign you a role.",
+               "لا يحمل حسابك أي صلاحية شاشة. اطلب من المسؤول إسناد دور إليك.")
+        </p>
+    </div>
+}
+else
+{
+    <div class="row g-3 sms-workspaces">
+        @foreach (var w in Model.Workspaces)
         {
-            ("bi-mortarboard", "Students", "الطلاب", Model.Students, "STU"),
-            ("bi-people", "Parents", "أولياء الأمور", Model.Parents, "PAR"),
-            ("bi-person-badge", "Employees", "الموظفون", Model.Employees, "EMP"),
-            ("bi-grid-3x3-gap", "Sections", "الشعب", Model.Sections, "SEC"),
-            ("bi-clipboard-data", "Audit entries", "سجلات التدقيق", Model.AuditEntries, "AUD"),
-        };
-    }
-    @foreach (var t in tiles)
-    {
-        <div class="col-6 col-md-4 col-xl">
-            <a class="sms-tile" asp-controller="Modules" asp-action="Index" asp-route-code="@t.Code">
-                <span class="sms-tile__icon"><i class="bi @t.Icon" aria-hidden="true"></i></span>
-                <span class="sms-tile__value">@t.Value.ToString("N0", CultureInfo.InvariantCulture)</span>
-                <span class="sms-tile__label">@T(t.En, t.Ar)</span>
-            </a>
-        </div>
-    }
-</div>
+            var single = w.IsSingleScreen ? w.Links[0] : null;
+            <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+                <a class="sms-workspace"
+                   asp-area=""
+                   asp-controller="@(single?.Controller ?? "Home")"
+                   asp-action="@(single?.Action ?? "Section")"
+                   asp-route-key="@(single == null ? w.Info.Key : null)">
+                    <span class="sms-workspace__icon"><i class="bi @w.Info.Icon" aria-hidden="true"></i></span>
+                    <span class="sms-workspace__title">@(isRtl ? w.Info.TitleAr : w.Info.TitleEn)</span>
+                    <span class="sms-workspace__blurb">@(isRtl ? w.Info.BlurbAr : w.Info.BlurbEn)</span>
+                    <span class="sms-workspace__count">
+                        @if (w.IsSingleScreen)
+                        {
+                            @T("Open", "افتح")
+                        }
+                        else
+                        {
+                            @w.ScreenCount.ToString("N0", CultureInfo.InvariantCulture)
+                            <text> </text>
+                            @T("screens", "شاشة")
+                        }
+                    </span>
+                </a>
+            </div>
+        }
+    </div>
 
-<h2 class="sms-section-title">@T("Modules", "الوحدات")</h2>
-<div class="row g-3">
-    @foreach (var m in ModuleCatalog.Modules.Where(x => (FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]) && visibleModules.Contains(x.Code)))
+    <div class="row g-3 mt-1 mb-4">
+        @*
+            Orientation, not navigation: how big is the school this account is looking at. Each is
+            gated on the module it counts, so a cashier is not told the roll. The audit count that
+            used to sit here is gone with the gate: Module 34 has no catalogued screen yet, so no
+            grant can ever make it visible, and a tile nobody can ever see is not a tile.
+        *@
+        @{
+            var counts = new (string Icon, string En, string Ar, int Value, string Code)[]
+            {
+                ("bi-mortarboard", "Students", "الطلاب", Model.Students, "STU"),
+                ("bi-people", "Parents", "أولياء الأمور", Model.Parents, "PAR"),
+                ("bi-person-badge", "Employees", "الموظفون", Model.Employees, "EMP"),
+                ("bi-grid-3x3-gap", "Sections", "الشعب", Model.Sections, "SEC"),
+            };
+        }
+        @foreach (var t in counts.Where(t => visibleModules.Contains(t.Code)))
+        {
+            <div class="col-6 col-md-4 col-xl">
+                <a class="sms-tile" asp-area="" asp-controller="Modules" asp-action="Index" asp-route-code="@t.Code">
+                    <span class="sms-tile__icon"><i class="bi @t.Icon" aria-hidden="true"></i></span>
+                    <span class="sms-tile__value">@t.Value.ToString("N0", CultureInfo.InvariantCulture)</span>
+                    <span class="sms-tile__label">@T(t.En, t.Ar)</span>
+                </a>
+            </div>
+        }
+    </div>
+
+    @if (modules.Count > 0)
     {
-        <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
-            <a class="sms-card sms-module-card" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">
-                <span class="sms-module-card__icon"><i class="bi @m.Icon" aria-hidden="true"></i></span>
-                <span class="sms-module-card__body">
-                    <span class="sms-module-card__num">@m.Number</span>
-                    <span class="sms-module-card__title">@(isRtl ? m.TitleAr : m.TitleEn)</span>
-                </span>
-                <i class="bi bi-chevron-right sms-module-card__chevron" aria-hidden="true"></i>
-            </a>
-        </div>
+        <details class="sms-all-modules">
+            <summary>@T("All modules", "كل الوحدات") <span class="text-muted">(@modules.Count)</span></summary>
+            <div class="row g-3 mt-1">
+                @foreach (var m in modules)
+                {
+                    <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+                        <a class="sms-card sms-module-card" asp-area="" asp-controller="Modules" asp-action="Index" asp-route-code="@m.Code">
+                            <span class="sms-module-card__icon"><i class="bi @m.Icon" aria-hidden="true"></i></span>
+                            <span class="sms-module-card__body">
+                                <span class="sms-module-card__num">@m.Number</span>
+                                <span class="sms-module-card__title">@(isRtl ? m.TitleAr : m.TitleEn)</span>
+                            </span>
+                            <i class="bi bi-chevron-right sms-module-card__chevron" aria-hidden="true"></i>
+                        </a>
+                    </div>
+                }
+            </div>
+        </details>
     }
-</div>
+}

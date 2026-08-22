@@ -1,0 +1,140 @@
+@using System.Globalization
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model TripsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Trip console", "لوحة الرحلات");
+    ViewData["Breadcrumb"] = T("Transport / Trips", "النقل المدرسي / الرحلات");
+    var routeById = Model.Routes.ToDictionary(r => r.Id);
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-trips-help", Title = T("Trip console — help", "لوحة الرحلات — مساعدة"),
+        Intro = T("One day at a time. The upper table is what is already out; the lower one is every active route that has not opened a trip for the chosen date yet.", "يوم واحد في كل مرة. الجدول الأعلى لما خرج فعلاً، والأسفل لكل مسار نشط لم تُفتَح له رحلة في التاريخ المختار بعد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Opening builds the roster", "الفتح يبني الكشف"), T("The day's roster is taken from the subscriptions that cover that date on this route's stops — active ones, plus a suspension whose effective date has not arrived yet, because a child suspended from next week still rides this morning.", "يُؤخَذ كشف اليوم من الاشتراكات التي تغطي ذلك التاريخ على محطات هذا المسار — النشطة منها، ومعها إيقاف لم يحلّ تاريخ سريانه، لأن الموقوف من الأسبوع القادم ما زال يركب هذا الصباح.")),
+            new HelpPanelViewModel.Item(T("What refuses to open", "ما الذي يرفض الفتح"), T("A bus with a missing or expired document, and a driver whose licence class does not cover that bus or has expired (BR-TRN-001/002). One trip per route per day — a second is refused rather than duplicated.", "حافلة تنقصها وثيقة أو انتهت، وسائق لا تغطّي فئة رخصته تلك الحافلة أو انتهت رخصته (BR-TRN-001/002). ورحلة واحدة لكل مسار في اليوم — والثانية تُرفَض ولا تُكرَّر.")),
+            new HelpPanelViewModel.Item(T("Substitute crew", "الطاقم البديل"), T("Leave both pickers on \"route driver\" and \"route attendant\" for an ordinary morning. A substitute is checked exactly as the route's own driver would be, and covers this one trip — the route keeps its standing crew for tomorrow.", "اترك القائمتين على «سائق المسار» و«مرافق المسار» في صباح عادي. ويُفحَص البديل تماماً كما يُفحَص سائق المسار، ويغطي هذه الرحلة وحدها — ويبقى للمسار طاقمه الدائم غداً.")),
+            new HelpPanelViewModel.Item(T("The override box", "خانة التجاوز"), T("Left blank on any ordinary day. Filling it is a Principal's decision to send a grounded bus out in an emergency, and it writes a safety event whether or not the bus turns out to have been grounded — the decision is the record, not its outcome.", "تُترك فارغة في أي يوم عادي. وملؤها قرار مدير بإخراج حافلة موقوفة في حالة طارئة، ويكتب حدث سلامة سواء تبيّن أن الحافلة موقوفة أم لا — فالقرار هو السجل لا نتيجته.")),
+            new HelpPanelViewModel.Item(T("Resolved against roster", "المُنجَز إلى الكشف"), T("The two numbers on an open trip are how many children have been accounted for and how many are on the roster. While they differ the trip cannot close, and a trip left open past its day is escalated overnight as a safety event.", "الرقمان في الرحلة المفتوحة هما كم طفلاً سُجِّل مصيره وكم في الكشف. وما اختلفا لم تُغلَق الرحلة، والرحلة التي تبقى مفتوحة بعد يومها تُصعَّد ليلاً كحدث سلامة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Opening a trip builds the day's roster from the active subscriptions on the route's stops, and refuses a bus with an expired document or a driver whose licence does not cover it (BR-TRN-005/001/002). Only a Principal may override, with a reason, and the override is itself a safety event.",
+               "فتح الرحلة يبني كشف اليوم من الاشتراكات النشطة على محطات المسار، ويرفض حافلة انتهت وثيقتها أو سائقاً لا تغطّيها رخصته (BR-TRN-005/001/002). ولا يتجاوز ذلك إلا المدير بسبب مكتوب، والتجاوز نفسه حدث سلامة.")
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-end">
+        <form method="get" class="d-flex gap-2 align-items-end">
+            <div>
+                <label class="form-label small mb-1" for="d">@T("Date", "التاريخ")</label>
+                <input id="d" type="date" name="date" value="@Model.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" class="form-control form-control-sm" />
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Show", "عرض")</button>
+        </form>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_TransportNav" />
+
+<h2 class="sms-section-title">@T("Open trips", "الرحلات المفتوحة")</h2>
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Open trips", "الرحلات المفتوحة")</caption>
+        <thead><tr>
+            <th scope="col">@T("Route", "المسار")</th>
+            <th scope="col">@T("Direction", "الاتجاه")</th>
+            <th scope="col" class="text-center">@T("Roster", "الكشف")</th>
+            <th scope="col" class="text-center">@T("Resolved", "مُنجَز")</th>
+            <th scope="col">@T("Status", "الحالة")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var trip in Model.Trips)
+        {
+            var route = routeById.TryGetValue(trip.RouteId, out var r) ? r : null;
+            var resolved = Model.ResolvedByTrip.TryGetValue(trip.Id, out var n) ? n : 0;
+            <tr>
+                <td class="fw-semibold">@(route == null ? $"#{trip.RouteId}" : $"{route.RouteNo} — {(isRtl ? route.NameAr : route.NameEn)}")</td>
+                <td>@TransportLabels.Direction(trip.Direction, isRtl)</td>
+                <td class="text-center">@trip.RosterCount</td>
+                <td class="text-center @(resolved < trip.RosterCount ? "text-warning-emphasis fw-semibold" : "")">@resolved</td>
+                <td>
+                    <span class="badge @(trip.Status switch {
+                        TripStatus.InProgress => "text-bg-primary",
+                        TripStatus.Closed => "text-bg-success",
+                        _ => "text-bg-danger" })">@TransportLabels.TripStatus(trip.Status, isRtl)</span>
+                </td>
+                <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="Trip" asp-route-id="@trip.Id">@T("Open", "فتح")</a></td>
+            </tr>
+        }
+        @if (Model.Trips.Count == 0)
+        {
+            <tr><td colspan="6" class="text-muted text-center py-4">@T("No trip has been opened for this date.", "لم تُفتَح رحلة في هذا التاريخ.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<h2 class="sms-section-title">@T("Routes not yet out", "مسارات لم تخرج بعد")</h2>
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Routes not yet out", "مسارات لم تخرج بعد")</caption>
+        <thead><tr>
+            <th scope="col">@T("Route", "المسار")</th>
+            <th scope="col">@T("Direction", "الاتجاه")</th>
+            <th scope="col">@T("Substitute crew", "طاقم بديل")</th>
+            <th scope="col">@T("Override reason", "سبب التجاوز")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @foreach (var route in Model.RoutesWithoutATrip)
+        {
+            <tr>
+                <td class="fw-semibold">@route.RouteNo — @(isRtl ? route.NameAr : route.NameEn)</td>
+                <td>@TransportLabels.Direction(route.Direction, isRtl)</td>
+                <td colspan="3">
+                    <form method="post" asp-action="OpenTrip" class="d-flex gap-1 flex-wrap align-items-center">
+                        <input type="hidden" name="routeId" value="@route.Id" />
+                        <input type="hidden" name="date" value="@Model.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                        <label class="visually-hidden" for="sd-@route.Id">@T("Substitute driver", "سائق بديل")</label>
+                        <select id="sd-@route.Id" name="substituteDriverId" class="form-select form-select-sm" style="width:11rem">
+                            <option value="">@T("route driver", "سائق المسار")</option>
+                            @foreach (var d in Model.Drivers.Where(d => d.IsActive))
+                            {
+                                <option value="@d.Id">@d.DisplayName</option>
+                            }
+                        </select>
+                        <label class="visually-hidden" for="sa-@route.Id">@T("Substitute attendant", "مرافق بديل")</label>
+                        <select id="sa-@route.Id" name="substituteAttendantId" class="form-select form-select-sm" style="width:11rem">
+                            <option value="">@T("route attendant", "مرافق المسار")</option>
+                            @foreach (var a in Model.Attendants.Where(a => a.IsActive))
+                            {
+                                <option value="@a.Id">@a.DisplayName</option>
+                            }
+                        </select>
+                        @* Left blank on an ordinary morning. Filling it is a Principal's decision and
+                           writes a safety event whether or not the bus turns out to be grounded. *@
+                        <input name="unroadworthyOverrideReason" class="form-control form-control-sm" style="width:13rem"
+                               placeholder="@T("only to override a grounded bus", "فقط لتجاوز حافلة موقوفة")"
+                               aria-label="@T("Unroadworthy override reason", "سبب تجاوز عدم الصلاحية")" />
+                        <button type="submit" class="btn btn-sm btn-primary">@T("Open trip", "فتح الرحلة")</button>
+                    </form>
+                </td>
+            </tr>
+        }
+        @if (Model.RoutesWithoutATrip.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted text-center py-4">@T("Every active route is out.", "كل المسارات النشطة خرجت.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

@@ -38,13 +38,15 @@ namespace Sms.Web.Controllers
         private readonly AppDbContext _db;
         private readonly ICurrentUser _user;
         private readonly IWorkingYearContext _workingYear;
+        private readonly Sms.Web.Services.PersonPhotoService _photos;
 
-        public PortalController(IParentPortalQuery portal, AppDbContext db, ICurrentUser user, IWorkingYearContext workingYear)
+        public PortalController(IParentPortalQuery portal, AppDbContext db, ICurrentUser user, IWorkingYearContext workingYear, Sms.Web.Services.PersonPhotoService photos)
         {
             _portal = portal;
             _db = db;
             _user = user;
             _workingYear = workingYear;
+            _photos = photos;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -136,6 +138,27 @@ namespace Sms.Web.Controllers
                 }).Where(x => x != null).Select(x => x!).OrderBy(x => x.Term.SequenceNumber).ThenBy(x => x.Subject.Code).ToList(),
             };
             return View(m);
+        }
+
+        /// <summary>
+        /// The child's photograph, behind the same BR-SEC-011 gate as everything else on the portal:
+        /// a parent who may not read this student's record does not get their face either, and the
+        /// refusal is a 404 like every other denial here (BR-SEC-010).
+        /// </summary>
+        [HttpGet("students/{id:int}/photo")]
+        [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
+        public async Task<IActionResult> StudentPhoto(int id)
+        {
+            try
+            {
+                await _portal.GetAttendanceSummaryAsync(_user.UserId, id);
+            }
+            catch (PortalAccessDeniedException) { return NotFound(); }
+
+            var photoId = await _db.Students.AsNoTracking()
+                .Where(s => s.Id == id).Select(s => s.PhotoAttachmentId).SingleOrDefaultAsync();
+            var photo = await _photos.ReadAsync(photoId, HttpContext.RequestAborted);
+            return photo == null ? NotFound() : File(photo.Value.Content, photo.Value.ContentType);
         }
 
         // ================================================================== My statement (BR-SEC-013: re-auth after 15 idle minutes)

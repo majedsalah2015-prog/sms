@@ -102,18 +102,37 @@
     <!-- ================================================== holder + basket -->
     <div class="col-lg-5">
         <div class="sms-card mb-3">
-            <form method="get" class="d-flex gap-2 align-items-end mb-2">
+            <form method="get" asp-action="Index" class="d-flex gap-2 align-items-end mb-2">
                 <div class="flex-grow-1">
-                    <label for="holder-q" class="form-label small text-muted">@T("Student or employee", "طالب أو موظف")</label>
-                    <input id="holder-q" name="q" class="form-control form-control-sm" autocomplete="off"
+                    <label for="holder-q" class="form-label small text-muted">@(Model.HolderKind == WalletHolderKind.Student ? T("Student", "طالب") : T("Employee", "موظف"))</label>
+                    <input id="holder-q" name="q" value="@Model.HolderQuery" class="form-control form-control-sm" autocomplete="off"
                            placeholder="@T("Name or number…", "الاسم أو الرقم…")" />
                 </div>
-                <select name="kind" class="form-select form-select-sm" style="width:auto" aria-label="@T("Holder kind", "نوع الحامل")">
-                    <option value="@WalletHolderKind.Student" selected="@(Model.HolderKind == WalletHolderKind.Student)">@T("Student", "طالب")</option>
-                    <option value="@WalletHolderKind.Employee" selected="@(Model.HolderKind == WalletHolderKind.Employee)">@T("Employee", "موظف")</option>
+                <select id="holder-kind" name="kind" class="form-select form-select-sm" style="width:auto" aria-label="@T("Holder kind", "نوع الحامل")">
+                    <option value="@WalletHolderKind.Student" selected="@(Model.HolderKind == WalletHolderKind.Student)">@T("Students", "الطلاب")</option>
+                    <option value="@WalletHolderKind.Employee" selected="@(Model.HolderKind == WalletHolderKind.Employee)">@T("Employees", "الموظفون")</option>
                 </select>
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-search" aria-hidden="true"></i><span class="visually-hidden">@T("Filter", "تصفية")</span>
+                </button>
             </form>
-            <div id="holder-results" class="list-group list-group-flush small"></div>
+            <div id="holder-results" class="list-group list-group-flush small border rounded" style="max-height:14rem; overflow-y:auto">
+                @foreach (var row in Model.HolderList)
+                {
+                    <a class="list-group-item list-group-item-action py-1 d-flex justify-content-between gap-2 @(Model.Holder?.Id == row.Id ? "active" : "")"
+                       href="@Url.Action("Index", new { holder = row.Id, kind = Model.HolderKind, q = Model.HolderQuery })">
+                        <span>@Name(row.NameAr, row.NameEn)</span>
+                        <bdi dir="ltr" class="text-muted">@row.Code</bdi>
+                    </a>
+                }
+                @if (Model.HolderList.Count == 0)
+                {
+                    <div class="list-group-item text-muted py-2">@T("Nobody matches that.", "لا أحد يطابق ذلك.")</div>
+                }
+            </div>
+            <div id="holder-more" class="form-text @(Model.HolderListTruncated ? "" : "d-none")">
+                @T("Showing the first 50 — narrow the filter to see the rest.", "تُعرض أول 50 — ضيّق التصفية لرؤية البقية.")
+            </div>
 
             @if (Model.Holder is { } h)
             {
@@ -378,31 +397,57 @@
     });
     applyFilters();
 
-    // ---- holder lookup
+    // ---- holder list. The server rendered the first page of it, so there is a list to look at
+    // before anybody types; typing narrows the same list against the whole table, not just the rows
+    // already on screen. With script off the form's own submit does the identical thing.
     var q = document.getElementById('holder-q');
     var results = document.getElementById('holder-results');
-    var kindSelect = document.querySelector('select[name="kind"]');
+    var moreNote = document.getElementById('holder-more');
+    var kindSelect = document.getElementById('holder-kind');
+    var selectedHolder = @(Model.Holder?.Id ?? 0);
+    var rtl = @(isRtl ? "true" : "false");
+    var emptyText = @Html.Raw(Json.Serialize(T("Nobody matches that.", "لا أحد يطابق ذلك.")));
     var timer = null;
+
+    function renderHolders(data) {
+        var term = q.value.trim();
+        results.innerHTML = '';
+        if (!data.rows.length) {
+            var none = document.createElement('div');
+            none.className = 'list-group-item text-muted py-2';
+            none.textContent = emptyText;
+            results.appendChild(none);
+        }
+        data.rows.forEach(function (row) {
+            var a = document.createElement('a');
+            a.className = 'list-group-item list-group-item-action py-1 d-flex justify-content-between gap-2'
+                + (row.id === selectedHolder ? ' active' : '');
+            a.href = '@Url.Action("Index")?holder=' + row.id + '&kind=' + kindSelect.value + '&q=' + encodeURIComponent(term);
+            var name = document.createElement('span');
+            name.textContent = rtl ? row.nameAr : row.nameEn;
+            var code = document.createElement('bdi');
+            code.dir = 'ltr';
+            code.className = 'text-muted';
+            code.textContent = row.code;
+            a.appendChild(name);
+            a.appendChild(code);
+            results.appendChild(a);
+        });
+        moreNote.classList.toggle('d-none', !data.truncated);
+    }
 
     q.addEventListener('input', function () {
         window.clearTimeout(timer);
         timer = window.setTimeout(function () {
-            var term = q.value.trim();
-            if (term.length < 2) { results.innerHTML = ''; return; }
-            fetch('@Url.Action("Search")?q=' + encodeURIComponent(term) + '&kind=' + kindSelect.value)
+            fetch('@Url.Action("Search")?q=' + encodeURIComponent(q.value.trim()) + '&kind=' + kindSelect.value)
                 .then(function (r) { return r.json(); })
-                .then(function (rows) {
-                    results.innerHTML = '';
-                    rows.forEach(function (row) {
-                        var a = document.createElement('a');
-                        a.className = 'list-group-item list-group-item-action py-1';
-                        a.href = '@Url.Action("Index")?holder=' + row.id + '&kind=' + kindSelect.value;
-                        a.textContent = (@(isRtl ? "true" : "false") ? row.nameAr : row.nameEn) + ' · ' + row.studentNo;
-                        results.appendChild(a);
-                    });
-                });
+                .then(renderHolders);
         }, 200);
     });
+
+    // Switching between students and employees is a different list and a different holder, so it is
+    // a reload rather than a swap — the panel below the list belongs to whoever was picked.
+    kindSelect.addEventListener('change', function () { kindSelect.form.submit(); });
 
     render();
 })();

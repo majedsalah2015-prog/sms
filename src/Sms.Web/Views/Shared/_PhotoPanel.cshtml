@@ -1,0 +1,42 @@
+@using System.Globalization
+@model PhotoPanelViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var inputId = Model.Id + "-file";
+}
+
+<div class="sms-photo-panel text-center">
+    @* A fixed frame whatever the file's shape, so a row of files does not jump about as the
+       photographs vary. object-fit crops rather than distorts: a squashed face is worse than a
+       cropped one. *@
+    <div class="sms-photo-frame mx-auto mb-2">
+        @if (Model.HasPhoto)
+        {
+            <img src="@Model.PhotoUrl" alt="@T("Photo of", "صورة") @Model.PersonName" loading="lazy" />
+        }
+        else
+        {
+            <span class="sms-photo-empty" aria-hidden="true"><i class="bi bi-person"></i></span>
+            <span class="visually-hidden">@T("No photo on file.", "لا توجد صورة في الملف.")</span>
+        }
+    </div>
+
+    @if (Model.CanEdit)
+    {
+        <form method="post" action="@Model.UploadUrl" enctype="multipart/form-data" class="d-grid gap-1">
+            <label class="visually-hidden" for="@inputId">@T("Photo file", "ملف الصورة")</label>
+            <input id="@inputId" type="file" name="photo" accept="image/jpeg,image/png" class="form-control form-control-sm" required />
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-upload me-1" aria-hidden="true"></i>@(Model.HasPhoto ? T("Replace", "استبدال") : T("Upload", "رفع"))
+            </button>
+        </form>
+        @if (Model.HasPhoto)
+        {
+            <form method="post" action="@Model.RemoveUrl" class="mt-1" onsubmit="return confirm('@T("Remove this photo?", "إزالة هذه الصورة؟")');">
+                <button type="submit" class="btn btn-sm btn-link text-danger p-0">@T("Remove", "إزالة")</button>
+            </form>
+        }
+        <div class="form-text">@T("JPEG or PNG, up to 2 MB.", "JPEG أو PNG، حتى 2 ميغابايت.")</div>
+    }
+</div>

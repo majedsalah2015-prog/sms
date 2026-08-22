@@ -1,0 +1,120 @@
+@using System.Globalization
+@model Sms.Web.Models.RoleListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Roles and permissions", "الأدوار والصلاحيات");
+    ViewData["Breadcrumb"] = T("System administration / Roles", "إدارة النظام / الأدوار");
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("A role is a named set of permissions; a person gets one by being assigned the role. Nothing is granted by default — a screen with no grant answers 404 rather than an error (BR-SEC-010).",
+               "الدور مجموعة صلاحيات باسم، والشخص يحصل عليها بإسناد الدور إليه. لا شيء ممنوح افتراضياً — الشاشة بلا صلاحية تردّ 404 لا رسالة خطأ (BR-SEC-010).")
+        </p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" asp-action="Users">
+        <i class="bi bi-people" aria-hidden="true"></i> @T("User assignments", "إسناد المستخدمين")
+    </a>
+</div>
+
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (TempData["Message"] is string message)
+{
+    <div class="alert alert-success" role="alert">@message</div>
+}
+
+<div class="sms-card mb-3">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Roles", "الأدوار")</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("Role", "الدور")</th>
+            <th scope="col">@T("Code", "الرمز")</th>
+            <th scope="col" class="text-center">@T("Permissions", "الصلاحيات")</th>
+            <th scope="col" class="text-center">@T("Holders", "عدد الحاملين")</th>
+            <th scope="col" class="text-center">@T("2FA", "التحقق الثنائي")</th>
+            <th scope="col" class="text-center">@T("Single session", "جلسة واحدة")</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var role in Model.Roles)
+        {
+            <tr class="@(role.IsActive ? "" : "text-muted")">
+                <td class="fw-semibold">
+                    <a asp-action="Role" asp-route-id="@role.Id">@(isRtl ? role.NameAr : role.NameEn)</a>
+                    @if (role.CanAdministerPermissions)
+                    {
+                        @* The roles that can change this very screen. Worth marking: it is the answer to
+                           "who could have done this", and the reason a revoke is sometimes refused. *@
+                        <span class="badge text-bg-warning ms-1" title="@T("Can change permissions", "يستطيع تعديل الصلاحيات")">
+                            <i class="bi bi-key-fill" aria-hidden="true"></i> @T("admin", "إدارة")
+                        </span>
+                    }
+                    @if (!role.IsActive)
+                    {
+                        <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّل")</span>
+                    }
+                </td>
+                <td><code>@role.Code</code></td>
+                <td class="text-center">@role.GrantCount</td>
+                <td class="text-center">@role.HolderCount</td>
+                <td class="text-center">@(role.RequireTwoFactor ? "✓" : "—")</td>
+                <td class="text-center">@(role.EnforceSingleSession ? "✓" : "—")</td>
+                <td class="text-end">
+                    @if (role.IsActive)
+                    {
+                        <form method="post" asp-action="Deactivate" asp-route-id="@role.Id" class="d-inline-flex gap-1">
+                            <input name="reason" class="form-control form-control-sm" style="width:10rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">@T("Deactivate", "تعطيل")</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="Reactivate" asp-route-id="@role.Id" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-success">@T("Reactivate", "تفعيل")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <a class="sms-inline-link" asp-action="Index" asp-route-includeInactive="@(!Model.IncludeInactive)">
+        @(Model.IncludeInactive ? T("Hide inactive roles", "إخفاء الأدوار المعطّلة") : T("Show inactive roles", "إظهار الأدوار المعطّلة"))
+    </a>
+</div>
+
+<h2 class="sms-section-title">@T("New role", "دور جديد")</h2>
+<div class="sms-card p-3">
+    <form method="post" asp-action="Create" class="row g-2 align-items-end">
+        <div class="col-12 col-md-2">
+            <label class="form-label" for="new-code">@T("Code", "الرمز")</label>
+            <input id="new-code" name="code" class="form-control" required placeholder="LIBRARY_CLERK" />
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="new-ar">@T("Name (Arabic)", "الاسم بالعربية")</label>
+            <input id="new-ar" name="nameAr" class="form-control" required />
+        </div>
+        <div class="col-12 col-md-3">
+            <label class="form-label" for="new-en">@T("Name (English)", "الاسم بالإنجليزية")</label>
+            <input id="new-en" name="nameEn" class="form-control" required />
+        </div>
+        <div class="col-6 col-md-2 form-check ms-2">
+            <input class="form-check-input" type="checkbox" id="new-2fa" name="requireTwoFactor" value="true" />
+            <label class="form-check-label" for="new-2fa">@T("Require 2FA", "تحقق ثنائي")</label>
+        </div>
+        <div class="col-6 col-md-1">
+            <button type="submit" class="btn btn-primary w-100">@T("Add", "إضافة")</button>
+        </div>
+    </form>
+</div>

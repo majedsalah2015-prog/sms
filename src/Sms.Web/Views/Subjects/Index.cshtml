@@ -52,6 +52,27 @@
             </div>
         </div>
         <div class="col-xl-4">
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6">@T("Load a stage's subjects", "إدخال مواد مرحلة")</h2>
+                <p class="small text-muted mb-2">
+                    @T("The list a school of that stage starts from. Codes that already exist are left untouched, so pressing a button twice changes nothing and a school teaching two stages can load both.",
+                       "القائمة التي تبدأ منها مدرسة تلك المرحلة. والرموز الموجودة تُترك كما هي، فالضغط مرتين لا يغيّر شيئاً، ومدرسة تدرّس مرحلتين تستطيع تحميل الحزمتين.")
+                </p>
+                <div class="d-flex gap-2 flex-wrap">
+                    @foreach (var stage in SubjectStagePacks.All)
+                    {
+                        var pack = SubjectStagePacks.For(stage);
+                        <form method="post" asp-action="AddStagePack" class="d-inline">
+                            <input type="hidden" name="stage" value="@stage" />
+                            <button class="btn btn-sm btn-outline-primary" type="submit"
+                                    title="@string.Join(" · ", pack.Select(r => isRtl ? r.NameAr : r.NameEn))">
+                                <i class="bi bi-collection me-1" aria-hidden="true"></i>@SubjectStagePacks.Label(stage, isRtl)
+                                <span class="badge text-bg-light border ms-1">@pack.Count</span>
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
             <div class="sms-card p-3">
                 <h2 class="h6">@T("New subject", "مادة جديدة")</h2>
                 <form method="post" asp-action="DefineSubject">

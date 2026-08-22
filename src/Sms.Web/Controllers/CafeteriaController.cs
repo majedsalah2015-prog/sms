@@ -65,9 +65,9 @@ namespace Sms.Web.Controllers
 
         [HttpGet("")]
         [RequirePermission(ScreenCatalog.Modules.Cafeteria, ScreenCatalog.Cafeteria.Pos, ActionVerb.View)]
-        public async Task<IActionResult> Index(int? holder = null, WalletHolderKind kind = WalletHolderKind.Student)
+        public async Task<IActionResult> Index(int? holder = null, WalletHolderKind kind = WalletHolderKind.Student, string? q = null)
         {
-            var m = new CafeteriaPosViewModel { HolderKind = kind };
+            var m = new CafeteriaPosViewModel { HolderKind = kind, HolderQuery = q };
 
             m.Items = await _db.CafeteriaItems.AsNoTracking()
                 .OrderBy(i => i.Category).ThenBy(i => i.NameEn)
@@ -96,6 +96,12 @@ namespace Sms.Web.Controllers
                 m.Holder = await LoadHolderAsync(kind, holderId);
             }
 
+            // One row over the limit is asked for so the screen can say "there are more" without
+            // counting the whole table a second time.
+            var list = await HolderListAsync(kind, q, HolderListSize + 1);
+            m.HolderListTruncated = list.Count > HolderListSize;
+            m.HolderList = m.HolderListTruncated ? list.Take(HolderListSize).ToList() : list;
+
             m.RecentSales = await RecentSalesAsync();
             return View(m);
         }
@@ -109,34 +115,60 @@ namespace Sms.Web.Controllers
             return holder == null ? NotFound() : Json(holder);
         }
 
+        /// <summary>How many people the pick list shows at once. Long enough to browse a queue, short enough that nobody scrolls a school.</summary>
+        private const int HolderListSize = 50;
+
+        /// <summary>
+        /// The one query behind both the list the server renders and the one the filter box refreshes:
+        /// students or employees of the selected kind, narrowed by number or by either name, ordered by
+        /// number. An empty term is not an empty result — it is the start of the list, which is what
+        /// lets an operator who does not know the number find somebody by looking.
+        /// </summary>
+        private async Task<List<CafeteriaPosViewModel.HolderRow>> HolderListAsync(WalletHolderKind kind, string? q, int take)
+        {
+            var term = q?.Trim();
+
+            if (kind == WalletHolderKind.Student)
+            {
+                var students = _db.Students.AsNoTracking();
+                if (!string.IsNullOrEmpty(term))
+                {
+                    students = students.Where(s => s.StudentNo.Contains(term) || s.FirstNameAr.Contains(term) || s.FamilyNameAr.Contains(term)
+                        || s.FirstNameEn.Contains(term) || s.FamilyNameEn.Contains(term));
+                }
+
+                return await students
+                    .OrderBy(s => s.StudentNo).Take(take)
+                    .Select(s => new CafeteriaPosViewModel.HolderRow(
+                        s.Id, s.StudentNo, s.FirstNameAr + " " + s.FamilyNameAr, s.FirstNameEn + " " + s.FamilyNameEn))
+                    .ToListAsync(HttpContext.RequestAborted);
+            }
+
+            var employees = _db.Employees.AsNoTracking();
+            if (!string.IsNullOrEmpty(term))
+            {
+                employees = employees.Where(e => e.EmployeeNo.Contains(term) || e.FirstNameAr.Contains(term) || e.FamilyNameAr.Contains(term)
+                    || e.FirstNameEn.Contains(term) || e.FamilyNameEn.Contains(term));
+            }
+
+            return await employees
+                .OrderBy(e => e.EmployeeNo).Take(take)
+                .Select(e => new CafeteriaPosViewModel.HolderRow(
+                    e.Id, e.EmployeeNo, e.FirstNameAr + " " + e.FamilyNameAr, e.FirstNameEn + " " + e.FamilyNameEn))
+                .ToListAsync(HttpContext.RequestAborted);
+        }
+
         [HttpGet("search")]
         [RequirePermission(ScreenCatalog.Modules.Cafeteria, ScreenCatalog.Cafeteria.Pos, ActionVerb.View)]
         public async Task<IActionResult> Search(string? q, WalletHolderKind kind = WalletHolderKind.Student)
         {
-            if (string.IsNullOrWhiteSpace(q))
+            var rows = await HolderListAsync(kind, q, HolderListSize + 1);
+            var truncated = rows.Count > HolderListSize;
+            return Json(new
             {
-                return Json(Array.Empty<object>());
-            }
-
-            var term = q.Trim();
-            if (kind == WalletHolderKind.Student)
-            {
-                var students = await _db.Students.AsNoTracking()
-                    .Where(s => s.StudentNo.Contains(term) || s.FirstNameAr.Contains(term) || s.FamilyNameAr.Contains(term)
-                        || s.FirstNameEn.Contains(term) || s.FamilyNameEn.Contains(term))
-                    .OrderBy(s => s.StudentNo).Take(12)
-                    .Select(s => new { s.Id, s.StudentNo, NameAr = s.FirstNameAr + " " + s.FamilyNameAr, NameEn = s.FirstNameEn + " " + s.FamilyNameEn })
-                    .ToListAsync(HttpContext.RequestAborted);
-                return Json(students);
-            }
-
-            var employees = await _db.Employees.AsNoTracking()
-                .Where(e => e.EmployeeNo.Contains(term) || e.FirstNameAr.Contains(term) || e.FamilyNameAr.Contains(term)
-                    || e.FirstNameEn.Contains(term) || e.FamilyNameEn.Contains(term))
-                .OrderBy(e => e.EmployeeNo).Take(12)
-                .Select(e => new { e.Id, StudentNo = e.EmployeeNo, NameAr = e.FirstNameAr + " " + e.FamilyNameAr, NameEn = e.FirstNameEn + " " + e.FamilyNameEn })
-                .ToListAsync(HttpContext.RequestAborted);
-            return Json(employees);
+                truncated,
+                rows = truncated ? rows.Take(HolderListSize) : rows,
+            });
         }
 
         [HttpPost("sell")]

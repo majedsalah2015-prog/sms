@@ -174,7 +174,43 @@
         // qualifiers that show up beside them
         'بنين': 'Boys', 'البنين': 'Boys', 'بنات': 'Girls', 'البنات': 'Girls',
         'مختلط': 'Mixed', 'المختلط': 'Mixed', 'ذكور': 'Boys', 'إناث': 'Girls', 'اناث': 'Girls',
-        'صباحي': 'Morning', 'الصباحي': 'Morning', 'مسائي': 'Evening', 'المسائي': 'Evening'
+        'صباحي': 'Morning', 'الصباحي': 'Morning', 'مسائي': 'Evening', 'المسائي': 'Evening',
+
+        // ---- the building the ladder is taught in: rooms, floors, wings.
+        // The same closed-vocabulary bet as above — a school names its rooms out
+        // of about thirty words, and the ordinal rules already turn "الطابق
+        // الأول" into "Floor 1" without any of them.
+        'المبنى الرئيسي': 'Main Building', 'الطابق الأرضي': 'Ground Floor', 'الطابق الارضي': 'Ground Floor',
+        'غرفة المعلمين': 'Teachers Room', 'غرفة المعلمات': 'Teachers Room', 'مختبر الحاسوب': 'Computer Lab',
+        'مختبر العلوم': 'Science Lab', 'قاعة الاجتماعات': 'Meeting Hall', 'غرفة المصادر': 'Resource Room',
+
+        'مبنى': 'Building', 'المبنى': 'Building', 'طابق': 'Floor', 'الطابق': 'Floor', 'دور': 'Floor', 'الدور': 'Floor',
+        'قاعة': 'Room', 'القاعة': 'Room', 'غرفة': 'Room', 'الغرفة': 'Room', 'صالة': 'Hall', 'الصالة': 'Hall',
+        'مختبر': 'Lab', 'المختبر': 'Lab', 'معمل': 'Lab', 'المعمل': 'Lab', 'ورشة': 'Workshop', 'الورشة': 'Workshop',
+        'مكتبة': 'Library', 'المكتبة': 'Library', 'مسرح': 'Theatre', 'المسرح': 'Theatre',
+        'ملعب': 'Playground', 'الملعب': 'Playground', 'مقصف': 'Cafeteria', 'المقصف': 'Cafeteria',
+        'عيادة': 'Clinic', 'العيادة': 'Clinic', 'مصلى': 'Prayer Room', 'المصلى': 'Prayer Room',
+        'مستودع': 'Store', 'المستودع': 'Store', 'مخزن': 'Store', 'المخزن': 'Store',
+        'إدارة': 'Administration', 'الإدارة': 'Administration', 'ادارة': 'Administration', 'الادارة': 'Administration',
+        'مدير': 'Principal', 'المدير': 'Principal', 'سكرتارية': 'Secretariat', 'استقبال': 'Reception', 'الاستقبال': 'Reception',
+        'جناح': 'Wing', 'الجناح': 'Wing', 'مدخل': 'Entrance', 'المدخل': 'Entrance', 'ممر': 'Corridor', 'الممر': 'Corridor',
+        'مصادر': 'Resources', 'المصادر': 'Resources', 'نشاط': 'Activity', 'النشاط': 'Activity',
+        'معلمين': 'Teachers', 'المعلمين': 'Teachers', 'معلمات': 'Teachers', 'المعلمات': 'Teachers',
+        'اجتماعات': 'Meetings', 'الاجتماعات': 'Meetings', 'اجتماع': 'Meeting', 'الاجتماع': 'Meeting',
+        'حاسوب': 'Computer', 'الحاسوب': 'Computer', 'حاسب': 'Computer', 'الحاسب': 'Computer',
+        'علوم': 'Science', 'العلوم': 'Science', 'كيمياء': 'Chemistry', 'الكيمياء': 'Chemistry',
+        'فيزياء': 'Physics', 'الفيزياء': 'Physics', 'أحياء': 'Biology', 'الأحياء': 'Biology',
+        'لغات': 'Languages', 'اللغات': 'Languages', 'فنون': 'Arts', 'الفنون': 'Arts',
+        'رياضة': 'Sports', 'الرياضة': 'Sports', 'موسيقى': 'Music', 'الموسيقى': 'Music',
+
+        // where and which one — the adjectives that finish a building's name
+        'رئيسي': 'Main', 'الرئيسي': 'Main', 'رئيسية': 'Main', 'الرئيسية': 'Main',
+        'أرضي': 'Ground', 'الأرضي': 'Ground', 'ارضي': 'Ground', 'الارضي': 'Ground',
+        'علوي': 'Upper', 'العلوي': 'Upper', 'سفلي': 'Lower', 'السفلي': 'Lower',
+        'شمالي': 'North', 'الشمالي': 'North', 'جنوبي': 'South', 'الجنوبي': 'South',
+        'شرقي': 'East', 'الشرقي': 'East', 'غربي': 'West', 'الغربي': 'West',
+        'جديد': 'New', 'الجديد': 'New', 'جديدة': 'New', 'الجديدة': 'New',
+        'قديم': 'Old', 'القديم': 'Old', 'قديمة': 'Old', 'القديمة': 'Old'
     };
 
     function normalize(text) {
@@ -251,7 +287,62 @@
         if (target.value) { target.setAttribute('data-translit-manual', '1'); }
     }
 
+    // ------------------------------------------------- typing Latin on an Arabic keyboard
+    //
+    // A browser cannot change the operating system's keyboard, so the field has to
+    // meet the typist where they are: the letters of the Arabic layout are mapped
+    // back to the Latin letter engraved on the same physical key, so a name typed
+    // without switching layouts comes out as the name that was meant.
+    //
+    // Only what is typed is remapped. A paste arrives as insertFromPaste and is
+    // left exactly as it was — pasting Arabic into an English field is a decision,
+    // not a slip.
+    var LAYOUT = {
+        'ض': 'q', 'ص': 'w', 'ث': 'e', 'ق': 'r', 'ف': 't', 'غ': 'y', 'ع': 'u', 'ه': 'i', 'خ': 'o', 'ح': 'p',
+        'ج': '[', 'د': ']', 'ذ': '`',
+        'ش': 'a', 'س': 's', 'ي': 'd', 'ب': 'f', 'ل': 'g', 'ا': 'h', 'ت': 'j', 'ن': 'k', 'م': 'l', 'ك': ';', 'ط': "'",
+        'ئ': 'z', 'ء': 'x', 'ؤ': 'c', 'ر': 'v', 'ى': 'n', 'ة': 'm', 'و': ',', 'ز': '.', 'ظ': '/',
+        'َ': 'Q', 'ً': 'W', 'ُ': 'E', 'ٌ': 'R', 'إ': 'Y', 'ْ': 'X', 'ّ': '~', 'أ': 'H', 'آ': 'N',
+        '،': 'K', 'ٍ': 'S', 'ِ': 'A'
+    };
+
+    function toLatinKeys(text) {
+        // "لا" sits on one key, and typing it produces two characters: read it as
+        // that key before the letters are taken one at a time.
+        var out = String(text).replace(/لا/g, 'b').replace(/لأ/g, 'B').replace(/لإ/g, 'T');
+        return Array.from(out).map(function (ch) {
+            return Object.prototype.hasOwnProperty.call(LAYOUT, ch) ? LAYOUT[ch] : ch;
+        }).join('');
+    }
+
+    window.smsToLatinKeys = toLatinKeys;
+
+    function wireLatinKeys(el) {
+        el.setAttribute('lang', 'en');
+        el.addEventListener('beforeinput', function (e) {
+            if (e.inputType !== 'insertText' || !e.data) { return; }
+            var mapped = toLatinKeys(e.data);
+            if (mapped === e.data) { return; }
+            e.preventDefault();
+            var start = el.selectionStart, end = el.selectionEnd;
+            if (typeof el.setRangeText === 'function') {
+                el.setRangeText(mapped, start, end, 'end');
+            } else {
+                el.value = el.value.slice(0, start) + mapped + el.value.slice(end);
+            }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-translit-from]').forEach(wire);
+
+        // Every English half of a bilingual pair, plus anything asking for it by
+        // name. The Arabic halves are labelled too, so a screen reader and the
+        // browser's own spellcheck both know which language they are looking at.
+        document.querySelectorAll('[data-translit-from], [data-latin-keys]').forEach(wireLatinKeys);
+        document.querySelectorAll('input[dir="rtl"], textarea[dir="rtl"]').forEach(function (el) {
+            el.setAttribute('lang', 'ar');
+        });
     });
 })();

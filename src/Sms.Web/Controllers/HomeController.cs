@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
+using Sms.Web.Navigation;
 using Sms.Web.Security;
 
 namespace Sms.Web.Controllers
@@ -16,10 +17,12 @@ namespace Sms.Web.Controllers
     public class HomeController : Controller
     {
         private readonly AppDbContext _db;
+        private readonly WorkspaceBuilder _workspaces;
 
-        public HomeController(AppDbContext db)
+        public HomeController(AppDbContext db, WorkspaceBuilder workspaces)
         {
             _db = db;
+            _workspaces = workspaces;
         }
 
         [NoPermissionRequired("The shell's landing page; every tile behind it is gated on its own.")]
@@ -46,10 +49,29 @@ namespace Sms.Web.Controllers
                 Employees = await _db.Employees.CountAsync(),
                 Sections = await _db.Sections.CountAsync(),
                 Parents = await _db.Parents.CountAsync(),
-                AuditEntries = await _db.AuditEntries.CountAsync(),
+                Workspaces = await _workspaces.BuildAllAsync(User, HttpContext.RequestAborted),
             };
 
             return View(model);
+        }
+
+        /// <summary>
+        /// One department's screens. Reached from the landing page's tiles; a department this user
+        /// may open nothing in answers 404, like every other screen they do not hold — the page must
+        /// not become a way to enumerate what exists behind permissions one does not have
+        /// (BR-SEC-010).
+        /// </summary>
+        [HttpGet("section/{key}")]
+        [NoPermissionRequired("A list of links, each of which the user already holds; it reads nothing else.")]
+        public async Task<IActionResult> Section(string key)
+        {
+            var workspace = await _workspaces.BuildAsync(key, User, HttpContext.RequestAborted);
+            if (workspace == null)
+            {
+                return NotFound();
+            }
+
+            return View(workspace);
         }
 
         [NoPermissionRequired("Static text.")]

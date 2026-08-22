@@ -21,6 +21,11 @@
 }
 
 <div class="sms-page-head">
+    @if (s.PhotoAttachmentId != null)
+    {
+        @* Read-only here: a portal shows the school's record, it does not edit it. *@
+        <img class="sms-photo-inline me-3" src="@Url.Action("StudentPhoto", new { id = s.Id })" alt="@T("Photo of", "صورة") @name" loading="lazy" />
+    }
     <div><div class="text-muted small"><code>@s.StudentNo</code> · @(Model.Grade == null ? T("not enrolled this year", "غير مقيّد هذا العام") : $"{Model.Grade.Code} {(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn)}{(Model.Section == null ? "" : " / " + (isRtl ? Model.Section.NameAr : Model.Section.NameEn))}") · @(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn))</div>
         <h1 class="sms-page-title">@name @if (Model.IsSelf) { <span class="badge fs-6 text-bg-light border">@T("me", "أنا")</span> }</h1></div>
     <div class="d-flex gap-2">

@@ -18,6 +18,13 @@ namespace Sms.Application.Parents
             int parentId, string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
             string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Sets where the family lives: the locality, and the quarter inside it where the locality has
+        /// any. Passing a neighbourhood that does not belong to the given area is refused rather than
+        /// stored, since nothing else in the system would ever catch the mismatch.
+        /// </summary>
+        Task SetResidenceAsync(int parentId, int? residenceAreaId, int? neighbourhoodId, CancellationToken cancellationToken = default);
+
         Task<Parent> RegisterParentAsync(
             string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
             string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default);

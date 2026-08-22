@@ -181,3 +181,52 @@ namespace Sms.Web.Models
         public string? NewCategoryEn { get; set; }
     }
 }
+
+namespace Sms.Web.Models
+{
+    /// <summary>
+    /// The country pack's own values, opened for editing on <c>/setup/pack/edit</c>.
+    /// <para>
+    /// VAT is carried as a percentage rather than the fraction the entity stores: 15 is what a
+    /// finance officer knows the rate as, and 0.15 is what four of them in a row have typed as
+    /// 15 by mistake.
+    /// </para>
+    /// </summary>
+    public sealed class CountryPackFormViewModel
+    {
+        /// <summary>Identity of the pack — edited content is written as a new version under the same code.</summary>
+        public string? Code { get; set; }
+
+        /// <summary>Shown, never posted back as an edit: the engine decides the next version.</summary>
+        public int Version { get; set; }
+
+        public string? NameAr { get; set; }
+
+        public string? NameEn { get; set; }
+
+        public string? CountryIsoCode { get; set; }
+
+        public string? DefaultCurrencyCode { get; set; }
+
+        public string? DefaultTimeZoneId { get; set; }
+
+        /// <summary>Percent, 0–100.</summary>
+        public decimal VatPercent { get; set; }
+
+        public bool HijriDisplayDefault { get; set; }
+
+        /// <summary>Comma-separated IdType lookup codes (BR-GLB-003).</summary>
+        public string? RequiredIdTypeCodes { get; set; }
+
+        public int AuditRetentionYearsMinimum { get; set; } = 10;
+
+        /// <summary>Comma-separated statutory report codes.</summary>
+        public string? StatutoryReportCodes { get; set; }
+
+        /// <summary>Comma-separated DayOfWeek names.</summary>
+        public string? DefaultWorkingDays { get; set; }
+
+        /// <summary>Mandatory once the school is live — rebinding after go-live is a T1 event (BR-SET-004).</summary>
+        public string? Reason { get; set; }
+    }
+}

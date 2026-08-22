@@ -1,0 +1,26 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? string.Empty;
+
+    // "Route" and "Trip" are the detail screens of "Routes" and "Trips"; both keep their list tab
+    // marked, so a person three clicks into a route still knows which part of the module they are in.
+    bool On(params string[] actions) => actions.Any(a => string.Equals(a, action, StringComparison.OrdinalIgnoreCase));
+}
+
+<nav class="mb-3" aria-label="@T("Transport sections", "أقسام النقل")">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><a class="nav-link @(On("Index") ? "active" : "")" asp-action="Index"><i class="bi bi-bus-front me-1" aria-hidden="true"></i>@T("Fleet", "الحافلات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Staff") ? "active" : "")" asp-action="Staff"><i class="bi bi-person-badge me-1" aria-hidden="true"></i>@T("Drivers", "السائقون")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Routes", "Route") ? "active" : "")" asp-action="Routes"><i class="bi bi-signpost-split me-1" aria-hidden="true"></i>@T("Routes", "المسارات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Subscriptions") ? "active" : "")" asp-action="Subscriptions"><i class="bi bi-people me-1" aria-hidden="true"></i>@T("Subscriptions", "الاشتراكات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Trips", "Trip") ? "active" : "")" asp-action="Trips"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>@T("Trips", "الرحلات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Safety") ? "active" : "")" asp-action="Safety"><i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>@T("Safety", "السلامة")</a></li>
+    </ul>
+</nav>
+
+@if (TempData["Error"] is string transportError)
+{
+    <div class="alert alert-danger" role="alert">@transportError</div>
+}

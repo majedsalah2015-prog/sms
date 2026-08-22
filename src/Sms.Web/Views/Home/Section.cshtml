@@ -1,0 +1,72 @@
+@using System.Globalization
+@using Sms.Web.Navigation
+@model Sms.Web.Navigation.WorkspaceBuilder.VisibleWorkspace
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var title = isRtl ? Model.Info.TitleAr : Model.Info.TitleEn;
+    ViewData["Title"] = title;
+    ViewData["Breadcrumb"] = title;
+    string T(string en, string ar) => isRtl ? ar : en;
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">
+            <i class="bi @Model.Info.Icon me-2 text-muted" aria-hidden="true"></i>@title
+        </h1>
+        <p class="text-muted mb-0">@(isRtl ? Model.Info.BlurbAr : Model.Info.BlurbEn)</p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" asp-area="" asp-controller="Home" asp-action="Index">
+        <i class="bi bi-grid" aria-hidden="true"></i> @T("All departments", "كل الأقسام")
+    </a>
+</div>
+
+<div class="row g-3">
+    @foreach (var link in Model.Links)
+    {
+        <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+            @* asp-area="" on every link: without it Url.Action inherits the current request's area,
+               and this page is reachable while an embedded ERP screen is the referrer. *@
+            <a class="sms-card sms-module-card" asp-area="" asp-controller="@link.Controller" asp-action="@link.Action">
+                <span class="sms-module-card__icon"><i class="bi @link.Icon" aria-hidden="true"></i></span>
+                <span class="sms-module-card__body">
+                    <span class="sms-module-card__title">@(isRtl ? link.TitleAr : link.TitleEn)</span>
+                </span>
+                <i class="bi bi-chevron-right sms-module-card__chevron" aria-hidden="true"></i>
+            </a>
+        </div>
+    }
+</div>
+
+@if (Model.ErpGroups.Count > 0)
+{
+    @* The embedded ERP, grouped as it groups itself. Listed here rather than folded into the cards
+       above because these are a different subsystem's screens — they open in its design system, and
+       pretending otherwise would make the seam invisible right up until the first one looks wrong. *@
+    <h2 class="sms-section-title mt-4">@T("Accounting", "المحاسبة")</h2>
+    @foreach (var group in Model.ErpGroups)
+    {
+        <h3 class="h6 text-muted mt-3 mb-2">
+            <i class="bi @group.Icon me-1" aria-hidden="true"></i>@group.Title(isRtl)
+        </h3>
+        <div class="row g-2">
+            @foreach (var item in group.Items)
+            {
+                <div class="col-12 col-sm-6 col-lg-4 col-xxl-3">
+                    @{
+                        var href = item.Url is { } explicitUrl
+                            ? (explicitUrl.StartsWith("/") ? Url.Content("~" + explicitUrl) : explicitUrl)
+                            : Url.Action(item.Action, item.Controller, NavLinks.RouteValuesFor(item)) ?? "#";
+                    }
+                    <a class="sms-card sms-module-card sms-module-card--compact" href="@href">
+                        <span class="sms-module-card__icon"><i class="bi @item.Icon" aria-hidden="true"></i></span>
+                        <span class="sms-module-card__body">
+                            <span class="sms-module-card__title">@item.Title(isRtl)</span>
+                        </span>
+                        <i class="bi bi-chevron-right sms-module-card__chevron" aria-hidden="true"></i>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+}

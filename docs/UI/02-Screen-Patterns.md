@@ -22,6 +22,11 @@
 | P-CONFIG | **Configuration matrix** | subscriptions matrix, permission tree, communication matrix, stacking matrix | Rows × toggles/values grid with product-floor indicators (locked cells + explanation tooltips). |
 | P-DASH | Dashboard | per Phase 9 specs | Widget grid per Module 31 rules. |
 | P-STMT | **Statement/position** | student/payer statement, wallet history | Header identity + running-balance table (multi-year, as-of picker) + document drill links + print (Off layout). |
+| P-LAUNCH | **Department launcher** | the landing page after sign-in, and one page per department | Grid of large icon tiles, one per department a school is staffed as — finance, students, secretariat, teaching staff, reports, timetable, cover rota. A tile shows only if the signed-in user can open at least one screen behind it (BR-SEC-010) and its module's feature is on (BR-SET-006); a department of exactly one screen opens that screen instead of a page holding one card. Second level is the same grid at card size, plus the embedded ERP's own groups under finance. See `Sms.Web/Navigation/WorkspaceCatalog`. |
+
+**Why a second taxonomy.** The sidebar groups screens the way the product is *built* — the 36 modules of `docs/Modules`, in the stages they were built in. P-LAUNCH groups the same screens the way the school is *staffed*. The two overlap deliberately: a cashier does not think of Fees, Instalments, Payments and Discounts as four modules, and parent records belong to both the students desk and the secretariat because two people reach them from two directions. Forcing a partition would make one of the two audiences wrong.
+
+Every launcher link names the same `(module, screen)` pair as the `[RequirePermission]` attribute on the action it opens, through the same constants — so what the launcher offers and what the server allows cannot drift, and a rename is a compile error rather than a dead tile. `Sms.Web.Tests/WorkspaceCatalogTests` holds that by reflection.
 
 ## 2. Forms & validation
 

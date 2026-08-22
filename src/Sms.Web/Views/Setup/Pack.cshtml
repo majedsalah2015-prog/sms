@@ -7,10 +7,15 @@
     ViewData["Title"] = T("Country pack", "حزمة الدولة");
     ViewData["Breadcrumb"] = T("System Setup / Country pack", "إعداد النظام / حزمة الدولة");
     var all = ViewData["AllPacks"] as IReadOnlyList<CountryPack> ?? Array.Empty<CountryPack>();
+    string DayName(string code) => Enum.TryParse<DayOfWeek>(code.Trim(), true, out var d) ? (isRtl ? CultureInfo.GetCultureInfo("ar-SA").DateTimeFormat.GetDayName(d) : d.ToString()) : code.Trim();
+    string DayList(string codes) => string.Join(isRtl ? "، " : ", ", codes.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(DayName));
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only contents of the active pack (BR-SET-004). Change it from the wizard's Country pack step.", "محتويات الحزمة الفعّالة للقراءة فقط (BR-SET-004). يمكن تغييرها من خطوة حزمة الدولة في المعالج.")</p></div>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Change", "تغيير")</a></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Contents of the active pack (BR-SET-004). Edit the values here, or switch to a different pack from the wizard's Country pack step.", "محتويات الحزمة الفعّالة (BR-SET-004). عدّل القيم هنا، أو انتقل إلى حزمة أخرى من خطوة حزمة الدولة في المعالج.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-primary btn-sm" asp-action="EditPack"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Edit values", "تعديل البيانات")</a>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>@T("Switch pack", "تغيير الحزمة")</a>
+    </div></div>
 <partial name="_SetupNav" />
 
 @if (Model == null)
@@ -31,7 +36,7 @@ else
                     <dt class="col-sm-5">@T("Hijri display default", "عرض الهجري افتراضياً")</dt><dd class="col-sm-7">@(Model.HijriDisplayDefault ? T("On", "مفعّل") : T("Off", "معطّل"))</dd>
                     <dt class="col-sm-5">@T("Accepted ID types (BR-GLB-003)", "أنواع الهوية المقبولة (BR-GLB-003)")</dt><dd class="col-sm-7">@Model.RequiredIdTypeCodes</dd>
                     <dt class="col-sm-5">@T("Audit retention floor (BR-AUD-006)", "الحد الأدنى للاحتفاظ بالتدقيق (BR-AUD-006)")</dt><dd class="col-sm-7">@Model.AuditRetentionYearsMinimum @T("years", "سنوات")</dd>
-                    <dt class="col-sm-5">@T("Default working days", "أيام العمل الافتراضية")</dt><dd class="col-sm-7">@Model.DefaultWorkingDays</dd>
+                    <dt class="col-sm-5">@T("Default working days", "أيام العمل الافتراضية")</dt><dd class="col-sm-7">@DayList(Model.DefaultWorkingDays)</dd>
                     <dt class="col-sm-5">@T("Statutory report set", "التقارير النظامية")</dt><dd class="col-sm-7">@Model.StatutoryReportCodes</dd>
                 </dl>
             </div>
@@ -40,7 +45,7 @@ else
             <div class="sms-card p-4">
                 <h2 class="h6 text-muted">@T("All product packs", "كل حزم المنتج")</h2>
                 <ul class="list-unstyled small mb-0">
-                    @foreach (var p in all) { <li class="py-1 @(p.Id == Model.Id ? "fw-semibold" : "")">@p.Code v@(p.Version) — @(isRtl ? p.Name.NameAr : p.Name.NameEn) @(p.IsActive ? "" : "· " + T("retired", "متقاعدة"))</li> }
+                    @foreach (var p in all) { <li class="py-1 @(p.Id == Model.Id ? "fw-semibold" : "")">@p.Code v@(p.Version) — @(isRtl ? p.Name.NameAr : p.Name.NameEn) @(p.IsActive ? "" : "· " + T("retired", "موقوفة"))</li> }
                 </ul>
             </div>
         </div>

@@ -60,6 +60,13 @@ namespace Sms.Domain.Employees
 
         public DateTime? PrimaryIdExpiry { get; set; }
 
+        /// <summary>
+        /// The staff photograph, held as an attachment like every other file the product stores:
+        /// the row keeps only the pointer, so the image goes through the same scan gate and the same
+        /// storage abstraction as a contract or a certificate (doc 10). Mirrors Student.PhotoAttachmentId.
+        /// </summary>
+        public int? PhotoAttachmentId { get; set; }
+
         public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
     }
 }

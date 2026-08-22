@@ -1,0 +1,196 @@
+@using System.Globalization
+@using Sms.Domain.Transport
+@using Sms.Web.Models
+@model RoutesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Routes and stops", "المسارات والمحطات");
+    ViewData["Breadcrumb"] = T("Transport / Routes", "النقل المدرسي / المسارات");
+    var capacityByBus = Model.Buses.ToDictionary(b => b.Id, b => b.Capacity);
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-routes-help", Title = T("Routes and stops — help", "المسارات والمحطات — مساعدة"),
+        Intro = T("A route is one direction — morning pick-up or afternoon drop — with one bus, one driver, an optional attendant, and stops in the order the bus reaches them.", "المسار اتجاه واحد — صعود الصباح أو نزول المساء — بحافلة واحدة وسائق واحد ومرافق اختياري، ومحطات بترتيب وصول الحافلة إليها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Three things must exist first", "ثلاثة أشياء يجب أن توجد أولاً"), T("A bus, a driver, and at least one fee category to price the zones with. If any is missing the designer is replaced by links to where you add it, because an empty dropdown does not say which one is empty.", "حافلة وسائق وفئة رسوم واحدة على الأقل لتسعير المناطق. فإن نقص أحدها استُبدل بالمصمّم روابط إلى موضع إضافته، لأن القائمة الفارغة لا تقول أيّها الفارغ.")),
+            new HelpPanelViewModel.Item(T("Stops and their times", "المحطات وأوقاتها"), T("Fill the rows in the order the bus travels and leave any row blank to skip it. The times must ascend down the list: a route that doubles back is refused rather than quietly re-sorted (BR-TRN-003).", "املأ الأسطر بترتيب سير الحافلة واترك أي سطر فارغاً لتجاهله. ويجب أن تتصاعد الأوقات من أعلى القائمة إلى أسفلها: فالمسار الذي يرتدّ يُرفَض ولا يُعاد ترتيبه بصمت (BR-TRN-003).")),
+            new HelpPanelViewModel.Item(T("Zone fee category", "فئة رسوم المنطقة"), T("Each stop names the category its zone is priced in, and that is what a subscription is charged by — the morning stop's zone, or the afternoon one's when there is no morning stop. Pricing by where the child is picked up is what keeps a number from being typed on the day.", "كل محطة تسمّي الفئة التي تُسعَّر بها منطقتها، وبها يُحتسَب الاشتراك — منطقة محطة الصباح، أو محطة المساء إن لم تكن هناك محطة صباح. والتسعير بمكان الصعود هو ما يمنع كتابة رقم في حينه.")),
+            new HelpPanelViewModel.Item(T("Occupancy and retiring", "الإشغال والتعطيل"), T("The bar is riders against the assigned bus's seats. Once it is full, subscribing puts the next student on the route's waiting list instead of charging them. Retire needs a reason and stays disabled while anybody still rides.", "الشريط يقيس الركاب إلى مقاعد الحافلة المسندة. فإذا امتلأ أدرج الاشتراكُ الطالبَ التالي في قائمة انتظار المسار بدل محاسبته. والتعطيل يتطلب سبباً ويبقى معطّلاً ما دام أحد يركب.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Stops are ordered by time and their times must ascend — a route that doubles back is refused, not sorted (BR-TRN-003). Each stop names the fee category its zone is priced in, so a subscription charges by where the child is picked up rather than by a number typed on the day.",
+               "المحطات مرتّبة بالوقت ويجب أن تتصاعد أوقاتها — المسار الذي يرتدّ يُرفَض ولا يُعاد ترتيبه (BR-TRN-003). وكل محطة تسمّي فئة الرسوم التي تُسعَّر بها منطقتها، فيُحتسَب الاشتراك بمكان الصعود لا برقم يُكتَب في حينه.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_TransportNav" />
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("Route", "المسار")</th>
+            <th scope="col">@T("Direction", "الاتجاه")</th>
+            <th scope="col" class="text-center">@T("Stops", "المحطات")</th>
+            <th scope="col">@T("Bus", "الحافلة")</th>
+            <th scope="col">@T("Occupancy", "الإشغال")</th>
+            <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var route in Model.Routes)
+        {
+            var riders = Model.Riders.TryGetValue(route.Id, out var n) ? n : 0;
+            var bus = Model.Buses.FirstOrDefault(b => b.Id == route.BusId);
+            var capacity = capacityByBus.TryGetValue(route.BusId, out var c) ? c : 0;
+            var pct = capacity > 0 ? Math.Min(100, riders * 100 / capacity) : 0;
+            <tr class="@(route.IsActive ? "" : "text-muted")">
+                <td class="fw-semibold">
+                    <a asp-action="Route" asp-route-id="@route.Id">@route.RouteNo — @(isRtl ? route.NameAr : route.NameEn)</a>
+                    @if (!route.IsActive)
+                    {
+                        <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّل")</span>
+                    }
+                </td>
+                <td>@TransportLabels.Direction(route.Direction, isRtl)</td>
+                <td class="text-center">@route.Stops.Count</td>
+                <td class="small">@(bus?.PlateNo ?? "—")</td>
+                <td style="min-width:9rem">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height:.5rem" role="progressbar"
+                             aria-valuenow="@riders" aria-valuemin="0" aria-valuemax="@capacity"
+                             aria-label="@T("Occupancy", "الإشغال")">
+                            <div class="progress-bar @(pct >= 100 ? "bg-danger" : "")" style="width:@pct%"></div>
+                        </div>
+                        <span class="small text-muted">@riders / @capacity</span>
+                    </div>
+                </td>
+                <td class="text-end">
+                    @if (route.IsActive)
+                    {
+                        <form method="post" asp-action="DeactivateRoute" asp-route-id="@route.Id" class="d-inline-flex gap-1">
+                            <input name="reason" class="form-control form-control-sm" style="width:8rem" placeholder="@T("reason", "السبب")" aria-label="@T("Reason", "السبب")" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger" @(riders > 0 ? "disabled" : "")>@T("Retire", "تعطيل")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Routes.Count == 0)
+        {
+            <tr><td colspan="6" class="text-muted text-center py-4">@T("No routes yet.", "لا توجد مسارات بعد.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<h2 class="sms-section-title">@T("Design a route", "تصميم مسار")</h2>
+<div class="sms-card p-3">
+    @if (Model.Buses.Count == 0 || Model.Drivers.Count == 0 || Model.FeeCategories.Count == 0)
+    {
+        @* Said plainly rather than shown as an empty picker: three things must exist before a route
+           can, and "the dropdown is empty" does not tell anybody which one is missing. *@
+        <p class="text-muted mb-0">
+            @T("A route needs a bus, a driver and at least one fee category to price its zones. Add the missing ones first:",
+               "المسار يحتاج حافلة وسائقاً وفئة رسوم واحدة على الأقل لتسعير مناطقه. أضِف الناقص أولاً:")
+            <a asp-action="Index">@T("fleet", "الحافلات")</a> ·
+            <a asp-action="Staff">@T("drivers", "السائقون")</a> ·
+            <a asp-controller="Fees" asp-action="Categories" asp-area="">@T("fee categories", "فئات الرسوم")</a>
+        </p>
+    }
+    else
+    {
+        <form method="post" asp-action="DefineRoute">
+            <div class="row g-2 align-items-end mb-3">
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="rar">@T("Name (Arabic)", "الاسم بالعربية")</label>
+                    <input id="rar" name="nameAr" class="form-control" required />
+                </div>
+                <div class="col-12 col-md-3">
+                    <label class="form-label" for="ren">@T("Name (English)", "الاسم بالإنجليزية")</label>
+                    <input id="ren" name="nameEn" class="form-control" required />
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="dir">@T("Direction", "الاتجاه")</label>
+                    <select id="dir" name="direction" class="form-select">
+                        @foreach (RouteDirection d in Enum.GetValues(typeof(RouteDirection)))
+                        {
+                            <option value="@d">@TransportLabels.Direction(d, isRtl)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="bus">@T("Bus", "الحافلة")</label>
+                    <select id="bus" name="busId" class="form-select" required>
+                        @foreach (var b in Model.Buses.Where(b => b.IsActive))
+                        {
+                            <option value="@b.Id">@b.PlateNo (@b.Capacity)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label" for="drv">@T("Driver", "السائق")</label>
+                    <select id="drv" name="driverId" class="form-select" required>
+                        @foreach (var d in Model.Drivers.Where(d => d.IsActive))
+                        {
+                            <option value="@d.Id">@d.DisplayName</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <label class="form-label" for="att">@T("Attendant", "المرافق")</label>
+                    <select id="att" name="attendantId" class="form-select">
+                        <option value="">@T("none", "بلا")</option>
+                        @foreach (var a in Model.Attendants.Where(a => a.IsActive))
+                        {
+                            <option value="@a.Id">@a.DisplayName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <h3 class="h6">@T("Stops, in order of time", "المحطات بترتيب الوقت")</h3>
+            <div class="table-responsive"><table class="table sms-table mb-2" id="stops">
+                <caption class="visually-hidden">@T("Stops", "المحطات")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Name (Arabic)", "الاسم بالعربية")</th>
+                    <th scope="col">@T("Name (English)", "الاسم بالإنجليزية")</th>
+                    <th scope="col">@T("Time", "الوقت")</th>
+                    <th scope="col">@T("Zone fee category", "فئة رسوم المنطقة")</th>
+                </tr></thead>
+                <tbody>
+                @for (var i = 0; i < 4; i++)
+                {
+                    <tr>
+                        <td><input name="stopNameAr" class="form-control form-control-sm" aria-label="@T($"Stop {i + 1} name (Arabic)", $"اسم المحطة {i + 1} بالعربية")" /></td>
+                        <td><input name="stopNameEn" class="form-control form-control-sm" aria-label="@T($"Stop {i + 1} name (English)", $"اسم المحطة {i + 1} بالإنجليزية")" /></td>
+                        <td><input name="stopTime" type="time" class="form-control form-control-sm" aria-label="@T($"Stop {i + 1} time", $"وقت المحطة {i + 1}")" /></td>
+                        <td>
+                            <select name="stopFeeCategoryId" class="form-select form-select-sm" aria-label="@T($"Stop {i + 1} fee category", $"فئة رسوم المحطة {i + 1}")">
+                                @foreach (var c in Model.FeeCategories)
+                                {
+                                    <option value="@c.Id">@c.Name(isRtl)</option>
+                                }
+                            </select>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+            <p class="small text-muted">@T("Leave a row blank to skip it. Times must ascend down the list.", "اترك السطر فارغاً لتجاهله. ويجب أن تتصاعد الأوقات من أعلى القائمة إلى أسفلها.")</p>
+
+            <button type="submit" class="btn btn-primary">@T("Create route", "إنشاء المسار")</button>
+        </form>
+    }
+</div>

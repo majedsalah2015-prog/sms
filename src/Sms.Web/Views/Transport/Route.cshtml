@@ -1,0 +1,143 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model RouteDetailViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var route = Model.Route;
+    ViewData["Title"] = $"{route.RouteNo} — {(isRtl ? route.NameAr : route.NameEn)}";
+    ViewData["Breadcrumb"] = T("Transport / Routes / ", "النقل المدرسي / المسارات / ") + route.RouteNo;
+    var capacity = Model.Bus?.Capacity ?? 0;
+    var pct = capacity > 0 ? Math.Min(100, Model.RiderCount * 100 / capacity) : 0;
+    var help = new HelpPanelViewModel
+    {
+        Id = "trn-route-help", Title = T("Route — help", "المسار — مساعدة"),
+        Intro = T("One route as it stands today: which bus and crew it is assigned, how full it is, and the stops in the order the bus reaches them.", "مسار واحد كما هو اليوم: أيّ حافلة وطاقم أُسنِدت إليه، وكم امتلأ، والمحطات بترتيب وصول الحافلة إليها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A standing assignment, not one morning", "إسناد دائم لا صباح واحد"), T("What you change here is the route's own bus and crew from now on. Covering a single absence is a different thing: pick the substitute when the trip is opened on the trip console, and the route keeps its own crew for tomorrow.", "ما تغيّره هنا هو حافلة المسار وطاقمه من الآن فصاعداً. أما تغطية غياب يوم واحد فأمر آخر: اختر البديل عند فتح الرحلة في لوحة الرحلات، ويبقى للمسار طاقمه غداً.")),
+            new HelpPanelViewModel.Item(T("What the swap is checked against", "ما يُفحَص عنده التبديل"), T("The new bus must seat everyone already subscribed, and the new driver's licence class must cover it and still be valid (BR-TRN-002/003). A reason is worth writing: it is what the audit trail will show later.", "يجب أن تتّسع الحافلة الجديدة لكل المشترِكين، وأن تغطّيها فئة رخصة السائق الجديد وتكون سارية (BR-TRN-002/003). ويستحق السبب أن يُكتَب: فهو ما سيُظهره سجل التدقيق لاحقاً.")),
+            new HelpPanelViewModel.Item(T("Occupancy", "الإشغال"), T("Riders against the assigned bus's seats. A bus that seats fewer than the route already carries is refused, so shrinking the bus means ending or moving subscriptions first.", "الركاب إلى مقاعد الحافلة المسندة. والحافلة التي تقلّ مقاعدها عمّا يحمله المسار فعلاً تُرفَض، فتصغير الحافلة يعني إنهاء اشتراكات أو نقلها أولاً.")),
+            new HelpPanelViewModel.Item(T("Stops", "المحطات"), T("Shown here in sequence with the fee category each zone is priced in; they are laid out on the routes screen. Moving a student to a stop in another zone credits the old charge and posts the new one (BR-TRN-007).", "تُعرض هنا بالتسلسل مع فئة الرسوم التي تُسعَّر بها كل منطقة؛ وتُرسَم في شاشة المسارات. ونقل طالب إلى محطة في منطقة أخرى يُصدر إشعاراً دائناً بالرسم القديم ويُنشئ الجديد (BR-TRN-007).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@TransportLabels.Direction(route.Direction, isRtl)</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Routes"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("All routes", "كل المسارات")</a>
+    </div>
+</div>
+
+<partial name="_TransportNav" />
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="sms-card p-3 h-100">
+            <div class="text-muted small">@T("Bus", "الحافلة")</div>
+            <div class="fw-semibold">@(Model.Bus?.PlateNo ?? "—")</div>
+            <div class="small text-muted">
+                @if (Model.Bus is { } bus)
+                {
+                    @TransportLabels.BusType(bus.Type, isRtl) <text> · </text>
+                    @T("licence", "الرخصة") <text> </text> @TransportLabels.LicenseClass(bus.RequiredLicenseClass, isRtl)
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="sms-card p-3 h-100">
+            <div class="text-muted small">@T("Crew", "الطاقم")</div>
+            <div class="fw-semibold">@(Model.Driver?.DisplayName ?? "—")</div>
+            <div class="small text-muted">@(Model.Attendant?.DisplayName ?? T("no attendant", "بلا مرافق"))</div>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="sms-card p-3 h-100">
+            <div class="text-muted small">@T("Occupancy", "الإشغال")</div>
+            <div class="fw-semibold">@Model.RiderCount / @capacity</div>
+            <div class="progress mt-2" style="height:.5rem" role="progressbar"
+                 aria-valuenow="@Model.RiderCount" aria-valuemin="0" aria-valuemax="@capacity"
+                 aria-label="@T("Occupancy", "الإشغال")">
+                <div class="progress-bar @(pct >= 100 ? "bg-danger" : "")" style="width:@pct%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h2 class="sms-section-title">@T("Reassign bus and crew", "إعادة إسناد الحافلة والطاقم")</h2>
+<div class="sms-card p-3 mb-4">
+    <p class="small text-muted">
+        @T("This is the route's standing assignment, not one morning's substitution — a substitute is chosen when the trip is opened. The new bus must seat everyone already subscribed, and the new driver must be licensed for it.",
+           "هذا الإسناد الدائم للمسار لا بديل صباح واحد — البديل يُختار عند فتح الرحلة. ويجب أن تتّسع الحافلة الجديدة لكل المشترِكين، وأن تغطّيها رخصة السائق الجديد.")
+    </p>
+    <form method="post" asp-action="ReassignCrew" asp-route-id="@route.Id" class="row g-2 align-items-end">
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="cbus">@T("Bus", "الحافلة")</label>
+            <select id="cbus" name="busId" class="form-select" required>
+                @foreach (var b in Model.Buses.Where(b => b.IsActive || b.Id == route.BusId))
+                {
+                    <option value="@b.Id" selected="@(b.Id == route.BusId)">@b.PlateNo (@b.Capacity)</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="cdrv">@T("Driver", "السائق")</label>
+            <select id="cdrv" name="driverId" class="form-select" required>
+                @foreach (var d in Model.Drivers.Where(d => d.IsActive || d.Id == route.DriverId))
+                {
+                    <option value="@d.Id" selected="@(d.Id == route.DriverId)">@d.DisplayName</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <label class="form-label" for="catt">@T("Attendant", "المرافق")</label>
+            <select id="catt" name="attendantId" class="form-select">
+                <option value="">@T("none", "بلا")</option>
+                @foreach (var a in Model.Attendants.Where(a => a.IsActive || a.Id == route.AttendantId))
+                {
+                    <option value="@a.Id" selected="@(a.Id == route.AttendantId)">@a.DisplayName</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label" for="creason">@T("Reason", "السبب")</label>
+            <input id="creason" name="reason" class="form-control" />
+        </div>
+        <div class="col-6 col-md-1"><button type="submit" class="btn btn-primary w-100">@T("Save", "حفظ")</button></div>
+    </form>
+</div>
+
+<h2 class="sms-section-title">@T("Stops", "المحطات")</h2>
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Stops", "المحطات")</caption>
+        <thead><tr>
+            <th scope="col" class="text-center">#</th>
+            <th scope="col">@T("Stop", "المحطة")</th>
+            <th scope="col">@T("Time", "الوقت")</th>
+            <th scope="col">@T("Zone fee category", "فئة رسوم المنطقة")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var stop in route.Stops.OrderBy(s => s.SequenceNumber))
+        {
+            var category = Model.FeeCategories.FirstOrDefault(c => c.Id == stop.ZoneFeeCategoryId);
+            <tr>
+                <td class="text-center text-muted">@stop.SequenceNumber</td>
+                <td class="fw-semibold">@(isRtl ? stop.NameAr : stop.NameEn)</td>
+                <td>@stop.ScheduledTime.ToString(@"hh\:mm", CultureInfo.InvariantCulture)</td>
+                <td class="small">@(category?.Name(isRtl) ?? $"#{stop.ZoneFeeCategoryId}")</td>
+            </tr>
+        }
+        @if (route.Stops.Count == 0)
+        {
+            <tr><td colspan="4" class="text-muted text-center py-4">@T("This route has no stops.", "لا محطات على هذا المسار.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

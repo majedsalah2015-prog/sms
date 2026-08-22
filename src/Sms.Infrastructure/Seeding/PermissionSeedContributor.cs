@@ -169,6 +169,25 @@ namespace Sms.Infrastructure.Seeding
             new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, Read),
             new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, Read),
 
+            // Module 23's screens landed, so this role stops being a name with a student lookup
+            // attached. It runs the transport operation end to end — the fleet's documents, the crew,
+            // the routes, who rides, and the morning itself.
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Fleet, null),
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Staff, null),
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Routes, null),
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Trips, null),
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Safety, null),
+
+            // Everything on the subscription desk except the arrears suspension: stopping a child's
+            // ride over money is the Principal's call (BR-TRN-008), and the supervisor who would
+            // otherwise be asked to do it quietly is exactly who the rule exists to protect.
+            new("TRANSPORT_SUPERVISOR", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Subscriptions,
+                new[] { ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate }),
+
+            // The two decisions the rule reserves for the Principal, and the oversight of them.
+            new("PRINCIPAL", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Subscriptions, new[] { ActionVerb.Approve }),
+            new("PRINCIPAL", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Safety, new[] { ActionVerb.Approve }),
+
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, null),

@@ -1,0 +1,164 @@
+@using System.Globalization
+@model CountryPackFormViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Edit country pack", "تعديل حزمة الدولة");
+    ViewData["Breadcrumb"] = T("System Setup / Country pack / Edit", "إعداد النظام / حزمة الدولة / تعديل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "pack-edit-help", Title = T("Country pack — help", "حزمة الدولة — مساعدة"),
+        Intro = T("The pack holds the defaults a country imposes rather than the ones a school chooses: the tax rate, which identity documents are acceptable, how long records must be kept, and which statutory reports exist.", "تحمل الحزمة الافتراضات التي تفرضها الدولة لا التي تختارها المدرسة: نسبة الضريبة، ووثائق الهوية المقبولة، ومدة الاحتفاظ الإلزامية، والتقارير النظامية."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Saving writes a new version", "الحفظ يكتب إصداراً جديداً"), T("A pack a school is already bound to is never overwritten: the current version is retired and version+1 is written in its place, then this school is moved onto it. Any school still pinned to the old version keeps resolving the old numbers, which is the point of versioning it at all (BR-SET-004).", "الحزمة المرتبطة بمدرسة لا تُكتَب فوقها أبداً: يُتقاعد الإصدار الحالي ويُكتَب إصدار+1 مكانه، ثم تُنقَل هذه المدرسة إليه. وتبقى أي مدرسة مثبَّتة على الإصدار القديم تقرأ أرقامه القديمة، وهذا هو سبب ترقيم الإصدارات أصلاً (BR-SET-004).")),
+            new HelpPanelViewModel.Item(T("Changing the code makes a new pack", "تغيير الرمز يُنشئ حزمة جديدة"), T("The code is the pack's identity. Leave it alone to edit this country's pack; change it — to PSE-01, say — and you are creating a pack for another country and binding the school to it. Use the presets to fill a plausible starting point, then correct it before saving.", "الرمز هو هوية الحزمة. اتركه لتعدّل حزمة هذه الدولة؛ وغيّره — إلى PSE-01 مثلاً — فأنت تنشئ حزمة لدولة أخرى وتربط المدرسة بها. استخدم الجاهزات لملء نقطة بداية معقولة ثم صحّحها قبل الحفظ.")),
+            new HelpPanelViewModel.Item(T("Time zone ids are the Windows ones", "معرّفات المناطق الزمنية بصيغة ويندوز"), T("This build resolves Windows time-zone names — \"Arab Standard Time\", \"West Bank Standard Time\" — not the IANA form (\"Asia/Gaza\"). An id the machine does not know will not resolve at all.", "يقرأ هذا الإصدار أسماء ويندوز للمناطق الزمنية — «Arab Standard Time» و«West Bank Standard Time» — لا صيغة IANA («Asia/Gaza»). والمعرّف الذي لا يعرفه الجهاز لا يُحَل أصلاً.")),
+            new HelpPanelViewModel.Item(T("Comma-separated lists", "القوائم المفصولة بفواصل"), T("Identity documents, statutory reports and working days are each a plain comma-separated list. Working days must be English DayOfWeek names — Sunday, Monday — because that is what the calendar engine parses.", "وثائق الهوية والتقارير النظامية وأيام العمل كلٌّ منها قائمة مفصولة بفواصل. ويجب أن تكون أيام العمل بأسماء أيام الأسبوع الإنجليزية — Sunday، Monday — لأن هذا ما يقرأه محرّك التقويم.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Editing", "تعديل") <strong>@Model.Code</strong> <span class="text-muted">v@(Model.Version)</span></p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Pack"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("Back", "رجوع")</a>
+    </div>
+</div>
+<partial name="_SetupNav" />
+
+<div class="sms-card p-4" style="max-width:60rem">
+    <div class="alert alert-info small">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+        @T("Saving retires the current version and writes the next one, then binds this school to it. Changing the code instead creates a pack for another country.",
+           "الحفظ يُتقاعِد الإصدار الحالي ويكتب التالي ثم يربط هذه المدرسة به. أما تغيير الرمز فيُنشئ حزمة لدولة أخرى.")
+    </div>
+
+    <div class="mb-3 d-flex gap-2 align-items-center flex-wrap">
+        <span class="small text-muted">@T("Start from:", "ابدأ من:")</span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="pse">@T("Palestine", "فلسطين")</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-preset="ksa">@T("Saudi Arabia", "السعودية")</button>
+        <span class="form-text mb-0">@T("Fills the form only — nothing is saved until you press Save.", "يملأ النموذج فقط — ولا يُحفَظ شيء حتى تضغط حفظ.")</span>
+    </div>
+
+    <form method="post" asp-action="EditPack" id="pack-form">
+        <input type="hidden" asp-for="Version" />
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label small" asp-for="Code">@T("Pack code", "رمز الحزمة") <span class="text-danger" aria-hidden="true">*</span></label>
+                <input asp-for="Code" class="form-control form-control-sm" dir="ltr" required aria-required="true" />
+                <div class="form-text">@T("Change it to create a pack for another country.", "غيّره لإنشاء حزمة لدولة أخرى.")</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small" asp-for="NameAr">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                <input asp-for="NameAr" class="form-control form-control-sm" dir="rtl" required aria-required="true" />
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small" asp-for="NameEn">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                <input asp-for="NameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#NameAr" data-translit-mode="term" required aria-required="true" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label small" asp-for="CountryIsoCode">@T("Country (ISO 3166-1)", "الدولة (ISO 3166-1)")</label>
+                <input asp-for="CountryIsoCode" class="form-control form-control-sm" dir="ltr" maxlength="2" placeholder="PS" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small" asp-for="DefaultCurrencyCode">@T("Currency (ISO 4217)", "العملة (ISO 4217)")</label>
+                <input asp-for="DefaultCurrencyCode" class="form-control form-control-sm" dir="ltr" maxlength="3" placeholder="ILS" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small" asp-for="DefaultTimeZoneId">@T("Time zone", "المنطقة الزمنية")</label>
+                <input asp-for="DefaultTimeZoneId" class="form-control form-control-sm" dir="ltr" placeholder="West Bank Standard Time" />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label small" asp-for="VatPercent">@T("Standard VAT %", "نسبة الضريبة %")</label>
+                <input asp-for="VatPercent" class="form-control form-control-sm" type="number" step="0.01" min="0" max="100" dir="ltr" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small" asp-for="AuditRetentionYearsMinimum">@T("Audit retention (years)", "الاحتفاظ بالتدقيق (سنوات)")</label>
+                <input asp-for="AuditRetentionYearsMinimum" class="form-control form-control-sm" type="number" min="1" dir="ltr" />
+                <div class="form-text">@T("The product keeps the greater of 10 and this (BR-AUD-006).", "يحتفظ النظام بالأكبر من 10 وهذا الرقم (BR-AUD-006).")</div>
+            </div>
+            <div class="col-md-6 align-self-center">
+                <div class="form-check mt-4">
+                    <input asp-for="HijriDisplayDefault" class="form-check-input" />
+                    <label asp-for="HijriDisplayDefault" class="form-check-label small">@T("Show Hijri dates by default", "عرض التاريخ الهجري افتراضياً")</label>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label small" asp-for="RequiredIdTypeCodes">@T("Accepted ID types (BR-GLB-003)", "أنواع الهوية المقبولة (BR-GLB-003)")</label>
+                <input asp-for="RequiredIdTypeCodes" class="form-control form-control-sm" dir="ltr" placeholder="NationalId,Passport" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small" asp-for="DefaultWorkingDays">@T("Default working days", "أيام العمل الافتراضية")</label>
+                <input asp-for="DefaultWorkingDays" class="form-control form-control-sm" dir="ltr" placeholder="Sunday,Monday,Tuesday,Wednesday,Thursday" />
+            </div>
+            <div class="col-12">
+                <label class="form-label small" asp-for="StatutoryReportCodes">@T("Statutory report set", "التقارير النظامية")</label>
+                <input asp-for="StatutoryReportCodes" class="form-control form-control-sm" dir="ltr" placeholder="RPT-STU-001,RPT-ATT-001" />
+            </div>
+
+            <div class="col-md-8">
+                <label class="form-label small" asp-for="Reason">@T("Reason", "السبب")</label>
+                <input asp-for="Reason" class="form-control form-control-sm" placeholder="@T("required once the school is live (T1)", "مطلوب بعد إطلاق المدرسة (T1)")" />
+            </div>
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary btn-sm">@T("Save", "حفظ")</button>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Pack">@T("Cancel", "إلغاء")</a>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // Starting points, not authorities: every value is visible in the form and editable before
+    // anything is written. The time zones are the Windows ids this build resolves.
+    var PRESETS = {
+        pse: {
+            Code: 'PSE-01', NameAr: 'فلسطين', NameEn: 'Palestine', CountryIsoCode: 'PS',
+            DefaultCurrencyCode: 'ILS', DefaultTimeZoneId: 'West Bank Standard Time',
+            VatPercent: 16, HijriDisplayDefault: true,
+            RequiredIdTypeCodes: 'NationalId,Passport',
+            AuditRetentionYearsMinimum: 10,
+            StatutoryReportCodes: 'RPT-STU-001,RPT-ATT-001,RPT-FEE-004',
+            DefaultWorkingDays: 'Sunday,Monday,Tuesday,Wednesday,Thursday'
+        },
+        ksa: {
+            Code: 'KSA-01', NameAr: 'السعودية', NameEn: 'Saudi Arabia', CountryIsoCode: 'SA',
+            DefaultCurrencyCode: 'SAR', DefaultTimeZoneId: 'Arab Standard Time',
+            VatPercent: 15, HijriDisplayDefault: true,
+            RequiredIdTypeCodes: 'NationalId,Iqama,Passport',
+            AuditRetentionYearsMinimum: 10,
+            StatutoryReportCodes: 'RPT-STU-001,RPT-ATT-001,RPT-FEE-004,RPT-VAT-001',
+            DefaultWorkingDays: 'Sunday,Monday,Tuesday,Wednesday,Thursday'
+        }
+    };
+
+    document.querySelectorAll('[data-preset]').forEach(function (button) {
+        button.addEventListener('click', function () {
+            var preset = PRESETS[button.dataset.preset];
+            if (!preset) { return; }
+            Object.keys(preset).forEach(function (name) {
+                var field = document.getElementById(name);
+                if (!field) { return; }
+                if (field.type === 'checkbox') { field.checked = !!preset[name]; }
+                else { field.value = preset[name]; }
+                // The English name auto-fills from the Arabic one; a preset counts as a human
+                // having decided, so the auto-fill must not overwrite it a keystroke later.
+                field.setAttribute('data-translit-manual', '1');
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+            });
+        });
+    });
+})();
+</script>
+}
