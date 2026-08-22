@@ -109,9 +109,36 @@ namespace Sms.ArchitectureTests
                 .OrderBy(x => x)
                 .ToList();
 
-            Assert.True(orphans.Count == 0,
+            // Not every permission guards a screen of its own. A few guard a *region* of one — a tab
+            // whose data is a restricted category — and those are enforced by an explicit
+            // IPermissionService.HasPermissionAsync call inside the host screen's action, which no
+            // attribute can express: the host screen has its own permission, and requiring both would
+            // withhold the whole file from everyone who may not see the region.
+            //
+            // Pinned exactly, like the anonymous actions below, so this stays a decision with a stated
+            // reason rather than a hole. A new orphan fails here; so does an entry that has since been
+            // given an action of its own and should come off the list.
+            var enforcedInsideAScreen = new[]
+            {
+                // Rendered as a tab of the student file (StudentsController.File), never as a page.
+                // BR-GLB-072: without the check, STU/File/View would hand over a family's
+                // circumstances, and this permission would exist only on paper. Its Edit verb is a
+                // real action (UpdateSocialProfile) and is therefore not listed here.
+                "STU/SocialProfile/View",
+            };
+
+            var unguarded = orphans.Except(enforcedInsideAScreen).ToList();
+            var stale = enforcedInsideAScreen.Except(orphans).ToList();
+
+            Assert.True(unguarded.Count == 0,
                 "The catalogue defines these permissions and no action requires them:"
-                + Environment.NewLine + string.Join(Environment.NewLine, orphans));
+                + Environment.NewLine + string.Join(Environment.NewLine, unguarded));
+
+            Assert.True(stale.Count == 0,
+                "These are listed as enforced inside another screen, but an action now requires them. "
+                + "Take them off the list — the attribute is the stronger guard, and the list should "
+                + "hold only what an attribute cannot express:"
+                + Environment.NewLine + string.Join(Environment.NewLine, stale));
         }
 
         [Fact]
