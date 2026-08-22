@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(dotnet --info)",
+      "Bash(dotnet ef migrations list:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git submodule status:*)",
+      "Bash(git branch:*)",
+      "Bash(git ls-files:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)",
+      "Bash(sed -n:*)",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w:*)"
+    ],
+    "deny": [
+      "Bash(git add -A:*)",
+      "Bash(git add .:*)",
+      "Bash(git commit -a:*)",
+      "Edit(external/erp/**)",
+      "Write(external/erp/**)",
+      "Edit(src/Sms.Web/appsettings.json)"
+    ]
+  }
+}
