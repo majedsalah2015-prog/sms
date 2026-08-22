@@ -31,8 +31,7 @@
       "Bash(git add .:*)",
       "Bash(git commit -a:*)",
       "Edit(external/erp/**)",
-      "Write(external/erp/**)",
-      "Edit(src/Sms.Web/appsettings.json)"
+      "Write(external/erp/**)"
     ]
   }
 }
