@@ -10,7 +10,7 @@
     string YearLabel(int? id) => id == null ? T("School default", "افتراضي المدرسة") : (Model.Years.FirstOrDefault(y => y.Id == id) is { } y ? (isRtl ? y.LabelAr : y.LabelEn) : id.ToString()!);
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Year-versionable keys keep history per academic year (BR-SET-005); every change is T1-audited and edits need a reason (BR-SET-007).", "المفاتيح القابلة للإصدار السنوي تحفظ تاريخاً لكل عام دراسي (BR-SET-005)؛ كل تغيير مدقَّق T1 والتعديلات تتطلب سبباً (BR-SET-007).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Year-versionable keys keep history per academic year (BR-SET-005); every change is T1-audited and edits need a reason (BR-SET-007).", "المفاتيح القابلة للإصدار السنوي تحفظ تاريخاً لكل عام دراسي (BR-SET-005)؛ كل تغيير مدقَّق T1 والتعديلات تتطلب سبباً (BR-SET-007).")</p></div><partial name="_HelpModal" model="SetupHelp.Settings(isRtl)" /></div>
 <partial name="_SetupNav" />
 
 <ul class="nav nav-tabs mb-3">

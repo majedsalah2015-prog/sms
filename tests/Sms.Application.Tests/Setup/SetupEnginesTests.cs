@@ -168,5 +168,55 @@ namespace Sms.Application.Tests.Setup
             }, codes);
             Assert.All(SetupWizardSteps.All, s => Assert.True(s.IsMandatory));
         }
+
+        [Fact]
+        [BusinessRule("BR-SET-003")]
+        public void Saving_a_step_moves_to_the_one_after_it_and_the_last_step_ends_the_walk()
+        {
+            Assert.Equal(SetupWizardSteps.CountryPack, SetupWizardEvaluator.NextStep(SetupWizardSteps.Profile)!.Code);
+            Assert.Equal(SetupWizardSteps.StageStructure, SetupWizardEvaluator.NextStep(SetupWizardSteps.NumberingSeries)!.Code);
+            Assert.Null(SetupWizardEvaluator.NextStep(SetupWizardSteps.StageStructure));
+
+            Assert.Equal(SetupWizardSteps.NumberingSeries, SetupWizardEvaluator.PreviousStep(SetupWizardSteps.StageStructure)!.Code);
+            Assert.Null(SetupWizardEvaluator.PreviousStep(SetupWizardSteps.Profile));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SET-003")]
+        public void Where_a_save_goes_does_not_depend_on_which_other_steps_are_still_open()
+        {
+            // The defect this replaced: "next" was read as "the first step still incomplete", so a
+            // save on step 7 with step 2 open carried the operator backwards to step 2 — and on a
+            // finished setup there was no incomplete step at all, so the walk stopped entirely.
+            var onlyProfileDone = new List<SetupChecklist> { new() { StepCode = SetupWizardSteps.Profile, Status = SetupStepStatus.Completed } };
+            var everythingDone = SetupWizardSteps.All.Select(s => new SetupChecklist { StepCode = s.Code, Status = SetupStepStatus.Completed }).ToList();
+
+            foreach (var checklist in new[] { onlyProfileDone, everythingDone })
+            {
+                _ = SetupWizardEvaluator.Evaluate(AllReady(checklist));
+                Assert.Equal(SetupWizardSteps.Languages, SetupWizardEvaluator.NextStep(SetupWizardSteps.WorkingWeek)!.Code);
+            }
+        }
+
+        [Fact]
+        [BusinessRule("BR-SET-003")]
+        public void Resume_points_at_the_first_step_still_open_and_at_nothing_once_all_are_done()
+        {
+            var twoDone = SetupWizardSteps.All.Take(2).Select(s => new SetupChecklist { StepCode = s.Code, Status = SetupStepStatus.Completed }).ToList();
+            Assert.Equal(SetupWizardSteps.Currency, SetupWizardEvaluator.ResumeAt(SetupWizardEvaluator.Evaluate(AllReady(twoDone)))!.Code);
+
+            Assert.Equal(SetupWizardSteps.Profile, SetupWizardEvaluator.ResumeAt(SetupWizardEvaluator.Evaluate(AllReady()))!.Code);
+
+            var allDone = SetupWizardSteps.All.Select(s => new SetupChecklist { StepCode = s.Code, Status = SetupStepStatus.Completed }).ToList();
+            Assert.Null(SetupWizardEvaluator.ResumeAt(SetupWizardEvaluator.Evaluate(AllReady(allDone))));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SET-003")]
+        public void An_unknown_step_code_is_refused_rather_than_answered_with_the_first_step()
+        {
+            Assert.Throws<ArgumentException>(() => SetupWizardEvaluator.NextStep("NOT_A_STEP"));
+            Assert.Throws<ArgumentException>(() => SetupWizardEvaluator.PreviousStep("NOT_A_STEP"));
+        }
     }
 }

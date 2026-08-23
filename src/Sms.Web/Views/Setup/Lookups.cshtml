@@ -7,9 +7,16 @@
     ViewData["Title"] = T("Lookup lists", "القوائم المرجعية");
     ViewData["Breadcrumb"] = T("System Setup / Lookup lists", "إعداد النظام / القوائم المرجعية");
     var readOnly = Model.Selected?.Tier == LookupCategoryTier.ProductSeeded;
+    var help = SetupHelp.Lookups(isRtl);
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Two tiers (BR-SET-001): product-seeded lists are read-only for schools; school-managed lists are yours. Values are deactivated, never deleted (BR-SET-002).", "مستويان (BR-SET-001): القوائم المزوَّدة من المنتج للقراءة فقط؛ وقوائم المدرسة تخصكم. القيم تُعطَّل ولا تُحذف (BR-SET-002).")</p></div></div>
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Two tiers (BR-SET-001): product-seeded lists are read-only for schools; school-managed lists are yours. Values are deactivated, never deleted (BR-SET-002).", "مستويان (BR-SET-001): القوائم المزوَّدة من المنتج للقراءة فقط؛ وقوائم المدرسة تخصكم. القيم تُعطَّل ولا تُحذف (BR-SET-002).")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
 <partial name="_SetupNav" />
 
 <div class="row g-3">
@@ -49,19 +56,54 @@
                     <tbody>
                     @foreach (var v in Model.Values)
                     {
-                        <tr class="@(v.IsActive ? "" : "text-muted")">
-                            <td>@v.SortOrder</td><td><code>@v.Code</code></td><td dir="rtl">@v.Name.NameAr</td><td dir="ltr">@v.Name.NameEn</td>
-                            <td><span title="@(v.IsActive ? T("Active", "فعّال") : T("Inactive", "معطَّل"))">@(v.IsActive ? "✓" : "—")</span></td>
-                            <td class="text-end">
-                                @if (!readOnly && v.IsActive)
-                                {
-                                    <form method="post" asp-action="DeactivateLookupValue" class="d-inline" onsubmit="return confirm('@T("Deactivate this value? It stays visible in historical records (BR-GLB-006).", "إلغاء تفعيل هذه القيمة؟ ستبقى ظاهرة في السجلات التاريخية (BR-GLB-006).")');">
-                                        <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="category" value="@Model.Selected.Code" />
-                                        <button class="btn btn-sm btn-outline-danger" type="submit">@T("Deactivate", "إلغاء التفعيل")</button>
-                                    </form>
-                                }
-                            </td>
-                        </tr>
+                        @* A product-seeded row is a statement; a school-managed one is a form.
+                           The grid could only append and deactivate, so a misspelling could be
+                           retired but never fixed — and the school's list then carried both. *@
+                        if (readOnly)
+                        {
+                            <tr class="@(v.IsActive ? "" : "text-muted")">
+                                <td>@v.SortOrder</td><td><code>@v.Code</code></td><td dir="rtl">@v.Name.NameAr</td><td dir="ltr">@v.Name.NameEn</td>
+                                <td><span aria-hidden="true">@(v.IsActive ? "✓" : "—")</span><span class="visually-hidden">@(v.IsActive ? T("Active", "فعّال") : T("Inactive", "معطَّل"))</span></td>
+                                <td></td>
+                            </tr>
+                        }
+                        else
+                        {
+                            <tr class="@(v.IsActive ? "" : "table-light text-muted")">
+                                <td colspan="6" class="py-1">
+                                    <div class="row g-1 align-items-center">
+                                        <form method="post" asp-action="UpdateLookupValue" asp-route-id="@v.Id" class="col d-flex gap-1 align-items-center mb-0">
+                                            <input type="hidden" name="category" value="@Model.Selected.Code" />
+                                            <input name="sortOrder" value="@v.SortOrder" type="number" min="0" class="form-control form-control-sm" style="width:4.5rem" aria-label="@T("Sort order", "الترتيب")" />
+                                            <code class="small text-nowrap" style="width:7rem" title="@T("The code is the identity — rows elsewhere point at it (BR-SET-002)", "الرمز هو الهوية — سجلات أخرى تشير إليه (BR-SET-002)")">@v.Code</code>
+                                            <input name="nameAr" value="@v.Name.NameAr" dir="rtl" class="form-control form-control-sm" aria-label="@T("Arabic name", "الاسم بالعربية")" />
+                                            <input name="nameEn" value="@v.Name.NameEn" dir="ltr" class="form-control form-control-sm" aria-label="@T("English name", "الاسم بالإنجليزية")" />
+                                            <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit" title="@T("Save this value", "حفظ هذه القيمة")"><i class="bi bi-check2" aria-hidden="true"></i></button>
+                                        </form>
+                                        <div class="col-auto d-flex gap-1">
+                                            @if (v.IsActive)
+                                            {
+                                                <form method="post" asp-action="DeactivateLookupValue" class="mb-0" onsubmit="return confirm('@T("Deactivate this value? It stays visible in historical records (BR-GLB-006).", "إلغاء تفعيل هذه القيمة؟ ستبقى ظاهرة في السجلات التاريخية (BR-GLB-006).")');">
+                                                    <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="category" value="@Model.Selected.Code" />
+                                                    <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit">@T("Deactivate", "إلغاء التفعيل")</button>
+                                                </form>
+                                            }
+                                            else
+                                            {
+                                                <form method="post" asp-action="ActivateLookupValue" class="mb-0">
+                                                    <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="category" value="@Model.Selected.Code" />
+                                                    <button class="btn btn-sm btn-outline-success text-nowrap" type="submit"><i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>@T("Reactivate", "إعادة التفعيل")</button>
+                                                </form>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    @if (Model.Values.Count == 0)
+                    {
+                        <tr><td colspan="6" class="text-center text-muted py-4">@T("This list has no values yet. Add the first one below — both languages are required.", "لا قيم في هذه القائمة بعد. أضِف الأولى أدناه — واللغتان مطلوبتان.")</td></tr>
                     }
                     </tbody>
                 </table></div>

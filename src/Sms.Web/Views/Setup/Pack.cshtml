@@ -15,6 +15,7 @@
     <div class="d-flex gap-2 align-items-center">
         <a class="btn btn-primary btn-sm" asp-action="EditPack"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Edit values", "تعديل البيانات")</a>
         <a class="btn btn-outline-secondary btn-sm" asp-action="Step" asp-route-code="COUNTRY_PACK"><i class="bi bi-arrow-left-right me-1" aria-hidden="true"></i>@T("Switch pack", "تغيير الحزمة")</a>
+        <partial name="_HelpModal" model="SetupHelp.Pack(isRtl)" />
     </div></div>
 <partial name="_SetupNav" />
 

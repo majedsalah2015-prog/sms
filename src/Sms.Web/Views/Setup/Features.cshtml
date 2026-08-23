@@ -9,7 +9,7 @@
     string Title(string code) => FeatureCatalog.TryGet(code, out var f) ? (isRtl ? f.TitleAr : f.TitleEn) : code;
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Off hides the module from menus and permissions; it never deletes data (BR-SET-006). Dependencies are enforced — e.g. Transport fees require Transport.", "التعطيل يخفي الوحدة من القوائم والصلاحيات ولا يحذف بيانات (BR-SET-006). التبعيات مُلزِمة — مثل: رسوم النقل تتطلب النقل.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Off hides the module from menus and permissions; it never deletes data (BR-SET-006). Dependencies are enforced — e.g. Transport fees require Transport.", "التعطيل يخفي الوحدة من القوائم والصلاحيات ولا يحذف بيانات (BR-SET-006). التبعيات مُلزِمة — مثل: رسوم النقل تتطلب النقل.")</p></div><partial name="_HelpModal" model="SetupHelp.Features(isRtl)" /></div>
 <partial name="_SetupNav" />
 
 <div class="sms-card">

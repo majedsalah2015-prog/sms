@@ -12,24 +12,103 @@
     var done = Model.State.Status == SetupStepStatus.Completed;
     var days = new[] { DayOfWeek.Saturday, DayOfWeek.Sunday, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday };
     string DayName(DayOfWeek d) => isRtl ? CultureInfo.GetCultureInfo("ar-SA").DateTimeFormat.GetDayName(d) : d.ToString();
+    var total = SetupWizardSteps.All.Count;
+    var help = SetupHelp.ForStep(step.Code, isRtl);
 }
 
 <div class="sms-page-head">
     <div>
-        <div class="text-muted small">@T("Step", "الخطوة") @step.Order @T("of", "من") @SetupWizardSteps.All.Count</div>
+        <div class="text-muted small">@T("Step", "الخطوة") @step.Order @T("of", "من") @total</div>
         <h1 class="sms-page-title">@title</h1>
     </div>
-    <div>
+    <div class="d-flex align-items-center gap-2">
         @if (done) { <span class="badge text-bg-success"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Completed", "مكتملة")</span> }
         else if (Model.State.IsReady) { <span class="badge text-bg-primary">@T("Ready", "جاهزة")</span> }
         else { <span class="badge text-bg-secondary">@T("Pending", "قيد الانتظار")</span> }
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 
 <partial name="_SetupNav" />
 
+@* Where you are in the nine, without having to read the list on the side. *@
+<div class="progress mb-3" role="progressbar" style="height:.4rem"
+     aria-label="@T("Wizard progress", "تقدّم المعالج")" aria-valuenow="@step.Order" aria-valuemin="1" aria-valuemax="@total">
+    <div class="progress-bar" style="width:@(step.Order * 100 / total)%"></div>
+</div>
+
 <div class="row g-3">
     <div class="col-lg-8">
+        @* The ladder the school already has, each row its own form. Outside the step's form
+           because HTML has no nested forms, and editable because a stage entered once is lived
+           with for years — the grid used to be append-only, so a typo could not be corrected
+           without leaving the wizard for the grades module. *@
+        @if (step.Code == SetupWizardSteps.StageStructure && Model.Stages.Count > 0)
+        {
+            <div class="sms-card mb-3">
+                <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+                    <h2 class="h6 mb-0">@T("The ladder so far", "السلّم حتى الآن")</h2>
+                    <span class="text-muted small">@Model.Stages.Count @T("stages", "مرحلة") · @Model.Stages.Sum(s => s.Grades.Count) @T("grades", "صفاً")</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm sms-table mb-0">
+                        <caption class="visually-hidden">@T("Stages and grades, editable", "المراحل والصفوف، قابلة للتعديل")</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width:5rem">@T("Order", "الترتيب")</th>
+                                <th scope="col">@T("Arabic", "عربي")</th>
+                                <th scope="col">@T("English", "إنجليزي")</th>
+                                <th scope="col" style="width:8rem">@T("Code", "الرمز")</th>
+                                <th scope="col" style="width:6rem"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var s in Model.Stages)
+                        {
+                            <tr class="table-light">
+                                <td colspan="5" class="py-1">
+                                    <form method="post" asp-action="UpdateStage" asp-route-id="@s.Id" class="row g-1 align-items-center">
+                                        <div class="col-auto" style="width:5rem"><input name="order" value="@s.Order" type="number" min="1" class="form-control form-control-sm" aria-label="@T("Stage order", "ترتيب المرحلة")" /></div>
+                                        <div class="col"><input name="nameAr" value="@s.NameAr" dir="rtl" class="form-control form-control-sm fw-semibold" aria-label="@T("Stage name (Arabic)", "اسم المرحلة (عربي)")" /></div>
+                                        <div class="col"><input name="nameEn" value="@s.NameEn" dir="ltr" class="form-control form-control-sm fw-semibold" aria-label="@T("Stage name (English)", "اسم المرحلة (إنجليزي)")" /></div>
+                                        <div class="col-auto" style="width:8rem"><span class="badge text-bg-secondary">@T("stage", "مرحلة")</span></div>
+                                        <div class="col-auto" style="width:6rem"><button class="btn btn-sm btn-outline-primary w-100" type="submit" title="@T("Save this stage", "حفظ هذه المرحلة")"><i class="bi bi-check2" aria-hidden="true"></i></button></div>
+                                    </form>
+                                </td>
+                            </tr>
+                            foreach (var g in s.Grades)
+                            {
+                                <tr>
+                                    <td colspan="5" class="py-1">
+                                        <form method="post" asp-action="UpdateGrade" asp-route-id="@g.Id" class="row g-1 align-items-center">
+                                            <div class="col-auto" style="width:5rem"><input name="order" value="@g.Order" type="number" min="1" class="form-control form-control-sm" aria-label="@T("Grade order", "ترتيب الصف")" /></div>
+                                            <div class="col"><input name="nameAr" value="@g.NameAr" dir="rtl" class="form-control form-control-sm" aria-label="@T("Grade name (Arabic)", "اسم الصف (عربي)")" /></div>
+                                            <div class="col"><input name="nameEn" value="@g.NameEn" dir="ltr" class="form-control form-control-sm" aria-label="@T("Grade name (English)", "اسم الصف (إنجليزي)")" /></div>
+                                            <div class="col-auto" style="width:8rem"><input name="code" value="@g.Code" dir="ltr" class="form-control form-control-sm" aria-label="@T("Grade code", "رمز الصف")" /></div>
+                                            @* Only worth offering once there is somewhere else to move it to. *@
+                                            @if (Model.StageOptions.Count > 1)
+                                            {
+                                                <div class="col-auto" style="width:9rem">
+                                                    <select name="stageId" class="form-select form-select-sm" aria-label="@T("Move this grade to another stage", "نقل هذا الصف إلى مرحلة أخرى")">
+                                                        @foreach (var opt in Model.StageOptions) { <option value="@opt.Id" selected="@(opt.Id == g.StageId)">@(isRtl ? opt.Ar : opt.En)</option> }
+                                                    </select>
+                                                </div>
+                                            }
+                                            <div class="col-auto" style="width:6rem"><button class="btn btn-sm btn-outline-primary w-100" type="submit" title="@T("Save this grade", "حفظ هذا الصف")"><i class="bi bi-check2" aria-hidden="true"></i></button></div>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                            if (s.Grades.Count == 0)
+                            {
+                                <tr><td colspan="5" class="text-center text-warning-emphasis small py-2">@T("No grades in this stage yet — add one below.", "لا صفوف في هذه المرحلة بعد — أضِف واحداً أدناه.")</td></tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
         <div class="sms-card p-4">
             <form method="post" asp-action="Step" asp-route-code="@step.Code" novalidate>
                 <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
@@ -164,14 +243,6 @@
 
                     case SetupWizardSteps.StageStructure:
                         <p class="text-muted small">@T("Define at least one stage and one grade. The full ladder (promotion targets, grade-year profiles) is Module 05.", "عرّف مرحلة واحدة وصفاً واحداً على الأقل. السلم الكامل (أهداف الترفيع، ملفات الصف السنوية) في الوحدة 05.")</p>
-                        @if (Model.Stages.Count > 0)
-                        {
-                            <div class="table-responsive mb-3"><table class="table table-sm sms-table">
-                                <caption class="visually-hidden">@T("Stages and grades", "المراحل والصفوف")</caption>
-                                <thead><tr><th scope="col">#</th><th scope="col">@T("Stage", "المرحلة")</th><th scope="col">@T("Grades", "الصفوف")</th></tr></thead>
-                                <tbody>@foreach (var s in Model.Stages) { <tr><td>@s.Order</td><td>@(isRtl ? s.StageAr : s.StageEn)</td><td>@string.Join(" · ", s.Grades.Select(g => $"{g.Code} {(isRtl ? g.Ar : g.En)}"))</td></tr> }</tbody>
-                            </table></div>
-                        }
                         <fieldset class="border rounded p-3 mb-3">
                             <legend class="float-none w-auto px-2 small text-muted">@T("New stage (optional)", "مرحلة جديدة (اختياري)")</legend>
                             <div class="row g-3">
@@ -199,21 +270,60 @@
                     <input asp-for="Notes" class="form-control" maxlength="500" />
                 </div>
 
-                <div class="d-flex gap-2 align-items-center">
-                    <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@(done ? T("Save & keep completed", "حفظ والإبقاء مكتملة") : T("Save & complete step", "حفظ وإكمال الخطوة"))</button>
-                    <a class="btn btn-outline-secondary" asp-action="Index">@T("Back to wizard", "العودة للمعالج")</a>
-                    @if (Model.NextStepCode != null) { <a class="ms-auto small" asp-action="Step" asp-route-code="@Model.NextStepCode">@T("Skip to next step", "التخطي للخطوة التالية") @(isRtl ? "←" : "→")</a> }
+                @* Two saves, because a step that defines rows and a step that sets one value are
+                   finished at different moments. "Continue" always moves forward by one step —
+                   it used to jump to the first step still incomplete anywhere in the list. *@
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    @if (Model.PreviousStepCode != null)
+                    {
+                        <a class="btn btn-outline-secondary" asp-action="Step" asp-route-code="@Model.PreviousStepCode">
+                            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Previous", "السابقة")
+                        </a>
+                    }
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check2 me-1" aria-hidden="true"></i>@(Model.NextStepCode == null ? T("Save & finish", "حفظ وإنهاء") : T("Save & continue", "حفظ ومتابعة"))
+                    </button>
+                    @if (Model.IsRowStep)
+                    {
+                        <button type="submit" name="AddAnother" value="true" class="btn btn-outline-primary">
+                            <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Save & add another", "حفظ وإضافة آخر")
+                        </button>
+                    }
+                    <a class="btn btn-link text-decoration-none" asp-action="Index">@T("Back to wizard", "العودة للمعالج")</a>
+                    @if (Model.NextStepCode != null)
+                    {
+                        <a class="ms-auto small" asp-action="Step" asp-route-code="@Model.NextStepCode">@T("Skip without saving", "التخطي دون حفظ") @(isRtl ? "←" : "→")</a>
+                    }
                 </div>
+                @if (done)
+                {
+                    <p class="text-muted small mt-2 mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("This step is already complete. Saving again updates it and keeps it green.", "هذه الخطوة مكتملة بالفعل. والحفظ مجدداً يحدّثها ويُبقيها خضراء.")</p>
+                }
             </form>
         </div>
     </div>
     <div class="col-lg-4">
         <div class="sms-card p-4">
             <h2 class="h6 text-muted">@T("Steps", "الخطوات")</h2>
-            <ol class="small ps-3 mb-0">
-                @foreach (var s in SetupWizardSteps.All)
+            <ol class="list-unstyled small mb-0">
+                @foreach (var s in Model.AllStates)
                 {
-                    <li class="@(s.Code == step.Code ? "fw-semibold" : "")"><a asp-action="Step" asp-route-code="@s.Code" class="sms-inline-link p-0">@(isRtl ? s.TitleAr : s.TitleEn)</a></li>
+                    var isHere = s.Step.Code == step.Code;
+                    var isDone = s.Status == SetupStepStatus.Completed;
+                    <li class="d-flex align-items-center gap-2 py-1 @(isHere ? "fw-semibold" : "")">
+                        @if (isDone)
+                        {
+                            <i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>
+                            <span class="visually-hidden">@T("Completed", "مكتملة")</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-circle text-muted" aria-hidden="true"></i>
+                            <span class="visually-hidden">@T("Not completed", "غير مكتملة")</span>
+                        }
+                        <a asp-action="Step" asp-route-code="@s.Step.Code" class="sms-inline-link p-0" aria-current="@(isHere ? "step" : null)">@(isRtl ? s.Step.TitleAr : s.Step.TitleEn)</a>
+                        @if (!s.Step.IsMandatory) { <span class="badge text-bg-light border">@T("optional", "اختيارية")</span> }
+                    </li>
                 }
             </ol>
         </div>

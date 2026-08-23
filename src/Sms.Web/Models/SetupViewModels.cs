@@ -13,6 +13,12 @@ namespace Sms.Web.Models
     {
         public IReadOnlyList<StepState> Steps { get; set; } = Array.Empty<StepState>();
 
+        /// <summary>
+        /// The first step not yet completed — where "continue" goes. Null once nothing is left,
+        /// which is also what turns the button into a badge.
+        /// </summary>
+        public SetupWizardSteps.Step? ResumeAt { get; set; }
+
         public int CompletionPercent { get; set; }
 
         public bool CanDeclareComplete { get; set; }
@@ -31,7 +37,30 @@ namespace Sms.Web.Models
 
         public StepState? State { get; set; }
 
+        /// <summary>
+        /// Every step's state, so the list beside the form can show which are done rather than
+        /// only which one you are on. Knowing that four of nine are green is most of what a
+        /// half-finished setup needs to tell its reader.
+        /// </summary>
+        public IReadOnlyList<StepState> AllStates { get; set; } = Array.Empty<StepState>();
+
         public string? NextStepCode { get; set; }
+
+        /// <summary>
+        /// The step that comes before this one, so a wizard can be walked backwards as well as
+        /// forwards. Null on the first step.
+        /// </summary>
+        public string? PreviousStepCode { get; set; }
+
+        /// <summary>
+        /// Set by the "save and add another" button. A step that defines rows — stages, grades — is
+        /// finished only when the school's whole ladder is in, and being carried to the next step
+        /// after the first row means walking back for every row after it.
+        /// </summary>
+        public bool AddAnother { get; set; }
+
+        /// <summary>True when this step's form adds rows, so it is worth offering to stay on it.</summary>
+        public bool IsRowStep => StepCode == SetupWizardSteps.StageStructure;
 
         // PROFILE (ISchoolAdmin.DefineSchoolAsync)
         public int? SchoolId { get; set; }
@@ -93,8 +122,17 @@ namespace Sms.Web.Models
         public IReadOnlyList<(string Code, string Entity, string Format)> NumberingSeries { get; set; } = Array.Empty<(string, string, string)>();
 
         // STAGE_STRUCTURE (IGradeStructureAdmin)
-        public IReadOnlyList<(string StageAr, string StageEn, int Order, IReadOnlyList<(string Code, string Ar, string En)> Grades)> Stages { get; set; }
-            = Array.Empty<(string, string, int, IReadOnlyList<(string, string, string)>)>();
+
+        /// <summary>
+        /// One stage the school already has, with the grades under it. Carries the ids because the
+        /// rows are editable in place: the ladder is entered once and corrected for years, and a
+        /// grid you can only append to means a typo in "الصف الأول" is permanent.
+        /// </summary>
+        public sealed record StageRow(int Id, string NameAr, string NameEn, int Order, IReadOnlyList<GradeRow> Grades);
+
+        public sealed record GradeRow(int Id, int StageId, string Code, string NameAr, string NameEn, int Order);
+
+        public IReadOnlyList<StageRow> Stages { get; set; } = Array.Empty<StageRow>();
 
         public string? StageNameAr { get; set; }
 

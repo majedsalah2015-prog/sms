@@ -70,6 +70,7 @@ namespace Sms.Web.Controllers
             return View(new SetupWizardViewModel
             {
                 Steps = steps,
+                ResumeAt = SetupWizardEvaluator.ResumeAt(steps),
                 CompletionPercent = SetupWizardEvaluator.CompletionPercent(steps),
                 CanDeclareComplete = SetupWizardEvaluator.CanDeclareComplete(steps),
                 IsComplete = school?.SetupCompletedAtUtc != null,
@@ -90,7 +91,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -123,19 +124,98 @@ namespace Sms.Web.Controllers
             {
                 await SaveStepAsync(step.Code, form);
                 await _setup.CompleteStepAsync(step.Code, form.Notes);
-                TempData["Flash"] = T($"Step \"{step.TitleEn}\" completed.", $"اكتملت خطوة \"{step.TitleAr}\".");
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 var model = await BuildStepModelAsync(step.Code, form);
                 return View(model);
             }
 
-            var next = (await _setup.GetChecklistAsync())
-                .OrderBy(s => s.Step.Order)
-                .FirstOrDefault(s => s.Status != SetupStepStatus.Completed);
-            return next == null ? RedirectToAction(nameof(Index)) : RedirectToAction(nameof(Step), new { code = next.Step.Code });
+            // "Save and add another" keeps the operator on a step that defines rows; anything else
+            // moves one step forward. SetupWizardEvaluator.NextStep owns which step that is, and
+            // its summary records why this is not the same question as "the first step still
+            // incomplete" — the rule this screen used to apply, and the reason it stopped advancing.
+            if (form.AddAnother)
+            {
+                TempData["Flash"] = T("Saved. Add another, or continue when this step is done.", "تم الحفظ. أضف عنصراً آخر، أو تابع عند انتهاء الخطوة.");
+                return RedirectToAction(nameof(Step), new { code = step.Code });
+            }
+
+            var next = SetupWizardEvaluator.NextStep(step.Code);
+            if (next == null)
+            {
+                TempData["Flash"] = T($"Step \"{step.TitleEn}\" completed — that was the last one.", $"اكتملت خطوة \"{step.TitleAr}\" — وهي الأخيرة.");
+                return RedirectToAction(nameof(Index));
+            }
+
+            TempData["Flash"] = T(
+                $"Step \"{step.TitleEn}\" completed. Now on \"{next.TitleEn}\".",
+                $"اكتملت خطوة \"{step.TitleAr}\". أنت الآن في \"{next.TitleAr}\".");
+            return RedirectToAction(nameof(Step), new { code = next.Code });
+        }
+
+        /// <summary>
+        /// doc/Modules/01 §8.1. Corrects a stage the school already defined, from the wizard's own
+        /// grid rather than by leaving the wizard for Module 05. The ladder is entered once and
+        /// lived with for years: a grid that only appends makes a typo in a stage name permanent
+        /// until someone finds the other screen.
+        /// <para>Its own form, because HTML has no nested forms and the step's main form is a save.</para>
+        /// </summary>
+        [HttpPost("step/stage/{id:int}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.Configure)]
+        public async Task<IActionResult> UpdateStage(int id, string? nameAr, string? nameEn, int? order)
+        {
+            try
+            {
+                Require(nameAr, "Stage name (Arabic)", "اسم المرحلة (عربي)");
+                Require(nameEn, "Stage name (English)", "اسم المرحلة (إنجليزي)");
+                var stage = await _db.Stages.AsNoTracking().SingleOrDefaultAsync(s => s.Id == id);
+                if (stage == null)
+                {
+                    return NotFound();
+                }
+
+                _audit.Reason ??= T("Setup wizard: stage corrected", "معالج الإعداد: تصحيح مرحلة");
+                await _grades.UpdateStageAsync(id, nameAr!.Trim(), nameEn!.Trim(), order ?? stage.SequenceOrder, stage.DefaultGenderPolicy);
+                TempData["Flash"] = T("Stage updated.", "تم تحديث المرحلة.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Step), new { code = SetupWizardSteps.StageStructure });
+        }
+
+        /// <summary>doc/Modules/01 §8.1. The same correction, one level down — and it may move the grade to another stage.</summary>
+        [HttpPost("step/grade/{id:int}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Wizard, ActionVerb.Configure)]
+        public async Task<IActionResult> UpdateGrade(int id, int? stageId, string? code, string? nameAr, string? nameEn, int? order)
+        {
+            try
+            {
+                Require(code, "Code", "الرمز");
+                Require(nameAr, "Grade name (Arabic)", "اسم الصف (عربي)");
+                Require(nameEn, "Grade name (English)", "اسم الصف (إنجليزي)");
+                var grade = await _db.GradeLevels.AsNoTracking().SingleOrDefaultAsync(g => g.Id == id);
+                if (grade == null)
+                {
+                    return NotFound();
+                }
+
+                _audit.Reason ??= T("Setup wizard: grade corrected", "معالج الإعداد: تصحيح صف");
+                await _grades.UpdateGradeLevelAsync(id, stageId ?? grade.StageId, code!.Trim(), nameAr!.Trim(), nameEn!.Trim(), order ?? grade.SequenceOrder);
+                TempData["Flash"] = T("Grade updated.", "تم تحديث الصف.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Step), new { code = SetupWizardSteps.StageStructure });
         }
 
         private async Task SaveStepAsync(string stepCode, SetupStepViewModel f)
@@ -144,10 +224,10 @@ namespace Sms.Web.Controllers
             switch (stepCode)
             {
                 case SetupWizardSteps.Profile:
-                    Require(f.NameAr, "Name (Arabic)");
-                    Require(f.NameEn, "Name (English)");
-                    Require(f.LicenseNumber, "License number");
-                    Require(f.MinistryCode, "Ministry code");
+                    Require(f.NameAr, "Name (Arabic)", "الاسم (عربي)");
+                    Require(f.NameEn, "Name (English)", "الاسم (إنجليزي)");
+                    Require(f.LicenseNumber, "License number", "رقم الترخيص");
+                    Require(f.MinistryCode, "Ministry code", "الرمز الوزاري");
                     _audit.Reason ??= T("Setup wizard: profile", "معالج الإعداد: الملف");
                     await _schools.DefineSchoolAsync(
                         school?.Id, f.NameAr!, f.NameEn!, f.LicenseNumber!, f.MinistryCode!,
@@ -156,12 +236,12 @@ namespace Sms.Web.Controllers
                     break;
 
                 case SetupWizardSteps.CountryPack:
-                    Require(f.PackCode, "Country pack");
+                    Require(f.PackCode, "Country pack", "حزمة الدولة");
                     await _setup.BindCountryPackAsync(f.PackCode!, reason: T("Setup wizard: country pack", "معالج الإعداد: حزمة الدولة"));
                     break;
 
                 case SetupWizardSteps.Currency:
-                    Require(f.CurrencyCode, "Currency");
+                    Require(f.CurrencyCode, "Currency", "العملة");
                     RequireSchool(school);
                     _audit.Reason ??= T("Setup wizard: currency", "معالج الإعداد: العملة");
                     await _schools.DefineSchoolAsync(school!.Id, school.NameAr, school.NameEn, school.LicenseNumber, school.MinistryCode,
@@ -169,7 +249,7 @@ namespace Sms.Web.Controllers
                     break;
 
                 case SetupWizardSteps.TimeZone:
-                    Require(f.TimeZoneId, "Time zone");
+                    Require(f.TimeZoneId, "Time zone", "المنطقة الزمنية");
                     RequireSchool(school);
                     _audit.Reason ??= T("Setup wizard: time zone", "معالج الإعداد: المنطقة الزمنية");
                     await _schools.DefineSchoolAsync(school!.Id, school.NameAr, school.NameEn, school.LicenseNumber, school.MinistryCode,
@@ -189,12 +269,12 @@ namespace Sms.Web.Controllers
                 case SetupWizardSteps.Languages:
                     _audit.Reason ??= T("Setup wizard: languages", "معالج الإعداد: اللغات");
                     await _setup.SetSettingAsync(SettingKeys.EnabledLanguages, string.Join(",", f.EnabledLanguages));
-                    Require(f.DefaultLanguage, "Default language");
+                    Require(f.DefaultLanguage, "Default language", "اللغة الافتراضية");
                     await _setup.SetSettingAsync(SettingKeys.DefaultLanguage, f.DefaultLanguage!);
                     break;
 
                 case SetupWizardSteps.CalendarType:
-                    Require(f.CalendarType, "Calendar type");
+                    Require(f.CalendarType, "Calendar type", "نوع التقويم");
                     _audit.Reason ??= T("Setup wizard: calendar", "معالج الإعداد: التقويم");
                     await _setup.SetSettingAsync(SettingKeys.CalendarType, f.CalendarType!);
                     await _setup.SetSettingAsync(SettingKeys.HijriDisplay, f.HijriDisplay ? "true" : "false");
@@ -207,8 +287,8 @@ namespace Sms.Web.Controllers
                 case SetupWizardSteps.StageStructure:
                     if (!string.IsNullOrWhiteSpace(f.StageNameEn) || !string.IsNullOrWhiteSpace(f.StageNameAr))
                     {
-                        Require(f.StageNameAr, "Stage name (Arabic)");
-                        Require(f.StageNameEn, "Stage name (English)");
+                        Require(f.StageNameAr, "Stage name (Arabic)", "اسم المرحلة (عربي)");
+                        Require(f.StageNameEn, "Stage name (English)", "اسم المرحلة (إنجليزي)");
                         var stage = await _grades.DefineStageAsync(f.StageNameAr!, f.StageNameEn!, f.StageOrder ?? 1, GenderPolicy.Mixed);
                         f.ExistingStageId = stage.Id;
                     }
@@ -220,8 +300,8 @@ namespace Sms.Web.Controllers
                             throw new InvalidOperationException(T("Choose or define a stage for the grade.", "اختر مرحلة أو عرّف واحدة للصف."));
                         }
 
-                        Require(f.GradeNameAr, "Grade name (Arabic)");
-                        Require(f.GradeNameEn, "Grade name (English)");
+                        Require(f.GradeNameAr, "Grade name (Arabic)", "اسم الصف (عربي)");
+                        Require(f.GradeNameEn, "Grade name (English)", "اسم الصف (إنجليزي)");
                         await _grades.DefineGradeLevelAsync(f.ExistingStageId.Value, f.GradeCode!, f.GradeNameAr!, f.GradeNameEn!, f.GradeOrder ?? 1, null, false);
                     }
 
@@ -236,7 +316,9 @@ namespace Sms.Web.Controllers
             var m = form ?? new SetupStepViewModel();
             m.StepCode = stepCode;
             m.State = states.Single(s => s.Step.Code == stepCode);
-            m.NextStepCode = states.OrderBy(s => s.Step.Order).FirstOrDefault(s => s.Step.Order > m.State.Step.Order)?.Step.Code;
+            m.AllStates = states.OrderBy(s => s.Step.Order).ToList();
+            m.NextStepCode = SetupWizardEvaluator.NextStep(stepCode)?.Code;
+            m.PreviousStepCode = SetupWizardEvaluator.PreviousStep(stepCode)?.Code;
 
             switch (stepCode)
             {
@@ -287,8 +369,11 @@ namespace Sms.Web.Controllers
                 case SetupWizardSteps.StageStructure:
                     var stages = await _db.Stages.AsNoTracking().OrderBy(s => s.SequenceOrder).ToListAsync();
                     var grades = await _db.GradeLevels.AsNoTracking().OrderBy(g => g.SequenceOrder).ToListAsync();
-                    m.Stages = stages.Select(s => (s.Name.NameAr, s.Name.NameEn, s.SequenceOrder,
-                        (IReadOnlyList<(string, string, string)>)grades.Where(g => g.StageId == s.Id).Select(g => (g.Code, g.Name.NameAr, g.Name.NameEn)).ToList())).ToList();
+                    m.Stages = stages.Select(s => new SetupStepViewModel.StageRow(
+                        s.Id, s.Name.NameAr, s.Name.NameEn, s.SequenceOrder,
+                        grades.Where(g => g.StageId == s.Id)
+                            .Select(g => new SetupStepViewModel.GradeRow(g.Id, g.StageId, g.Code, g.Name.NameAr, g.Name.NameEn, g.SequenceOrder))
+                            .ToList())).ToList();
                     m.StageOptions = stages.Select(s => (s.Id, s.Name.NameAr, s.Name.NameEn)).ToList();
                     m.StageOrder ??= stages.Count + 1;
                     m.GradeOrder ??= grades.Count + 1;
@@ -382,7 +467,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Features));
@@ -444,9 +529,9 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(form.Code, T("Code", "الرمز"));
-                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)"));
-                Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                Require(form.Code, "Code", "الرمز");
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)");
+                Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
 
                 var days = new List<DayOfWeek>();
                 foreach (var code in SettingKeys.SplitCodes(form.DefaultWorkingDays ?? string.Empty))
@@ -484,7 +569,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return View(form);
             }
         }
@@ -507,21 +592,16 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                var cat = await _db.LookupCategories.AsNoTracking().SingleAsync(c => c.Code == category);
-                if (cat.Tier == LookupCategoryTier.ProductSeeded)
-                {
-                    throw new InvalidOperationException(T("Product-seeded lists are updated by product releases, not by schools (BR-SET-001).", "القوائم المزوَّدة من المنتج تُحدَّث بإصدارات المنتج وليس من المدرسة (BR-SET-001)."));
-                }
-
-                Require(form.Code, "Code");
-                Require(form.NameAr, "Name (Arabic)");
-                Require(form.NameEn, "Name (English)");
+                await RequireSchoolManagedAsync(category);
+                Require(form.Code, "Code", "الرمز");
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)");
+                Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
                 await _lookups.DefineValueAsync(category, form.Code!.Trim(), form.NameAr!, form.NameEn!, form.SortOrder ?? 0);
                 TempData["Flash"] = T("Value saved.", "تم حفظ القيمة.");
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Lookups), new { category });
@@ -534,16 +614,16 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(form.NewCategoryCode, "Code");
-                Require(form.NewCategoryAr, "Name (Arabic)");
-                Require(form.NewCategoryEn, "Name (English)");
+                Require(form.NewCategoryCode, "Code", "الرمز");
+                Require(form.NewCategoryAr, "Name (Arabic)", "الاسم (عربي)");
+                Require(form.NewCategoryEn, "Name (English)", "الاسم (إنجليزي)");
                 await _lookups.DefineCategoryAsync(form.NewCategoryCode!.Trim(), LookupCategoryTier.SchoolManaged, form.NewCategoryAr!, form.NewCategoryEn!);
                 TempData["Flash"] = T("Category created.", "تم إنشاء الفئة.");
                 return RedirectToAction(nameof(Lookups), new { category = form.NewCategoryCode!.Trim() });
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Lookups));
             }
         }
@@ -555,21 +635,110 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                var cat = await _db.LookupCategories.AsNoTracking().SingleAsync(c => c.Code == category);
-                if (cat.Tier == LookupCategoryTier.ProductSeeded)
-                {
-                    throw new InvalidOperationException(T("Product-seeded values cannot be changed by schools (BR-SET-001).", "لا يمكن للمدرسة تعديل القيم المزوَّدة من المنتج (BR-SET-001)."));
-                }
-
+                await RequireSchoolManagedAsync(category);
                 await _lookups.DeactivateValueAsync(id);
                 TempData["Flash"] = T("Value deactivated (BR-SET-002: never deleted).", "تم إلغاء تفعيل القيمة (BR-SET-002: لا حذف).");
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Lookups), new { category });
+        }
+
+        /// <summary>
+        /// doc/Modules/01 §8.2. Corrects a value in place. The grid could add and deactivate and
+        /// nothing else, so a misspelled name could only be retired and re-entered under a second
+        /// code — which leaves the school's own list carrying both, and every historical record
+        /// still pointing at the wrong one.
+        /// <para>
+        /// The code is the identity and is not editable here: rows elsewhere point at this value,
+        /// and BR-SET-002 says a value is retired, never replaced underneath them.
+        /// </para>
+        /// </summary>
+        [HttpPost("lookups/value/{id:int}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Edit)]
+        public async Task<IActionResult> UpdateLookupValue(int id, string category, string? nameAr, string? nameEn, int? sortOrder)
+        {
+            try
+            {
+                await RequireSchoolManagedAsync(category);
+                Require(nameAr, "Name (Arabic)", "الاسم (عربي)");
+                Require(nameEn, "Name (English)", "الاسم (إنجليزي)");
+                var value = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(v => v.Id == id && v.SchoolId == _tenant.SchoolId);
+                if (value == null)
+                {
+                    return NotFound();
+                }
+
+                await _lookups.DefineValueAsync(category, value.Code, nameAr!.Trim(), nameEn!.Trim(), sortOrder ?? value.SortOrder);
+                TempData["Flash"] = T("Value updated.", "تم تحديث القيمة.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Lookups), new { category });
+        }
+
+        /// <summary>
+        /// doc/Modules/01 §8.2. Puts a retired value back in the pickers. Deactivation was a
+        /// one-way door on this screen — the Nationalities editor could reverse it and the generic
+        /// grid could not, so retiring the wrong row meant living with it.
+        /// <para>The upsert is the reactivation: <c>DefineValueAsync</c> sets the active flag.</para>
+        /// </summary>
+        [HttpPost("lookups/activate")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Edit)]
+        public async Task<IActionResult> ActivateLookupValue(int id, string category)
+        {
+            try
+            {
+                await RequireSchoolManagedAsync(category);
+                var value = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(v => v.Id == id && v.SchoolId == _tenant.SchoolId);
+                if (value == null)
+                {
+                    return NotFound();
+                }
+
+                await _lookups.DefineValueAsync(category, value.Code, value.Name.NameAr, value.Name.NameEn, value.SortOrder);
+                TempData["Flash"] = T("Value reactivated.", "تمت إعادة تفعيل القيمة.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Lookups), new { category });
+        }
+
+        /// <summary>
+        /// BR-SET-001: a product-seeded list is updated by product releases, not by a school.
+        /// <para>
+        /// Also the only place that answers "no such category" in a sentence. The three call sites
+        /// each used <c>SingleAsync</c>, which for an unknown code throws "Sequence contains no
+        /// elements" — a message from the query provider, in English, shown to an administrator.
+        /// </para>
+        /// </summary>
+        private async Task RequireSchoolManagedAsync(string categoryCode)
+        {
+            var category = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == categoryCode);
+            if (category == null)
+            {
+                throw new InvalidOperationException(T(
+                    $"There is no lookup list with the code \"{categoryCode}\".",
+                    $"لا توجد قائمة مرجعية بالرمز «{categoryCode}»."));
+            }
+
+            if (category.Tier == LookupCategoryTier.ProductSeeded)
+            {
+                throw new InvalidOperationException(T(
+                    "Product-seeded lists are updated by product releases, not by schools (BR-SET-001).",
+                    "القوائم المزوَّدة من المنتج تُحدَّث بإصدارات المنتج وليس من المدرسة (BR-SET-001)."));
+            }
         }
 
         // ------------------------------------------------------------------
@@ -597,9 +766,9 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(code, T("Code", "الرمز"));
-                Require(nameAr, T("Name (Arabic)", "الاسم بالعربية"));
-                Require(nameEn, T("Name (English)", "الاسم بالإنجليزية"));
+                Require(code, "Code", "الرمز");
+                Require(nameAr, "Name (Arabic)", "الاسم بالعربية");
+                Require(nameEn, "Name (English)", "الاسم بالإنجليزية");
                 var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == NationalityCategory);
                 if (cat == null)
                 {
@@ -609,7 +778,7 @@ namespace Sms.Web.Controllers
                 await _lookups.DefineValueAsync(NationalityCategory, code!.Trim().ToUpperInvariant(), nameAr!.Trim(), nameEn!.Trim(), sortOrder ?? 0);
                 TempData["Flash"] = T("Nationality saved.", "تم حفظ الجنسية.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Nationalities));
         }
 
@@ -623,7 +792,7 @@ namespace Sms.Web.Controllers
                 await _lookups.DeactivateValueAsync(id);
                 TempData["Flash"] = T("Nationality deactivated (kept in historical records).", "تم إلغاء تفعيل الجنسية (تبقى في السجلات التاريخية).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Nationalities));
         }
 
@@ -638,7 +807,7 @@ namespace Sms.Web.Controllers
                 await _lookups.DefineValueAsync(NationalityCategory, v.Code, v.Name.NameAr, v.Name.NameEn, v.SortOrder); // upsert re-activates
                 TempData["Flash"] = T("Nationality reactivated.", "تمت إعادة تفعيل الجنسية.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Nationalities));
         }
 
@@ -658,9 +827,9 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(category, T("Category", "الفئة"));
-                Require(nameAr, T("Name (Arabic)", "الاسم بالعربية"));
-                Require(nameEn, T("Name (English)", "الاسم بالإنجليزية"));
+                Require(category, "Category", "الفئة");
+                Require(nameAr, "Name (Arabic)", "الاسم بالعربية");
+                Require(nameEn, "Name (English)", "الاسم بالإنجليزية");
                 var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == category);
                 if (cat == null) throw new InvalidOperationException(T("Unknown lookup category.", "فئة غير معروفة."));
                 if (cat.Tier == LookupCategoryTier.ProductSeeded && !QuickAddSeededAllowlist.Contains(cat.Code))
@@ -681,7 +850,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return Json(new { ok = false, error = ex.Message });
+                return Json(new { ok = false, error = UserMessage.For(ex, IsArabic) });
             }
         }
 
@@ -726,11 +895,17 @@ namespace Sms.Web.Controllers
             return await query.OrderBy(v => v.SortOrder).ThenBy(v => v.Code).ToListAsync();
         }
 
-        private static void Require(string? value, string field)
+        /// <summary>
+        /// Names the missing field in the reader's own language. It used to take one string and
+        /// drop it into both sentences, so an Arabic-speaking administrator was told
+        /// «الحقل Ministry code مطلوب» — which says what language the product was written in and
+        /// very little else. The caller now supplies both names, as everything user-visible does.
+        /// </summary>
+        private static void Require(string? value, string fieldEn, string fieldAr)
         {
             if (string.IsNullOrWhiteSpace(value))
             {
-                throw new InvalidOperationException(T($"{field} is required.", $"الحقل {field} مطلوب."));
+                throw new InvalidOperationException(T($"{fieldEn} is required.", $"الحقل «{fieldAr}» مطلوب."));
             }
         }
 

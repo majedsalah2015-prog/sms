@@ -318,7 +318,7 @@ namespace Sms.Application.Security
             // ---- Setup
             S(Modules.Setup, Setup.Wizard, "Setup wizard", "معالج الإعداد", ActionVerb.View, ActionVerb.Configure),
             S(Modules.Setup, Setup.Settings, "System settings", "إعدادات النظام", ActionVerb.View, ActionVerb.Configure),
-            S(Modules.Setup, Setup.Lookups, "Lookup lists", "القوائم المرجعية", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+            S(Modules.Setup, Setup.Lookups, "Lookup lists", "القوائم المرجعية", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
             S(Modules.Setup, Setup.Nationalities, "Nationalities", "الجنسيات", Crud),
             S(Modules.Setup, Setup.Features, "Feature toggles", "مفاتيح الميزات", ActionVerb.View, ActionVerb.Configure),
             // Configure, not Edit: changing what a country imposes is the same shape of act as the
