@@ -341,3 +341,8 @@ input[type=number].form-control { min-width: 4.5rem; }
     object-fit: cover;
     border: 1px solid var(--sms-border, #d5dae2);
 }
+
+/* Smaller again, for a row of siblings beside a payer's name at the cashier's
+   counter — several faces have to fit on one line without pushing the balance
+   below the fold. */
+.sms-photo-inline.is-sm { width: 2.25rem; height: 2.25rem; border-radius: .375rem; }

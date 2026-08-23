@@ -85,7 +85,9 @@ namespace Sms.Infrastructure.Attachments
             attachment.VerifiedByUserId = null;
             attachment.VerifiedAtUtc = null;
 
-            var storageReference = await _fileStore.SaveAsync(content, fileName, cancellationToken);
+            // The type code is the folder: photos with photos, contracts with contracts (BR-ATT-010 —
+            // the store maps the category, this layer never composes a path).
+            var storageReference = await _fileStore.SaveAsync(content, fileName, documentType.Code, cancellationToken);
             var version = new AttachmentVersion
             {
                 VersionNumber = attachment.CurrentVersionNumber,

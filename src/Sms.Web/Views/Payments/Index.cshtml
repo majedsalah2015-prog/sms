@@ -54,7 +54,26 @@
         {
             <div class="sms-card mb-3">
                 <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span><br /><span class="small text-muted">@string.Join(" · ", sel.Children.Select(ch => $"{ch.StudentNo} {FinanceLabels.StudentName(ch, isRtl)}"))</span></div>
+                    <div>
+                        <span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span>
+                        @* The children as faces, not just numbers: money is taken at this counter for
+                           one child of several, and the sibling on the screen should be the sibling in
+                           front of it. Names stay whether or not the photo does (BR-STU-008). *@
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            @foreach (var ch in sel.Children)
+                            {
+                                <span class="d-inline-flex align-items-center gap-2 small text-muted">
+                                    @if (Model.CanSeeStudentPhotos && ch.PhotoAttachmentId != null)
+                                    {
+                                        <img class="sms-photo-inline is-sm" loading="lazy"
+                                             src="@Url.Action("Photo", "Students", new { id = ch.Id })"
+                                             alt="@T("Photo of", "صورة") @FinanceLabels.StudentName(ch, isRtl)" />
+                                    }
+                                    <span>@ch.StudentNo @FinanceLabels.StudentName(ch, isRtl)</span>
+                                </span>
+                            }
+                        </div>
+                    </div>
                     <div class="text-end"><div class="small text-muted">@T("Total due", "إجمالي المستحق")</div><div class="fs-4 fw-bold @(Model.TotalDue > 0 ? "text-danger" : "text-success")">@Model.TotalDue.ToString("N2") <span class="visually-hidden">@(Model.TotalDue > 0 ? T("due", "مستحق") : T("settled", "مسدّد"))</span></div>@if (Model.AdvanceBalance > 0) { <div class="small text-success">@T("advance", "مقدّم") @Model.AdvanceBalance.ToString("N2")</div> }</div>
                 </div>
                 <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">

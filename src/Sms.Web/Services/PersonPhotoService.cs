@@ -11,6 +11,36 @@ using Sms.Infrastructure.Persistence;
 
 namespace Sms.Web.Services
 {
+    /// <summary>Why a chosen file cannot be a person's photograph.</summary>
+    public enum PhotoRejection
+    {
+        /// <summary>The file is usable.</summary>
+        None = 0,
+
+        /// <summary>Nothing was chosen, or the chosen file was empty.</summary>
+        NoFile = 1,
+
+        /// <summary>Above <see cref="PersonPhotoService.MaxPhotoBytes"/>.</summary>
+        TooLarge = 2,
+
+        /// <summary>Neither a JPEG nor a PNG, as far as the name and the browser's content type say.</summary>
+        NotAnImage = 3,
+    }
+
+    /// <summary>
+    /// A refusal carrying its reason rather than its wording. The service has no language — the
+    /// screen that caught it says why in the reader's, which is the rule the product runs on and
+    /// the reason an English sentence must never be thrown from here to a page.
+    /// </summary>
+    public sealed class PhotoRejectedException : InvalidOperationException
+    {
+        public PhotoRejectedException(PhotoRejection rejection)
+            : base($"The chosen file cannot be used as a photograph ({rejection}).")
+            => Rejection = rejection;
+
+        public PhotoRejection Rejection { get; }
+    }
+
     /// <summary>
     /// The one photograph a person's file carries, for students and staff alike.
     /// <para>
@@ -48,6 +78,18 @@ namespace Sms.Web.Services
         public sealed record Stored(int AttachmentId, string ContentType);
 
         /// <summary>
+        /// Says whether a chosen file can be a photograph, without storing anything — so a screen
+        /// that creates a person *and* takes their picture can refuse the picture before it creates
+        /// the person, rather than leaving a half-made record behind a rejected upload.
+        /// </summary>
+        public static PhotoRejection Inspect(IFormFile? file)
+        {
+            if (file == null || file.Length == 0) { return PhotoRejection.NoFile; }
+            if (file.Length > MaxPhotoBytes) { return PhotoRejection.TooLarge; }
+            return FormatOf(file.FileName, file.ContentType) == null ? PhotoRejection.NotAnImage : PhotoRejection.None;
+        }
+
+        /// <summary>
         /// Reads the uploaded file, rejects anything that is not a JPEG or PNG within the size limit,
         /// and stores it as the person's photo slot. Returns the attachment id to point the person's
         /// row at.
@@ -56,18 +98,13 @@ namespace Sms.Web.Services
             IFormFile file, string owningEntityType, int owningEntityId, string moduleCode,
             CancellationToken cancellationToken = default)
         {
-            if (file == null || file.Length == 0)
+            var rejection = Inspect(file);
+            if (rejection != PhotoRejection.None)
             {
-                throw new InvalidOperationException("No file was chosen.");
+                throw new PhotoRejectedException(rejection);
             }
 
-            if (file.Length > MaxPhotoBytes)
-            {
-                throw new InvalidOperationException($"A photo must be {MaxPhotoBytes / (1024 * 1024)} MB or smaller.");
-            }
-
-            var format = FormatOf(file.FileName, file.ContentType)
-                ?? throw new InvalidOperationException("A photo must be a JPEG or a PNG.");
+            var format = FormatOf(file.FileName, file.ContentType)!.Value;
 
             var typeCode = owningEntityType == "Student" ? StudentPhotoType : EmployeePhotoType;
             await EnsureTypeAsync(typeCode, moduleCode, cancellationToken);

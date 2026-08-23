@@ -18,6 +18,7 @@ using Sms.Web.Models;
 using Sms.Application.Security;
 using Sms.Domain.Security;
 using Sms.Web.Security;
+using Sms.Web.Services;
 
 namespace Sms.Web.Controllers
 {
@@ -109,14 +110,39 @@ namespace Sms.Web.Controllers
         [HttpPost("new")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Create)]
-        public async Task<IActionResult> Register(StudentFormViewModel form)
+        public async Task<IActionResult> Register(StudentFormViewModel form, IFormFile? photo = null)
         {
             try
             {
                 RequireNames(form);
                 if (form.DateOfBirth == null || form.NationalityLookupId == null) throw new InvalidOperationException(T("Date of birth and nationality are required.", "تاريخ الميلاد والجنسية مطلوبان."));
+
+                // The photograph is judged before the student exists. A file that is going to be
+                // refused must not leave a registered student behind it — the registrar would have
+                // to find the half-made record and finish it from the file screen, and the second
+                // attempt at this form is how a child ends up in the register twice.
+                var rejection = photo == null ? PhotoRejection.None : PersonPhotoService.Inspect(photo);
+                if (rejection != PhotoRejection.None) throw new InvalidOperationException(Labels.PhotoRejection(rejection, IsArabic));
+
                 var student = await _students.RegisterStudentAsync(form.FirstNameAr!, form.FatherNameAr!, form.GrandfatherNameAr!, form.FamilyNameAr!, form.FirstNameEn!, form.FatherNameEn!, form.GrandfatherNameEn!, form.FamilyNameEn!,
                     form.Gender, form.DateOfBirth.Value, form.NationalityLookupId.Value, form.PrimaryIdTypeLookupId, string.IsNullOrWhiteSpace(form.PrimaryIdNo) ? null : form.PrimaryIdNo.Trim(), form.PrimaryIdExpiry);
+
+                if (photo != null)
+                {
+                    // Inspect() has already passed, so what is left is the document type's own
+                    // upload policy — a school may have tightened it. The student is registered
+                    // either way: undoing a numbered record because a JPEG was refused would cost
+                    // a student number that is never re-issued (BR-NUM-004).
+                    try
+                    {
+                        await AttachPhotoAsync(student.Id, photo);
+                    }
+                    catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException)
+                    {
+                        TempData["Error"] = T("The student was registered, but the photo was not accepted — add it from the file.", "تم تسجيل الطالب، لكن الصورة لم تُقبل — أضفها من ملف الطالب.");
+                    }
+                }
+
                 if (form.ParentId != null && form.RelationshipLookupId != null)
                 {
                     await _students.LinkGuardianAsync(student.Id, form.ParentId.Value, form.RelationshipLookupId.Value, true, true, true, true, _clock.UtcNow);
@@ -233,12 +259,9 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                var student = await _db.Students.SingleOrDefaultAsync(s => s.Id == id);
-                if (student == null) { return NotFound(); }
+                if (!await _db.Students.AnyAsync(s => s.Id == id, HttpContext.RequestAborted)) { return NotFound(); }
 
-                student.PhotoAttachmentId = await _photos.SaveAsync(
-                    photo!, "Student", id, ScreenCatalog.Modules.Students, HttpContext.RequestAborted);
-                await _db.SaveChangesAsync(HttpContext.RequestAborted);
+                await AttachPhotoAsync(id, photo!);
                 TempData["Flash"] = T("Photo updated.", "تم تحديث الصورة.");
             }
             // The policy exception is an InvalidOperationException, so it has to be caught first or
@@ -247,6 +270,9 @@ namespace Sms.Web.Controllers
             {
                 TempData["Error"] = T("That file is not an acceptable photo.", "هذا الملف ليس صورة مقبولة.");
             }
+            // Also an InvalidOperationException, and it carries a reason rather than a sentence —
+            // the wording is chosen here, in the reader's language, never thrown from the service.
+            catch (PhotoRejectedException ex) { TempData["Error"] = Labels.PhotoRejection(ex.Rejection, IsArabic); }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
 
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
@@ -266,6 +292,20 @@ namespace Sms.Web.Controllers
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
             TempData["Flash"] = T("Photo removed.", "تمت إزالة الصورة.");
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
+        }
+
+        /// <summary>
+        /// Stores the file as the student's photograph and points the record at it. Shared by the
+        /// registration screen and the file screen so both mean the same thing by "photo".
+        /// </summary>
+        private async Task AttachPhotoAsync(int studentId, IFormFile file)
+        {
+            var attachmentId = await _photos.SaveAsync(
+                file, "Student", studentId, ScreenCatalog.Modules.Students, HttpContext.RequestAborted);
+
+            var student = await _db.Students.SingleAsync(s => s.Id == studentId, HttpContext.RequestAborted);
+            student.PhotoAttachmentId = attachmentId;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
         }
 
         [HttpPost("{id:int}/status")]

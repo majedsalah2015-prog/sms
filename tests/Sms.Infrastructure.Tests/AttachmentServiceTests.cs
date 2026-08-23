@@ -160,6 +160,85 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(content, readBack);
         }
 
+        // --- storage layout: a folder per document type (BR-ATT-010) ---------
+        //
+        // The point of the folder is operational, not cosmetic: a school that wants its student
+        // photographs — to back them up, to hand them to an ID-card printer, to purge them on a
+        // retention date — should not have to work out which of ten thousand GUIDs are the faces.
+
+        [Fact]
+        [BusinessRule("BR-ATT-010")]
+        public async Task A_stored_file_lands_in_a_folder_named_for_its_document_type()
+        {
+            using var db = CreateContext();
+            var service = CreateService(db);
+
+            var version = await service.UploadAsync("STU-BIRTH-CERT", "Student", 601, Bytes("cert"), "cert.pdf", DocumentFormat.Pdf);
+
+            Assert.StartsWith("stu-birth-cert/", version.StorageReference, StringComparison.Ordinal);
+            Assert.True(File.Exists(Path.Combine(_storageRoot, "stu-birth-cert", Path.GetFileName(version.StorageReference))));
+
+            // Still opaque: the folder says what kind of file it is, the name never says whose.
+            Assert.DoesNotContain("601", version.StorageReference, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [BusinessRule("BR-ATT-010")]
+        public async Task Two_document_types_do_not_share_a_folder()
+        {
+            using var db = CreateContext();
+            var service = CreateService(db);
+
+            var cert = await service.UploadAsync("STU-BIRTH-CERT", "Student", 602, Bytes("cert"), "cert.pdf", DocumentFormat.Pdf);
+            var iqama = await service.UploadAsync("STU-IQAMA", "Student", 602, Bytes("iqama"), "iqama.pdf", DocumentFormat.Pdf,
+                expiryDateUtc: _clock.UtcNow.AddYears(1));
+
+            Assert.NotEqual(
+                Path.GetDirectoryName(cert.StorageReference),
+                Path.GetDirectoryName(iqama.StorageReference));
+        }
+
+        [Fact]
+        [BusinessRule("BR-ATT-010")]
+        public async Task A_file_stored_flat_before_folders_existed_still_reads_back()
+        {
+            // The references already in a live database have no folder in them. Foldering new
+            // uploads must not orphan them, which is the whole reason the reference is resolved
+            // against the root rather than re-derived from the type.
+            var legacyReference = await ((IFileStore)_fileStore).SaveAsync(Bytes("older file"), "old.pdf");
+
+            Assert.DoesNotContain('/', legacyReference);
+            Assert.Equal(Bytes("older file"), await _fileStore.ReadAsync(legacyReference));
+        }
+
+        [Theory]
+        [InlineData("../escape")]
+        [InlineData("..\\escape")]
+        [InlineData("/rooted")]
+        [InlineData("صور")]
+        [BusinessRule("BR-SEC-023")]
+        public async Task A_category_that_is_not_a_plain_name_never_becomes_one(string folder)
+        {
+            // A school defines its own document types and may code them in Arabic or with a
+            // separator in them. None of that may reach the file system: what survives sanitising
+            // is a plain name, or nothing at all and the file stores at the root.
+            var reference = await _fileStore.SaveAsync(Bytes("x"), "x.pdf", folder);
+
+            Assert.DoesNotContain("..", reference, StringComparison.Ordinal);
+            Assert.DoesNotContain('\\', reference);
+            Assert.False(reference.StartsWith('/'));
+            Assert.Equal(Bytes("x"), await _fileStore.ReadAsync(reference));
+            Assert.StartsWith(Path.GetFullPath(_storageRoot), Path.GetFullPath(Path.Combine(_storageRoot, reference)), StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-023")]
+        public async Task A_reference_pointing_outside_the_root_is_refused_rather_than_read()
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => _fileStore.ReadAsync("../" + Path.GetFileName(_storageRoot) + "-elsewhere/secret.pdf"));
+        }
+
         // --- versioning: re-upload on the same slot (doc 10 §2) --------------
 
         [Fact]

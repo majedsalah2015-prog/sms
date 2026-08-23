@@ -10,6 +10,20 @@ namespace Sms.Web.Models
     /// </summary>
     public static class Labels
     {
+        /// <summary>
+        /// Why an upload was refused as a photograph, said as a fact rather than as a rule
+        /// (BR-ATT-005 sets the limits; the person holding the file needs to know what to do next).
+        /// </summary>
+        public static string PhotoRejection(Sms.Web.Services.PhotoRejection r, bool arabic) => r switch
+        {
+            Services.PhotoRejection.NoFile => arabic ? "لم يتم اختيار ملف صورة." : "No photo file was chosen.",
+            Services.PhotoRejection.TooLarge => arabic
+                ? $"يجب ألا تتجاوز الصورة {Sms.Web.Services.PersonPhotoService.MaxPhotoBytes / (1024 * 1024)} ميغابايت."
+                : $"A photo must be {Sms.Web.Services.PersonPhotoService.MaxPhotoBytes / (1024 * 1024)} MB or smaller.",
+            Services.PhotoRejection.NotAnImage => arabic ? "يجب أن تكون الصورة بصيغة JPEG أو PNG." : "A photo must be a JPEG or a PNG.",
+            _ => arabic ? "تعذّر استخدام الملف كصورة." : "That file cannot be used as a photo.",
+        };
+
         public static string YearStatus(AcademicYearStatus s, bool arabic) => s switch
         {
             AcademicYearStatus.Preparation => arabic ? "إعداد" : "Preparation",

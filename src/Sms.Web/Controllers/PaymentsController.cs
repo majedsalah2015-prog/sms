@@ -39,14 +39,16 @@ namespace Sms.Web.Controllers
         private readonly IAuditContext _audit;
         private readonly ICurrentUser _user;
         private readonly IClock _clock;
+        private readonly IPermissionService _permissions;
 
-        public PaymentsController(IPaymentAdmin payments, AppDbContext db, IAuditContext audit, ICurrentUser user, IClock clock)
+        public PaymentsController(IPaymentAdmin payments, AppDbContext db, IAuditContext audit, ICurrentUser user, IClock clock, IPermissionService permissions)
         {
             _payments = payments;
             _db = db;
             _audit = audit;
             _user = user;
             _clock = clock;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -60,6 +62,13 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> Index(string? q = null, int? payerId = null, decimal? amount = null)
         {
             var m = new CashierViewModel { Q = q, PreviewAmount = amount };
+
+            // The face beside the name is what stops a cashier receipting the wrong sibling — but it
+            // is student-file data, and BR-STU-008 shows a photo per permission, not per screen. A
+            // cashier who may not open a student file sees the names only.
+            m.CanSeeStudentPhotos = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View, HttpContext.RequestAborted);
+
             m.OpenSessions = await _db.TillSessions.AsNoTracking().Where(s => s.Status == TillSessionStatus.Open).OrderBy(s => s.OpenedAtUtc).ToListAsync();
             m.MySession = m.OpenSessions.FirstOrDefault(s => s.CashierUserId == _user.UserId);
             if (!string.IsNullOrWhiteSpace(q))

@@ -289,6 +289,14 @@ namespace Sms.Web.Models
         public TillSession? MySession { get; set; }
 
         public IReadOnlyList<(Receipt Receipt, Parent? Payer)> RecentReceipts { get; set; } = Array.Empty<(Receipt, Parent?)>();
+
+        /// <summary>
+        /// BR-STU-008: a photograph is shown "per permission", and the cashier's screen is not the
+        /// place that grants it. False renders the children as names alone rather than as broken
+        /// image frames — the photo endpoint answers <c>NotFound</c> to a user without
+        /// <c>STU/File/View</c>, which is correct and would look like a fault here.
+        /// </summary>
+        public bool CanSeeStudentPhotos { get; set; }
     }
 
     public sealed class ReceiptViewModel
