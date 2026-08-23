@@ -9,6 +9,19 @@
     ViewData["Breadcrumb"] = T("Accounting / GL export / Batch", "المحاسبة / الترحيل إلى الأستاذ العام / دفعة");
     var voided = b.Status == GlExportBatchStatus.Voided;
     string Name(string code) => Model.AccountNames.TryGetValue(code, out var n) && !string.IsNullOrWhiteSpace(n) ? n : "—";
+    var help = new HelpPanelViewModel
+    {
+        Id = "gl-batch-help",
+        Title = T("GL export batch — help", "دفعة الترحيل إلى الأستاذ — مساعدة"),
+        Intro = T("One period's school transactions, translated into accounting journal lines and handed to the ledger. This is the seam between the school system and the accounting product — everything above it is fees and receipts, everything below it is debits and credits.", "معاملات المدرسة لفترة واحدة، مترجَمةً إلى سطور قيد محاسبي ومسلَّمةً إلى الأستاذ. وهذا هو الوصل بين نظام المدرسة والمنتج المحاسبي — فما فوقه رسوم وسندات، وما تحته مدين ودائن."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Debits must equal credits", "المدين يساوي الدائن"), T("A batch that does not balance is not a batch — the totals in the header are the first thing to read. An imbalance points at a GL mapping that is missing an account, not at arithmetic.", "الدفعة غير المتوازنة ليست دفعة — والإجماليات في الترويسة أول ما يُقرأ. وعدم التوازن يدل على تعيين حسابي ينقصه حساب لا على خطأ حسابي.")),
+            new HelpPanelViewModel.Item(T("The account mapping decides everything here", "التعيين الحسابي يقرّر كل شيء هنا"), T("Each line's account comes from the mapping table, not from the fee category directly. An unexpected account on a line is a mapping to fix — correcting it here would only correct one batch.", "حساب كل سطر يأتي من جدول التعيين لا من فئة الرسم مباشرة. فالحساب غير المتوقع على سطر تعيينٌ يُصحَّح — وتصحيحه هنا يصحّح دفعة واحدة فقط.")),
+            new HelpPanelViewModel.Item(T("Voiding does not unpost the ledger", "الإبطال لا يلغي الترحيل في الأستاذ"), T("Once a batch has been posted, its journal lives in the accounting product and is reversed there by an accounting entry. Voiding on this side marks the batch; it does not reach into the ledger and delete anything.", "متى رُحِّلت الدفعة صار قيدها في المنتج المحاسبي ويُعكس هناك بقيد محاسبي. والإبطال في هذه الجهة يوسم الدفعة؛ ولا يمتد إلى الأستاذ ليحذف شيئاً.")),
+            new HelpPanelViewModel.Item(T("CSV is for reconciliation, not for re-import", "ملف CSV للمطابقة لا لإعادة الاستيراد"), T("The download is the batch as it stands, for checking against the ledger or handing to an auditor. Posting happens through the bridge, never by importing this file somewhere.", "التنزيل هو الدفعة كما هي، للمطابقة مع الأستاذ أو لتسليمها لمدقق. والترحيل يتم عبر الجسر لا باستيراد هذا الملف في مكان ما.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -22,6 +35,7 @@
     <div class="d-flex gap-2">
         <a class="btn btn-outline-secondary btn-sm" asp-action="Csv" asp-route-id="@b.Id"><i class="bi bi-download me-1" aria-hidden="true"></i>CSV</a>
         <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back", "رجوع")</a>
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 <partial name="_GlExportNav" />

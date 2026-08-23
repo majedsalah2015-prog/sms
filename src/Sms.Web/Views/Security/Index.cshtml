@@ -5,6 +5,19 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Roles and permissions", "الأدوار والصلاحيات");
     ViewData["Breadcrumb"] = T("System administration / Roles", "إدارة النظام / الأدوار");
+    var help = new HelpPanelViewModel
+    {
+        Id = "roles-help",
+        Title = T("Roles and permissions — help", "الأدوار والصلاحيات — مساعدة"),
+        Intro = T("The whole access model of the product, in one table (doc/Modules/06 §8). A role is a named bundle of permissions; a person holds permissions only by holding a role. There is no per-person grant and no \"just this once\" exception — everything an account can do traces back to a role on this list.", "نموذج الوصول في المنتج كله، في جدول واحد (الوثيقة 06 §8). فالدور حزمة صلاحيات باسم، والشخص لا يملك صلاحية إلا بامتلاك دور. ولا يوجد منح فردي ولا استثناء «هذه المرة فقط» — فكل ما يستطيع الحساب فعله يعود إلى دور في هذه القائمة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Deny by default, and it disappears rather than refuses", "المنع افتراضي والشاشة تختفي لا ترفض"), T("A screen nobody granted answers 404, not \"access denied\" (BR-SEC-010), and its sidebar and launcher entries are not drawn at all. A user who cannot open the fee ledger should not learn from the menu that a fee ledger exists.", "الشاشة التي لم تُمنح لأحد تردّ 404 لا «ممنوع الوصول» (BR-SEC-010)، ولا تُرسَم مداخلها في القائمة الجانبية ولا في لوحة الإطلاق. فمن لا يستطيع فتح دفتر الرسوم لا ينبغي أن يعرف من القائمة أن دفتر رسوم موجود.")),
+            new HelpPanelViewModel.Item(T("Verbs are not interchangeable", "الأفعال ليست مترادفة"), T("View, Create, Edit, Deactivate, Post, Approve, Configure and Export mean fixed things. Deactivate covers every delete, void and cancel — this product has no Delete. Post is the one that moves money. Configure changes the system's own shape, which is why it is rarely the same people.", "«عرض» و«إنشاء» و«تعديل» و«إلغاء تفعيل» و«ترحيل» و«اعتماد» و«ضبط» و«تصدير» لها معانٍ ثابتة. و«إلغاء التفعيل» يغطي كل حذف وإبطال وإلغاء — فلا حذف في هذا المنتج. و«الترحيل» هو ما يحرّك المال. و«الضبط» يغيّر شكل النظام نفسه، ولذلك نادراً ما يكون لنفس الأشخاص.")),
+            new HelpPanelViewModel.Item(T("The key badge is the dangerous one", "وسم المفتاح هو الخطر"), T("A role marked \"can change permissions\" can grant itself anything, including that same power to another role. Treat it as the administrator role it is, keep the number of holders small, and remember that every grant change is audited.", "الدور الموسوم بـ«يعدّل الصلاحيات» يستطيع أن يمنح نفسه أي شيء، بما في ذلك المنح نفسه لدور آخر. فعامله كدور مدير النظام الذي هو عليه، وأبقِ حامليه قليلين، واذكر أن كل تغيير منح مدقَّق.")),
+            new HelpPanelViewModel.Item(T("Holders, and what changing a role does", "الحاملون وأثر تعديل الدور"), T("The holder count is how many accounts will feel an edit. Removing a permission from a role removes it from every holder at once, on their next request — there is no per-person override to soften it, which is the point of roles.", "عدد الحاملين هو عدد الحسابات التي ستشعر بالتعديل. وإزالة صلاحية من دور تزيلها عن كل حامليه دفعةً واحدة عند طلبهم التالي — ولا تجاوز فردي يخفف ذلك، وهذه هي غاية الأدوار.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -15,9 +28,12 @@
                "الدور مجموعة صلاحيات باسم، والشخص يحصل عليها بإسناد الدور إليه. لا شيء ممنوح افتراضياً — الشاشة بلا صلاحية تردّ 404 لا رسالة خطأ (BR-SEC-010).")
         </p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Users">
-        <i class="bi bi-people" aria-hidden="true"></i> @T("User assignments", "إسناد المستخدمين")
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Users">
+            <i class="bi bi-people" aria-hidden="true"></i> @T("User assignments", "إسناد المستخدمين")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 @if (TempData["Error"] is string error)

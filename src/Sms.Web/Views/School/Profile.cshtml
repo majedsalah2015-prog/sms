@@ -7,11 +7,28 @@
     ViewData["Breadcrumb"] = T("Schools / School profile", "المدارس / ملف المدرسة");
     var tabs = new (string Key, string En, string Ar)[] { ("identity", "Identity", "الهوية"), ("license", "License & Ministry", "الترخيص والوزارة"), ("contacts", "Contacts & Location", "التواصل والموقع"), ("branding", "Branding", "الهوية البصرية"), ("stages", "Stages offered", "المراحل المقدَّمة") };
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+    var help = new HelpPanelViewModel
+    {
+        Id = "school-profile-help",
+        Title = T("School profile — help", "ملف المدرسة — مساعدة"),
+        Intro = T("The school's own record (doc/Modules/02 §8). One school per deployment, so this screen is filled once and corrected rarely — but everything it holds is printed on official documents, which is why identity edits are audited and demand a reason.", "سجل المدرسة نفسها (الوثيقة 02 §8). مدرسة واحدة لكل تركيب، فتُملأ هذه الشاشة مرة وتُصحَّح نادراً — لكن ما تحمله يُطبع على المستندات الرسمية، ولذلك تُدقَّق تعديلات الهوية وتتطلب سبباً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Identity", "الهوية"), T("The Arabic and English official names are both required and are reproduced on certificates and letters exactly as typed (BR-SCH-001) — a trailing space or a spelling variant is what the ministry will read. Time zone and currency are shown disabled here because the Setup wizard owns them: currency in particular is what every stored amount means, so it is not a field to revise from a profile screen.", "الاسمان الرسميان بالعربية والإنجليزية كلاهما مطلوب، ويُنقلان إلى الشهادات والخطابات كما كُتبا تماماً (BR-SCH-001) — فمسافة زائدة أو اختلاف إملائي هو ما ستقرأه الوزارة. المنطقة الزمنية والعملة معطَّلتان هنا لأن معالج الإعداد يملكهما: والعملة تحديداً هي معنى كل مبلغ مخزَّن، فليست حقلاً يُراجَع من شاشة ملف.")),
+            new HelpPanelViewModel.Item(T("The reason field is not optional", "حقل السبب ليس اختيارياً"), T("Changing an identity field without a reason is refused (BR-SCH-002). The school is T1-audited: the old value, the new value and the reason are written in the same transaction as the change, and that record is what answers \"who renamed the school before the certificates were printed\" a year later.", "تغيير حقل هوية بلا سبب مرفوض (BR-SCH-002). والمدرسة مدقَّقة بمستوى T1: تُكتب القيمة القديمة والجديدة والسبب في المعاملة نفسها مع التغيير، وهذا السجل هو ما يجيب لاحقاً عن «من غيّر اسم المدرسة قبل طباعة الشهادات».")),
+            new HelpPanelViewModel.Item(T("License & Ministry", "الترخيص والوزارة"), T("License number, ministry code and expiry date. Nothing here blocks the system when it lapses — the product does not stop a school from teaching because a date passed — but these are the fields official documents and ministry exports quote, so an out-of-date expiry is a real reporting error.", "رقم الترخيص والرمز الوزاري وتاريخ الانتهاء. ولا شيء هنا يوقف النظام عند انتهائه — فالمنتج لا يمنع مدرسة من التدريس لأن تاريخاً مضى — لكن هذه هي الحقول التي تقتبسها المستندات الرسمية والتصدير الوزاري، فالتاريخ المنتهي خطأ تقريري حقيقي.")),
+            new HelpPanelViewModel.Item(T("Stages offered", "المراحل المقدَّمة"), T("A grade cannot be created outside a stage the school offers (BR-SCH-003). Today the list is read-only and every stage defined in Module 05 counts as offered; declaring a subset explicitly is a follow-up. Empty means the stage structure has not been entered yet — the Setup wizard's stage step is where it starts.", "لا يمكن إنشاء صف خارج مرحلة تقدّمها المدرسة (BR-SCH-003). واليوم القائمة للقراءة فقط وكل مرحلة معرَّفة في الوحدة 05 تُعدّ مقدَّمة؛ وتحديد مجموعة جزئية صراحةً عمل لاحق. والقائمة الفارغة تعني أن الهيكل الدراسي لم يُدخل بعد — وخطوة المراحل في معالج الإعداد هي البداية.")),
+            new HelpPanelViewModel.Item(T("What is not here yet", "ما لم يصل بعد"), T("Logo and seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) arrives with the attachment store screens in doc 10; templates render whatever branding is current at the moment a document is issued. The map pin picker behind latitude/longitude (BR-SCH-008) is also pending, which is why those two boxes are disabled rather than hidden.", "رفع الشعار والختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات مخزن المرفقات في الوثيقة 10؛ والقوالب تعرض الهوية البصرية السارية لحظة إصدار المستند. ومنتقي الخريطة خلف خطي العرض والطول (BR-SCH-008) لم يصل بعد، ولذلك الحقلان معطَّلان لا مخفيان.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@(Model.SchoolId == null ? T("New school", "مدرسة جديدة") : (isRtl ? Model.NameAr : Model.NameEn))</h1>
     <p class="text-muted mb-0">@T("Module 02 — identity fields appear on official documents exactly as entered (BR-SCH-001) and later edits require a reason (BR-SCH-002).", "الوحدة 02 — حقول الهوية تظهر في المستندات الرسمية كما أُدخلت (BR-SCH-001) والتعديلات اللاحقة تتطلب سبباً (BR-SCH-002).")</p></div>
-    @if (Model.Status != null) { <span class="badge @(Model.Status == Sms.Domain.Schools.SchoolStatus.Active ? "text-bg-success" : "text-bg-secondary")">@Model.Status</span> }
+    <div class="d-flex align-items-center gap-2">
+        @if (Model.Status != null) { <span class="badge @(Model.Status == Sms.Domain.Schools.SchoolStatus.Active ? "text-bg-success" : "text-bg-secondary")">@Model.Status</span> }
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 <partial name="_SchoolNav" />
 

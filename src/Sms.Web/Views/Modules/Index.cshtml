@@ -7,6 +7,18 @@
     ViewData["Title"] = title;
     ViewData["Breadcrumb"] = (isRtl ? "الوحدات" : "Modules") + " / " + title;
     string T(string en, string ar) => isRtl ? ar : en;
+    var help = new HelpPanelViewModel
+    {
+        Id = "module-overview-help",
+        Title = T("Module overview — help", "نظرة عامة على الوحدة — مساعدة"),
+        Intro = T("A landing page for one of the product's numbered modules: what it is for, and the screens inside it you are allowed to open.", "صفحة وصول لإحدى وحدات المنتج المرقّمة: ما غايتها، والشاشات التي بداخلها ويُسمح لك بفتحها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The module number is not decoration", "رقم الوحدة ليس زينة"), T("It is the same number the specification uses. Module 17 on this page is doc/Modules/17 in the documentation and BR-GRA-### in the business rules, so a question about a rule can be taken straight to the right document.", "هو الرقم نفسه الذي تستخدمه المواصفة. فالوحدة 17 في هذه الصفحة هي doc/Modules/17 في التوثيق و BR-GRA-### في قواعد العمل، فيمكن أخذ السؤال عن قاعدة إلى الوثيقة الصحيحة مباشرة.")),
+            new HelpPanelViewModel.Item(T("A short list is not a broken page", "القائمة القصيرة ليست صفحة معطوبة"), T("Screens you have no permission for are not listed — the product hides what you cannot open rather than showing it and refusing (BR-SEC-010). If a colleague sees more entries here than you do, that is a role difference, not a fault.", "الشاشات التي لا تملك صلاحيتها لا تُدرَج — فالمنتج يخفي ما لا تستطيع فتحه بدل عرضه ثم رفضه (BR-SEC-010). فإن رأى زميل مداخل أكثر مما ترى فذلك فرق أدوار لا خلل.")),
+            new HelpPanelViewModel.Item(T("Where to go instead", "إلى أين تذهب بدلاً من ذلك"), T("The sidebar reaches the same screens, and the launcher groups them by department — by what a person came to do — rather than by module number. This page is the view from the specification's side.", "القائمة الجانبية تصل إلى الشاشات نفسها، ولوحة الإطلاق تجمعها بالأقسام — بما جاء الشخص ليفعله — لا برقم الوحدة. وهذه الصفحة هي المنظور من جهة المواصفة.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -17,6 +29,7 @@
             <h1 class="sms-page-title mb-0">@title</h1>
         </div>
     </div>
+    <partial name="_HelpModal" model="help" />
 </div>
 
 <div class="row g-3">

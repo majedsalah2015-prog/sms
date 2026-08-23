@@ -5,8 +5,22 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Register student", "تسجيل طالب");
     ViewData["Breadcrumb"] = T("Students / Register", "الطلاب / تسجيل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "student-register-help",
+        Title = T("Register student — help", "تسجيل طالب — مساعدة"),
+        Intro = T("The direct route into the student register (doc/Modules/08 §8) — for a transfer-in, or for loading the school's existing students when the system goes live. An applicant who came through admissions should not be registered here; the admissions pipeline creates the student itself on acceptance, and doing both makes two records for one child.", "الطريق المباشر إلى سجل الطلاب (الوثيقة 08 §8) — للطالب المنقول، أو لتحميل طلاب المدرسة الحاليين عند بدء التشغيل. أما المتقدم عبر القبول فلا يُسجَّل هنا؛ فمسار القبول ينشئ الطالب نفسه عند الموافقة، وفعل الاثنين يصنع سجلين لطفل واحد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Four name parts, in both languages", "أربعة أجزاء للاسم بكلتا اللغتين"), T("First, father, grandfather and family, Arabic and English, all required. They are printed on certificates and matched against ministry records, so this is the one place where entering the name casually costs the most later — a missing grandfather name is a re-issued certificate.", "الأول والأب والجد والعائلة، بالعربية والإنجليزية، وكلها مطلوبة. وتُطبع على الشهادات وتُطابق بسجلات الوزارة، فهذا هو الموضع الذي يكلّف فيه إدخال الاسم باستعجال أكثر ما يكلّف لاحقاً — فاسم جدٍّ ناقص يعني شهادة معادة الإصدار.")),
+            new HelpPanelViewModel.Item(T("The student number is issued, not typed", "رقم الطالب يُصدَر لا يُكتب"), T("It comes from the numbering series configured for students and materialises with the record it belongs to. You do not choose it, and it does not change afterwards.", "يأتي من سلسلة الترقيم المضبوطة للطلاب ويتجسّد مع السجل الذي يخصّه. فأنت لا تختاره، ولا يتغيّر بعد ذلك.")),
+            new HelpPanelViewModel.Item(T("Registering is not enrolling", "التسجيل ليس إلحاقاً"), T("This creates the student and their file. Placing them in a grade and a section for a given academic year is a separate step — a student can exist without a current enrolment, which is exactly what a transfer-out or a gap year looks like.", "هذا ينشئ الطالب وملفه. أما وضعه في صف وشعبة لعام دراسي محدد فخطوة منفصلة — فقد يوجد طالب بلا التحاق حالي، وهذا بالضبط ما يبدو عليه المنقول أو المنقطع لعام.")),
+            new HelpPanelViewModel.Item(T("Dates of birth are Gregorian", "تواريخ الميلاد ميلادية"), T("Entered and stored Gregorian in both interface languages. If the family gives a Hijri date, convert it before entering rather than typing the Hijri numbers into a Gregorian field — age-based rules read this value directly.", "تُدخل وتُخزَّن ميلادية في لغتي الواجهة. فإن أعطت الأسرة تاريخاً هجرياً فحوّله قبل الإدخال بدل كتابة أرقام هجرية في حقل ميلادي — فالقواعد المبنية على العمر تقرأ هذه القيمة مباشرة.")),
+        },
+    };
 }
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Direct registration (transfer-in / opening data). Admissions applicants register through the pipeline instead.", "تسجيل مباشر (منقول / بيانات افتتاح). متقدمو القبول يُسجَّلون عبر المسار.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Direct registration (transfer-in / opening data). Admissions applicants register through the pipeline instead.", "تسجيل مباشر (منقول / بيانات افتتاح). متقدمو القبول يُسجَّلون عبر المسار.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <form method="post" asp-action="Register">
     <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
     <p class="form-text">@T("Fields marked * are required.", "الحقول المعلّمة بـ * إلزامية.")</p>

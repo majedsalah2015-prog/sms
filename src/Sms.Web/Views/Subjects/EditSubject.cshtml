@@ -6,9 +6,22 @@
     ViewData["Title"] = T("Edit subject", "تعديل المادة") + " — " + Model.Code;
     ViewData["Breadcrumb"] = T("Subjects / Edit", "المواد الدراسية / تعديل");
     ViewData["SubjectsTab"] = "catalog";
+    var help = new HelpPanelViewModel
+    {
+        Id = "subject-edit-help",
+        Title = T("Edit subject — help", "تعديل المادة — مساعدة"),
+        Intro = T("One entry in the subject catalogue (doc/Modules/13 §8). The catalogue says what subjects exist; which grades study them and for how many periods is the study plan's job, and who may teach them is the teaching matrix's.", "مدخل واحد في دليل المواد (الوثيقة 13 §8). فالدليل يقول ما المواد الموجودة؛ أما أي الصفوف تدرسها وبكم حصة فعمل خطة الدراسة، ومن يجوز له تدريسها فعمل مصفوفة التدريس."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The code is unique per school", "الرمز فريد على مستوى المدرسة"), T("Enforced on save (BR-SUB-001). Changing it carries through to every study plan and matrix entry pointing at this subject rather than orphaning them — the references are by identity, not by text.", "يُفرض عند الحفظ (BR-SUB-001). وتغييره يسري إلى كل خطة دراسة ومدخل مصفوفة يشير إلى هذه المادة بدل تيتيمها — فالإشارات بالهوية لا بالنص.")),
+            new HelpPanelViewModel.Item(T("Retiring a subject does not erase it", "تقاعد المادة لا يمحوها"), T("A deactivated subject stops appearing in pickers but stays readable wherever it was already used — last year's marks and certificates keep naming it. That is deliberate, and it is why there is no delete.", "المادة المُلغى تفعيلها تتوقف عن الظهور في المنتقيات وتبقى مقروءة حيثما استُخدمت — فدرجات العام الماضي وشهاداته تظل تسمّيها. وهذا مقصود، وهو سبب غياب الحذف.")),
+            new HelpPanelViewModel.Item(T("Both names travel to certificates", "الاسمان يذهبان إلى الشهادات"), T("Arabic and English are both required (BR-GLB-001) because report cards and transcripts are issued in either language. A subject named in one is blank on half the documents the school prints.", "العربي والإنجليزي كلاهما مطلوب (BR-GLB-001) لأن بطاقات النتائج وكشوف الدرجات تصدر بأي من اللغتين. والمادة المسمّاة بواحدة فارغة في نصف ما تطبعه المدرسة.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Code is unique per school (BR-SUB-001). Changing the code/name updates every plan and matrix entry that references the subject.", "الرمز فريد على مستوى المدرسة (BR-SUB-001). تغيير الرمز/الاسم ينعكس على كل خطة ومصفوفة تشير إلى المادة.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Code is unique per school (BR-SUB-001). Changing the code/name updates every plan and matrix entry that references the subject.", "الرمز فريد على مستوى المدرسة (BR-SUB-001). تغيير الرمز/الاسم ينعكس على كل خطة ومصفوفة تشير إلى المادة.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_SubjectsNav" />
 
 <div class="sms-card p-4" style="max-width:640px">

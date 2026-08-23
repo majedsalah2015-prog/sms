@@ -5,9 +5,25 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Verification", "التحقق");
+    var help = new HelpPanelViewModel
+    {
+        Id = "twofactor-help",
+        Title = T("Two-factor verification — help", "التحقق بخطوتين — مساعدة"),
+        ButtonLabel = T("Code not working?", "الرمز لا يعمل؟"),
+        Intro = T("Your password was accepted; this is the second factor (BR-SEC-003). No session exists yet — until a valid code is entered, the sign-in is still incomplete.", "قُبلت كلمة مرورك؛ وهذه هي الخطوة الثانية (BR-SEC-003). ولا توجد جلسة بعد — فحتى يُدخل رمز صحيح يبقى الدخول غير مكتمل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The code is time-based", "الرمز مرتبط بالوقت"), T("It changes every 30 seconds and only the current one is accepted. A code that was correct a minute ago is not — wait for the next one rather than retyping the old.", "يتغيّر كل 30 ثانية ولا يُقبل إلا الحالي. والرمز الذي كان صحيحاً قبل دقيقة ليس كذلك الآن — فانتظر التالي بدل إعادة كتابة القديم.")),
+            new HelpPanelViewModel.Item(T("A clock that drifts breaks every code", "الساعة المنحرفة تُفسد كل رمز"), T("If the device generating the codes has the wrong time, every code it produces will be rejected. Turning on automatic time on that device fixes what looks like a broken account.", "إن كان الجهاز المولِّد للرموز على وقت خاطئ رُفض كل رمز ينتجه. وتشغيل الوقت التلقائي على ذلك الجهاز يُصلح ما يبدو حساباً معطوباً.")),
+            new HelpPanelViewModel.Item(T("A lost device needs an administrator", "الجهاز المفقود يحتاج مسؤولاً"), T("Re-enrolling issues a fresh secret and the old device stops working immediately. It is done from the user administration screens by someone who holds that permission — there is no bypass here.", "إعادة التسجيل تُصدر سرّاً جديداً ويتوقف الجهاز القديم فوراً. وتتم من شاشات إدارة المستخدمين بيد من يملك تلك الصلاحية — ولا تجاوز من هنا.")),
+        },
+    };
 }
 
-<h2 class="sms-auth__title">@T("Two-factor verification", "التحقق بخطوتين")</h2>
+<div class="d-flex align-items-start justify-content-between gap-2">
+    <h2 class="sms-auth__title mb-0">@T("Two-factor verification", "التحقق بخطوتين")</h2>
+    <partial name="_HelpModal" model="help" />
+</div>
 <p class="text-muted small">@T("Enter the 6-digit code from your authenticator app.", "أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة.")</p>
 
 <form asp-action="TwoFactor" method="post" novalidate>

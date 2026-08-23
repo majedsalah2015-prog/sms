@@ -9,13 +9,27 @@
     ViewData["Title"] = T("Edit ", "تعديل ") + kindLabel + " — " + (isRtl ? Model.NameAr : Model.NameEn);
     ViewData["Breadcrumb"] = T("Classrooms / Edit", "القاعات / تعديل");
     var action = Model.Kind switch { "building" => "EditBuilding", "floor" => "EditFloor", _ => "EditRoom" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "room-edit-help",
+        Title = T("Edit — help", "تعديل — مساعدة"),
+        Intro = T("One node of the building → floor → room tree (doc/Modules/12 §8). The same form edits all three; which fields appear depends on what you opened.", "عقدة واحدة من شجرة مبنى ← طابق ← قاعة (الوثيقة 12 §8). والنموذج نفسه يعدّل الثلاثة؛ والحقول الظاهرة تتبع ما فتحته."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Room codes are unique per school", "رموز القاعات فريدة على مستوى المدرسة"), T("Not per floor or per building (BR-ROM-001) — the code is what people say out loud and write on a timetable, and two rooms sharing one is exactly the confusion the rule prevents.", "لا لكل طابق ولا لكل مبنى (BR-ROM-001) — فالرمز هو ما ينطق به الناس ويكتبونه في الجدول، وتشارك قاعتين فيه هو بالضبط اللبس الذي تمنعه القاعدة.")),
+            new HelpPanelViewModel.Item(T("Exam capacity is not the same seat count", "سعة الاختبار ليست العدد نفسه"), T("It must be less than or equal to the standard capacity (BR-ROM-002), because exam seating spaces students out. Setting them equal is allowed but usually means the exam figure has not been thought about.", "يجب أن تكون أقل من أو تساوي السعة العادية (BR-ROM-002)، لأن جلوس الاختبارات يباعد بين الطلاب. وتساويهما مسموح لكنه يعني عادةً أن رقم الاختبار لم يُفكَّر فيه.")),
+            new HelpPanelViewModel.Item(T("Moving a floor moves its rooms", "نقل الطابق ينقل قاعاته"), T("Re-parenting a floor to another building takes everything on it along. The room codes do not change — they were never scoped to the building in the first place.", "إعادة إسناد طابق إلى مبنى آخر تأخذ كل ما عليه معه. ورموز القاعات لا تتغير — فهي لم تكن مرتبطة بالمبنى أصلاً.")),
+            new HelpPanelViewModel.Item(T("The wing tag limits who can use the room", "وسم الجناح يحدّد من يستخدم القاعة"), T("A boys-wing room cannot be the home room of a girls section (BR-ROM-003). Changing the tag on a room already in use is refused rather than silently breaking the section that depends on it.", "قاعة جناح البنين لا تصلح قاعةً أساسية لشعبة بنات (BR-ROM-003). وتغيير الوسم على قاعة قيد الاستخدام يُرفض بدل كسر الشعبة المعتمدة عليها بصمت.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">
     @if (Model.Kind == "room") { @T("Room code is unique per school (BR-ROM-001); exam capacity ≤ standard capacity (BR-ROM-002).", "رمز القاعة فريد على مستوى المدرسة (BR-ROM-001)؛ سعة الاختبار ≤ السعة العادية (BR-ROM-002).") }
     else if (Model.Kind == "floor") { @T("Floor names/order and the building it belongs to.", "أسماء الطابق وترتيبه والمبنى الذي يتبعه.") }
     else { @T("Building names.", "أسماء المبنى.") }
-</p></div></div>
+</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:680px">
     <form method="post" asp-action="@action" asp-route-id="@Model.Id" novalidate>

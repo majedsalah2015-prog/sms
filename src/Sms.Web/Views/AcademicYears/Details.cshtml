@@ -11,11 +11,26 @@
     string Left(DateTime d) => ((d - y.StartDate).TotalDays / total * 100).ToString("0.##", CultureInfo.InvariantCulture);
     string Width(DateTime s, DateTime e) => (Math.Max(0.5, (e - s).TotalDays / total * 100)).ToString("0.##", CultureInfo.InvariantCulture);
     var colors = new[] { "#2563eb", "#7c3aed", "#0ea5e9", "#16a34a" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "year-details-help",
+        Title = T("Year structure — help", "هيكل العام — مساعدة"),
+        Intro = T("One year's semester and term structure, drawn to scale (doc/Modules/03 §9, BR-AYR-007). The bar is the year; the blocks on it are what the school actually divides that year into, and what every marksheet, report card and fee schedule will later be organised around.", "هيكل الفصول والفترات لعام واحد مرسوماً بالمقياس (الوثيقة 03 §9، BR-AYR-007). فالشريط هو العام، والكتل عليه هي ما تقسّم المدرسة به ذلك العام فعلاً، وما ستُنظَّم حوله لاحقاً كل كشوف الدرجات وبطاقات النتائج وجداول الرسوم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Terms nest in semesters, semesters in the year", "الفترات داخل الفصول والفصول داخل العام"), T("The hierarchy is strict and enforced on save (BR-AYR-007): a term cannot start before its semester or end after it, and no semester can fall outside the year's own dates. The timeline is the quickest way to see a gap or an overlap you did not intend.", "التسلسل صارم ويُفرض عند الحفظ (BR-AYR-007): لا تبدأ الفترة قبل فصلها ولا تنتهي بعده، ولا يقع فصل خارج تواريخ العام نفسه. والخط الزمني أسرع وسيلة لرؤية فجوة أو تداخل لم تقصده.")),
+            new HelpPanelViewModel.Item(T("Structure is per year, not per school", "الهيكل لكل عام لا لكل مدرسة"), T("Each year carries its own semesters and terms. A school that moves from two semesters to three trimesters changes the new year and leaves last year's records described exactly as they were taught — which is why nothing here is a school-level setting.", "كل عام يحمل فصوله وفتراته. والمدرسة التي تنتقل من فصلين إلى ثلاثة تغيّر العام الجديد وتترك سجلات العام الماضي موصوفة تماماً كما دُرِّست — ولهذا لا شيء هنا إعداد على مستوى المدرسة.")),
+            new HelpPanelViewModel.Item(T("Gregorian dates, Hijri label", "تواريخ ميلادية ووسم هجري"), T("The dates on the bar are Gregorian in both languages; the Hijri label beside the year's name is a display convenience. Changing the interface language never changes which calendar the data is stored in.", "التواريخ على الشريط ميلادية في اللغتين؛ والوسم الهجري بجانب اسم العام تسهيل عرضي. وتغيير لغة الواجهة لا يغيّر أبداً التقويم المخزَّنة به البيانات.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><div class="text-muted small">@T("Academic year", "العام الدراسي") · @Labels.YearStatus(y.Status, isRtl)</div><h1 class="sms-page-title">@label <span class="text-muted fs-6">@y.HijriLabel</span></h1>
     <p class="text-muted mb-0"><bdi>@y.StartDate.ToString("yyyy-MM-dd") → @y.EndDate.ToString("yyyy-MM-dd")</bdi> · @T("Semester/term structure is per year (BR-AYR-007); terms nest in semesters, semesters in the year (§9).", "هيكل الفصول/الفترات لكل عام (BR-AYR-007)؛ الفترات داخل الفصول والفصول داخل العام (§9).")</p></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Board", "اللوحة")</a></div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Board", "اللوحة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 
 <div class="sms-card p-4 mb-3">
     <h2 class="h6 text-muted">@T("Timeline", "الخط الزمني")</h2>

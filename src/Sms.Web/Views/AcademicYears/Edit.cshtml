@@ -6,9 +6,22 @@
     var label = Model.Year == null ? string.Empty : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn);
     ViewData["Title"] = T("Edit academic year", "تعديل العام الدراسي") + " — " + label;
     ViewData["Breadcrumb"] = T("Academic Years / Edit", "الأعوام الدراسية / تعديل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "year-edit-help",
+        Title = T("Edit academic year — help", "تعديل العام الدراسي — مساعدة"),
+        Intro = T("Two different things live on this form (doc/Modules/03 §8). The labels are cosmetic and always editable; the dates are structural and lock the moment the year has students in it.", "على هذا النموذج شيئان مختلفان (الوثيقة 03 §8). فالتسميات شكلية وقابلة للتعديل دائماً؛ أما التواريخ فبنيوية وتُقفل لحظة وجود طلاب في العام."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Why the dates lock", "لماذا تُقفل التواريخ"), T("Once a student is enrolled, the year's span is the frame every attendance day, mark and fee instalment already sits inside. Moving it would silently reinterpret records that were entered correctly, so the fields are disabled rather than validated after the fact.", "بمجرد تسجيل طالب تصبح مدة العام هي الإطار الذي تقع داخله كل أيام الحضور والدرجات وأقساط الرسوم المسجَّلة. وتحريكها يعيد تفسير سجلات أُدخلت صحيحة دون أن يشعر أحد، ولذلك تُعطَّل الحقول بدل التحقق بعد وقوع الفعل.")),
+            new HelpPanelViewModel.Item(T("While they are still open", "ما دامت مفتوحة"), T("The same rules as defining a year apply — 6 to 14 months, no overlap with another year (BR-AYR-001) — plus one more: every semester and term already defined must still fit inside the new span (BR-AYR-007). Shrink the year past a term and the save is refused, with the term named.", "تنطبق قواعد التعريف نفسها — من 6 إلى 14 شهراً وبلا تداخل مع عام آخر (BR-AYR-001) — وقاعدة إضافية: يجب أن يبقى كل فصل وفترة معرَّفَين داخل المدة الجديدة (BR-AYR-007). فإن قلّصت العام إلى ما دون فترة رُفض الحفظ مع تسمية الفترة.")),
+            new HelpPanelViewModel.Item(T("Labels are always correctable", "التسميات قابلة للتصحيح دائماً"), T("A misspelt year name can be fixed at any point in the year's life, including after it is closed — the label is what people read, not what anything is keyed on. Clear both and they regenerate from the dates.", "الاسم الخاطئ للعام يُصحَّح في أي وقت من عمر العام، حتى بعد إغلاقه — فالتسمية هي ما يقرؤه الناس لا ما يُبنى عليه شيء. وإن أفرغتهما معاً أُعيد توليدهما من التواريخ.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Labels can always be corrected. Dates can be changed only while no student is enrolled, and then keep the 6–14 month span and no-overlap rules (BR-AYR-001), with existing semesters staying inside them (BR-AYR-007). Labels are regenerated from the dates when left blank.", "التسميات قابلة للتصحيح دائماً. أما التواريخ فلا تتغيّر إلا ما دام لا يوجد طلاب مسجلون، وتخضع حينها لقاعدة 6–14 شهراً وعدم التداخل (BR-AYR-001)، مع بقاء الفصول الحالية داخلها (BR-AYR-007). وتُولَّد التسميات من التواريخ إن تُركت فارغة.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Labels can always be corrected. Dates can be changed only while no student is enrolled, and then keep the 6–14 month span and no-overlap rules (BR-AYR-001), with existing semesters staying inside them (BR-AYR-007). Labels are regenerated from the dates when left blank.", "التسميات قابلة للتصحيح دائماً. أما التواريخ فلا تتغيّر إلا ما دام لا يوجد طلاب مسجلون، وتخضع حينها لقاعدة 6–14 شهراً وعدم التداخل (BR-AYR-001)، مع بقاء الفصول الحالية داخلها (BR-AYR-007). وتُولَّد التسميات من التواريخ إن تُركت فارغة.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:760px">
     <form method="post" asp-action="Edit" asp-route-id="@Model.YearId" novalidate>

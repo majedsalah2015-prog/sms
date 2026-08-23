@@ -6,6 +6,19 @@
     var r = Model.Receipt;
     ViewData["Title"] = T("Receipt", "سند قبض") + " · " + r.ReceiptNo;
     ViewData["Breadcrumb"] = T("Payments / Cashier / Receipt", "المدفوعات / الصندوق / سند");
+    var help = new HelpPanelViewModel
+    {
+        Id = "receipt-help",
+        Title = T("Receipt — help", "سند القبض — مساعدة"),
+        Intro = T("Proof that money was taken, and the record of what it paid for (doc/Modules/20 §8). The number and the allocation below it were both created in the same transaction as the payment — neither can exist without the other.", "إثبات أن مالاً قُبض، وسجل ما سُدِّد به (الوثيقة 20 §8). فالرقم والتخصيص تحته أُنشئا في المعاملة نفسها مع الدفعة — ولا يوجد أحدهما بلا الآخر."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Allocation is oldest-first, automatically", "التخصيص للأقدم أولاً تلقائياً"), T("The payment is applied to the oldest outstanding charges until it runs out. That is deliberate: it keeps the ageing of a family's balance honest instead of letting a payment be aimed at whichever invoice is most convenient.", "تُطبَّق الدفعة على أقدم الرسوم المستحقة حتى تنفد. وهذا مقصود: فهو يبقي تقادم رصيد الأسرة صادقاً بدل توجيه الدفعة إلى الفاتورة الأنسب.")),
+            new HelpPanelViewModel.Item(T("The RCP number is issued, never chosen", "رقم السند يُصدَر ولا يُختار"), T("It comes from the receipt numbering series and materialises with the receipt it stamps. There are no gaps to fill and no number to reserve in advance.", "يأتي من سلسلة ترقيم السندات ويتجسّد مع السند الذي يختمه. فلا فجوات تُملأ ولا رقم يُحجز مسبقاً.")),
+            new HelpPanelViewModel.Item(T("Correcting a receipt means reversing it", "تصحيح السند إبطاله"), T("A receipt is never edited. It is reversed, which unwinds its allocation, and a correct one is taken — both stay in the record. Money that moved leaves a trail in this product by design.", "السند لا يُعدَّل أبداً. بل يُعكس فيُفكّ تخصيصه، ويُقبض سند صحيح — ويبقى كلاهما في السجل. فالمال الذي تحرك يترك أثراً في هذا المنتج بالتصميم.")),
+            new HelpPanelViewModel.Item(T("Print gives the payer's copy", "الطباعة تعطي نسخة الدافع"), T("The print view is the receipt alone, without the navigation around it. Amounts stay in Latin digits and right-aligned in both languages.", "عرض الطباعة هو السند وحده بلا عناصر التنقل حوله. وتبقى المبالغ بأرقام لاتينية ومحاذاة يمين في اللغتين.")),
+        },
+    };
 }
 <style>
     .rc-sheet { background: #fff; color: #111; max-width: 720px; margin: 0 auto; padding: 1.5rem 2rem; border: 1px solid #ddd; }
@@ -20,6 +33,7 @@
         <a class="btn btn-outline-success btn-sm" asp-action="Index" asp-route-payerId="@r.PayerId"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Another payment", "دفعة أخرى")</a>
         <a class="btn btn-outline-secondary btn-sm" asp-controller="Fees" asp-action="Position" asp-route-payerId="@r.PayerId"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Statement", "كشف الحساب")</a>
         <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Cashier", "الصندوق")</a>
+        <partial name="_HelpModal" model="help" />
     </div></div>
 <partial name="_FinanceNav" />
 

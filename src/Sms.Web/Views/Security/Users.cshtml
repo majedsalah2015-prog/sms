@@ -5,6 +5,19 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("User role assignments", "إسناد الأدوار للمستخدمين");
     ViewData["Breadcrumb"] = T("System administration / User roles", "إدارة النظام / أدوار المستخدمين");
+    var help = new HelpPanelViewModel
+    {
+        Id = "user-roles-help",
+        Title = T("User role assignments — help", "إسناد الأدوار للمستخدمين — مساعدة"),
+        Intro = T("Which person holds which role (doc/Modules/06 §8). This screen is the only route by which a permission reaches a human being: roles are defined next door, and here they are handed out.", "من يحمل أي دور (الوثيقة 06 §8). وهذه الشاشة هي الطريق الوحيد الذي تصل به صلاحية إلى إنسان: فالأدوار تُعرَّف في الشاشة المجاورة، وهنا تُوزَّع."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("An account with no role reaches nothing", "الحساب بلا دور لا يصل إلى شيء"), T("It can sign in successfully and then find every screen answering 404. That is working as designed, not a broken account — but it is also the single most common \"the system is broken\" report after a new hire starts, so check here first.", "يستطيع الدخول بنجاح ثم يجد كل شاشة تردّ 404. وهذا عمل صحيح لا حساب معطوب — لكنه أيضاً أكثر بلاغات «النظام لا يعمل» شيوعاً بعد التحاق موظف جديد، فابدأ التحقق من هنا.")),
+            new HelpPanelViewModel.Item(T("Roles add up", "الأدوار تتراكم"), T("Holding two roles gives the union of their permissions, never the intersection. There is no deny that overrides a grant, so a narrow role cannot be used to take something away — remove the wider role instead.", "حمل دورين يمنح اتحاد صلاحياتهما لا تقاطعهما. ولا يوجد منع يتغلب على منح، فلا يمكن استخدام دور ضيّق لسحب شيء — بل احذف الدور الأوسع.")),
+            new HelpPanelViewModel.Item(T("Changes land on the next request", "التغييرات تسري في الطلب التالي"), T("Assigning or removing a role does not wait for the person to sign out. Their next page load is evaluated against the new set — which matters most when you are removing access from someone who is currently signed in.", "إسناد دور أو نزعه لا ينتظر خروج الشخص. فتحميل صفحته التالي يُقيَّم بالمجموعة الجديدة — وهذا أهم ما يكون حين تنزع وصولاً عن شخص متصل الآن.")),
+            new HelpPanelViewModel.Item(T("Staff and portal accounts are different animals", "حسابات الموظفين والبوابة نوعان مختلفان"), T("Parent and student accounts live in the portal and are redirected there; staff URLs answer 404 for them by design (BR-SEC-010). Do not try to fix a parent's access by granting them a staff role — the account type, not the role, is what routes them.", "حسابات أولياء الأمور والطلاب في البوابة ويُحوَّلون إليها؛ وروابط الموظفين تردّ لهم 404 بالتصميم (BR-SEC-010). فلا تحاول إصلاح وصول ولي أمر بمنحه دور موظف — فنوع الحساب لا الدور هو ما يوجّهه.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -15,9 +28,12 @@
                "الصلاحيات تصل الشخص عبر الدور فقط. الحساب بلا دور يستطيع الدخول ولا يصل إلى شيء.")
         </p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Index">
-        <i class="bi bi-shield-lock" aria-hidden="true"></i> @T("Roles", "الأدوار")
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index">
+            <i class="bi bi-shield-lock" aria-hidden="true"></i> @T("Roles", "الأدوار")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 @if (TempData["Error"] is string error)

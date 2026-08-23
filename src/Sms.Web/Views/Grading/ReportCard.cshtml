@@ -9,6 +9,19 @@
     ViewData["GradingYear"] = Model.Year.Id;
     var nameAr = $"{s.FirstNameAr} {s.FatherNameAr} {s.GrandfatherNameAr} {s.FamilyNameAr}";
     var nameEn = $"{s.FirstNameEn} {s.FatherNameEn} {s.GrandfatherNameEn} {s.FamilyNameEn}";
+    var help = new HelpPanelViewModel
+    {
+        Id = "report-card-help",
+        Title = T("Report card — help", "بطاقة التقرير — مساعدة"),
+        Intro = T("One student's term result as the school issues it (doc/Modules/17 §8). Every number on it is calculated from the term's blueprints and the marks entered against them — nothing here is typed directly onto the card.", "نتيجة فصل لطالب واحد كما تصدرها المدرسة (الوثيقة 17 §8). وكل رقم عليها محسوب من مخططات الفصل والدرجات المُدخلة عليها — فلا شيء هنا يُكتب على البطاقة مباشرة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A subject's mark comes from its blueprint", "درجة المادة تأتي من مخططها"), T("Components and their weights total 100 (BR-GRA-003), and the subject total is their weighted sum. A mark that looks wrong is traced back through the marksheet to the blueprint, not corrected on the card.", "المكوّنات وأوزانها مجموعها 100 (BR-GRA-003)، ومجموع المادة هو مجموعها الموزون. والدرجة التي تبدو خاطئة تُتعقَّب عبر كشف الدرجات إلى المخطط، ولا تُصحَّح على البطاقة.")),
+            new HelpPanelViewModel.Item(T("Grade bands come from the scale in force", "حدود التقديرات من المقياس الساري"), T("The letter or band beside a mark is resolved by the grading scale configured for this year (BR-GRA-005), so the same 78 can be a different band in a school that changed its scale.", "الحرف أو التقدير بجانب الدرجة يُستخرج من مقياس التقديرات المضبوط لهذا العام (BR-GRA-005)، فالدرجة 78 نفسها قد تكون تقديراً مختلفاً في مدرسة غيّرت مقياسها.")),
+            new HelpPanelViewModel.Item(T("Reprints are watermarked on purpose", "إعادة الطباعة موسومة قصداً"), T("The reprint switch marks the copy so an original and a reissue are distinguishable in a file (BR-GRA-007). Leave it on when producing a duplicate for a parent who lost theirs.", "مبدّل إعادة الطباعة يسم النسخة ليتميّز الأصل والمعاد في الملف (BR-GRA-007). فأبقه مفعّلاً عند إنتاج نسخة لولي أمر فقد نسخته.")),
+            new HelpPanelViewModel.Item(T("The numbered PDF and portal release are pending", "ملف PDF المرقّم والنشر في البوابة مؤجَّلان"), T("This page prints from the browser. The immutable numbered PDF and its release to the portal (BR-GRA-008) are deferred behind an owner decision on the rendering engine — a stated gap, not an oversight.", "هذه الصفحة تطبع من المتصفح. أما ملف PDF المرقّم الثابت ونشره في البوابة (BR-GRA-008) فمؤجَّلان خلف قرار المالك بشأن محرك العرض — وهي فجوة معلنة لا سهو.")),
+        },
+    };
 }
 <style>
     .rc-sheet { background: #fff; color: #111; max-width: 900px; margin: 0 auto; padding: 2rem 2.5rem; border: 1px solid #ddd; position: relative; }
@@ -25,6 +38,7 @@
         <form method="get" class="d-flex gap-2"><select name="term" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var t in Model.Terms) { <option value="@t.Id" selected="@(t.Id == Model.Term.Id)">@(isRtl ? t.NameAr : t.NameEn)</option> }</select><label class="small d-flex align-items-center gap-1"><input type="checkbox" name="reprint" value="true" class="form-check-input" checked="@Model.IsReprint" onchange="this.form.submit()" /> @T("reprint (watermark)", "إعادة طباعة (علامة مائية)")</label></form>
         <button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
         <a class="btn btn-outline-secondary" asp-action="Results" asp-route-year="@Model.Year.Id" asp-route-section="@Model.Section?.Id" asp-route-term="@Model.Term.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Results", "النتائج")</a>
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 

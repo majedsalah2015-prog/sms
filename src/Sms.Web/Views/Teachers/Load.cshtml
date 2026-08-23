@@ -8,10 +8,26 @@
     var yid = Model.Year?.Id;
     var over = Model.Rows.Count(r => r.Load > r.Profile.MaxWeeklyPeriods);
     var under = Model.Rows.Count(r => r.Load < r.Profile.MaxWeeklyPeriods / 2);
+    var help = new HelpPanelViewModel
+    {
+        Id = "load-board-help",
+        Title = T("Load board — help", "لوحة النصاب — مساعدة"),
+        Intro = T("Every teacher's weekly period count against the maximum on their profile (doc/Modules/14 §8, BR-TCH-004). This is the board to read before the timetable is published, not after — it is where an unbalanced allocation shows up as a number rather than as a complaint.", "عدد حصص كل معلم الأسبوعية مقابل الحد في ملفه (الوثيقة 14 §8، BR-TCH-004). وهذه اللوحة تُقرأ قبل نشر الجدول لا بعده — فهنا يظهر التوزيع غير المتوازن رقماً لا شكوى."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Over the maximum is a refusal waiting to happen", "التجاوز رفض مؤجَّل"), T("The timetable checks each teacher's maximum when a lesson is assigned (BR-TCH-004). A teacher already over it will refuse the next assignment — the red count here is how many such walls the builder is about to hit.", "الجدول يفحص حد كل معلم عند إسناد حصة (BR-TCH-004). والمعلم المتجاوز أصلاً سيرفض الإسناد التالي — والعدد الأحمر هنا هو عدد الجدران التي سيصطدم بها المنشئ.")),
+            new HelpPanelViewModel.Item(T("Under half is a question, not a fault", "أقل من النصف سؤال لا خطأ"), T("A part-time teacher, a head of department, or someone hired mid-year will legitimately sit low. The count is there so the case gets looked at, not so it gets filled.", "المعلم بدوام جزئي أو رئيس القسم أو من عُيّن في منتصف العام سيكون منخفضاً بحق. والعدد موجود ليُنظر في الحالة لا لتُملأ.")),
+            new HelpPanelViewModel.Item(T("The maximum is per teacher, not per school", "الحد لكل معلم لا لكل مدرسة"), T("It lives on each teacher's own profile, so a school with different contract types does not need one number to fit everyone. Change it on the teacher, not here.", "يعيش في ملف كل معلم، فالمدرسة ذات أنواع العقود المختلفة لا تحتاج رقماً واحداً يناسب الجميع. فغيّره على المعلم لا هنا.")),
+            new HelpPanelViewModel.Item(T("The year selector matters", "منتقي العام مهم"), T("Load is counted for the selected academic year. Building next year's timetable while looking at this year's load is a common way to conclude that everybody is free.", "يُحتسب النصاب للعام الدراسي المختار. وبناء جدول العام القادم بينما تنظر إلى نصاب هذا العام طريق شائع لاستنتاج أن الجميع متفرغ.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All teachers' load vs max (BR-TCH-004):", "نصاب كل المعلمين مقابل الحد (BR-TCH-004):") <span class="text-danger">@over @T("over", "متجاوز")</span> · <span class="text-warning-emphasis">@under @T("under half", "أقل من النصف")</span></p></div>
-    <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form></div>
+    <div class="d-flex align-items-center gap-2">
+        <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 <partial name="_StaffNav" />
 
 <div class="sms-card">

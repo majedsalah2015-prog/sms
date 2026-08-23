@@ -4,6 +4,18 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Timetable", "الجدول الدراسي") + " — " + Model.Title;
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-timetable-help",
+        Title = T("Weekly timetable — help", "الجدول الأسبوعي — مساعدة"),
+        Intro = T("The published weekly timetable for this student (BR-TTB-008). What you see is the version the school has published — drafts and work in progress never reach the portal.", "الجدول الأسبوعي المنشور لهذا الطالب (BR-TTB-008). وما تراه هو الإصدار الذي نشرته المدرسة — فالمسوّدات والعمل الجاري لا يصلان البوابة أبداً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("It changes when the school republishes", "يتغير حين تعيد المدرسة النشر"), T("A timetable revised mid-term appears here as soon as it is published, replacing what was shown before. Print for reference by all means, but check the screen when something looks unexpected.", "الجدول المعدَّل في منتصف الفصل يظهر هنا فور نشره ليحلّ محل ما كان معروضاً. فاطبع للمرجع بكل حال، لكن راجع الشاشة حين يبدو شيء غير متوقع.")),
+            new HelpPanelViewModel.Item(T("Cover and one-off changes are not here", "التغطية والتغييرات الطارئة ليست هنا"), T("A teacher covering a single lesson does not change the published timetable. Same room, same time, different teacher — the school notifies those separately when they matter.", "المعلم الذي يغطي حصة واحدة لا يغيّر الجدول المنشور. القاعة نفسها والوقت نفسه ومعلم مختلف — والمدرسة تُشعر بذلك منفصلاً حين يكون مهماً.")),
+            new HelpPanelViewModel.Item(T("You see only your own children", "ترى أبناءك وحدهم"), T("The portal is scoped to the students linked to your account (BR-SEC-012). There is no way to reach another family's timetable from here, by URL or otherwise.", "البوابة محصورة بالطلاب المرتبطين بحسابك (BR-SEC-012). ولا سبيل للوصول إلى جدول أسرة أخرى من هنا، لا برابط ولا بغيره.")),
+        },
+    };
 }
 
 <div class="sms-page-head d-print-none">
@@ -12,6 +24,7 @@
     <div class="d-flex gap-2">
         <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
         <a class="btn btn-outline-secondary" asp-action="Student" asp-route-id="@Model.BackId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Student profile", "ملف الطالب")</a>
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 <div class="d-none d-print-block mb-2"><h1 class="h4 mb-0">@Model.Title</h1><div class="small">@Model.Subtitle · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div></div>

@@ -5,9 +5,23 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Signatories", "الموقّعون");
     ViewData["Breadcrumb"] = T("Schools / Signatories", "المدارس / الموقّعون");
+    var help = new HelpPanelViewModel
+    {
+        Id = "school-signatories-help",
+        Title = T("Signatories — help", "الموقّعون — مساعدة"),
+        Intro = T("Who signs each class of official document, and from when (doc/Modules/02 §8, BR-SCH-004). This is a history, not a setting: the table keeps every signatory the school has ever had, because a document reissued in 2030 must carry the name that was in force on its original issue date.", "من يوقّع كل فئة من المستندات الرسمية، ومنذ متى (الوثيقة 02 §8، BR-SCH-004). وهذا سجل تاريخي لا إعداد: يحتفظ الجدول بكل موقّع مرّ على المدرسة، لأن مستنداً يُعاد إصداره عام 2030 يجب أن يحمل الاسم الساري في تاريخ إصداره الأصلي."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Effective dating does the closing for you", "تاريخ السريان يُغلق نيابةً عنك"), T("Saving a new signatory for a document class ends the current one automatically, dated the day the new one begins. There is no \"end this signatory\" button and there should not be — a gap with nobody in force is what would leave a certificate unsigned.", "حفظ موقّع جديد لفئة مستند يُنهي الحالي تلقائياً بتاريخ بدء الجديد. ولا يوجد زر «إنهاء هذا الموقّع» ولا ينبغي — فالفجوة التي لا يسري فيها أحد هي ما يترك شهادة بلا توقيع.")),
+            new HelpPanelViewModel.Item(T("Reading the table", "قراءة الجدول"), T("The bold row with no \"effective to\" date is the one signing today; greyed rows are closed history. A class showing \"None defined\" will print its documents without a signatory block — define one before the first certificate run, not after.", "الصف الغامق الذي لا تاريخ انتهاء له هو الموقّع اليوم؛ والصفوف الباهتة تاريخ مغلق. والفئة التي تُظهر «غير معرَّف» ستطبع مستنداتها بلا كتلة توقيع — عرِّف واحداً قبل أول دفعة شهادات لا بعدها.")),
+            new HelpPanelViewModel.Item(T("Name and title, in both languages", "الاسم والمسمى بكلتا اللغتين"), T("Both are required (BR-GLB-001), and both are printed — an Arabic certificate carries the Arabic name and title, an English transcript the English pair. The title is the office (\"Principal\", \"مدير المدرسة\"), not the person's academic rank; it is what appears under the signature line.", "كلاهما مطلوب (BR-GLB-001)، وكلاهما يُطبع — فالشهادة العربية تحمل الاسم والمسمى بالعربية، وكشف الدرجات الإنجليزي يحمل النظير الإنجليزي. والمسمى هو المنصب («مدير المدرسة»، \"Principal\") لا الرتبة العلمية للشخص؛ وهو ما يظهر تحت سطر التوقيع.")),
+            new HelpPanelViewModel.Item(T("Effective from is a real date", "«ساري من» تاريخ حقيقي"), T("Backdate it to when the person actually took office rather than to today, and documents issued in between will reissue correctly. Dates are Gregorian in both languages — the Arabic interface does not switch the calendar.", "أرجِعه إلى اليوم الذي تولّى فيه الشخص المنصب فعلاً لا إلى اليوم، فتُعاد المستندات الصادرة بينهما إصداراً صحيحاً. والتواريخ ميلادية في اللغتين — فالواجهة العربية لا تبدّل التقويم.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per document class, effective-dated: defining a new signatory closes out the current one; reissued documents show the signatory in force at issue (BR-SCH-004).", "لكل فئة مستند بتاريخ سريان: تعريف موقّع جديد يغلق الحالي؛ المستندات المعاد إصدارها تعرض الموقّع الساري وقت الإصدار (BR-SCH-004).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per document class, effective-dated: defining a new signatory closes out the current one; reissued documents show the signatory in force at issue (BR-SCH-004).", "لكل فئة مستند بتاريخ سريان: تعريف موقّع جديد يغلق الحالي؛ المستندات المعاد إصدارها تعرض الموقّع الساري وقت الإصدار (BR-SCH-004).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_SchoolNav" />
 
 <div class="row g-3">

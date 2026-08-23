@@ -5,8 +5,22 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Register employee", "تسجيل موظف");
     ViewData["Breadcrumb"] = T("Employees / Register", "الموظفون / تسجيل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "employee-register-help",
+        Title = T("Register employee — help", "تسجيل موظف — مساعدة"),
+        Intro = T("Creates the person, once and for their whole history with the school (doc/Modules/11 §8, BR-EMP-001). Positions, contracts and teaching assignments are all attached afterwards and can come and go; this record does not.", "ينشئ الشخص مرة واحدة ولكامل تاريخه مع المدرسة (الوثيقة 11 §8، BR-EMP-001). أما المناصب والعقود وإسنادات التدريس فتُلحق بعد ذلك وتأتي وتذهب؛ وهذا السجل لا."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A rehire is not a new employee", "إعادة التعيين ليست موظفاً جديداً"), T("Someone returning after leaving keeps their original record and EMP number (BR-EMP-001) — search the directory first, including inactive staff. Creating a second record splits their service history and their qualifications across two files that will never be reconciled.", "العائد بعد ترك العمل يحتفظ بسجله ورقمه الأصلي (BR-EMP-001) — فابحث في الدليل أولاً، وشمل غير النشطين. وإنشاء سجل ثانٍ يشطر تاريخ خدمته ومؤهلاته بين ملفين لن يُوفَّق بينهما أبداً.")),
+            new HelpPanelViewModel.Item(T("Registering does not employ anyone", "التسجيل لا يوظّف أحداً"), T("This screen creates the person. Giving them a position, an org unit and a contract is a separate step on their file — which is exactly what lets you enter a new hire before their start date without them appearing as current staff.", "هذه الشاشة تنشئ الشخص. أما منحه منصباً ووحدة تنظيمية وعقداً فخطوة منفصلة في ملفه — وهذا بالضبط ما يتيح إدخال موظف جديد قبل تاريخ مباشرته دون أن يظهر ضمن الموظفين الحاليين.")),
+            new HelpPanelViewModel.Item(T("Teachers are employees first", "المعلمون موظفون أولاً"), T("There is no separate teacher registration. Register the person here, then add the teaching profile on their file; that is what keeps one human being from having both an employee record and an unconnected teacher record.", "لا يوجد تسجيل منفصل للمعلمين. فسجّل الشخص هنا ثم أضف ملف التدريس في ملفه؛ وهذا ما يمنع أن يكون لإنسان واحد سجل موظف وسجل معلم غير مرتبط به.")),
+            new HelpPanelViewModel.Item(T("Names and dates follow the same rules as everywhere", "الأسماء والتواريخ تتبع القواعد نفسها"), T("Four name parts in Arabic and English, both required (BR-GLB-001) because both appear on contracts and official letters. Dates are Gregorian in both interface languages.", "أربعة أجزاء للاسم بالعربية والإنجليزية، وكلاهما مطلوب (BR-GLB-001) لأنهما يظهران في العقود والخطابات الرسمية. والتواريخ ميلادية في لغتي الواجهة.")),
+        },
+    };
 }
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("One permanent record and EMP number per person — rehires reuse it (BR-EMP-001).", "سجل واحد دائم ورقم EMP لكل شخص — إعادة التعيين تعيد استخدامه (BR-EMP-001).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("One permanent record and EMP number per person — rehires reuse it (BR-EMP-001).", "سجل واحد دائم ورقم EMP لكل شخص — إعادة التعيين تعيد استخدامه (BR-EMP-001).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_StaffNav" />
 <form method="post" asp-action="Register">
     <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>

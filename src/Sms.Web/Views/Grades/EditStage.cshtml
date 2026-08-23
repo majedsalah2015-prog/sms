@@ -7,9 +7,22 @@
     ViewData["Title"] = T("Edit stage", "تعديل المرحلة");
     ViewData["Breadcrumb"] = T("Grades / Edit stage", "الصفوف / تعديل المرحلة");
     string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
+    var help = new HelpPanelViewModel
+    {
+        Id = "stage-edit-help",
+        Title = T("Edit stage — help", "تعديل المرحلة — مساعدة"),
+        Intro = T("A stage groups the grades beneath it and sets their default gender policy (doc/Modules/05 §8). Names and order are free to correct; the gender policy is the one field with consequences below it.", "المرحلة تجمع الصفوف تحتها وتحدّد سياسة الجنس الافتراضية لها (الوثيقة 05 §8). والأسماء والترتيب حرّة التصحيح؛ وسياسة الجنس هي الحقل الوحيد الذي له أثر فيما تحته."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Narrowing the gender policy can be refused", "تضييق سياسة الجنس قد يُرفض"), T("Moving from mixed to boys or girls is a narrowing, and it is refused if any grade-year profile under this stage would stop being a valid narrowing of it (BR-GRD-004). Widening is always allowed. The refusal names the profile in the way, so fix that one and try again.", "الانتقال من مختلط إلى بنين أو بنات تضييق، ويُرفض إن كان أي ملف صف سنوي تحت هذه المرحلة سيصبح غير متوافق معه (BR-GRD-004). أما التوسيع فمسموح دائماً. والرفض يسمّي الملف المانع، فأصلحه ثم أعد المحاولة.")),
+            new HelpPanelViewModel.Item(T("Order is how the school is read, everywhere", "الترتيب هو ما تُقرأ به المدرسة في كل مكان"), T("It drives the sequence stages appear in on every picker, report and ladder in the product. Set it to the school's real progression rather than alphabetically.", "يقود التسلسل الذي تظهر به المراحل في كل منتقٍ وتقرير وسلّم في المنتج. فاضبطه على التدرج الحقيقي للمدرسة لا أبجدياً.")),
+            new HelpPanelViewModel.Item(T("Both names are required", "الاسمان مطلوبان"), T("Arabic and English (BR-GLB-001). Stage names reach certificates and ministry exports, so a stage named only in Arabic is blank on every English document.", "العربي والإنجليزي (BR-GLB-001). وأسماء المراحل تصل إلى الشهادات والتصدير الوزاري، فالمرحلة المسمّاة بالعربية وحدها فارغة في كل مستند إنجليزي.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Names, order and default gender policy. Narrowing the gender policy is refused while a grade-year profile of this stage would stop being a valid narrowing (BR-GRD-004).", "الأسماء والترتيب وسياسة الجنس الافتراضية. يُرفض تضييق سياسة الجنس إذا كان أحد ملفات الصفوف السنوية في هذه المرحلة سيصبح غير متوافق (BR-GRD-004).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Names, order and default gender policy. Narrowing the gender policy is refused while a grade-year profile of this stage would stop being a valid narrowing (BR-GRD-004).", "الأسماء والترتيب وسياسة الجنس الافتراضية. يُرفض تضييق سياسة الجنس إذا كان أحد ملفات الصفوف السنوية في هذه المرحلة سيصبح غير متوافق (BR-GRD-004).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:640px">
     <form method="post" asp-action="EditStage" asp-route-id="@Model.Id" novalidate>

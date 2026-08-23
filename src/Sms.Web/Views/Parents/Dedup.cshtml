@@ -5,8 +5,21 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Dedup workbench", "طاولة التكرار");
     ViewData["Breadcrumb"] = T("Parents / Dedup workbench", "أولياء الأمور / طاولة التكرار");
+    var help = new HelpPanelViewModel
+    {
+        Id = "parent-dedup-help",
+        Title = T("Dedup workbench — help", "طاولة التكرار — مساعدة"),
+        Intro = T("Pairs of parent files that look like the same person (doc/Modules/09 §8, BR-PAR-002/004). Duplicates are not a tidiness problem: they split a family's fee statement in two, send every notification twice, and give one father two portal logins that each show him half his children.", "أزواج من ملفات أولياء الأمور تبدو للشخص نفسه (الوثيقة 09 §8، BR-PAR-002/004). والتكرار ليس مسألة ترتيب: فهو يشطر كشف رسوم الأسرة نصفين، ويرسل كل إشعار مرتين، ويعطي أباً واحداً حسابي بوابة يعرض كل منهما نصف أبنائه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The reason tells you how hard to look", "السبب يخبرك بمقدار التدقيق"), T("Same mobile is close to conclusive. Identical name is not — two men genuinely share a name, and merging them is worse than leaving them apart. Same email sits in between. Open both files before deciding, every time.", "تطابق الجوال شبه قاطع. أما تطابق الاسم فلا — فرجلان قد يتشاركان الاسم فعلاً، ودمجهما أسوأ من تركهما. وتطابق البريد بينهما. فافتح الملفين قبل القرار في كل مرة.")),
+            new HelpPanelViewModel.Item(T("Look at the children column first", "انظر إلى عمود الأبناء أولاً"), T("It is the fastest test. Two files whose children are siblings are the same parent; two files with unrelated children who merely share a name are not, however similar the rest looks.", "إنه أسرع اختبار. فملفان أبناؤهما إخوة هما لولي أمر واحد؛ وملفان بأبناء لا صلة بينهم ويتشاركان الاسم فقط ليسا كذلك مهما تشابه الباقي.")),
+            new HelpPanelViewModel.Item(T("A merge moves history, it does not delete it", "الدمج ينقل السجل ولا يحذفه"), T("Children, statements and audit entries follow the surviving file — nothing in this product is hard-deleted. But the merge is not something to undo casually, which is why the pair is shown in full rather than merged on detection.", "الأبناء والكشوف وقيود التدقيق تتبع الملف الباقي — فلا شيء في هذا المنتج يُحذف نهائياً. لكن الدمج ليس مما يُتراجَع عنه باستهانة، ولذلك يُعرض الزوج كاملاً بدل دمجه لحظة الاكتشاف.")),
+            new HelpPanelViewModel.Item(T("An empty workbench is the goal", "الطاولة الفارغة هي الهدف"), T("Nothing listed means no pair currently matches a rule. New pairs appear as records are added, so this is a screen to revisit after an admissions intake or a data import rather than one to clear once.", "خلوّها يعني ألا زوج يطابق قاعدة الآن. وتظهر أزواج جديدة كلما أُضيفت سجلات، فهذه شاشة تُراجَع بعد دفعة قبول أو استيراد بيانات لا شاشة تُفرَّغ مرة واحدة.")),
+        },
+    };
 }
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Pairs.Count @T("candidate pair(s) — same mobile, identical name or same email (BR-PAR-002/004).", "زوج مرشح — نفس الجوال أو اسم مطابق أو نفس البريد (BR-PAR-002/004).")</p></div><a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Pairs.Count @T("candidate pair(s) — same mobile, identical name or same email (BR-PAR-002/004).", "زوج مرشح — نفس الجوال أو اسم مطابق أو نفس البريد (BR-PAR-002/004).")</p></div><div class="d-flex align-items-center gap-2"><a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a><partial name="_HelpModal" model="help" /></div></div>
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0 align-middle">

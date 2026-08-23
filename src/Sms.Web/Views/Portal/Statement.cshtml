@@ -4,9 +4,23 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("My statement", "كشف حسابي");
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-statement-help",
+        Title = T("My statement — help", "كشف حسابي — مساعدة"),
+        Intro = T("One account for the whole family (BR-SEC-013). Every child's posted invoices are gathered here, because the school bills the family rather than each child separately."
+            , "حساب واحد للأسرة كلها (BR-SEC-013). فتُجمع هنا الفواتير المرحّلة لكل الأبناء، لأن المدرسة تفوتر الأسرة لا كل ابن على حدة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Gross, discount and balance are separate on purpose", "الإجمالي والخصم والرصيد منفصلة قصداً"), T("The full fee is shown before any discount, then the discount, then what is left (BR-DIS-010). A scholarship or sibling discount is visible as a line rather than folded silently into a smaller number, so you can check it was applied.", "يُعرض الرسم كاملاً قبل أي خصم، ثم الخصم، ثم المتبقي (BR-DIS-010). فالمنحة أو خصم الإخوة يظهر سطراً لا مطوياً بصمت في رقم أصغر، فيمكنك التحقق من تطبيقه.")),
+            new HelpPanelViewModel.Item(T("Only posted invoices appear", "تظهر الفواتير المرحّلة فقط"), T("A charge the school has prepared but not yet posted is not on this statement and is not owed yet. Nothing here is an estimate — every line is a real, issued document.", "الرسم الذي أعدّته المدرسة ولم تُرحّله بعد ليس في هذا الكشف وليس مستحقاً بعد. ولا شيء هنا تقدير — فكل سطر مستند حقيقي صادر.")),
+            new HelpPanelViewModel.Item(T("Payments appear once they are receipted", "الدفعات تظهر بعد إيصالها"), T("A payment shows after the school records it against your account and issues a receipt (BR-PAY-007). A transfer made this morning may not have been receipted yet — that is a timing gap, not a lost payment.", "تظهر الدفعة بعد أن تسجّلها المدرسة على حسابك وتُصدر إيصالاً (BR-PAY-007). فالحوالة الصباحية قد لا تكون أُوصلت بعد — وهذه فجوة توقيت لا دفعة ضائعة.")),
+            new HelpPanelViewModel.Item(T("Printing gives you the same document", "الطباعة تعطيك المستند نفسه"), T("The print button produces the statement as shown, without the navigation. Amounts stay in Latin digits and right-aligned in both languages so the figures read the same on paper.", "زر الطباعة ينتج الكشف كما يظهر بلا عناصر التنقل. وتبقى المبالغ بأرقام لاتينية ومحاذاة يمين في اللغتين لتُقرأ الأرقام كما هي على الورق.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All children, posted invoices only — gross, discounts and balance shown separately (BR-DIS-010).", "كل الأبناء، الفواتير المرحّلة فقط — الإجمالي والخصومات والرصيد معروضة منفصلة (BR-DIS-010).")</p></div><button class="btn btn-outline-secondary d-print-none" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("All children, posted invoices only — gross, discounts and balance shown separately (BR-DIS-010).", "كل الأبناء، الفواتير المرحّلة فقط — الإجمالي والخصومات والرصيد معروضة منفصلة (BR-DIS-010).")</p></div><div class="d-flex align-items-center gap-2 d-print-none"><button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button><partial name="_HelpModal" model="help" /></div></div>
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0">

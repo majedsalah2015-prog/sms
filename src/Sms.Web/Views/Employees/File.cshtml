@@ -18,12 +18,28 @@
         ("qualifications", "Qualifications", "المؤهلات", Model.Qualifications.Count.ToString()), ("teaching", "Teaching", "التدريس", Model.TeacherProfile == null ? null : Model.Teaching.Count(t => t.Assignment.EffectiveToUtc == null).ToString()),
         ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()), ("more", "More…", "المزيد…", null),
     };
+    var help = new HelpPanelViewModel
+    {
+        Id = "employee-file-help",
+        Title = T("Employee file — help", "ملف الموظف — مساعدة"),
+        Intro = T("One person's whole history with the school (doc/Modules/11 §8). Most of what is here is effective-dated rather than current-only: the file answers what someone's position was in 2024 as readily as what it is today.", "تاريخ شخص واحد كاملاً مع المدرسة (الوثيقة 11 §8). ومعظم ما هنا مؤرَّخ السريان لا حاليّاً فقط: فالملف يجيب عن منصب شخص عام 2024 كما يجيب عن منصبه اليوم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Positions are dated, not replaced", "المناصب مؤرَّخة لا مستبدَلة"), T("A promotion adds an assignment and closes the previous one; it does not overwrite it (BR-EMP-002). The row with no end date is the current one. That is what lets a certificate reissued for last year name the position that was actually held then.", "الترقية تضيف إسناداً وتغلق السابق؛ ولا تكتب فوقه (BR-EMP-002). والصف بلا تاريخ انتهاء هو الحالي. وهذا ما يتيح لشهادة يُعاد إصدارها عن العام الماضي أن تسمّي المنصب الذي كان مشغولاً فعلاً حينها.")),
+            new HelpPanelViewModel.Item(T("The contracts tab is restricted", "لسان العقود مقيَّد"), T("Salary and contract terms are a restricted category with their own permission (BR-GLB-072). The padlock is not decoration — without the grant the tab's contents are not sent to the browser at all.", "الراتب وشروط العقد فئة مقيَّدة لها صلاحيتها (BR-GLB-072). والقفل ليس زينة — فبدون المنح لا تُرسل محتويات اللسان إلى المتصفح أصلاً.")),
+            new HelpPanelViewModel.Item(T("Teaching is a profile on top of the employee", "التدريس ملف فوق الموظف"), T("The teaching tab appears once the person has a teacher profile. Subject qualifications there are what the timetable checks before it will let someone be assigned a class (BR-TCH-001, BR-SUB-006) — an unqualified assignment is refused there, not here.", "يظهر لسان التدريس متى صار للشخص ملف معلم. ومؤهلات المواد فيه هي ما يفحصه الجدول قبل أن يسمح بإسناد حصة لأحد (BR-TCH-001، BR-SUB-006) — فالإسناد غير المؤهَّل يُرفض هناك لا هنا.")),
+            new HelpPanelViewModel.Item(T("Ending service does not remove the person", "إنهاء الخدمة لا يزيل الشخص"), T("Status moves them out of the active directory and leaves everything they did in place. There is no delete in this product — and it is the reason a rehire can pick their old record back up intact.", "الحالة تُخرجه من الدليل النشط وتترك كل ما فعله في مكانه. فلا حذف في هذا المنتج — وهو السبب في أن العائد يستطيع استئناف سجله القديم سليماً.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
     <div><div class="text-muted small"><code>@e.EmployeeNo</code> · @Model.NationalityName · @(e.Gender == Sms.Domain.Common.Gender.Male ? T("Male", "ذكر") : T("Female", "أنثى")) · @e.DateOfBirth.ToString("yyyy-MM-dd")@(current == null ? "" : $" · {current.Position ?? "?"} · {(current.OrgUnit == null ? "?" : (isRtl ? current.OrgUnit.NameAr : current.OrgUnit.NameEn))}")</div>
         <h1 class="sms-page-title">@name <span class="badge fs-6 @StaffLabels.EmployeeBadge(e.Status)">@StaffLabels.EmployeeStatus(e.Status, isRtl)</span> @if (Model.TeacherProfile != null) { <span class="badge fs-6 text-bg-info">@T("teacher", "معلم")</span> }</h1></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 <partial name="_StaffNav" />
 

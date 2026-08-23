@@ -4,9 +4,22 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Announcements", "الإعلانات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-announcements-help",
+        Title = T("Announcements — help", "الإعلانات — مساعدة"),
+        Intro = T("Messages the school has sent to you. Read-only, and only what was actually sent (BR-SEC-012) — nothing the school is still drafting appears here.", "الرسائل التي أرسلتها إليك المدرسة. للقراءة فقط، وما أُرسل فعلاً لا غير (BR-SEC-012) — فلا يظهر هنا ما تزال المدرسة تُعدّه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Not everyone gets the same list", "ليست القائمة نفسها للجميع"), T("The audience tag on each item shows who it was addressed to — the whole school, a stage, a class. An announcement a friend mentions that is not here was sent to a group you are not in.", "وسم الجمهور على كل عنصر يبيّن إلى من وُجّه — المدرسة كلها أو مرحلة أو صف. فالإعلان الذي يذكره صديق ولا تجده هنا أُرسل إلى مجموعة لست منها.")),
+            new HelpPanelViewModel.Item(T("This is a copy, not the delivery", "هذه نسخة لا التسليم"), T("The same announcement is normally also sent to you by message. This page is the durable record of it, which is where to look when a notification was missed or deleted.", "يُرسل الإعلان نفسه إليك عادةً برسالة أيضاً. وهذه الصفحة سجله الدائم، وإليها تعود حين يفوت إشعار أو يُحذف.")),
+            new HelpPanelViewModel.Item(T("Replying is not done here", "الرد لا يكون هنا"), T("Announcements are one-way. Contact the school by the means given in the message itself; there is no reply channel on the portal.", "الإعلانات باتجاه واحد. فتواصل مع المدرسة بالوسيلة المذكورة في الرسالة نفسها؛ ولا قناة رد في البوابة.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only: only announcements the school has sent appear here (BR-SEC-012).", "للقراءة فقط: تظهر هنا الإعلانات التي أرسلتها المدرسة فقط (BR-SEC-012).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Read-only: only announcements the school has sent appear here (BR-SEC-012).", "للقراءة فقط: تظهر هنا الإعلانات التي أرسلتها المدرسة فقط (BR-SEC-012).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card"><div class="list-group list-group-flush">
     @foreach (var a in Model.Announcements) { <div class="list-group-item py-3"><div class="d-flex align-items-center gap-2"><h2 class="h6 fw-semibold mb-0">@(isRtl ? a.TitleAr : a.TitleEn)</h2><span class="badge text-bg-light border small">@a.AudienceScope</span><span class="ms-auto small text-muted">@(a.SentAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "")</span></div><div class="mt-2" style="white-space:pre-wrap">@(isRtl ? a.BodyAr : a.BodyEn)</div></div> }

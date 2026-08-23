@@ -10,6 +10,19 @@
     var closed = Model.Section.Status == SectionStatus.Closed;
     var pct = Model.Section.Capacity == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * Model.Members.Count / Model.Section.Capacity));
     var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "section-details-help",
+        Title = T("Section — help", "الشعبة — مساعدة"),
+        Intro = T("One class group for one academic year (doc/Modules/07 §8): who is in it, how full it is, and where it sits. Membership here is what attendance registers, marksheets and timetables are all built from.", "مجموعة صفّية واحدة لعام دراسي واحد (الوثيقة 07 §8): من فيها وكم امتلأت وأين تجلس. والعضوية هنا هي ما تُبنى عليه سجلات الحضور وكشوف الدرجات والجداول."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Adding a student is checked against three things", "إضافة طالب تُفحص بثلاثة أمور"), T("Capacity, the section's gender policy, and that the student is enrolled in this grade for this year (BR-SCN-002/004). A refusal names which one failed rather than saying the assignment is invalid.", "السعة وسياسة جنس الشعبة وأن يكون الطالب مقيّداً في هذا الصف لهذا العام (BR-SCN-002/004). والرفض يسمّي أيها أخفق بدل القول إن الإسناد غير صالح.")),
+            new HelpPanelViewModel.Item(T("Closing needs an empty section", "الإغلاق يحتاج شعبة فارغة"), T("A section with students in it cannot be closed (BR-SCN-007) — move them to another section first. Closing is not deleting: the section and everything recorded against it stay readable.", "الشعبة التي فيها طلاب لا تُغلق (BR-SCN-007) — فانقلهم إلى شعبة أخرى أولاً. والإغلاق ليس حذفاً: فالشعبة وكل ما سُجِّل عليها يبقى مقروءاً.")),
+            new HelpPanelViewModel.Item(T("The capacity bar is today, not the plan", "شريط السعة هو اليوم لا الخطة"), T("It compares current members against this section's own capacity. The grade's study plan has its own expected section size, which this may deliberately differ from.", "يقارن الأعضاء الحاليين بسعة هذه الشعبة نفسها. ولخطة دراسة الصف حجم شعبة متوقع قد تختلف عنه هذه قصداً.")),
+            new HelpPanelViewModel.Item(T("The home room is a default, not a reservation", "القاعة الأساسية افتراض لا حجز"), T("It is where the section sits unless a timetable entry says otherwise, and it must be compatible with the section's gender policy (BR-ROM-003).", "هي مكان جلوس الشعبة ما لم يقل مدخل جدول غير ذلك، ويجب أن تتوافق مع سياسة جنس الشعبة (BR-ROM-003).")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -17,7 +30,8 @@
         <h1 class="sms-page-title">@name @if (closed) { <span class="badge text-bg-secondary fs-6">@T("Closed", "مغلقة")</span> }</h1>
         <div class="d-flex align-items-center gap-3 small text-muted"><span>@Model.Members.Count / @Model.Section.Capacity @T("students", "طالب")</span><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Capacity", "السعة")" style="width:10rem"><span style="width:@(pct)%"></span></div><span>@Model.Section.GenderPolicy</span>@if (Model.RoomName != null) { <span><i class="bi bi-door-open me-1" aria-hidden="true"></i>@Model.RoomName</span> }</div></div>
     <div class="d-flex gap-2"><a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
-        @if (!closed) { <form method="post" asp-action="Close" asp-route-id="@Model.Section.Id" onsubmit="return confirm('@T("Close this section? Only allowed with zero current students (BR-SCN-007).", "إغلاق الشعبة؟ مسموح فقط بدون طلاب حاليين (BR-SCN-007).")');"><button class="btn btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>@T("Close section", "إغلاق الشعبة")</button></form> }</div>
+        @if (!closed) { <form method="post" asp-action="Close" asp-route-id="@Model.Section.Id" onsubmit="return confirm('@T("Close this section? Only allowed with zero current students (BR-SCN-007).", "إغلاق الشعبة؟ مسموح فقط بدون طلاب حاليين (BR-SCN-007).")');"><button class="btn btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>@T("Close section", "إغلاق الشعبة")</button></form> }
+        <partial name="_HelpModal" model="help" /></div>
 </div>
 
 <div class="row g-3">

@@ -9,12 +9,28 @@
     ViewData["GradingYear"] = b.AcademicYearId;
     var ok = Model.WeightSum == 100m;
     var locked = b.IsLocked;
+    var help = new HelpPanelViewModel
+    {
+        Id = "blueprint-help",
+        Title = T("Assessment blueprint — help", "مخطط التقويم — مساعدة"),
+        Intro = T("How one subject's term mark is built for one grade (doc/Modules/17 §8): the components, and what share of the final mark each carries. Every marksheet for this subject, grade and term is generated from this blueprint.", "كيف تُبنى درجة الفصل لمادة واحدة في صف واحد (الوثيقة 17 §8): المكوّنات ونصيب كل منها من الدرجة النهائية. وكل كشف درجات لهذه المادة والصف والفصل يُولَّد من هذا المخطط."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The weights must total exactly 100", "الأوزان تساوي 100 بالضبط"), T("Not approximately, and not 99.99 (BR-GRA-003). The running total is shown as you edit, and finalising is refused until it lands on 100 — a blueprint that does not add up would silently produce a term mark out of the wrong denominator.", "لا تقريباً ولا 99.99 (BR-GRA-003). ويُعرض المجموع الجاري أثناء التعديل، ويُرفض الاعتماد حتى يبلغ 100 — فالمخطط الذي لا يستقيم مجموعه ينتج درجة فصل من مقام خاطئ بصمت.")),
+            new HelpPanelViewModel.Item(T("Finalising is the point of no return", "الاعتماد نقطة اللاعودة"), T("A locked blueprint stops being editable because marks have been entered against its components. Changing the shape afterwards would reinterpret marks that teachers entered under the old one.", "المخطط المعتمد يتوقف عن قبول التعديل لأن درجات أُدخلت على مكوّناته. وتغيير الشكل بعدها يعيد تفسير درجات أدخلها المعلمون تحت الشكل القديم.")),
+            new HelpPanelViewModel.Item(T("Draft means nothing has been entered yet", "المسودة تعني ألا شيء أُدخل بعد"), T("While it is a draft you can add, remove and reweight components freely. That is the moment to get the shape right — after finalisation the only route is a new blueprint for a new term.", "ما دام مسودةً يمكنك إضافة المكوّنات وحذفها وإعادة وزنها بحرية. وتلك هي لحظة ضبط الشكل — فبعد الاعتماد لا سبيل إلا مخطط جديد لفصل جديد.")),
+            new HelpPanelViewModel.Item(T("One blueprint per subject, grade and term", "مخطط واحد لكل مادة وصف وفصل"), T("The header names all three. A different grade studying the same subject has its own blueprint and can weight it differently — which is the point.", "الترويسة تسمّي الثلاثة. والصف الآخر الذي يدرس المادة نفسها له مخططه ويمكن أن يوزنه على نحو مختلف — وهذه هي الغاية.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
     <div><div class="text-muted small"><code>@Model.Subject.Code</code> · @Model.Grade.Code @(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Term.NameAr : Model.Term.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
         <h1 class="sms-page-title">@(isRtl ? Model.Subject.Name.NameAr : Model.Subject.Name.NameEn) @if (locked) { <span class="badge fs-6 text-bg-dark"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("Finalized", "معتمد")</span> } else { <span class="badge fs-6 text-bg-warning">@T("Draft", "مسودة")</span> }</h1></div>
-    <a class="btn btn-outline-secondary" asp-action="Blueprints" asp-route-year="@b.AcademicYearId" asp-route-profile="@Model.ProfileId" asp-route-term="@b.TermId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Blueprints" asp-route-year="@b.AcademicYearId" asp-route-profile="@Model.ProfileId" asp-route-term="@b.TermId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 <partial name="_GradingNav" />
 

@@ -11,6 +11,19 @@
     var s = Model.Student;
     var isVat = c.VatRateSnapshot != null;
     var voided = c.Status == ChargeStatus.Void;
+    var help = new HelpPanelViewModel
+    {
+        Id = "charge-document-help",
+        Title = T("Tax invoice — help", "الفاتورة الضريبية — مساعدة"),
+        Intro = T("One issued charge, rendered as the bilingual tax invoice the school gives the payer (doc/Modules/19 §8, BR-FEE-005). This is a document, not a form — what it shows was fixed when it was posted.", "رسم واحد صادر، معروضاً كالفاتورة الضريبية ثنائية اللغة التي تسلّمها المدرسة للدافع (الوثيقة 19 §8، BR-FEE-005). وهذا مستند لا نموذج — فما يعرضه ثُبِّت لحظة ترحيله."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The VAT rate is a snapshot", "نسبة الضريبة لقطة"), T("The rate stored on the invoice is the one in force the day it was issued, not today's. That is what makes a reprint of a two-year-old invoice legally the same document rather than a recalculation of it.", "النسبة المخزَّنة على الفاتورة هي السارية يوم إصدارها لا نسبة اليوم. وهذا ما يجعل إعادة طباعة فاتورة عمرها سنتان المستند نفسه قانوناً لا إعادة حساب له.")),
+            new HelpPanelViewModel.Item(T("Correcting means voiding, not editing", "التصحيح إبطال لا تعديل"), T("A posted invoice cannot be altered. A wrong one is voided — it stays visible with a void marker, and a replacement is issued with its own number. That trail is what an audit expects to find.", "الفاتورة المرحّلة لا تُعدَّل. والخاطئة تُبطَل — فتبقى ظاهرة بعلامة إبطال، ويصدر بديل برقمه الخاص. وهذا الأثر هو ما يتوقع المدقّق أن يجده.")),
+            new HelpPanelViewModel.Item(T("Money reads left-to-right in both languages", "المال يُقرأ من اليسار في اللغتين"), T("Amounts stay in Latin digits and right-aligned even in Arabic, so the same figure is unambiguous on an Arabic and an English copy of the same invoice.", "تبقى المبالغ بأرقام لاتينية ومحاذاة يمين حتى بالعربية، فيكون الرقم نفسه غير ملتبس في النسختين العربية والإنجليزية من الفاتورة نفسها.")),
+            new HelpPanelViewModel.Item(T("The stored PDF is not here yet", "ملف PDF المخزَّن لم يصل بعد"), T("This page prints from the browser. The immutable stored PDF is deferred behind an owner decision on the rendering engine — the invoice number, its content and its QR payload are already final regardless.", "هذه الصفحة تطبع من المتصفح. أما ملف PDF الثابت المخزَّن فمؤجَّل خلف قرار المالك بشأن محرك العرض — ورقم الفاتورة ومحتواها وحمولة رمزها نهائية أصلاً.")),
+        },
+    };
 }
 <style>
     .inv-sheet { background: #fff; color: #111; max-width: 860px; margin: 0 auto; padding: 1.75rem 2.25rem; border: 1px solid #ddd; position: relative; }
@@ -27,6 +40,7 @@
         <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
         <a class="btn btn-outline-secondary btn-sm" asp-action="Position" asp-route-payerId="@c.PayerId"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Payer statement", "كشف حساب الدافع")</a>
         <a class="btn btn-outline-secondary btn-sm" asp-action="Index" asp-route-year="@c.AcademicYearId"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Charges", "الفواتير")</a>
+        <partial name="_HelpModal" model="help" />
     </div></div>
 <partial name="_FinanceNav" />
 

@@ -8,10 +8,26 @@
     ViewData["Breadcrumb"] = T("Academic Years / Status board", "الأعوام الدراسية / لوحة الحالة");
     string Name(AcademicYearStatus s) => s switch { AcademicYearStatus.Preparation => T("Preparation", "إعداد"), AcademicYearStatus.Active => T("Active", "نشط"), AcademicYearStatus.Closing => T("Closing", "قيد الإغلاق"), AcademicYearStatus.Closed => T("Closed", "مغلق"), AcademicYearStatus.Archived => T("Archived", "مؤرشف"), _ => s.ToString() };
     string Badge(AcademicYearStatus s) => s switch { AcademicYearStatus.Active => "text-bg-success", AcademicYearStatus.Preparation => "text-bg-primary", AcademicYearStatus.Closing => "text-bg-warning", AcademicYearStatus.Closed => "text-bg-secondary", _ => "text-bg-dark" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "years-help",
+        Title = T("Academic years — help", "الأعوام الدراسية — مساعدة"),
+        Intro = T("The board every other module reads from (doc/Modules/03 §8). Almost everything in this system is scoped to a year — enrolments, marks, fees, timetables — so which year is Active and which year you are working in are two of the most consequential settings in the product.", "اللوحة التي تقرأ منها بقية الوحدات (الوثيقة 03 §8). فكل شيء تقريباً في هذا النظام مرتبط بعام — التسجيل والدرجات والرسوم والجداول — ولذلك فإن العام النشط والعام الذي تعمل فيه من أهم إعدادات المنتج أثراً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("One Active, one in Preparation", "نشط واحد وإعداد واحد"), T("Exactly one year may be Active and at most one may be in Preparation (BR-AYR-002). That is what lets next year be built — semesters, sections, fee structures — while this year is still running, without either one having to guess which set of data it belongs to.", "يمكن أن يكون عام واحد فقط نشطاً وعام واحد على الأكثر في الإعداد (BR-AYR-002). وهذا ما يتيح بناء العام القادم — فصولاً وشعباً وهياكل رسوم — بينما العام الحالي يعمل، دون أن يضطر أحدهما إلى تخمين البيانات التي يخصّها.")),
+            new HelpPanelViewModel.Item(T("Working year vs Active year", "عام العمل مقابل العام النشط"), T("They are not the same thing and the banner appears when they differ. The Active year is the school's operational reality; the working year is the one your screens are currently reading and writing. Preparing next year means deliberately working in a year that is not the active one — check the banner before wondering why today's marks are not showing.", "ليسا الشيء نفسه، ويظهر الشريط عند اختلافهما. فالعام النشط هو واقع المدرسة التشغيلي؛ وعام العمل هو الذي تقرأ منه شاشاتك وتكتب فيه الآن. وتحضير العام القادم يعني العمل قصداً في عام غير النشط — فانظر إلى الشريط قبل أن تتساءل لماذا لا تظهر درجات اليوم.")),
+            new HelpPanelViewModel.Item(T("The status ladder only goes forward", "سلم الحالات يمضي إلى الأمام فقط"), T("Preparation → Active → Closing → Closed → Archived. Closing is the working phase where results are finalised and the year is rolled over; Closed and Archived are read-only. There is no step back, so activation and closure are decisions, not navigation.", "إعداد ← نشط ← قيد الإغلاق ← مغلق ← مؤرشف. ومرحلة «قيد الإغلاق» هي مرحلة العمل التي تُعتمد فيها النتائج ويُرحَّل العام؛ أما المغلق والمؤرشف فللقراءة فقط. ولا خطوة إلى الوراء، فالتفعيل والإغلاق قراران لا تنقُّل.")),
+            new HelpPanelViewModel.Item(T("Before the first year can activate", "قبل تفعيل أول عام"), T("A school still in Setup cannot activate its first academic year (BR-SET-003) — finish the setup wizard's mandatory steps first. After that, activation is what opens enrolment, attendance and the fee calendar for the year.", "المدرسة التي لا تزال في حالة الإعداد لا يمكنها تفعيل أول عام دراسي (BR-SET-003) — فأكمل خطوات المعالج الإلزامية أولاً. وبعدها يكون التفعيل هو ما يفتح التسجيل والحضور وتقويم الرسوم للعام.")),
+        },
+    };
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Preparation → Active → Closing → Closed → Archived; exactly one Active, at most one in Preparation (BR-AYR-002).", "إعداد → نشط → قيد الإغلاق → مغلق → مؤرشف؛ عام نشط واحد فقط وعام إعداد واحد على الأكثر (BR-AYR-002).")</p></div>
-    <a class="btn btn-primary" asp-action="Define"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("New academic year", "عام دراسي جديد")</a></div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-primary" asp-action="Define"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("New academic year", "عام دراسي جديد")</a>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 
 @if (Model.WorkingYear != null && Model.ActiveYear != null && Model.WorkingYear.Id != Model.ActiveYear.Id)
 {

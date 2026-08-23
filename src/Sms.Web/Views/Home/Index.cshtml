@@ -22,6 +22,20 @@
     var modules = ModuleCatalog.Modules
         .Where(x => (FeatureCatalog.ForModule(x.Code) is not { } f || featureStates[f.Code]) && visibleModules.Contains(x.Code))
         .ToList();
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "home-help",
+        Title = T("Home — help", "الرئيسية — مساعدة"),
+        Intro = T("The launcher. Two ways into the same product: departments, which group screens by what a person came to do, and the full module list underneath, which is what the product contains.", "لوحة الإطلاق. طريقان إلى المنتج نفسه: الأقسام التي تجمع الشاشات بما جاء الشخص ليفعله، وقائمة الوحدات الكاملة تحتها، وهي ما يحتويه المنتج."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("You are seeing your own product", "أنت ترى منتجك أنت"), T("Departments, tiles and modules are filtered to what your roles allow (BR-SEC-010). A screen you cannot open is not shown greyed out — it is not drawn at all, so this page is a different size for every role.", "الأقسام والبطاقات والوحدات مُرشَّحة إلى ما تسمح به أدوارك (BR-SEC-010). والشاشة التي لا تستطيع فتحها لا تُعرض باهتة — بل لا تُرسم أصلاً، فهذه الصفحة بحجم مختلف لكل دور.")),
+            new HelpPanelViewModel.Item(T("An empty page means no role, not a fault", "الصفحة الفارغة تعني غياب دور لا خللاً"), T("If nothing is assigned to you, the page says so instead of showing an empty grid. The fix is a role assignment from the user-roles screen, not a reinstall.", "إن لم يُسنَد إليك شيء قالت الصفحة ذلك بدل عرض شبكة فارغة. والعلاج إسناد دور من شاشة أدوار المستخدمين لا إعادة تركيب.")),
+            new HelpPanelViewModel.Item(T("Feature toggles hide whole modules", "مفاتيح الميزات تخفي وحدات كاملة"), T("A module switched off in setup disappears from the list for everyone, permissions or not. If a colleague cannot find Transport and their role looks right, check the feature toggles before the roles.", "الوحدة المُطفأة في الإعداد تختفي من القائمة للجميع، بصلاحية أو بغيرها. فإن لم يجد زميل وحدة النقل وبدا دوره صحيحاً فافحص مفاتيح الميزات قبل الأدوار.")),
+            new HelpPanelViewModel.Item(T("The two badges at the top", "الوسمان في الأعلى"), T("School status and the active academic year are the two settings that decide what the rest of the product will accept today. A suspended school or a year still in Preparation explains most \"why can I not save this\" questions.", "حالة المدرسة والعام الدراسي النشط هما الإعدادان اللذان يقرران ما يقبله بقية المنتج اليوم. والمدرسة الموقوفة أو العام الذي لا يزال في الإعداد يفسّران معظم أسئلة «لماذا لا أستطيع الحفظ».")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -42,6 +56,7 @@
             }
         </p>
     </div>
+    <partial name="_HelpModal" model="help" />
 </div>
 
 @if (Model.Workspaces.Count == 0)

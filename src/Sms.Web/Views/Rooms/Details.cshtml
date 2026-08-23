@@ -8,13 +8,29 @@
     ViewData["Title"] = name;
     ViewData["Breadcrumb"] = T("Classrooms / ", "القاعات / ") + name;
     var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    var help = new HelpPanelViewModel
+    {
+        Id = "room-details-help",
+        Title = T("Classroom — help", "القاعة — مساعدة"),
+        Intro = T("One room, with everything that competes for it (doc/Modules/12 §8): its features, the windows it is unavailable in, its bookings, and the sections that call it home.", "قاعة واحدة، ومعها كل ما يتنافس عليها (الوثيقة 12 §8): تجهيزاتها ونوافذ عدم إتاحتها وحجوزاتها والشعب التي تتخذها قاعة أساسية."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Maintenance and reserved windows refuse bookings", "نوافذ الصيانة والحجز ترفض الحجوزات"), T("A window covering a date makes the room unavailable for it, and any booking inside that window is refused rather than warned about (BR-ROM-004). Close the window before trying to book through it.", "النافذة التي تغطي تاريخاً تجعل القاعة غير متاحة فيه، وأي حجز داخلها يُرفض لا يُنبَّه عليه (BR-ROM-004). فأغلق النافذة قبل محاولة الحجز خلالها.")),
+            new HelpPanelViewModel.Item(T("Home room is not the same as booked", "القاعة الأساسية ليست الحجز"), T("A section's home room is where it sits by default; bookings are one-off claims on top of that. A room can be a home room and still be booked by someone else for a period the section does not use.", "قاعة الشعبة الأساسية هي مكانها الافتراضي؛ أما الحجوزات فمطالبات مفردة فوق ذلك. فقد تكون القاعة أساسية ومحجوزة لغيرها في حصة لا تستخدمها الشعبة.")),
+            new HelpPanelViewModel.Item(T("Two capacities, two purposes", "سعتان لغرضين"), T("Standard is teaching occupancy; exam is the spaced-out seating the exam timetable allocates against. Both are read by different modules, so neither is a rounded guess.", "العادية هي إشغال التدريس؛ والاختبار هو الجلوس المتباعد الذي يوزّع عليه جدول الاختبارات. وتقرأ كلاً منهما وحدة مختلفة، فليست إحداهما تقديراً مقرَّباً.")),
+            new HelpPanelViewModel.Item(T("Retiring a room keeps its history", "تقاعد القاعة يبقي سجلها"), T("Deactivation is refused while an active section uses it as a home room. Once retired, past bookings and timetables still name it — nothing here is hard-deleted.", "يُرفض إلغاء التفعيل ما دامت شعبة نشطة تتخذها قاعة أساسية. وبعد التقاعد تظل الحجوزات والجداول السابقة تسمّيها — فلا شيء هنا يُحذف نهائياً.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
     <div><div class="text-muted small">@(isRtl ? Model.Building.Name.NameAr : Model.Building.Name.NameEn) / @(isRtl ? Model.Floor.Name.NameAr : Model.Floor.Name.NameEn) · @Model.TypeName</div>
         <h1 class="sms-page-title"><code>@Model.Room.Code</code> @name</h1>
         <div class="small text-muted">@T("Standard", "عادية") @Model.Room.StandardCapacity · @T("Exam", "اختبار") @Model.Room.ExamCapacity · @Model.Room.WingTag @if (Model.SectionsUsing.Count > 0) { <text>· @T("home room of", "قاعة") @string.Join(", ", Model.SectionsUsing.Select(s => isRtl ? s.NameAr : s.NameEn))</text> }</div></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Catalog", "الدليل")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Catalog", "الدليل")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 <div class="row g-3">

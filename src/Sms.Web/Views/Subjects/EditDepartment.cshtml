@@ -6,9 +6,21 @@
     ViewData["Title"] = T("Edit department", "تعديل القسم") + " — " + (isRtl ? Model.NameAr : Model.NameEn);
     ViewData["Breadcrumb"] = T("Subjects / Departments / Edit", "المواد الدراسية / الأقسام / تعديل");
     ViewData["SubjectsTab"] = "departments";
+    var help = new HelpPanelViewModel
+    {
+        Id = "department-edit-help",
+        Title = T("Edit department — help", "تعديل القسم — مساعدة"),
+        Intro = T("A department groups subjects and gives them a head (doc/Modules/13 §8). It is an organisational unit, not a teaching one — nothing is timetabled against a department.", "القسم يجمع المواد ويمنحها رئيساً (الوثيقة 13 §8). وهو وحدة تنظيمية لا تدريسية — فلا شيء يُجدوَل على قسم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The head must be a teacher with an account", "رئيس القسم معلم له حساب"), T("The picker only offers teachers who have a linked user account (BR-SUB-007), because the role carries screens they have to be able to open. A teacher missing from the list needs an account first, not a different department.", "لا يعرض المنتقي إلا المعلمين ذوي الحسابات المرتبطة (BR-SUB-007)، لأن الدور يحمل شاشات يجب أن يستطيعوا فتحها. فالمعلم الغائب من القائمة يحتاج حساباً أولاً لا قسماً آخر.")),
+            new HelpPanelViewModel.Item(T("Renaming is safe", "إعادة التسمية آمنة"), T("Subjects reference the department by identity, not by name, so a correction here follows through everywhere at once. Both languages are required (BR-GLB-001).", "المواد تشير إلى القسم بهويته لا باسمه، فالتصحيح هنا يسري في كل مكان دفعةً واحدة. واللغتان مطلوبتان (BR-GLB-001).")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Names and head of department (a teacher with a linked user account, BR-SUB-007).", "الأسماء ورئيس القسم (معلم له حساب مستخدم مرتبط، BR-SUB-007).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Names and head of department (a teacher with a linked user account, BR-SUB-007).", "الأسماء ورئيس القسم (معلم له حساب مستخدم مرتبط، BR-SUB-007).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_SubjectsNav" />
 
 <div class="sms-card p-4" style="max-width:640px">

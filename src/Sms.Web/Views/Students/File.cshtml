@@ -24,12 +24,28 @@
     }
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
     string Badge(StudentStatus st) => st switch { StudentStatus.Enrolled => "text-bg-success", StudentStatus.Suspended => "text-bg-warning", StudentStatus.Graduated or StudentStatus.Alumni => "text-bg-primary", _ => "text-bg-secondary" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "student-file-help",
+        Title = T("Student file — help", "ملف الطالب — مساعدة"),
+        Intro = T("Everything the school holds about one student, gathered from every module that knows anything about them (doc/Modules/08 §8). The tabs are not one screen split up — several of them read live from attendance, fees and certificates, which is why their counts can change while you have the page open.", "كل ما تحتفظ به المدرسة عن طالب واحد، مجموعاً من كل وحدة تعرف عنه شيئاً (الوثيقة 08 §8). والألسنة ليست شاشة واحدة مقسّمة — فبعضها يقرأ مباشرةً من الحضور والرسوم والشهادات، ولذلك قد تتغير أعدادها والصفحة مفتوحة أمامك."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A tab you cannot see is not an empty tab", "اللسان الذي لا تراه ليس لساناً فارغاً"), T("The social profile is a restricted category with its own permission (BR-GLB-072), and without it the tab is not drawn at all rather than shown disabled. A greyed-out tab would still tell you sensitive data exists and whom it is about.", "البيانات الاجتماعية فئة مقيَّدة لها صلاحيتها (BR-GLB-072)، وبدونها لا يُرسم اللسان أصلاً بدل عرضه معطَّلاً. فاللسان الباهت يخبرك رغم ذلك بوجود بيانات حساسة وبمن تخصّ.")),
+            new HelpPanelViewModel.Item(T("Status is a lifecycle, not a flag", "الحالة دورة حياة لا وسماً"), T("Enrolled, suspended, graduated, alumni and the rest each change what other modules will accept for this student — a suspended student is not a deleted one, and their history stays intact and readable throughout (BR-STU-002).", "«ملتحق» و«موقوف» و«متخرج» و«خريج» وغيرها، كل منها يغيّر ما تقبله الوحدات الأخرى لهذا الطالب — فالطالب الموقوف ليس محذوفاً، ويبقى سجله سليماً مقروءاً طوال الوقت (BR-STU-002).")),
+            new HelpPanelViewModel.Item(T("The audit tab answers \"who changed this\"", "لسان التدقيق يجيب «من غيّر هذا»"), T("Identity edits on a student are captured field by field with the old and new value, in the same transaction as the change itself. Nothing is written there by hand and nothing can be removed from it.", "تُلتقط تعديلات هوية الطالب حقلاً حقلاً بالقيمة القديمة والجديدة، في المعاملة نفسها مع التغيير. ولا يُكتب فيه شيء يدوياً ولا يُنزع منه شيء.")),
+            new HelpPanelViewModel.Item(T("Guardians are people, not fields", "أولياء الأمور أشخاص لا حقول"), T("A parent is a record in their own right and is linked to the student, which is what lets siblings share one father and one portal account. Correct a guardian's details on the parent's own file, not by re-typing them here.", "ولي الأمر سجل قائم بذاته ومرتبط بالطالب، وهذا ما يتيح للإخوة أن يشتركوا في أبٍ واحد وحساب بوابة واحد. فصحّح بيانات ولي الأمر في ملفه هو لا بإعادة كتابتها هنا.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
     <div><div class="text-muted small"><code>@s.StudentNo</code> · @Model.NationalityName · @(s.Gender == Sms.Domain.Common.Gender.Male ? T("Male", "ذكر") : T("Female", "أنثى")) · @s.DateOfBirth.ToString("yyyy-MM-dd")</div>
         <h1 class="sms-page-title">@name <span class="badge fs-6 @Badge(s.Status)">@s.Status</span></h1></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 <div class="sms-card">

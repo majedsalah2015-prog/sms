@@ -14,12 +14,28 @@
         ("portal", "Portal account", "حساب البوابة", null), ("dups", "Possible duplicates", "تكرارات محتملة", Model.PossibleDuplicates.Count.ToString()), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()), ("more", "More…", "المزيد…", null),
     };
     var total = Model.FamilyStatement.Sum(l => l.Position);
+    var help = new HelpPanelViewModel
+    {
+        Id = "parent-file-help",
+        Title = T("Parent file — help", "ملف ولي الأمر — مساعدة"),
+        Intro = T("One family, seen from the parent's side (doc/Modules/09 §8). The children, the money and the portal login all hang off this record, which is why keeping it single and correct matters more than the individual fields on it.", "أسرة واحدة منظوراً إليها من جهة ولي الأمر (الوثيقة 09 §8). فالأبناء والمال وحساب البوابة كلها معلّقة بهذا السجل، ولهذا فإن إبقاءه واحداً وصحيحاً أهم من الحقول المفردة عليه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The family statement is one balance, not several", "كشف الأسرة رصيد واحد لا عدة أرصدة"), T("Charges for every child are gathered into a single position (BR-FEE-008) so the family is billed and chased as one. A parent with two files gets two statements and pays neither in full — which is what the duplicate badge is warning you about.", "تُجمع رسوم كل الأبناء في مركز واحد (BR-FEE-008) لتُفوتر الأسرة وتُتابَع كوحدة. وولي الأمر بملفين يحصل على كشفين ولا يسدد أياً منهما كاملاً — وهذا ما يحذّر منه وسم التكرار.")),
+            new HelpPanelViewModel.Item(T("The portal account is this parent's own", "حساب البوابة حساب ولي الأمر نفسه"), T("It shows exactly the children linked here and nothing else (BR-SEC-011). A parent reporting that a child is \"missing\" from their portal is almost always a linking problem on the children tab, not a portal fault.", "يعرض بالضبط الأبناء المرتبطين هنا ولا شيء غيرهم (BR-SEC-011). وبلاغ ولي أمر بأن ابناً «مفقود» من بوابته هو غالباً مشكلة ربط في لسان الأبناء لا خللاً في البوابة.")),
+            new HelpPanelViewModel.Item(T("Notifications follow the preferred language", "الإشعارات تتبع اللغة المفضلة"), T("Every message this family receives is rendered in the language set on the identity tab (BR-NOT-007), regardless of the language the sending staff member is working in.", "كل رسالة تتلقاها هذه الأسرة تُعرض باللغة المضبوطة في لسان الهوية (BR-NOT-007)، بغضّ النظر عن لغة الموظف المرسِل.")),
+            new HelpPanelViewModel.Item(T("The duplicates tab is a question, not a verdict", "لسان التكرارات سؤال لا حكم"), T("It lists files matching on mobile, name or email (BR-PAR-002/004). Two men can share a name; check the children before merging, because a merge is far harder to reverse than leaving two files alone for another day.", "يسرد الملفات المتطابقة في الجوال أو الاسم أو البريد (BR-PAR-002/004). وقد يتشارك رجلان اسماً؛ فافحص الأبناء قبل الدمج، لأن التراجع عن دمج أصعب بكثير من ترك ملفين يوماً آخر.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
     <div><div class="text-muted small"><code>@p.ParentFileNo</code> · <span dir="ltr">@p.PrimaryMobile</span> @(string.IsNullOrEmpty(p.Email) ? "" : "· " + p.Email) · @(p.PreferredLanguage == "ar" ? "العربية" : "English")</div>
         <h1 class="sms-page-title">@(isRtl ? p.NameAr : p.NameEn) @if (Model.PossibleDuplicates.Count > 0) { <span class="badge fs-6 text-bg-warning">@T("possible duplicate", "تكرار محتمل")</span> }</h1></div>
-    <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 <div class="sms-card">

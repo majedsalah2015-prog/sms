@@ -5,9 +5,23 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("New academic year", "عام دراسي جديد");
     ViewData["Breadcrumb"] = T("Academic Years / New", "الأعوام الدراسية / جديد");
+    var help = new HelpPanelViewModel
+    {
+        Id = "year-define-help",
+        Title = T("New academic year — help", "عام دراسي جديد — مساعدة"),
+        Intro = T("Defining a year is mostly picking two dates (doc/Modules/03 §8, BR-AYR-001). Everything else about the year — semesters, terms, sections, fee structures — is built afterwards, inside the span you set here.", "تعريف العام هو في معظمه اختيار تاريخين (الوثيقة 03 §8، BR-AYR-001). وكل ما عدا ذلك — الفصول والفترات والشعب وهياكل الرسوم — يُبنى بعدها داخل المدة التي تحددها هنا."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("6 to 14 months, and no overlap", "من 6 إلى 14 شهراً وبلا تداخل"), T("The span is bounded on both sides so a typo in the year part of a date is caught immediately rather than after sections have been built inside it. Overlapping another year is refused outright: two years covering the same day would make \"which year does this attendance belong to\" unanswerable.", "المدة محدودة من الطرفين ليُلتقط خطأ سنة التاريخ فوراً لا بعد بناء الشعب داخله. والتداخل مع عام آخر مرفوض تماماً: فعامان يغطيان اليوم نفسه يجعلان سؤال «إلى أي عام ينتمي هذا الحضور» بلا جواب.")),
+            new HelpPanelViewModel.Item(T("Leave the labels blank and they write themselves", "اترك التسميات فارغة تُكتب نفسها"), T("Both the Arabic and the English label are generated from the dates when you leave them empty, which is the right choice for an ordinary year. Type them only when the school's own naming differs from the calendar.", "تُولَّد التسميتان العربية والإنجليزية من التواريخ إن تركتهما فارغتين، وهذا هو الخيار الصحيح للعام الاعتيادي. ولا تكتبهما إلا إذا اختلفت تسمية المدرسة عن التقويم.")),
+            new HelpPanelViewModel.Item(T("It starts in Preparation, not Active", "يبدأ في الإعداد لا نشطاً"), T("Saving does not switch the school onto the new year. It arrives in Preparation so it can be built out while the current year keeps running; activating it is a separate, deliberate act from the status board.", "الحفظ لا ينقل المدرسة إلى العام الجديد. فهو يصل في مرحلة الإعداد ليُبنى بينما يستمر العام الحالي؛ وتفعيله عمل منفصل ومقصود من لوحة الحالة.")),
+            new HelpPanelViewModel.Item(T("Dates are Gregorian", "التواريخ ميلادية"), T("Entry is Gregorian in both languages; a Hijri label is shown alongside where the year is displayed. The Arabic interface does not switch the calendar underneath you.", "الإدخال ميلادي في اللغتين؛ ويُعرض وسم هجري بجانبه حيث يظهر العام. والواجهة العربية لا تبدّل التقويم من تحتك.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("6–14 months, no overlap with another year; labels are generated from the dates when left blank (BR-AYR-001). The year starts in Preparation.", "من 6 إلى 14 شهراً وبلا تداخل مع عام آخر؛ تُولَّد التسميات من التواريخ إن تُركت فارغة (BR-AYR-001). يبدأ العام في مرحلة الإعداد.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("6–14 months, no overlap with another year; labels are generated from the dates when left blank (BR-AYR-001). The year starts in Preparation.", "من 6 إلى 14 شهراً وبلا تداخل مع عام آخر؛ تُولَّد التسميات من التواريخ إن تُركت فارغة (BR-AYR-001). يبدأ العام في مرحلة الإعداد.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:760px">
     <form method="post" asp-action="Define" novalidate>

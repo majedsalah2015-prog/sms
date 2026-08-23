@@ -9,6 +9,19 @@
     ViewData["Breadcrumb"] = T("Timetable / ", "الجدول الدراسي / ") + kindLabel;
     ViewData["TtYear"] = Model.Year?.Id; ViewData["TtVersion"] = Model.Version?.Id;
     var backMode = Model.Kind == "teacher" ? "teacher" : Model.Kind == "room" ? "room" : "section";
+    var help = new HelpPanelViewModel
+    {
+        Id = "personal-timetable-help",
+        Title = T("Weekly timetable — help", "الجدول الأسبوعي — مساعدة"),
+        Intro = T("One week, seen from a single point of view — a teacher, a room or a section (doc/Modules/15 §8). All three are the same timetable data sliced differently; nothing is edited here, only read and printed.", "أسبوع واحد منظوراً إليه من زاوية واحدة — معلم أو قاعة أو شعبة (الوثيقة 15 §8). والثلاثة بيانات الجدول نفسها مقطَّعة على نحو مختلف؛ ولا شيء يُعدَّل هنا، بل يُقرأ ويُطبع."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The version badge is the whole story", "وسم الإصدار هو القصة كلها"), T("A draft version is work in progress and can change under you; a published one is what teachers, students and parents are actually working from. Print from a published version, or you will be handing out a plan that no longer holds.", "الإصدار المسوّدة عمل جارٍ وقد يتغير من تحتك؛ والمنشور هو ما يعمل به المعلمون والطلاب وأولياء الأمور فعلاً. فاطبع من إصدار منشور وإلا وزّعت خطة لم تعد قائمة.")),
+            new HelpPanelViewModel.Item(T("Clashes are not visible from one slice", "التعارضات لا تُرى من زاوية واحدة"), T("A teacher's week looks fine while the room it needs is double-booked. The conflicts screen is what checks all three dimensions at once — this page is for reading one of them, not for validating the timetable.", "أسبوع المعلم يبدو سليماً بينما القاعة التي يحتاجها محجوزة مرتين. وشاشة التعارضات هي ما يفحص الأبعاد الثلاثة معاً — وهذه الصفحة لقراءة أحدها لا للتحقق من الجدول.")),
+            new HelpPanelViewModel.Item(T("Cover is not shown here", "التغطية لا تظهر هنا"), T("A one-off cover arrangement does not alter the published timetable — same slot, same room, a different teacher for a day. The cover rota is the screen that knows about those.", "ترتيب التغطية المفرد لا يغيّر الجدول المنشور — الحصة نفسها والقاعة نفسها ومعلم مختلف ليوم. ونوبة التغطية هي الشاشة التي تعرف تلك.")),
+            new HelpPanelViewModel.Item(T("Print drops the navigation", "الطباعة تُسقط عناصر التنقل"), T("The printed sheet carries the title, the subtitle and the grid alone, with the year shown in both languages so a copy pinned to a wall reads correctly to everyone.", "الورقة المطبوعة تحمل العنوان والعنوان الفرعي والشبكة وحدها، مع عرض العام باللغتين لتُقرأ النسخة المعلّقة على الحائط صحيحةً للجميع.")),
+        },
+    };
 }
 
 <div class="sms-page-head d-print-none"><div><h1 class="sms-page-title">@Model.Title</h1><p class="text-muted mb-0">@Model.Subtitle @if (Model.Year != null) { <span>· @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</span> } @if (Model.Version != null) { <span class="badge @TimetableLabels.VersionBadge(Model.Version.Status) ms-1">v@(Model.Version.Id) · @TimetableLabels.VersionStatus(Model.Version.Status, isRtl)</span> }</p></div>
@@ -16,6 +29,7 @@
         @if (Model.Kind == "section") { <a class="btn btn-sm btn-outline-secondary" asp-action="Builder" asp-route-year="@Model.Year?.Id" asp-route-version="@Model.Version?.Id" asp-route-section="@Model.BackId"><i class="bi bi-table me-1" aria-hidden="true"></i>@T("Builder", "المنشئ")</a> }
         else { <a class="btn btn-sm btn-outline-secondary" asp-action="Builder" asp-route-year="@Model.Year?.Id" asp-route-version="@Model.Version?.Id" asp-route-mode="@backMode" asp-route-teacher="@(Model.Kind == "teacher" ? Model.BackId : null)" asp-route-room="@(Model.Kind == "room" ? Model.BackId : null)"><i class="bi bi-table me-1" aria-hidden="true"></i>@T("Builder", "المنشئ")</a> }
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <partial name="_HelpModal" model="help" />
     </div></div>
 <div class="d-none d-print-block mb-2"><h1 class="h4 mb-0">@Model.Title</h1><div class="small">@Model.Subtitle · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) · @(Model.Year == null ? "" : isRtl ? Model.Year.LabelEn : Model.Year.LabelAr)</div></div>
 @if (!Model.Print) { <partial name="_TimetableNav" /> }

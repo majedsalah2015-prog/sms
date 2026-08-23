@@ -7,9 +7,22 @@
     string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys", "بنين"), GenderPolicy.Girls => T("Girls", "بنات"), _ => T("Mixed", "مختلط") };
     ViewData["Title"] = T("Edit section", "تعديل الشعبة") + " — " + (isRtl ? Model.Section.NameAr : Model.Section.NameEn);
     ViewData["Breadcrumb"] = T("Sections / Edit", "الشعب / تعديل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "section-edit-help",
+        Title = T("Edit section — help", "تعديل الشعبة — مساعدة"),
+        Intro = T("A section is one class group within a grade for one academic year (doc/Modules/07 §8). The numbers in the header are the constraints this form is checked against — the grade's plan size, its gender policy, and how many students are already in.", "الشعبة مجموعة صفّية واحدة داخل صف لعام دراسي واحد (الوثيقة 07 §8). والأرقام في الترويسة هي القيود التي يُفحص بها هذا النموذج — حجم الشعبة في خطة الصف وسياسة جنسه وعدد الطلاب الموجودين فعلاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Capacity cannot drop below the students already in it", "السعة لا تنزل تحت الطلاب الموجودين"), T("The refusal is deliberate (BR-SCN-001): a section over its own capacity would be invisible everywhere except the moment someone tried to add one more. Move students out first, then reduce the capacity.", "الرفض مقصود (BR-SCN-001): فالشعبة الزائدة عن سعتها لن تُرى في أي مكان إلا لحظة محاولة إضافة طالب آخر. فأخرج الطلاب أولاً ثم اخفض السعة.")),
+            new HelpPanelViewModel.Item(T("Gender must stay a valid narrowing of the grade", "الجنس يبقى تضييقاً صحيحاً لجنس الصف"), T("A mixed grade may hold boys, girls or mixed sections; a boys grade may not hold a girls section (BR-SCN-003). The grade's own policy is shown in the header so you can see what is available before the save refuses.", "الصف المختلط يحتمل شعب بنين أو بنات أو مختلطة؛ وصف البنين لا يحتمل شعبة بنات (BR-SCN-003). وسياسة الصف معروضة في الترويسة لترى المتاح قبل أن يرفض الحفظ.")),
+            new HelpPanelViewModel.Item(T("The plan size is guidance, not a limit", "حجم الخطة إرشاد لا حدّ"), T("It is what the grade's study plan expects a section to hold. A section may be set above or below it deliberately — the number is there so the deviation is a decision rather than an accident.", "هو ما تتوقعه خطة دراسة الصف أن تحمله الشعبة. ويمكن ضبط الشعبة فوقه أو دونه قصداً — والرقم موجود ليكون الانحراف قراراً لا مصادفة.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@(isRtl ? Model.GradeLabelAr : Model.GradeLabelEn) · @T("plan section size", "حجم الشعبة في الخطة") @Model.PlanSectionSize · @T("grade gender", "جنس الصف") @Gender(Model.GradeGender) · @Model.CurrentMembers @T("students assigned now", "طالباً مسنداً حالياً")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@(isRtl ? Model.GradeLabelAr : Model.GradeLabelEn) · @T("plan section size", "حجم الشعبة في الخطة") @Model.PlanSectionSize · @T("grade gender", "جنس الصف") @Gender(Model.GradeGender) · @Model.CurrentMembers @T("students assigned now", "طالباً مسنداً حالياً")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:640px">
     <form method="post" asp-action="Edit" asp-route-id="@Model.Id" novalidate>

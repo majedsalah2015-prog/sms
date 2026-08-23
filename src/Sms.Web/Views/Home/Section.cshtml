@@ -7,6 +7,18 @@
     ViewData["Title"] = title;
     ViewData["Breadcrumb"] = title;
     string T(string en, string ar) => isRtl ? ar : en;
+    var help = new HelpPanelViewModel
+    {
+        Id = "department-help",
+        Title = T("Department — help", "القسم — مساعدة"),
+        Intro = T("One department's screens, gathered by the job they do rather than by the module they belong to. Finance, students, the secretariat and the rest each pull from several modules, because that is how the work actually divides in a school.", "شاشات قسم واحد، مجموعةً بالعمل الذي تؤديه لا بالوحدة التي تنتمي إليها. فالمالية والطلاب والسكرتارية وغيرها يسحب كل منها من عدة وحدات، لأن هكذا ينقسم العمل في المدرسة فعلاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The list is yours, not the department's", "القائمة قائمتك لا قائمة القسم"), T("Tiles you have no permission for are not drawn (BR-SEC-010), so two people in the same department can see different lists here. A missing tile is a role question, not a missing feature.", "البطاقات التي لا تملك صلاحيتها لا تُرسم (BR-SEC-010)، فقد يرى شخصان في القسم نفسه قائمتين مختلفتين هنا. والبطاقة الغائبة سؤال أدوار لا ميزة ناقصة.")),
+            new HelpPanelViewModel.Item(T("A screen can sit in more than one department", "الشاشة قد تقع في أكثر من قسم"), T("Departments are an index over the same screens, not folders that own them. Finding the fee ledger under finance and again beside the student file is deliberate — both people need it and neither should have to know which module it came from.", "الأقسام فهرس على الشاشات نفسها لا مجلدات تملكها. ووجود دفتر الرسوم تحت المالية ومرة أخرى بجانب ملف الطالب مقصود — فكلاهما يحتاجه ولا ينبغي لأحدهما أن يعرف من أي وحدة جاء.")),
+            new HelpPanelViewModel.Item(T("Where the module numbers live", "أين أرقام الوحدات"), T("The home page's module list is the other index — the product as the specification describes it, numbered 01 to 36. Use it when you are chasing a documented rule; use departments when you are doing a job.", "قائمة الوحدات في الصفحة الرئيسية هي الفهرس الآخر — المنتج كما تصفه المواصفة، مرقّماً من 01 إلى 36. استخدمها حين تتعقّب قاعدة موثّقة، واستخدم الأقسام حين تؤدي عملاً.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -16,9 +28,12 @@
         </h1>
         <p class="text-muted mb-0">@(isRtl ? Model.Info.BlurbAr : Model.Info.BlurbEn)</p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" asp-area="" asp-controller="Home" asp-action="Index">
-        <i class="bi bi-grid" aria-hidden="true"></i> @T("All departments", "كل الأقسام")
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-area="" asp-controller="Home" asp-action="Index">
+            <i class="bi bi-grid" aria-hidden="true"></i> @T("All departments", "كل الأقسام")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 <div class="row g-3">

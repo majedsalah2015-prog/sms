@@ -8,9 +8,23 @@
     ViewData["Breadcrumb"] = T("Schools / School status", "المدارس / حالة المدرسة");
     string Name(SchoolStatus s) => s switch { SchoolStatus.Setup => T("Setup", "إعداد"), SchoolStatus.Active => T("Active", "نشطة"), SchoolStatus.Suspended => T("Suspended", "موقوفة"), SchoolStatus.Closed => T("Closed", "مغلقة"), _ => s.ToString() };
     string Badge(SchoolStatus s) => s switch { SchoolStatus.Active => "text-bg-success", SchoolStatus.Suspended => "text-bg-warning", SchoolStatus.Closed => "text-bg-dark", _ => "text-bg-secondary" };
+    var help = new HelpPanelViewModel
+    {
+        Id = "school-status-help",
+        Title = T("School status — help", "حالة المدرسة — مساعدة"),
+        Intro = T("The school's lifecycle (doc/Modules/02 §8, BR-SCH-005). Four states, and the only one you cannot leave is the last. Status is not a label: it decides who can sign in and what the system will accept, so a move made to tidy a list has operational consequences the same afternoon.", "دورة حياة المدرسة (الوثيقة 02 §8، BR-SCH-005). أربع حالات، والوحيدة التي لا يمكن مغادرتها هي الأخيرة. والحالة ليست وسماً: فهي تقرّر من يستطيع الدخول وما يقبله النظام، فالانتقال الذي يُجرى لترتيب قائمة له أثر تشغيلي في العصر نفسه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The picker only offers legal moves", "القائمة تعرض الانتقالات المشروعة فقط"), T("\"Move to\" is filled from the transitions allowed out of the current state, so an illegal move is not something you can pick and be refused for — it simply is not listed. An empty list with the button disabled means the school is Closed.", "تُملأ «الانتقال إلى» من الانتقالات المسموحة من الحالة الحالية، فالانتقال غير المشروع ليس شيئاً تختاره ثم تُرفض عليه — بل لا يُعرض أصلاً. والقائمة الفارغة مع تعطُّل الزر تعني أن المدرسة مغلقة.")),
+            new HelpPanelViewModel.Item(T("Suspended is reversible; Closed is not", "الموقوفة قابلة للرجوع؛ المغلقة لا"), T("Suspended blocks the parent/student portal and new transactions while staff reading and fee collection stay available, and the school can be reactivated. Closed is terminal and read-only forever — there is no path back, and no screen anywhere in the product will reopen it.", "الموقوفة تحجب بوابة أولياء الأمور والطلاب والمعاملات الجديدة بينما تبقى القراءة للموظفين وتحصيل الرسوم متاحة، ويمكن إعادة تفعيل المدرسة. أما المغلقة فنهائية وللقراءة فقط دائماً — لا طريق للعودة، ولا شاشة في المنتج كله تعيد فتحها.")),
+            new HelpPanelViewModel.Item(T("Setup is a gate, not a stage of decoration", "الإعداد بوابة لا مرحلة شكلية"), T("While the school sits in Setup the first academic year cannot be activated (BR-SET-003). Leaving Setup is what the wizard's \"declare setup complete\" is for; if this screen still shows Setup, the wizard has unfinished mandatory steps.", "ما دامت المدرسة في حالة الإعداد لا يمكن تفعيل أول عام دراسي (BR-SET-003). ومغادرة الإعداد هي غاية «إعلان اكتمال الإعداد» في المعالج؛ فإن كانت هذه الشاشة لا تزال تعرض «إعداد» فللمعالج خطوات إلزامية لم تكتمل.")),
+            new HelpPanelViewModel.Item(T("The reason is mandatory and permanent", "السبب إلزامي ودائم"), T("Every move is T1-audited: the old state, the new state and your reason are written in the same transaction as the change. Write the reason for the person who reads it in two years — \"suspended pending licence renewal, ref 44/2026\" survives; \"test\" does not.", "كل انتقال مدقَّق بمستوى T1: تُكتب الحالة القديمة والجديدة وسببك في المعاملة نفسها مع التغيير. اكتب السبب لمن يقرؤه بعد سنتين — «موقوفة لحين تجديد الترخيص، مرجع 44/2026» يبقى نافعاً، و«تجربة» لا.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Setup → Active → Suspended → Closed; Suspended blocks portal and transactions, Closed is terminal (BR-SCH-005). Every move is T1-audited with a reason.", "إعداد → نشطة → موقوفة → مغلقة؛ الموقوفة تحجب البوابة والمعاملات، والمغلقة نهائية (BR-SCH-005). كل انتقال مدقَّق T1 مع سبب.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Setup → Active → Suspended → Closed; Suspended blocks portal and transactions, Closed is terminal (BR-SCH-005). Every move is T1-audited with a reason.", "إعداد → نشطة → موقوفة → مغلقة؛ الموقوفة تحجب البوابة والمعاملات، والمغلقة نهائية (BR-SCH-005). كل انتقال مدقَّق T1 مع سبب.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <partial name="_SchoolNav" />
 
 @if (Model.School == null)

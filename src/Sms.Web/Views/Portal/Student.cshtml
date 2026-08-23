@@ -18,6 +18,19 @@
     };
     string DayBadge(AttendanceStatus st) => st switch { AttendanceStatus.Present => "text-bg-success", AttendanceStatus.Late or AttendanceStatus.EarlyLeave or AttendanceStatus.Permission => "text-bg-warning", AttendanceStatus.Exempted => "text-bg-light border", _ => "text-bg-danger" };
     var att = Model.Attendance;
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-student-help",
+        Title = T("Student profile — help", "ملف الطالب — مساعدة"),
+        Intro = T("What the school has published about this student for the current academic year — attendance, results and fees. Read-only: the portal shows the school's record and does not edit it.", "ما نشرته المدرسة عن هذا الطالب للعام الدراسي الحالي — الحضور والنتائج والرسوم. للقراءة فقط: فالبوابة تعرض سجل المدرسة ولا تعدّله."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Attendance is what was recorded, not what was excused later", "الحضور هو ما سُجِّل لا ما عُذر لاحقاً"), T("An absence marked unexcused becomes excused once the school accepts a justification (BR-ATD-009). If you have sent one and the day still shows as unexcused, it has not been processed yet — the correction happens at the school, not here.", "الغياب المسجَّل بلا عذر يصير بعذر متى قبلت المدرسة المبرر (BR-ATD-009). فإن أرسلت واحداً وما زال اليوم بلا عذر فلم يُعالَج بعد — والتصحيح يتم في المدرسة لا هنا.")),
+            new HelpPanelViewModel.Item(T("Results appear only once published", "النتائج تظهر بعد نشرها فقط"), T("Marks are entered, reviewed and then published as a set. A subject missing from the results is not a lost mark — that subject's marksheet has not reached the published stage yet.", "تُدخل الدرجات وتُراجع ثم تُنشر مجموعةً واحدة. فالمادة الغائبة من النتائج ليست درجة ضائعة — بل كشف درجاتها لم يبلغ مرحلة النشر بعد.")),
+            new HelpPanelViewModel.Item(T("Fees here are this child's share", "الرسوم هنا حصة هذا الابن"), T("The family statement is the one to pay from — it gathers every child into a single balance. This tab is the breakdown for this student alone, shown gross with the discount separate (BR-DIS-010).", "كشف الأسرة هو ما يُسدَّد منه — فهو يجمع كل الأبناء في رصيد واحد. وهذا اللسان تفصيل لهذا الطالب وحده، يُعرض إجمالياً والخصم منفصل (BR-DIS-010).")),
+            new HelpPanelViewModel.Item(T("\"Not enrolled this year\" is a real state", "«غير مقيّد هذا العام» حالة حقيقية"), T("A student can exist without a current-year enrolment — a transfer, a gap, or a year not yet started. Their history stays readable throughout (BR-STU-002); only this year's grade and section are absent.", "قد يوجد طالب بلا قيد لهذا العام — نقل أو انقطاع أو عام لم يبدأ بعد. ويبقى سجله مقروءاً طوال الوقت (BR-STU-002)؛ والغائب هو صف هذا العام وشعبته فقط.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -31,6 +44,7 @@
     <div class="d-flex gap-2">
         @if (Model.Section != null) { <a class="btn btn-outline-primary" asp-action="Timetable" asp-route-id="@s.Id"><i class="bi bi-table me-1" aria-hidden="true"></i>@T("Timetable", "الجدول")</a> }
         <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("My family", "عائلتي")</a>
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 

@@ -12,6 +12,20 @@
     string Cls(DayType t) => t switch { DayType.Working => "is-working", DayType.Weekend => "is-weekend", DayType.Holiday => "is-holiday", DayType.Partial => "is-partial", DayType.ExamPeriodWorking => "is-exam", _ => "" };
     string TypeName(DayType t) => t switch { DayType.Working => T("Working", "عمل"), DayType.Weekend => T("Weekend", "عطلة أسبوعية"), DayType.Holiday => T("Holiday", "إجازة"), DayType.Partial => T("Partial day", "يوم جزئي"), DayType.ExamPeriodWorking => T("Exam period", "فترة اختبارات"), _ => t.ToString() };
     string CatName(CalendarEventCategory c) => c switch { CalendarEventCategory.National => T("National", "وطني"), CalendarEventCategory.Religious => T("Religious", "ديني"), CalendarEventCategory.SchoolEvent => T("School event", "حدث مدرسي"), CalendarEventCategory.ProfessionalDay => T("Professional day", "يوم مهني"), _ => c.ToString() };
+    var help = new HelpPanelViewModel
+    {
+        Id = "calendar-help",
+        Title = T("Academic calendar — help", "التقويم الدراسي — مساعدة"),
+        Intro = T("Which days the school actually teaches, for one academic year (doc/Modules/04 §8). Attendance, timetables and anything that counts instructional days read this calendar, so a day painted wrong here is wrong everywhere downstream.", "الأيام التي تُدرِّس فيها المدرسة فعلاً، لعام دراسي واحد (الوثيقة 04 §8). فالحضور والجداول وكل ما يعدّ الأيام الدراسية يقرأ هذا التقويم، فاليوم المعيَّن خطأً هنا خطأ في كل ما بعده."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Weekends are a setting; paint is an exception", "العطلة الأسبوعية إعداد والتعيين استثناء"), T("The recurring weekend comes from the working-week setting, and painting a day overrides it for that date only (BR-CAL-001/002). Use paint for the one-off — a national holiday, a professional day, a Saturday the school opened for exams — and change the working-week setting when the pattern itself changed.", "العطلة الأسبوعية المتكررة تأتي من إعداد أسبوع العمل، وتعيين يوم يتجاوزها لذلك التاريخ وحده (BR-CAL-001/002). فاستخدم التعيين للحالة الفردية — إجازة وطنية أو يوم مهني أو سبتٍ فتحت فيه المدرسة للاختبارات — وغيّر إعداد أسبوع العمل حين يتغير النمط نفسه.")),
+            new HelpPanelViewModel.Item(T("Day types are not colours", "أنواع الأيام ليست ألواناً"), T("Working, Weekend, Holiday, Partial and Exam period each mean something to the modules that read them: a partial day still counts for attendance but on a shortened schedule, and an exam-period day is instructional even when normal lessons are not running.", "«عمل» و«عطلة أسبوعية» و«إجازة» و«يوم جزئي» و«فترة اختبارات» لكل منها معنى عند الوحدات التي تقرؤها: فاليوم الجزئي يُحتسب للحضور لكن بجدول مختصر، ويوم فترة الاختبارات يوم دراسي وإن لم تُعقد فيه الحصص المعتادة.")),
+            new HelpPanelViewModel.Item(T("Publishing is what makes it real", "النشر هو ما يجعله واقعاً"), T("Edits are drafts until you publish, and publishing snapshots a new numbered version (BR-CAL-007). The button is disabled when there is nothing unpublished. Old versions stay readable, which is how you answer what the calendar said before a mid-year change.", "التعديلات مسوّدات حتى تنشر، والنشر يحفظ إصداراً مرقّماً جديداً (BR-CAL-007). والزر معطَّل حين لا يوجد غير منشور. وتبقى الإصدارات القديمة مقروءة، وبها تُجيب عمّا كان يقوله التقويم قبل تغيير في منتصف العام.")),
+            new HelpPanelViewModel.Item(T("The Hijri overlay is display only", "العرض الهجري للعرض فقط"), T("Toggling it adds Hijri dates beside the Gregorian grid; it never changes what is stored or which day a record belongs to. The Arabic interface does not turn the overlay on by itself.", "تبديله يضيف التواريخ الهجرية بجانب الشبكة الميلادية؛ ولا يغيّر أبداً ما هو مخزَّن ولا اليوم الذي ينتمي إليه سجل. والواجهة العربية لا تشغّل العرض من تلقائها.")),
+            new HelpPanelViewModel.Item(T("Instructional days is the number to watch", "عدد الأيام الدراسية هو الرقم الذي تراقبه"), T("The count in the header is what the ministry minimum is checked against and what attendance percentages divide by. If it looks wrong, the cause is almost always a stretch of days painted with the wrong type rather than a miscount.", "العدد في الترويسة هو ما يُقاس عليه الحد الأدنى الوزاري وما تُقسم عليه نسب الحضور. فإن بدا خاطئاً فالسبب في الغالب مجموعة أيام عُيِّنت بنوع خاطئ لا خطأ في العدّ.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -25,6 +39,7 @@
         </form>
         <form method="post" asp-action="Publish"><input type="hidden" name="academicYearId" value="@Model.Year.Id" />
             <button class="btn btn-sm btn-success" type="submit" @(Model.HasUnpublishedEdits ? "" : "disabled") title="@T("BR-CAL-007: snapshots a new published version", "BR-CAL-007: يحفظ إصداراً منشوراً جديداً")"><i class="bi bi-megaphone me-1" aria-hidden="true"></i>@T("Publish", "نشر") @(Model.Versions.Count > 0 ? $"v{Model.Versions[0].VersionNumber + 1}" : "v1")</button></form>
+        <partial name="_HelpModal" model="help" />
     </div>
 </div>
 

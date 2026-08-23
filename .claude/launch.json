@@ -4,7 +4,7 @@
     {
       "name": "sms-web",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--no-launch-profile", "--project", "src/Sms.Web/Sms.Web.csproj", "--urls", "http://localhost:5000"],
+      "runtimeArgs": ["run", "--no-launch-profile", "--project", "src/Sms.Web/Sms.Web.csproj", "--environment", "Development", "--urls", "http://localhost:5000"],
       "port": 5000
     }
   ]

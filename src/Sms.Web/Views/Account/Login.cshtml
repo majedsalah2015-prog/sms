@@ -5,9 +5,26 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Sign in", "تسجيل الدخول");
+    var help = new HelpPanelViewModel
+    {
+        Id = "login-help",
+        Title = T("Signing in — help", "تسجيل الدخول — مساعدة"),
+        ButtonLabel = T("Trouble signing in?", "تعذّر الدخول؟"),
+        Intro = T("One account per person, staff and portal alike (doc/Modules/06 §8). The sign-in rules below are the ones that produce almost every failed attempt, and none of them can be worked around from this page.", "حساب واحد لكل شخص، للموظفين والبوابة على السواء (الوثيقة 06 §8). والقواعد أدناه هي التي تنتج كل محاولة فاشلة تقريباً، ولا يمكن تجاوز أي منها من هذه الصفحة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Repeated wrong passwords lock the account", "تكرار كلمة المرور الخاطئة يقفل الحساب"), T("Failed attempts accumulate and the account locks itself for a period (BR-SEC-002). The lock lifts on its own — waiting is faster than trying variations, and every further attempt while locked is recorded too.", "المحاولات الفاشلة تتراكم ويقفل الحساب نفسه لمدة (BR-SEC-002). والقفل يزول من تلقائه — فالانتظار أسرع من تجريب الصيغ، وكل محاولة إضافية أثناء القفل تُسجَّل أيضاً.")),
+            new HelpPanelViewModel.Item(T("A new account must change its password first", "الحساب الجديد يغيّر كلمة مروره أولاً"), T("A password issued by an administrator is one-time: signing in with it takes you straight to a change-password screen and nowhere else until it is changed (BR-SEC-005).", "كلمة المرور الصادرة من المسؤول لمرة واحدة: فالدخول بها ينقلك مباشرة إلى شاشة تغيير كلمة المرور ولا شيء غيرها حتى تُغيَّر (BR-SEC-005).")),
+            new HelpPanelViewModel.Item(T("Forgotten passwords go through an administrator", "كلمة المرور المنسية تمرّ عبر المسؤول"), T("There is no self-service reset in this product. An administrator issues a new one-time password from the user administration screens; nobody can recover the old one, because passwords are stored hashed and are not readable by anyone.", "لا توجد إعادة تعيين ذاتية في هذا المنتج. فالمسؤول يُصدر كلمة مرور جديدة لمرة واحدة من شاشات إدارة المستخدمين؛ ولا أحد يستطيع استرجاع القديمة، لأن كلمات المرور مخزَّنة مُجزَّأة ولا يقرؤها أحد.")),
+            new HelpPanelViewModel.Item(T("Right account, wrong door", "الحساب الصحيح والباب الخطأ"), T("Parent and student accounts are taken to the portal automatically; staff screens are not visible to them by design. Signing in successfully and landing somewhere unexpected usually means the account type, not the password, is the surprise.", "حسابات أولياء الأمور والطلاب تُنقل إلى البوابة تلقائياً؛ وشاشات الموظفين غير مرئية لهم بالتصميم. فالدخول بنجاح والوصول إلى مكان غير متوقع يعني عادةً أن المفاجأة في نوع الحساب لا في كلمة المرور.")),
+        },
+    };
 }
 
-<h2 class="sms-auth__title">@T("Sign in to your account", "تسجيل الدخول إلى حسابك")</h2>
+<div class="d-flex align-items-start justify-content-between gap-2">
+    <h2 class="sms-auth__title mb-0">@T("Sign in to your account", "تسجيل الدخول إلى حسابك")</h2>
+    <partial name="_HelpModal" model="help" />
+</div>
 
 <form asp-action="Login" method="post" novalidate>
     <input type="hidden" asp-for="ReturnUrl" />

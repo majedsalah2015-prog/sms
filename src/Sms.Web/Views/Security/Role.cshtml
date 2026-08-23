@@ -15,6 +15,19 @@
     string ModuleTitle(string code) =>
         ModuleCatalog.Find(code) is { } m ? (isRtl ? m.TitleAr : m.TitleEn) : code;
     string VerbLabel(Sms.Domain.Security.ActionVerb v) => Sms.Web.Models.Labels.Verb(v, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "role-designer-help",
+        Title = T("Role designer — help", "مصمم الأدوار — مساعدة"),
+        Intro = T("Every screen in the product, grouped by module, with a checkbox per verb (doc/Modules/06 §8). What you tick here is exactly what this role's holders can reach; what you leave blank does not appear in their sidebar at all.", "كل شاشة في المنتج مجمَّعة بالوحدات، مع مربع اختيار لكل فعل (الوثيقة 06 §8). فما تؤشّره هنا هو بالضبط ما يصل إليه حاملو هذا الدور؛ وما تتركه فارغاً لا يظهر في قائمتهم الجانبية أصلاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("View is the one that carries the rest", "«العرض» هو ما يحمل البقية"), T("Granting Edit without View gives a holder the right to change a screen they cannot open. Start from View for anything the role should see, then add the verbs it should be able to do.", "منح «التعديل» بلا «العرض» يعطي الحامل حق تغيير شاشة لا يستطيع فتحها. فابدأ بـ«العرض» لكل ما ينبغي للدور رؤيته، ثم أضف الأفعال التي ينبغي له فعلها.")),
+            new HelpPanelViewModel.Item(T("What the verbs actually mean", "ما تعنيه الأفعال فعلاً"), T("Deactivate is delete, void and cancel together — this product never hard-deletes. Post is the verb that moves money and is the one to grant sparingly. Approve signs something off; Configure changes the system's own shape. Export releases data out of the building.", "«إلغاء التفعيل» هو الحذف والإبطال والإلغاء مجتمعة — فالمنتج لا يحذف نهائياً أبداً. و«الترحيل» هو الفعل الذي يحرّك المال وأولى الأفعال بالتقتير. و«الاعتماد» يصادق على شيء؛ و«الضبط» يغيّر شكل النظام نفسه. و«التصدير» يُخرج البيانات من المبنى.")),
+            new HelpPanelViewModel.Item(T("Saving affects everyone holding the role", "الحفظ يمسّ كل حاملي الدور"), T("The holder count in the header is how many people this change reaches, and it reaches them on their next request rather than at their next sign-in. Removing a verb from a busy role mid-morning is felt immediately.", "عدد الحاملين في الترويسة هو عدد من يصلهم هذا التغيير، ويصلهم في طلبهم التالي لا في دخولهم التالي. فنزع فعل من دور مزدحم في منتصف الصباح يُحسّ به فوراً.")),
+            new HelpPanelViewModel.Item(T("The permission-administration flag", "وسم إدارة الصلاحيات"), T("If this role can change permissions, its holders can edit this very screen — including granting themselves anything and marking other roles the same way. Every grant change is audited, but audit is a record, not a barrier.", "إن كان هذا الدور يعدّل الصلاحيات فحاملوه يستطيعون تعديل هذه الشاشة نفسها — بما في ذلك منح أنفسهم أي شيء ووسم أدوار أخرى بالمثل. وكل تغيير منح مدقَّق، لكن التدقيق سجل لا حاجز.")),
+        },
+    };
 }
 
 <div class="sms-page-head">
@@ -30,7 +43,10 @@
             @role.GrantCount @T("permissions", "صلاحية") · @role.HolderCount @T("holders", "حاملاً")
         </p>
     </div>
-    <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("All roles", "كل الأدوار")</a>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Index"><i class="bi bi-arrow-left" aria-hidden="true"></i> @T("All roles", "كل الأدوار")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
 </div>
 
 @if (TempData["Error"] is string error)

@@ -5,9 +5,23 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("My family", "عائلتي");
     var who = isRtl ? Model.ParentNameAr : Model.ParentNameEn;
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-home-help",
+        Title = T("My family — help", "عائلتي — مساعدة"),
+        Intro = T("Your children, and what the school has published about each of them. The portal is read-only by design: it shows you the school's records, and everything on it is corrected by the school rather than here.", "أبناؤك وما نشرته المدرسة عن كل منهم. والبوابة للقراءة فقط بالتصميم: تعرض لك سجلات المدرسة، وكل ما فيها يُصحَّح لدى المدرسة لا من هنا."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("A missing child is a linking question", "الابن الغائب مسألة ربط"), T("You see exactly the students linked to your account (BR-SEC-011). If a child is missing, their record has not been linked to you yet — the school's office adds the link; nothing you can do on this page will make them appear.", "ترى بالضبط الطلاب المرتبطين بحسابك (BR-SEC-011). فإن غاب ابن فسجله لم يُربط بك بعد — وإدارة المدرسة تضيف الربط؛ ولا شيء تفعله في هذه الصفحة يُظهره.")),
+            new HelpPanelViewModel.Item(T("You are seeing published, not draft", "أنت ترى المنشور لا المسوّدة"), T("Results appear only after the school publishes them, and fees only after they are posted. A mark your child has been told about that is not here yet has not been published — it is not lost.", "تظهر النتائج بعد نشر المدرسة لها فقط، والرسوم بعد ترحيلها فقط. فالدرجة التي أُخبر بها ابنك ولم تظهر هنا بعد لم تُنشر — وليست ضائعة.")),
+            new HelpPanelViewModel.Item(T("The academic year matters", "العام الدراسي مهم"), T("The year shown at the top is the one everything on this page belongs to. Attendance and fees from a previous year are not missing; they belong to that year's records.", "العام المعروض في الأعلى هو الذي ينتمي إليه كل ما في هذه الصفحة. فحضور العام السابق ورسومه ليست مفقودة؛ بل تخصّ سجلات ذلك العام.")),
+            new HelpPanelViewModel.Item(T("The language is yours to set", "اللغة لك أن تضبطها"), T("The portal follows the preferred language on your file, and the switch at the top changes it for this visit. Dates stay Gregorian in both — the calendar does not change with the language.", "تتبع البوابة اللغة المفضلة في ملفك، والمبدّل في الأعلى يغيّرها لهذه الزيارة. وتبقى التواريخ ميلادية في اللغتين — فالتقويم لا يتغير بتغير اللغة.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@(string.IsNullOrEmpty(who) ? T("My family", "عائلتي") : T($"Welcome, {who}", $"مرحباً، {who}"))</h1><p class="text-muted mb-0">@(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)) · @T("Attendance, published results and posted fees for each child.", "الحضور والنتائج المنشورة والرسوم المرحّلة لكل ابن/ابنة.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@(string.IsNullOrEmpty(who) ? T("My family", "عائلتي") : T($"Welcome, {who}", $"مرحباً، {who}"))</h1><p class="text-muted mb-0">@(Model.Year == null ? "" : (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)) · @T("Attendance, published results and posted fees for each child.", "الحضور والنتائج المنشورة والرسوم المرحّلة لكل ابن/ابنة.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 @if (Model.Children.Count == 0)
 {

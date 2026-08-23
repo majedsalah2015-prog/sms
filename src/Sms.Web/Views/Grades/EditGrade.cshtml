@@ -5,9 +5,22 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Edit grade", "تعديل الصف");
     ViewData["Breadcrumb"] = T("Grades / Edit grade", "الصفوف / تعديل الصف");
+    var help = new HelpPanelViewModel
+    {
+        Id = "grade-edit-help",
+        Title = T("Edit grade — help", "تعديل الصف — مساعدة"),
+        Intro = T("One rung of the school's ladder (doc/Modules/05 §8). This form holds what the grade is; what it leads to — the promotion path and whether it graduates — belongs to the ladder screen, because those are relationships between grades rather than properties of one.", "درجة واحدة من سلّم المدرسة (الوثيقة 05 §8). هذا النموذج يحمل ما هو الصف؛ أما ما يؤدي إليه — مسار الترفيع وهل يتخرج منه — فيخصّ شاشة السلّم، لأن تلك علاقات بين الصفوف لا خصائص لصف واحد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The code is unique and widely referenced", "الرمز فريد ومُشار إليه في كل مكان"), T("Unique per school (BR-GRD-009). Changing it updates everything that points at this grade rather than breaking those links — but the old code stops matching anything a person has written down outside the system, so change it deliberately.", "فريد على مستوى المدرسة (BR-GRD-009). وتغييره يحدّث كل ما يشير إلى هذا الصف بدل كسر تلك الروابط — لكن الرمز القديم يتوقف عن مطابقة أي شيء دوّنه أحد خارج النظام، فغيّره عن قصد.")),
+            new HelpPanelViewModel.Item(T("Moving a grade to another stage", "نقل الصف إلى مرحلة أخرى"), T("The stage sets the gender policy this grade's year profiles must be a valid narrowing of (BR-GRD-004). A move that would leave an existing profile inconsistent is refused, naming what is in the way.", "المرحلة تحدد سياسة الجنس التي يجب أن تكون ملفات هذا الصف السنوية تضييقاً صحيحاً لها (BR-GRD-004). والنقل الذي يترك ملفاً قائماً غير متسق يُرفض مع تسمية المانع.")),
+            new HelpPanelViewModel.Item(T("Order positions it within the stage", "الترتيب يضعه داخل المرحلة"), T("It is what pickers, reports and the promotion ladder read to sort grades. Two grades sharing an order number will sort unpredictably — give each its own.", "هو ما تقرؤه المنتقيات والتقارير وسلّم الترفيع لترتيب الصفوف. وصفّان يتشاركان رقم ترتيب سيُرتَّبان بلا انتظام — فأعطِ كلاً منهما رقمه.")),
+        },
+    };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"] — @Model.Code</h1><p class="text-muted mb-0">@T("Stage, code, names and order. Codes are unique per school (BR-GRD-009); the promotion path and graduating flag are edited on the ladder itself.", "المرحلة والرمز والأسماء والترتيب. الرموز فريدة على مستوى المدرسة (BR-GRD-009)؛ ويُعدَّل مسار الترفيع وعلامة التخرج من السلم نفسه.")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"] — @Model.Code</h1><p class="text-muted mb-0">@T("Stage, code, names and order. Codes are unique per school (BR-GRD-009); the promotion path and graduating flag are edited on the ladder itself.", "المرحلة والرمز والأسماء والترتيب. الرموز فريدة على مستوى المدرسة (BR-GRD-009)؛ ويُعدَّل مسار الترفيع وعلامة التخرج من السلم نفسه.")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 
 <div class="sms-card p-4" style="max-width:640px">
     <form method="post" asp-action="EditGrade" asp-route-id="@Model.Id" novalidate>

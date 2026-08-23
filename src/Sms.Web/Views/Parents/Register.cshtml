@@ -5,8 +5,22 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("New parent", "ولي أمر جديد");
     ViewData["Breadcrumb"] = T("Parents / New", "أولياء الأمور / جديد");
+    var help = new HelpPanelViewModel
+    {
+        Id = "parent-register-help",
+        Title = T("New parent — help", "ولي أمر جديد — مساعدة"),
+        Intro = T("A parent is a record in their own right, not a set of fields on a student (doc/Modules/09 §8). That is what lets four siblings share one father, one fee statement and one portal login instead of four half-matching copies of the same man.", "ولي الأمر سجل قائم بذاته لا مجموعة حقول على الطالب (الوثيقة 09 §8). وهذا ما يتيح لأربعة إخوة أن يشتركوا في أبٍ واحد وكشف رسوم واحد وحساب بوابة واحد بدل أربع نسخ نصف متطابقة للرجل نفسه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The primary mobile is the identity", "الجوال الأساسي هو الهوية"), T("It is the key duplicates are detected on (BR-PAR-002) and the number notifications are sent to. Enter the parent's own number, not the school's and not a relative's — a shared number is how two families end up merged into one file.", "هو المفتاح الذي تُكتشف به التكرارات (BR-PAR-002) والرقم الذي تُرسل إليه الإشعارات. فأدخل رقم ولي الأمر نفسه لا رقم المدرسة ولا رقم قريب — فالرقم المشترك هو ما يجعل أسرتين تنتهيان في ملف واحد.")),
+            new HelpPanelViewModel.Item(T("Check before you create", "افحص قبل أن تنشئ"), T("If the family already has a child in the school, the parent almost certainly exists. Search the directory first and link the new student to the existing file; the dedup workbench exists because this step gets skipped.", "إن كان للأسرة ابن في المدرسة فولي الأمر موجود على الأرجح. فابحث في الدليل أولاً واربط الطالب الجديد بالملف الموجود؛ فطاولة التكرار وُجدت لأن هذه الخطوة تُتخطّى.")),
+            new HelpPanelViewModel.Item(T("Preferred language is not cosmetic", "اللغة المفضلة ليست شكلية"), T("It decides which language this parent's notifications, statements and portal are rendered in — independently of what language the staff member entering the record happens to be using.", "تقرّر اللغة التي تُعرض بها إشعارات ولي الأمر وكشوفه وبوابته — مستقلةً عن اللغة التي يستخدمها الموظف المُدخِل للسجل.")),
+            new HelpPanelViewModel.Item(T("The file number is issued", "رقم الملف يُصدَر"), T("The PAR series produces it when the record is saved. It is not typed, not reused, and stays with the family for as long as they are with the school.", "سلسلة PAR تنتجه عند حفظ السجل. فلا يُكتب ولا يُعاد استخدامه، ويبقى مع الأسرة ما بقيت مع المدرسة.")),
+        },
+    };
 }
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("An independent parent file (PAR series) that students link to; the primary mobile is the dedup key (BR-PAR-002).", "ملف ولي أمر مستقل (سلسلة PAR) يرتبط به الطلاب؛ الجوال الأساسي مفتاح منع التكرار (BR-PAR-002).")</p></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("An independent parent file (PAR series) that students link to; the primary mobile is the dedup key (BR-PAR-002).", "ملف ولي أمر مستقل (سلسلة PAR) يرتبط به الطلاب؛ الجوال الأساسي مفتاح منع التكرار (BR-PAR-002).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
 <form method="post" asp-action="Register">
     <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
     <p class="form-text">@T("Fields marked * are required.", "الحقول المعلّمة بـ * إلزامية.")</p>
