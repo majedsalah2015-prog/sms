@@ -95,6 +95,51 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(EmployeeStatus.Active, employee.Status);
         }
 
+        // --- personal details: marital status and where the salary is paid -----
+
+        [Fact]
+        [BusinessRule("BR-EMP-001")]
+        public async Task Personal_details_are_stored_and_blanks_are_recorded_as_unknown_not_as_empty()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            _audit.Reason = "imported from the staff register";
+            await admin.UpdatePersonalDetailsAsync(employee.Id, MaritalStatus.Married, "  بنك فلسطين  ", " 0123456789 ");
+
+            var saved = await db.Employees.SingleAsync(e => e.Id == employee.Id);
+            Assert.Equal(MaritalStatus.Married, saved.MaritalStatus);
+            Assert.Equal("بنك فلسطين", saved.BankName);
+            Assert.Equal("0123456789", saved.BankAccountNo);
+
+            // A register that left the column out must leave the field unknown. An empty string
+            // would read as an answer in every report and picker afterwards.
+            await admin.UpdatePersonalDetailsAsync(employee.Id, null, "   ", string.Empty);
+
+            var cleared = await db.Employees.SingleAsync(e => e.Id == employee.Id);
+            Assert.Null(cleared.MaritalStatus);
+            Assert.Null(cleared.BankName);
+            Assert.Null(cleared.BankAccountNo);
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-001")]
+        public async Task Changing_the_account_that_receives_someones_pay_is_refused_without_a_reason()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            // The point of putting [RequiresAuditReason] on the bank pair, and the reason this test
+            // exists rather than the happy path alone: a silent change of where a salary is paid is
+            // the one edit on this record nobody should be able to make without saying why.
+            _audit.Reason = null;
+
+            await Assert.ThrowsAsync<MissingAuditReasonException>(
+                () => admin.UpdatePersonalDetailsAsync(employee.Id, null, "بنك آخر", "9999999999"));
+        }
+
         // --- BR-EMP-001 status transitions -------------------------------------
 
         [Fact]

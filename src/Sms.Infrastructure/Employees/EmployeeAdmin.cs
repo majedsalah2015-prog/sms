@@ -191,6 +191,23 @@ namespace Sms.Infrastructure.Employees
             return employee;
         }
 
+        public async Task<Employee> UpdatePersonalDetailsAsync(
+            int employeeId, MaritalStatus? maritalStatus, string? bankName, string? bankAccountNo,
+            CancellationToken cancellationToken = default)
+        {
+            var employee = await _db.Employees.SingleAsync(e => e.Id == employeeId, cancellationToken);
+
+            // Blank means "not recorded", not "recorded as empty": a register that left the column
+            // out should leave the field null rather than storing an empty string that reads as an
+            // answer in every report and picker afterwards.
+            employee.MaritalStatus = maritalStatus;
+            employee.BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim();
+            employee.BankAccountNo = string.IsNullOrWhiteSpace(bankAccountNo) ? null : bankAccountNo.Trim();
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return employee;
+        }
+
         public async Task<Contract> UpdateContractAsync(
             int contractId, ContractType type, DateTime startDate, DateTime endDate, decimal salaryBasic,
             decimal? salaryAllowances = null, CancellationToken cancellationToken = default)
@@ -251,7 +268,7 @@ namespace Sms.Infrastructure.Employees
                     throw new OrgUnitInUseException(orgUnitId, "an org unit cannot be its own parent (BR-EMP-002)");
                 }
 
-                // Walk up from the proposed parent — moving under one of our own descendants would create a cycle.
+                // Walk up from the proposed parent ï¿½ moving under one of our own descendants would create a cycle.
                 var units = await _db.OrgUnits.Select(u => new { u.Id, u.ParentOrgUnitId }).ToListAsync(cancellationToken);
                 var byId = units.ToDictionary(u => u.Id, u => u.ParentOrgUnitId);
                 if (!byId.ContainsKey(parentOrgUnitId.Value))

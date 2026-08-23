@@ -44,6 +44,26 @@ namespace Sms.Application.Employees
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
             CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Marital status and where the salary is paid — the three fields doc/Modules/12 §7 does
+        /// not list, added at the owner's request (2026-08-23).
+        /// <para>
+        /// Its own method rather than three more parameters on
+        /// <see cref="UpdateEmployeeAsync"/>, which already takes fifteen. The precedent is
+        /// <c>IStudentAdmin.UpdateSocialProfileAsync</c>: a block of fields that belongs to a
+        /// different region of the file, is likely to end up behind a permission of its own, and
+        /// has no business lengthening the identity signature.
+        /// </para>
+        /// <para>
+        /// All three are T1 with a required reason, so <c>IAuditContext.Reason</c> must be set
+        /// before this is called on an existing row — a bank account that changes with no stated
+        /// reason is the one edit on this record nobody should be able to make quietly.
+        /// </para>
+        /// </summary>
+        Task<Employee> UpdatePersonalDetailsAsync(
+            int employeeId, MaritalStatus? maritalStatus, string? bankName, string? bankAccountNo,
+            CancellationToken cancellationToken = default);
+
         /// <summary>Edits a Draft contract (dates/type/salary) — active contracts are immutable documents; throws <see cref="Common.Exceptions.OverlappingContractException"/>.</summary>
         Task<Contract> UpdateContractAsync(
             int contractId, ContractType type, DateTime startDate, DateTime endDate, decimal salaryBasic,

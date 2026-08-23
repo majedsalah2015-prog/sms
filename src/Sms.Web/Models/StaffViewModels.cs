@@ -214,6 +214,19 @@ namespace Sms.Web.Models
             _ => t.ToString(),
         };
 
+        /// <summary>
+        /// Rendered in the reader's language, and gendered in Arabic the way a form is — the
+        /// record does not decide which half applies, so both are shown.
+        /// </summary>
+        public static string MaritalStatus(Sms.Domain.Employees.MaritalStatus m, bool ar) => m switch
+        {
+            Sms.Domain.Employees.MaritalStatus.Single => ar ? "أعزب / عزباء" : "Single",
+            Sms.Domain.Employees.MaritalStatus.Married => ar ? "متزوج / متزوجة" : "Married",
+            Sms.Domain.Employees.MaritalStatus.Divorced => ar ? "مطلق / مطلقة" : "Divorced",
+            Sms.Domain.Employees.MaritalStatus.Widowed => ar ? "أرمل / أرملة" : "Widowed",
+            _ => m.ToString(),
+        };
+
         public static string TeacherRole(Sms.Domain.Teachers.TeacherRole r, bool ar) => r switch
         {
             Sms.Domain.Teachers.TeacherRole.Primary => ar ? "أساسي" : "Primary",

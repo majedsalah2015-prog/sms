@@ -33,7 +33,7 @@ namespace Sms.Web.Controllers
     /// flagged, not hidden.
     /// </summary>
     [Route("employees")]
-    public class EmployeesController : Controller
+    public partial class EmployeesController : Controller
     {
         private readonly IEmployeeAdmin _employees;
         private readonly ITeacherAdmin _teachers;
@@ -108,8 +108,33 @@ namespace Sms.Web.Controllers
             {
                 RequireNames(form);
                 if (form.DateOfBirth == null || form.NationalityLookupId == null) throw new InvalidOperationException(T("Date of birth and nationality are required.", "تاريخ الميلاد والجنسية مطلوبان."));
+
+                // The photograph is judged before the employee exists, the way the student register
+                // judges it: a file that is going to be refused must not leave a registered person
+                // behind it. The second attempt at this form is how one human being ends up holding
+                // two EMP numbers, which BR-EMP-001 exists to prevent.
+                var rejection = form.Photo == null ? Sms.Web.Services.PhotoRejection.None : Sms.Web.Services.PersonPhotoService.Inspect(form.Photo);
+                if (rejection != Sms.Web.Services.PhotoRejection.None) throw new InvalidOperationException(Labels.PhotoRejection(rejection, IsArabic));
+
                 var e = await _employees.RegisterEmployeeAsync(form.FirstNameAr!.Trim(), form.FatherNameAr!.Trim(), form.GrandfatherNameAr!.Trim(), form.FamilyNameAr!.Trim(), form.FirstNameEn!.Trim(), form.FatherNameEn!.Trim(), form.GrandfatherNameEn!.Trim(), form.FamilyNameEn!.Trim(),
                     form.Gender, form.DateOfBirth.Value, form.NationalityLookupId.Value, form.UserAccountId, form.PrimaryIdTypeLookupId, string.IsNullOrWhiteSpace(form.PrimaryIdNo) ? null : form.PrimaryIdNo.Trim(), form.PrimaryIdExpiry);
+
+                if (form.Photo != null)
+                {
+                    // Inspect() has already passed, so what is left is the document type's own
+                    // upload policy, which a school may have tightened. The employee is registered
+                    // either way: an EMP number is permanent and never re-issued, so undoing a
+                    // registration over a refused JPEG costs more than the photograph is worth.
+                    try
+                    {
+                        await AttachPhotoAsync(e.Id, form.Photo);
+                    }
+                    catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException)
+                    {
+                        TempData["Error"] = T("The employee was registered, but the photo was not accepted — add it from the employee file.", "تم تسجيل الموظف، لكن الصورة لم تُقبل — أضفها من ملف الموظف.");
+                    }
+                }
+
                 if (form.OrgUnitId != null && form.PositionLookupId != null)
                 {
                     await _employees.AssignPositionAsync(e.Id, form.OrgUnitId.Value, form.PositionLookupId.Value, form.ManagerEmployeeId, _clock.UtcNow.Date);
@@ -180,9 +205,27 @@ namespace Sms.Web.Controllers
             {
                 TempData["Error"] = T("That file is not an acceptable photo.", "هذا الملف ليس صورة مقبولة.");
             }
+            // Also an InvalidOperationException, and it carries a reason rather than a sentence —
+            // the wording is chosen here, in the reader's language, never thrown from the service.
+            catch (Sms.Web.Services.PhotoRejectedException ex) { TempData["Error"] = Labels.PhotoRejection(ex.Rejection, IsArabic); }
             catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
 
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
+        }
+
+        /// <summary>
+        /// Points the employee's row at the photograph once the person exists — nothing can be
+        /// stored against an EMP id that has not been issued yet, which is why the registration
+        /// form calls this after the record is made rather than sending the file on its own.
+        /// </summary>
+        private async Task AttachPhotoAsync(int employeeId, IFormFile file)
+        {
+            var attachmentId = await _photos.SaveAsync(
+                file, "Employee", employeeId, ScreenCatalog.Modules.Employees, HttpContext.RequestAborted);
+
+            var employee = await _db.Employees.SingleAsync(e => e.Id == employeeId, HttpContext.RequestAborted);
+            employee.PhotoAttachmentId = attachmentId;
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
         }
 
         [HttpPost("{id:int}/photo/remove")]

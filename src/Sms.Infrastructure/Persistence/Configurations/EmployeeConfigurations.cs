@@ -24,6 +24,14 @@ namespace Sms.Infrastructure.Persistence.Configurations
             }
 
             builder.Property(x => x.PrimaryIdNo).HasMaxLength(30);
+
+            // Disbursement details (doc/Modules/12 §7 extension, owner request 2026-08-23).
+            // Both nullable: a school importing an old register rarely has them for everyone, and
+            // an employee who is paid in cash has neither. Lengths are generous rather than
+            // country-specific — an IBAN is 34 characters at most, and the bank's own name is
+            // written however the school writes it.
+            builder.Property(x => x.BankName).HasMaxLength(120);
+            builder.Property(x => x.BankAccountNo).HasMaxLength(40);
         }
     }
 

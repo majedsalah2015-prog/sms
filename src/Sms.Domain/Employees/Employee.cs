@@ -68,5 +68,40 @@ namespace Sms.Domain.Employees
         public int? PhotoAttachmentId { get; set; }
 
         public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
+
+        /// <summary>
+        /// الحالة الاجتماعية. Optional, and no rule in Module 12 reads it — see
+        /// <see cref="MaritalStatus"/> for why it is here at all.
+        /// </summary>
+        [RequiresAuditReason]
+        public MaritalStatus? MaritalStatus { get; set; }
+
+        /// <summary>
+        /// اسم البنك — where this employee's salary is paid.
+        /// <para>
+        /// A deliberate extension beyond doc/Modules/12 §7, made at the owner's request
+        /// (2026-08-23) and worth stating plainly: BR-EMP-007 holds that this system never
+        /// computes a net salary and hands payroll to whoever does, as an export. Disbursement
+        /// details therefore had no home here. They have one now because the school's own staff
+        /// register carries them and the payroll export is the thing that will need them — but
+        /// nothing in this product pays anybody, and adding these two columns does not change
+        /// that.
+        /// </para>
+        /// <para>
+        /// Audited with a mandatory reason, like <see cref="Contract.SalaryBasic"/>: a silent
+        /// change of the account that receives someone's pay is the one edit on this record that
+        /// nobody should be able to make without saying why.
+        /// </para>
+        /// </summary>
+        [RequiresAuditReason]
+        public string? BankName { get; set; }
+
+        /// <summary>
+        /// رقم الحساب البنكي / IBAN. Stored as written — the format differs by country and the
+        /// country pack does not describe one, so validating it here would reject valid accounts
+        /// in the next deployment. See <see cref="BankName"/> for why the pair exists.
+        /// </summary>
+        [RequiresAuditReason]
+        public string? BankAccountNo { get; set; }
     }
 }
