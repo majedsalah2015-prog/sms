@@ -9,6 +9,7 @@ using Sms.Application.Classrooms;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Schools;
+using Sms.Domain.Timetable;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Application.Security;
@@ -264,8 +265,206 @@ namespace Sms.Web.Controllers
                 SectionsUsing = await _db.Sections.AsNoTracking().Where(s => s.DefaultClassroomId == id).ToListAsync(),
                 Years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync(),
                 WorkingYearId = _workingYear.AcademicYearId,
+                ImpactedSessions = await ImpactedSessionsAsync(id),
+                Week = await RoomWeekAsync(id),
             });
         }
+
+        /// <summary>
+        /// doc/Modules/08 §8.3: how many timetabled sessions each maintenance window
+        /// covers. Closing a room for a fortnight is a different decision when it costs
+        /// forty sessions than when it costs none, and until now the screen showed the
+        /// window without ever saying which.
+        /// <para>
+        /// Counted on <c>Session</c> rather than on the weekly placement, because a
+        /// session is the thing that actually falls on a date — and it honours
+        /// <c>OverrideRoomId</c>, so a class already moved out of this room for that
+        /// day is not counted as impacted by closing it.
+        /// </para>
+        /// </summary>
+        private async Task<IReadOnlyDictionary<int, int>> ImpactedSessionsAsync(int roomId)
+        {
+            var windows = await _db.RoomAvailabilityExceptions.AsNoTracking()
+                .Where(x => x.RoomId == roomId).ToListAsync();
+            if (windows.Count == 0)
+            {
+                return new Dictionary<int, int>();
+            }
+
+            var earliest = windows.Min(w => w.StartDate);
+            var latest = windows.Max(w => w.EndDate);
+
+            var sessions = await (
+                from s in _db.Sessions.AsNoTracking()
+                join p in _db.Placements.AsNoTracking() on s.PlacementId equals p.Id
+                where s.Date >= earliest && s.Date <= latest
+                      && (s.OverrideRoomId == roomId || (s.OverrideRoomId == null && p.RoomId == roomId))
+                select s.Date).ToListAsync();
+
+            return windows.ToDictionary(
+                w => w.Id,
+                w => sessions.Count(d => d >= w.StartDate && d <= w.EndDate));
+        }
+
+        /// <summary>
+        /// doc/Modules/08 §8.2's "sessions from timetable overlaid read-only" — the
+        /// room's own week off the published version. A room does not own its
+        /// timetable, so nothing here edits: it answers "what happens in here", which
+        /// is the question somebody standing in the doorway is asking.
+        /// </summary>
+        private async Task<IReadOnlyList<RoomWeekSlot>> RoomWeekAsync(int roomId)
+        {
+            var version = await PublishedVersionAsync(_workingYear.AcademicYearId);
+            if (version == null)
+            {
+                return Array.Empty<RoomWeekSlot>();
+            }
+
+            var rows = await (
+                from p in _db.Placements.AsNoTracking()
+                where p.TimetableVersionId == version.Id && p.RoomId == roomId
+                join slot in _db.PeriodSlots.AsNoTracking() on p.PeriodSlotId equals slot.Id
+                select new { slot.DayOfWeek, slot.SequenceNumber, slot.StartTime, slot.EndTime, p.SectionId, p.CurriculumOfferingId, p.TeacherProfileId })
+                .ToListAsync();
+
+            if (rows.Count == 0)
+            {
+                return Array.Empty<RoomWeekSlot>();
+            }
+
+            // IgnoreQueryFilters throughout: a placement keeps naming the section,
+            // subject and teacher it was made with, and a room's week must still read
+            // after any of them is retired.
+            var sectionIds = rows.Select(r => r.SectionId).Distinct().ToList();
+            var sections = await _db.Sections.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => sectionIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => IsArabic ? s.NameAr : s.NameEn);
+
+            var offeringIds = rows.Select(r => r.CurriculumOfferingId).Distinct().ToList();
+            var subjects = await (
+                from o in _db.CurriculumOfferings.IgnoreQueryFilters().AsNoTracking()
+                where offeringIds.Contains(o.Id)
+                join subject in _db.Subjects.IgnoreQueryFilters().AsNoTracking() on o.SubjectId equals subject.Id
+                select new { o.Id, subject.Name })
+                .ToDictionaryAsync(x => x.Id, x => IsArabic ? x.Name.NameAr : x.Name.NameEn);
+
+            var teacherNames = await TeacherNamesAsync(rows.Select(r => r.TeacherProfileId).Distinct().ToList());
+
+            return rows
+                .OrderBy(r => r.DayOfWeek).ThenBy(r => r.SequenceNumber)
+                .Select(r => new RoomWeekSlot(
+                    r.DayOfWeek, r.SequenceNumber, r.StartTime, r.EndTime,
+                    sections.TryGetValue(r.SectionId, out var section) ? section : null,
+                    subjects.TryGetValue(r.CurriculumOfferingId, out var subject) ? subject : null,
+                    teacherNames.TryGetValue(r.TeacherProfileId, out var teacher) ? teacher : null))
+                .ToList();
+        }
+
+        /// <summary>
+        /// doc/Modules/08 §8.5 — the heat map. Rooms down, teaching periods across,
+        /// and one number for the building.
+        /// </summary>
+        [HttpGet("utilization")]
+        [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Utilization, ActionVerb.View)]
+        public async Task<IActionResult> Utilization(int? year = null)
+        {
+            var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
+            var selected = years.FirstOrDefault(y => y.Id == (year ?? _workingYear.AcademicYearId))
+                ?? years.FirstOrDefault(y => y.Status == AcademicYearStatus.Active)
+                ?? years.FirstOrDefault();
+
+            var m = new RoomUtilizationViewModel { Years = years, YearId = selected?.Id };
+            if (selected == null)
+            {
+                return View(m);
+            }
+
+            var version = await PublishedVersionAsync(selected.Id);
+            m.PublishedVersionId = version?.Id;
+            if (version == null)
+            {
+                // Nothing published means nothing to read. An empty grid here would
+                // read as "every room is free", which is the opposite of the truth
+                // while a draft timetable sits unpublished.
+                return View(m);
+            }
+
+            // The week shape is per stage, not per version, so the columns are the
+            // union of the year's teaching periods. A school with one shape gets one
+            // week; a school running the primary and secondary days differently gets
+            // both, which is the truth about its building.
+            var shapeIds = await _db.TimetableShapes.AsNoTracking()
+                .Where(s => s.AcademicYearId == selected.Id).Select(s => s.Id).ToListAsync();
+
+            var slots = await _db.PeriodSlots.AsNoTracking()
+                .Where(s => shapeIds.Contains(s.TimetableShapeId) && !s.IsBreak)
+                .OrderBy(s => s.DayOfWeek).ThenBy(s => s.SequenceNumber)
+                .ToListAsync();
+
+            var placements = await _db.Placements.AsNoTracking()
+                .Where(p => p.TimetableVersionId == version.Id && p.RoomId != null)
+                .Select(p => new { RoomId = p.RoomId!.Value, p.PeriodSlotId })
+                .ToListAsync();
+
+            var rooms = await _db.Rooms.AsNoTracking().ToListAsync();
+            var floors = await _db.Floors.IgnoreQueryFilters().AsNoTracking()
+                .Where(f => f.SchoolId == _db.CurrentSchoolId).ToListAsync();
+            var buildings = await _db.Buildings.IgnoreQueryFilters().AsNoTracking()
+                .Where(b => b.SchoolId == _db.CurrentSchoolId).ToListAsync();
+
+            var grid = RoomUtilizationCalculator.Build(
+                rooms.Select(r => r.Id).ToList(),
+                slots.Select(s => new RoomUtilizationCalculator.TeachingSlot(s.Id, s.DayOfWeek, s.SequenceNumber)).ToList(),
+                placements.Select(p => new RoomUtilizationCalculator.RoomPlacement(p.RoomId, p.PeriodSlotId)).ToList());
+
+            m.Columns = slots.Select(s => new RoomUtilizationViewModel.Column(s.Id, s.DayOfWeek, s.SequenceNumber, s.StartTime)).ToList();
+            m.Rows = grid.Select(g =>
+            {
+                var room = rooms.First(r => r.Id == g.RoomId);
+                var floor = floors.FirstOrDefault(f => f.Id == room.FloorId);
+                var building = floor == null ? null : buildings.FirstOrDefault(b => b.Id == floor.BuildingId);
+                return new RoomUtilizationViewModel.Row(
+                    room,
+                    building == null ? "—" : (IsArabic ? building.Name.NameAr : building.Name.NameEn),
+                    floor == null ? "—" : (IsArabic ? floor.Name.NameAr : floor.Name.NameEn),
+                    g.BySlot, g.PercentUsed, g.HasDoubleBooking);
+            }).ToList();
+
+            m.OverallPercent = RoomUtilizationCalculator.OverallPercent(grid);
+            m.Busiest = m.Rows.OrderByDescending(r => r.PercentUsed).Take(3).ToList();
+            m.Idlest = m.Rows.OrderBy(r => r.PercentUsed).Take(3).ToList();
+            return View(m);
+        }
+
+        /// <summary>
+        /// The one operational version (BR-TTB-002: only one Published at a time). The
+        /// heat map and the room's week both read it rather than a draft — a draft is
+        /// somebody's work in progress, not what the school is doing on Sunday.
+        /// </summary>
+        /// <summary>Teacher display names by profile id, through the employee the profile points at.</summary>
+        private async Task<Dictionary<int, string>> TeacherNamesAsync(IReadOnlyCollection<int> teacherProfileIds)
+        {
+            if (teacherProfileIds.Count == 0)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            // IgnoreQueryFilters: a placement keeps naming the teacher who made it, and
+            // a room's week must still read after that teacher leaves the school.
+            return await (
+                from p in _db.TeacherProfiles.IgnoreQueryFilters().AsNoTracking()
+                where p.SchoolId == _db.CurrentSchoolId && teacherProfileIds.Contains(p.Id)
+                join e in _db.Employees.IgnoreQueryFilters().AsNoTracking() on p.EmployeeId equals e.Id
+                select new { p.Id, e.FirstNameAr, e.FamilyNameAr, e.FirstNameEn, e.FamilyNameEn })
+                .ToDictionaryAsync(
+                    x => x.Id,
+                    x => IsArabic ? $"{x.FirstNameAr} {x.FamilyNameAr}" : $"{x.FirstNameEn} {x.FamilyNameEn}");
+        }
+
+        private Task<TimetableVersion?> PublishedVersionAsync(int academicYearId)
+            => _db.TimetableVersions.AsNoTracking()
+                .Where(v => v.AcademicYearId == academicYearId && v.Status == TimetableVersionStatus.Published)
+                .OrderByDescending(v => v.PublishedAtUtc)
+                .FirstOrDefaultAsync()!;
 
         [HttpPost("{id:int}/feature")]
         [ValidateAntiForgeryToken]

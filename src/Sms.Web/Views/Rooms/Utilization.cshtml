@@ -1,0 +1,127 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model RoomUtilizationViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Room utilisation", "استغلال القاعات");
+    ViewData["Breadcrumb"] = T("Classrooms / Utilisation", "القاعات / الاستغلال");
+
+    string DayName(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Sunday => T("Sun", "الأحد"),
+        DayOfWeek.Monday => T("Mon", "الاثنين"),
+        DayOfWeek.Tuesday => T("Tue", "الثلاثاء"),
+        DayOfWeek.Wednesday => T("Wed", "الأربعاء"),
+        DayOfWeek.Thursday => T("Thu", "الخميس"),
+        DayOfWeek.Friday => T("Fri", "الجمعة"),
+        _ => T("Sat", "السبت"),
+    };
+
+    // Five bands, not a gradient: a reader compares cells against each other, and a
+    // continuous scale makes 61% and 64% look meaningfully different when they are not.
+    string Band(int used) => used == 0 ? "" : used == 1 ? "sms-heat-1" : used == 2 ? "sms-heat-2" : "sms-heat-3";
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "room-util-help", Title = T("Room utilisation — help", "استغلال القاعات — مساعدة"),
+        Intro = T("Every room against every teaching period of the week, read off the published timetable. The screen exists to answer one question a building decision turns on: is the school short of rooms, or short of scheduling?", "كل قاعة مقابل كل حصة تدريس في الأسبوع، مقروءةً من الجدول المنشور. وُجدت الشاشة للإجابة عن سؤال واحد يتوقف عليه قرار التوسعة: أينقص المدرسةَ قاعاتٌ أم يَنقصها جدولةٌ؟"),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Published only", "المنشور وحده"), T("A draft timetable is somebody's work in progress, not what the school does on Sunday, so the grid reads the published version and says so when there is none — an empty grid would otherwise read as \"every room is free\".", "الجدول المسودة عمل قيد الإنجاز لا ما تفعله المدرسة يوم الأحد، فتقرأ الشبكة النسخة المنشورة وتصرّح حين لا توجد — وإلا قُرئت الشبكة الفارغة على أنها «كل القاعات شاغرة».")),
+            new HelpPanelViewModel.Item(T("Breaks are not counted against a room", "الفُسَح لا تُحسب على القاعة"), T("The denominator is teaching periods only. Counting break slots would make every room in every school look half idle, which is how a useful number becomes an ignored one.", "المقام حصص التدريس وحدها. فاحتساب الفُسَح يُظهر كل قاعة في كل مدرسة نصف عاطلة، وهكذا يتحول الرقم المفيد إلى رقم مُهمَل.")),
+            new HelpPanelViewModel.Item(T("A red cell is a clash", "الخانة الحمراء تعارض"), T("Two classes placed in one room in one period. The timetable validator refuses these, so one here was created after validation — it is a real fault in the published week, not a display artefact.", "صفّان في قاعة واحدة في الحصة نفسها. ويرفض مدقّق الجدول هذا، فوجوده هنا يعني أنه أُنشئ بعد التحقق — وهو خلل حقيقي في الأسبوع المنشور لا أثر عرض.")),
+            new HelpPanelViewModel.Item(T("An empty row is not a mistake", "الصف الفارغ ليس خطأ"), T("A room nothing is placed in still gets a row: it is the most useful line on the screen for whoever is deciding where to put a class.", "القاعة التي لا يُوضع فيها شيء تبقى لها سطر: فهو أنفع سطر على الشاشة لمن يقرر أين يضع صفاً.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Rooms × periods off the published timetable (doc/Modules/08 §8.5).", "القاعات × الحصص من الجدول المنشور (الوحدة 08 §8.5).")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Year", "العام")">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.YearId)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </form>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index">@T("Catalogue", "الفهرس")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.PublishedVersionId == null)
+{
+    <div class="sms-card">
+        <div class="p-4 text-center">
+            <p class="h5 mb-2">@T("No published timetable for this year.", "لا جدول منشور لهذا العام.")</p>
+            <p class="text-muted mb-0">
+                @T("The grid reads the published version, and this year has none — so there is nothing to say about how the rooms are used. A draft is not read here on purpose: it is somebody's work in progress, not the week the school runs.",
+                   "تقرأ الشبكة النسخة المنشورة، ولا نسخة منشورة لهذا العام — فلا شيء يُقال عن استغلال القاعات. ولا تُقرأ المسودة هنا عن قصد: فهي عمل قيد الإنجاز لا الأسبوع الذي تسير عليه المدرسة.")
+            </p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-4"><div class="sms-card p-3">
+            <span class="d-block sms-tile__value">@Model.OverallPercent%</span>
+            <span class="small text-muted">@T("of room-periods in use across the week", "من زمن القاعات مستغَل خلال الأسبوع")</span>
+        </div></div>
+        <div class="col-md-4"><div class="sms-card p-3">
+            <span class="small text-muted d-block mb-1">@T("Busiest", "الأكثر ازدحاماً")</span>
+            @foreach (var r in Model.Busiest) { <div class="small">@r.Room.Code — @r.PercentUsed%</div> }
+        </div></div>
+        <div class="col-md-4"><div class="sms-card p-3">
+            <span class="small text-muted d-block mb-1">@T("Least used", "الأقل استغلالاً")</span>
+            @foreach (var r in Model.Idlest) { <div class="small">@r.Room.Code — @r.PercentUsed%</div> }
+        </div></div>
+    </div>
+
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0" style="min-width:48rem">
+            <caption class="visually-hidden">@ViewData["Title"]</caption>
+            <thead>
+                <tr>
+                    <th scope="col" style="min-width:12rem">@T("Room", "القاعة")</th>
+                    @foreach (var c in Model.Columns)
+                    {
+                        <th scope="col" class="text-center small" title="@DayName(c.Day) · @c.StartTime.ToString(@"hh\:mm")">
+                            <div>@DayName(c.Day)</div>
+                            <div class="text-muted">@c.SequenceNumber</div>
+                        </th>
+                    }
+                    <th scope="col" class="text-center">@T("Used", "الاستغلال")</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td>
+                        <a asp-action="Details" asp-route-id="@r.Room.Id"><code>@r.Room.Code</code></a>
+                        <div class="small text-muted">@r.BuildingName · @r.FloorName</div>
+                    </td>
+                    @foreach (var c in Model.Columns)
+                    {
+                        var used = r.BySlot.TryGetValue(c.PeriodSlotId, out var n) ? n : 0;
+                        <td class="text-center @(used > 1 ? "sms-heat-clash" : Band(used))"
+                            title="@(used == 0 ? T("free", "شاغرة") : used == 1 ? T("in use", "مشغولة") : string.Format(T("{0} classes placed here — a clash", "{0} صفوف موضوعة هنا — تعارض"), used))">
+                            <span class="visually-hidden">@(used == 0 ? T("free", "شاغرة") : T("in use", "مشغولة"))</span>
+                            @(used > 1 ? used.ToString(CultureInfo.InvariantCulture) : used == 1 ? "•" : "")
+                        </td>
+                    }
+                    <td class="text-center fw-semibold @(r.HasDoubleBooking ? "text-danger" : "")">@r.PercentUsed%</td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0)
+            {
+                <tr><td colspan="@(Model.Columns.Count + 2)" class="text-center text-muted py-4">@T("No rooms defined yet.", "لا قاعات معرَّفة بعد.")</td></tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

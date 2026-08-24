@@ -261,6 +261,21 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<RoomAvailabilityException> Unavailability { get; set; } = Array.Empty<RoomAvailabilityException>();
 
+        /// <summary>
+        /// doc/Modules/08 §8.3: how many timetabled sessions each maintenance window
+        /// covers. Keyed by the window's id. The number is the whole point of the
+        /// window — closing a room for a fortnight is a different decision when it
+        /// costs forty sessions than when it costs none — and it was missing.
+        /// </summary>
+        public IReadOnlyDictionary<int, int> ImpactedSessions { get; set; } = new Dictionary<int, int>();
+
+        /// <summary>
+        /// doc/Modules/08 §8.2's "sessions from timetable overlaid read-only": the
+        /// room's own week off the published version. Read-only here because a room
+        /// does not own its timetable — Module 15 does.
+        /// </summary>
+        public IReadOnlyList<RoomWeekSlot> Week { get; set; } = Array.Empty<RoomWeekSlot>();
+
         public IReadOnlyList<RoomBooking> Bookings { get; set; } = Array.Empty<RoomBooking>();
 
         public IReadOnlyList<Sms.Domain.Sections.Section> SectionsUsing { get; set; } = Array.Empty<Sms.Domain.Sections.Section>();

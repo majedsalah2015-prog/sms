@@ -151,6 +151,9 @@ namespace Sms.Application.Security
         {
             public const string Rooms = "Rooms";
             public const string Buildings = "Buildings";
+
+            /// <summary>doc/Modules/08 §8.5 — rooms × periods occupancy off the published timetable.</summary>
+            public const string Utilization = "Utilization";
         }
 
         public static class Admissions
@@ -387,6 +390,7 @@ namespace Sms.Application.Security
             // ---- Classrooms
             S(Modules.Classrooms, Classrooms.Rooms, "Classrooms", "القاعات", Crud),
             S(Modules.Classrooms, Classrooms.Buildings, "Buildings and floors", "المباني والطوابق", ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Classrooms, Classrooms.Utilization, "Room utilisation", "استغلال القاعات", ReadOnly),
 
             // ---- Admissions
             S(Modules.Admissions, Admissions.Applications, "Applications", "طلبات القبول", CrudApprove),

@@ -23,7 +23,10 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Building → floor → room tree with standard/exam capacity, wing tag and feature tags (BR-ROM-001/002/003).", "شجرة مبنى → طابق → قاعة مع السعة العادية/الاختبارية ووسم الجناح والتجهيزات (BR-ROM-001/002/003).") · @Model.TotalRooms @T("rooms", "قاعة") · @Model.TotalSeats @T("seats", "مقعد")</p></div>
-    <partial name="_HelpModal" model="help" /></div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-outline-secondary" asp-action="Utilization"><i class="bi bi-grid-3x3 me-1" aria-hidden="true"></i>@T("Utilisation", "الاستغلال")</a>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
 
 <div class="row g-3">
     <div class="col-xl-8">

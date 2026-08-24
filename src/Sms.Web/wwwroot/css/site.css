@@ -460,3 +460,13 @@ input[type=number].form-control { min-width: 4.5rem; }
    and the product does not yet enforce. Saying so is the difference between a
    screen an operator can plan around and one that misleads them. */
 .sms-unenforced { border-inline-start: 3px solid #b45309; padding-inline-start: .6rem; }
+
+/* Room utilisation heat map (doc/Modules/08 §8.5). Five bands rather than a
+   gradient: the reader compares cells against each other, and a continuous scale
+   makes 61% and 64% look meaningfully different when they are not. The clash band
+   is the only one that carries a number, because it is the only one where the
+   count itself is the finding. */
+.sms-heat-1 { background: rgba(37, 99, 235, .12); }
+.sms-heat-2 { background: rgba(37, 99, 235, .28); }
+.sms-heat-3 { background: rgba(37, 99, 235, .45); }
+.sms-heat-clash { background: rgba(220, 38, 38, .35); font-weight: 600; }

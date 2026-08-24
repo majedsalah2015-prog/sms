@@ -1,5 +1,6 @@
 @using System.Globalization
 @using Sms.Domain.Classrooms
+@using Sms.Domain.Grades
 @model RoomDetailViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -8,6 +9,7 @@
     ViewData["Title"] = name;
     ViewData["Breadcrumb"] = T("Classrooms / ", "القاعات / ") + name;
     var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    string Gender(GenderPolicy g) => g switch { GenderPolicy.Boys => T("Boys wing", "جناح بنين"), GenderPolicy.Girls => T("Girls wing", "جناح بنات"), _ => T("Mixed", "مشترك") };
     var help = new HelpPanelViewModel
     {
         Id = "room-details-help",
@@ -26,19 +28,66 @@
 <div class="sms-page-head">
     <div><div class="text-muted small">@(isRtl ? Model.Building.Name.NameAr : Model.Building.Name.NameEn) / @(isRtl ? Model.Floor.Name.NameAr : Model.Floor.Name.NameEn) · @Model.TypeName</div>
         <h1 class="sms-page-title"><code>@Model.Room.Code</code> @name</h1>
-        <div class="small text-muted">@T("Standard", "عادية") @Model.Room.StandardCapacity · @T("Exam", "اختبار") @Model.Room.ExamCapacity · @Model.Room.WingTag @if (Model.SectionsUsing.Count > 0) { <text>· @T("home room of", "قاعة") @string.Join(", ", Model.SectionsUsing.Select(s => isRtl ? s.NameAr : s.NameEn))</text> }</div></div>
+        <div class="small text-muted">@T("Standard", "عادية") @Model.Room.StandardCapacity · @T("Exam", "اختبار") @Model.Room.ExamCapacity · @Gender(Model.Room.WingTag) @if (Model.SectionsUsing.Count > 0) { <text>· @T("home room of", "قاعة") @string.Join(", ", Model.SectionsUsing.Select(s => isRtl ? s.NameAr : s.NameEn))</text> }</div></div>
     <div class="d-flex align-items-center gap-2">
         <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Catalog", "الدليل")</a>
         <partial name="_HelpModal" model="help" />
     </div>
 </div>
 
+@{
+    string DayName(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Sunday => T("Sunday", "الأحد"),
+        DayOfWeek.Monday => T("Monday", "الاثنين"),
+        DayOfWeek.Tuesday => T("Tuesday", "الثلاثاء"),
+        DayOfWeek.Wednesday => T("Wednesday", "الأربعاء"),
+        DayOfWeek.Thursday => T("Thursday", "الخميس"),
+        DayOfWeek.Friday => T("Friday", "الجمعة"),
+        _ => T("Saturday", "السبت"),
+    };
+}
+
 <div class="row g-3">
     <div class="col-xl-8">
+        @* doc/Modules/08 §8.2's "sessions from timetable overlaid read-only". Nothing
+           here edits: a room does not own its timetable, Module 15 does. It answers
+           "what happens in here", which is what somebody standing in the doorway asks. *@
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("This room's week", "أسبوع هذه القاعة")</h2>
+                <span class="small text-muted">@T("from the published timetable", "من الجدول المنشور")</span>
+            </div>
+            @if (Model.Week.Count == 0)
+            {
+                <div class="p-3 small text-muted">@T("Nothing is timetabled in this room — either no version is published for the working year, or no class is placed here.", "لا شيء مجدول في هذه القاعة — إما لا نسخة منشورة للعام الجاري، أو لا صفّ موضوع هنا.")</div>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+                    <caption class="visually-hidden">@T("This room's week", "أسبوع هذه القاعة")</caption>
+                    <thead><tr><th scope="col">@T("Day", "اليوم")</th><th scope="col">@T("Period", "الحصة")</th><th scope="col">@T("Time", "الوقت")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Subject", "المادة")</th><th scope="col">@T("Teacher", "المعلم")</th></tr></thead>
+                    <tbody>
+                    @foreach (var s in Model.Week)
+                    {
+                        <tr>
+                            <td>@DayName(s.Day)</td>
+                            <td>@s.SequenceNumber</td>
+                            <td dir="ltr">@s.StartTime.ToString(@"hh\:mm") – @s.EndTime.ToString(@"hh\:mm")</td>
+                            <td>@(s.SectionName ?? "—")</td>
+                            <td>@(s.SubjectName ?? "—")</td>
+                            <td>@(s.TeacherName ?? "—")</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+
         <div class="sms-card mb-3">
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Maintenance / reserved windows", "فترات الصيانة / الحجز")</h2><span class="small text-muted">BR-ROM-004</span></div>
-            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><caption class="visually-hidden">@T("Maintenance / reserved windows", "فترات الصيانة / الحجز")</caption><thead><tr><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Notes", "ملاحظات")</th></tr></thead>
-                <tbody>@foreach (var u in Model.Unavailability) { <tr><td><span class="badge @(u.Reason == RoomAvailabilityReason.Maintenance ? "text-bg-warning" : "text-bg-info")">@(u.Reason == RoomAvailabilityReason.Maintenance ? T("Maintenance", "صيانة") : T("Reserved", "محجوزة"))</span></td><td>@u.StartDate.ToString("yyyy-MM-dd")</td><td>@u.EndDate.ToString("yyyy-MM-dd")</td><td class="small">@u.Notes</td></tr> }
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0"><caption class="visually-hidden">@T("Maintenance / reserved windows", "فترات الصيانة / الحجز")</caption><thead><tr><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Sessions affected", "الحصص المتأثرة")</th><th scope="col">@T("Notes", "ملاحظات")</th></tr></thead>
+                <tbody>@foreach (var u in Model.Unavailability) { <tr><td><span class="badge @(u.Reason == RoomAvailabilityReason.Maintenance ? "text-bg-warning" : "text-bg-info")">@(u.Reason == RoomAvailabilityReason.Maintenance ? T("Maintenance", "صيانة") : T("Reserved", "محجوزة"))</span></td><td>@u.StartDate.ToString("yyyy-MM-dd")</td><td>@u.EndDate.ToString("yyyy-MM-dd")</td><td>@{ var hit = Model.ImpactedSessions.TryGetValue(u.Id, out var hits) ? hits : 0; }<span class="badge @(hit > 0 ? "text-bg-danger" : "text-bg-light border")" title="@T("Timetabled sessions this window covers — closing the room costs them (doc/Modules/08 §8.3).", "الحصص المجدولة التي تغطيها هذه الفترة — وإغلاق القاعة يكلّفها (الوحدة 08 §8.3).")">@hit</span></td><td class="small">@u.Notes</td></tr> }
                 @if (Model.Unavailability.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("Always available.", "متاحة دائماً.")</td></tr> }</tbody></table></div>
         </div>
         <div class="sms-card">
