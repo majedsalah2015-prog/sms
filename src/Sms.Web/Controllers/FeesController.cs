@@ -245,6 +245,31 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Structure), new { year });
         }
 
+        /// <summary>
+        /// The exit an approved price did not have. BR-FEE-002 makes the amount
+        /// immutable and the delete path is draft-only, so before this a line approved
+        /// against the wrong grade stayed in the price list permanently. Withdrawing
+        /// leaves the row and its figure readable (BR-GLB-005) and stops it billing.
+        /// </summary>
+        [HttpPost("structure/{id:int}/withdraw")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Deactivate)]
+        public async Task<IActionResult> WithdrawLine(int id, string? reason, int? year)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    throw new InvalidOperationException(T("A reason is required to withdraw an approved price.", "السبب مطلوب لسحب سعر معتمد."));
+                }
+
+                await _fees.WithdrawStructureLineAsync(id, reason.Trim());
+                TempData["Flash"] = T("Price withdrawn — it stays on the record and stops being charged.", "سُحب السعر — يبقى في السجل ويتوقف عن التحميل.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(Structure), new { year });
+        }
+
         [HttpPost("structure/approve-all")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Approve)]

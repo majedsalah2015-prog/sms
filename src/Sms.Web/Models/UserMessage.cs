@@ -160,6 +160,18 @@ namespace Sms.Web.Models
                 ? "هذه الحركة غير مسموحة من حالة الطلب الحالية — ربما بُتَّ فيه بالفعل (BR-WF-001)."
                 : "That move is not allowed from the request's current state — it may have been decided already (BR-WF-001).",
 
+            FeeStructureLineInUseException => arabic
+                ? "حُمِّل هذا السعر على طلاب بالفعل — اعكس تلك الرسوم بإشعار دائن قبل سحبه، وإلا بقيت فواتير لا يمكن تفسير مصدرها."
+                : "This price has already been charged to students — reverse those charges with a credit note before withdrawing it, or invoices are left with nothing explaining them.",
+
+            FeeStructureLineNotDraftException => arabic
+                ? "السعر معتمد ولا يُعدَّل ولا يُحذف (BR-FEE-002) — اسحبه بدلاً من ذلك، فيبقى في السجل ويتوقف عن التحميل."
+                : "The price is approved, so it cannot be edited or deleted (BR-FEE-002) — withdraw it instead: it stays on the record and stops being charged.",
+
+            InvalidFeeStructureLineStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة السعر الحالية: المسودة تُعتمد، والمعتمد يُسحب، ولا طريق عائد إلى المسودة (BR-FEE-002)."
+                : "That move is not available from the price's current state: a draft is approved, an approved price is withdrawn, and there is no way back to draft (BR-FEE-002).",
+
             _ => exception.Message,
         };
 

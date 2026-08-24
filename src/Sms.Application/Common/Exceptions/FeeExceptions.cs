@@ -69,6 +69,19 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>
+    /// BR-GLB-004: an approved price that has already billed somebody is not a plan
+    /// any more. Withdrawing it would leave those charges pointing at a line that is
+    /// no longer in the price list, and nobody able to say what they were for.
+    /// </summary>
+    public class FeeStructureLineInUseException : InvalidOperationException
+    {
+        public FeeStructureLineInUseException(int feeStructureLineId)
+            : base($"Fee structure line {feeStructureLineId} has already been charged to students; reverse those charges before withdrawing it.")
+        {
+        }
+    }
+
     /// <summary>doc/Modules/19 §9: one line per grade-year profile × category.</summary>
     public class FeeStructureLineAlreadyExistsException : InvalidOperationException
     {

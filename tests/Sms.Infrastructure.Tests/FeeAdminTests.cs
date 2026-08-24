@@ -291,6 +291,71 @@ namespace Sms.Infrastructure.Tests
             Assert.False(db.FeeStructureLines.Any(l => l.Id == draft.Id));
         }
 
+        /// <summary>
+        /// Before this an approved line had no exit: the amount is immutable
+        /// (BR-FEE-002), the delete path is draft-only, and the only transition was
+        /// Draft → Approved — so a price approved against the wrong grade stayed in
+        /// the list for good. Withdrawing is the exit, and it is not a delete: the row
+        /// and its figure stay readable (BR-GLB-005).
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-FEE-002")]
+        public async Task An_approved_price_is_withdrawn_rather_than_deleted_and_stops_billing()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("أوراق امتحان", "Exam papers", null, false, false, false);
+            var lineId = await DefineApprovedLine(admin, category.Id, 12500m);
+
+            await admin.WithdrawStructureLineAsync(lineId, "أُقرّت على الصف الخطأ.");
+
+            var stored = db.FeeStructureLines.Single(l => l.Id == lineId);
+            Assert.Equal(FeeStructureLineStatus.Withdrawn, stored.Status);
+            Assert.Equal(12500m, stored.Amount);
+
+            // PostChargeAsync reads approved lines only, so withdrawing stops it billing
+            // without any further wiring — the point of using the status rather than a flag.
+            await Assert.ThrowsAsync<FeeStructureLineNotApprovedException>(
+                () => admin.PostChargeAsync(_studentId, _payerId, _profileId, category.Id, ChargeSourceType.Registration));
+        }
+
+        [Fact]
+        [BusinessRule("BR-FEE-002")]
+        public async Task Withdrawing_needs_a_reason_and_is_refused_from_draft()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("نقل", "Transport", null, false, false, false);
+            var draft = await admin.DefineStructureLineAsync(_profileId, category.Id, 500m);
+
+            // A draft is deleted, not withdrawn — there is nothing to keep on the record.
+            await Assert.ThrowsAsync<InvalidFeeStructureLineStatusTransitionException>(
+                () => admin.WithdrawStructureLineAsync(draft.Id, "لا داعي له."));
+
+            await admin.ApproveStructureLineAsync(draft.Id);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => admin.WithdrawStructureLineAsync(draft.Id, "   "));
+        }
+
+        /// <summary>
+        /// Once a price has billed somebody it is not a plan any more. Removing it from
+        /// the list would leave those invoices with nothing explaining what they were for.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-004")]
+        public async Task A_price_that_has_already_been_charged_cannot_be_withdrawn()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var category = await admin.DefineCategoryAsync("رسوم دراسية", "Tuition", null, true, false, false);
+            var lineId = await DefineApprovedLine(admin, category.Id, 12000m);
+            await admin.PostChargeAsync(_studentId, _payerId, _profileId, category.Id, ChargeSourceType.Registration);
+
+            await Assert.ThrowsAsync<FeeStructureLineInUseException>(
+                () => admin.WithdrawStructureLineAsync(lineId, "غيّرنا رأينا."));
+
+            Assert.Equal(FeeStructureLineStatus.Approved, db.FeeStructureLines.Single(l => l.Id == lineId).Status);
+        }
+
         [Fact]
         [BusinessRule("BR-FEE-002")]
         public async Task Copying_a_structure_to_the_next_year_creates_uplifted_draft_lines_once_per_pair()

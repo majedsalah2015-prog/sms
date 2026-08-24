@@ -37,6 +37,25 @@ namespace Sms.Application.Fees
         Task DeleteStructureLineAsync(int feeStructureLineId, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Takes an approved line out of the price list (BR-GLB-005: withdrawn, never
+        /// deleted). The line stops producing charges immediately — <c>PostChargeAsync</c>
+        /// reads only approved lines — while the row and its amount stay readable for
+        /// anything already billed from it.
+        /// <para>
+        /// Refused once a charge has been posted from this line, because at that point
+        /// the price is not a plan any more but the basis of money somebody owes:
+        /// removing it from the list would leave those charges unexplainable. Reverse
+        /// the charges first (credit note), then withdraw.
+        /// </para>
+        /// <para>
+        /// Reason is mandatory and audited — this is the only exit an approved price
+        /// has, and "why did this grade stop being charged for books" is the question
+        /// it exists to answer a year later.
+        /// </para>
+        /// </summary>
+        Task WithdrawStructureLineAsync(int feeStructureLineId, string reason, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// 8.2 "copy-from-last-year with % uplift": for every approved source-year line whose grade level has a
         /// profile in the target year and no line yet for that category, creates a Draft line at amount × (1 + uplift).
         /// Returns the number of lines created.

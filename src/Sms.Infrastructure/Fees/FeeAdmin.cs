@@ -19,12 +19,18 @@ namespace Sms.Infrastructure.Fees
         private readonly AppDbContext _db;
         private readonly INumberIssuer _numberIssuer;
         private readonly IClock _clock;
+        private readonly Sms.Application.Audit.IAuditContext _audit;
 
-        public FeeAdmin(AppDbContext db, INumberIssuer numberIssuer, IClock clock)
+        // The audit context is optional in the signature and required in practice: DI
+        // always supplies the request-scoped one, and the fallback exists so the dozen
+        // existing tests that construct a FeeAdmin directly did not all have to grow a
+        // parameter for an operation none of them calls.
+        public FeeAdmin(AppDbContext db, INumberIssuer numberIssuer, IClock clock, Sms.Application.Audit.IAuditContext? audit = null)
         {
             _db = db;
             _numberIssuer = numberIssuer;
             _clock = clock;
+            _audit = audit ?? new Sms.Infrastructure.Audit.AuditContext();
         }
 
         public async Task<FeeCategory> DefineCategoryAsync(
@@ -132,6 +138,43 @@ namespace Sms.Infrastructure.Fees
             }
 
             _db.FeeStructureLines.Remove(line);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task WithdrawStructureLineAsync(int feeStructureLineId, string reason, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new InvalidOperationException("A reason is required to withdraw an approved fee structure line.");
+            }
+
+            var line = await _db.FeeStructureLines.SingleAsync(l => l.Id == feeStructureLineId, cancellationToken);
+            if (!FeeStructureLineStatusTransitions.CanTransition(line.Status, FeeStructureLineStatus.Withdrawn))
+            {
+                throw new InvalidFeeStructureLineStatusTransitionException(line.Status, FeeStructureLineStatus.Withdrawn);
+            }
+
+            // Charges do not point at the line they came from — they carry the category
+            // and the year — so "was anything billed from this line" is asked through the
+            // enrolment that puts a student in the grade the line prices. Exact rather
+            // than by category alone: the same category priced for another grade is a
+            // different line, and blocking on it would make this operation useless in
+            // any school that charges books to more than one year group.
+            var billed = await (
+                from c in _db.Charges
+                join e in _db.Enrollments on c.StudentId equals e.StudentId
+                where c.FeeCategoryId == line.FeeCategoryId
+                      && c.AcademicYearId == line.AcademicYearId
+                      && e.GradeYearProfileId == line.GradeYearProfileId
+                select c.Id).AnyAsync(cancellationToken);
+
+            if (billed)
+            {
+                throw new FeeStructureLineInUseException(feeStructureLineId);
+            }
+
+            _audit.Reason = reason;
+            line.Status = FeeStructureLineStatus.Withdrawn;
             await _db.SaveChangesAsync(cancellationToken);
         }
 
