@@ -128,6 +128,44 @@ namespace Sms.Web.Models
                 ? $"العام الدراسي مستخدَم: {Clause(e.Message)}"
                 : e.Message,
 
+            // ---------------------------------------------------------------- M06 sections
+
+            DuplicateSectionNameException e => arabic
+                ? $"توجد شعبة باسم «{e.Name}» في هذا الصف والعام — أسماء الشعب لا تتكرر داخل الصف (BR-SCN-001)."
+                : $"A section named \"{e.Name}\" already exists in this grade and year — section names do not repeat within a grade (BR-SCN-001).",
+
+            SectionCapacityPlanExceededException e => arabic
+                ? $"سعة {e.RequestedCapacity} تتجاوز حجم الشعبة المخطط للصف ({e.GradeTargetSectionSize}) — عدّل خطة الصف أولاً إن كان هذا هو المقصود (BR-SCN-002)."
+                : $"A capacity of {e.RequestedCapacity} exceeds the grade's planned section size ({e.GradeTargetSectionSize}) — change the grade's plan first if that is what you mean (BR-SCN-002).",
+
+            SectionFullException => arabic
+                ? "الشعبة بلغت سعتها — تجاوز السعة يحتاج صلاحية استثناء غير متاحة بعد (BR-SCN-002)."
+                : "The section is at capacity — going beyond it needs an override permission that does not exist yet (BR-SCN-002).",
+
+            InvalidSectionGenderPolicyException e => arabic
+                ? $"سياسة «{Labels.Gender(e.RequestedPolicy, true)}» لا تُضيّق سياسة الصف «{Labels.Gender(e.GradePolicy, true)}» — للشعبة أن تُضيّق سياسة صفها لا أن تُوسّعها (BR-SCN-003)."
+                : $"\"{Labels.Gender(e.RequestedPolicy, false)}\" does not narrow the grade's \"{Labels.Gender(e.GradePolicy, false)}\" — a section may narrow its grade's policy, never widen it (BR-SCN-003).",
+
+            SectionGenderMismatchException => arabic
+                ? "سياسة الشعبة الجنسية لا تقبل هذا الطالب (BR-SCN-003)."
+                : "The section's gender policy does not admit this student (BR-SCN-003).",
+
+            SectionGradeMismatchException => arabic
+                ? "هذه الشعبة تتبع صفاً آخر — الطالب يُوضع في شعبة صفه (BR-SCN-001)."
+                : "That section belongs to a different grade — a student goes into a section of their own grade (BR-SCN-001).",
+
+            SectionCloseWithMembersException e => arabic
+                ? $"لا تُغلق الشعبة وفيها {e.MemberCount} طالباً — انقلهم أولاً (BR-SCN-007)."
+                : $"The section still holds {e.MemberCount} student(s) — transfer them before closing it (BR-SCN-007).",
+
+            // The reason is a clause the service composed in English. The frame is
+            // translated and the clause kept — half a sentence in the reader's
+            // language beats none, and inventing a translation for text this class
+            // cannot see would be worse than either.
+            SectionInUseException e => arabic
+                ? $"الشعبة مستخدَمة: {e.Reason}."
+                : e.Message,
+
             // ---------------------------------------------------------------- M36 roles and permissions
 
             LastPermissionAdministratorException => arabic

@@ -1,0 +1,195 @@
+@using System.Globalization
+@using Sms.Domain.Common
+@using Sms.Domain.Grades
+@model SectionCloseViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var sectionName = isRtl ? Model.Section.NameAr : Model.Section.NameEn;
+    ViewData["Title"] = string.Format(T("Close {0}", "إغلاق {0}"), sectionName);
+    ViewData["Breadcrumb"] = T("Sections / Close", "الشعب / الإغلاق");
+    string GenderTag(Gender g) => g == Gender.Female ? T("F", "أنثى") : T("M", "ذكر");
+    var blocked = Model.Unplaceable.Count > 0;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "close-help",
+        Title = T("Closing a section — help", "إغلاق شعبة — مساعدة"),
+        Intro = T("Closing a section is a decision about where its students go, not a button. This page shows what closing costs and where everybody lands, because the two are the same decision.", "إغلاق الشعبة قرار بشأن وجهة طلابها لا مجرد زر. تعرض هذه الصفحة كلفة الإغلاق ووجهة كل طالب، لأن الأمرين قرار واحد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Nobody is left behind", "لا يُترك أحد"), T("A section cannot close while a student is still recorded in it (BR-SCN-007), so every student needs a target section before the button works. Both halves happen in one write — never students moved with the section still open.", "لا تُغلق الشعبة وفيها طالب مسجَّل (BR-SCN-007)، فلكل طالب شعبة مقصد قبل أن يعمل الزر. ويقع الأمران في كتابة واحدة — فلا يُنقل الطلاب وتبقى الشعبة مفتوحة.")),
+            new HelpPanelViewModel.Item(T("The section stays in history", "تبقى الشعبة في السجل"), T("Closed is not deleted. Past attendance, marks and memberships go on naming this section — that is what makes last year's records still readable (BR-GLB-005).", "الإغلاق ليس حذفاً. فسجلات الحضور والدرجات والعضوية السابقة تظل تسمّي هذه الشعبة — وبذلك تبقى سجلات العام الماضي مقروءة (BR-GLB-005).")),
+            new HelpPanelViewModel.Item(T("The timetable is not rewritten here", "لا يُعاد كتابة الجدول هنا"), T("BR-SCN-007 also voids this section's sessions forward from the effective date. That belongs to Timetable (Module 15), which owns sessions; the count is shown here so the decision is made with it in view, but this page does not do it.", "تُلغي BR-SCN-007 كذلك حصص هذه الشعبة اعتباراً من تاريخ السريان. وذلك من شأن الجدول (الوحدة 15) المالك للحصص؛ ويُعرض العدد هنا ليُتخذ القرار وهو ظاهر، لكن هذه الصفحة لا تفعله.")),
+            new HelpPanelViewModel.Item(T("Approval is not wired yet", "الاعتماد غير مربوط بعد"), T("Module 06 asks for Vice-Principal approval (P2) on a close. There is no workflow definition for it in the catalogue, so the close applies directly and is audited. That gap is known, not hidden.", "تطلب الوحدة 06 اعتماد وكيل المدرسة (P2) للإغلاق. ولا سير عمل معرَّف لذلك في الفهرس، فيُطبَّق الإغلاق مباشرةً ويُدقَّق. وهذه ثغرة معلومة لا مخفية.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <div class="text-muted small">@(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn) · @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn)</div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Impact, target mapping, then one write (doc/Modules/06 §8.5, BR-SCN-007).", "الأثر، ثم وجهة كل طالب، ثم كتابة واحدة (الوحدة 06 §8.5، BR-SCN-007).")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Details" asp-route-id="@Model.Section.Id">@T("Back to section", "عودة للشعبة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="sms-card mb-3">
+    <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("What closing this section costs", "ما يكلّفه إغلاق هذه الشعبة")</h2></div>
+    <div class="p-3 d-flex flex-wrap gap-3">
+        @foreach (var impact in Model.Impacts)
+        {
+            <div class="border rounded p-2 px-3 @(impact.Blocking ? "border-warning" : "")">
+                <div class="h5 mb-0">@impact.Count</div>
+                <div class="small text-muted">@(isRtl ? impact.LabelAr : impact.LabelEn)</div>
+            </div>
+        }
+        @if (Model.HomeroomTeacher != null)
+        {
+            <div class="border rounded p-2 px-3">
+                <div class="fw-semibold">@Model.HomeroomTeacher</div>
+                <div class="small text-muted">@T("homeroom — the assignment ends on the effective date", "رائد الفصل — ينتهي التعيين بتاريخ السريان")</div>
+            </div>
+        }
+    </div>
+    @if (Model.Impacts.Any(i => i.Count > 0 && !i.Blocking))
+    {
+        <div class="p-3 border-top small text-muted">
+            @T("Timetable placements and sessions are not rewritten here — Module 15 owns them (BR-SCN-007).",
+               "لا يُعاد كتابة حصص الجدول هنا — فالوحدة 15 تملكها (BR-SCN-007).")
+        </div>
+    }
+</div>
+
+@if (Model.Members.Count == 0)
+{
+    <div class="sms-card">
+        <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Close the section", "إغلاق الشعبة")</h2></div>
+        <div class="p-3">
+            <p class="mb-3">@T("No student is assigned to this section, so nothing has to move. Its history stays readable after closing.", "لا طالب مسند لهذه الشعبة، فلا شيء ينتقل. ويبقى سجلها مقروءاً بعد الإغلاق.")</p>
+            <form method="post" asp-action="CloseWizard" asp-route-id="@Model.Section.Id" class="d-flex flex-wrap gap-2 align-items-end"
+                  onsubmit="return confirm('@T("Close this section?", "إغلاق هذه الشعبة؟")');">
+                <input type="hidden" name="placements" value="" />
+                <input type="hidden" name="reasonCode" value="balancing" />
+                <div>
+                    <label class="form-label small mb-1" for="empty-date">@T("Effective date", "تاريخ السريان")</label>
+                    <input id="empty-date" type="date" name="effectiveDate" class="form-control form-control-sm" value="@Model.EffectiveDate.ToString("yyyy-MM-dd")" />
+                </div>
+                <button class="btn btn-sm btn-danger" type="submit">@T("Close section", "إغلاق الشعبة")</button>
+            </form>
+        </div>
+    </div>
+    return;
+}
+
+@if (Model.Targets.Count == 0)
+{
+    <div class="sms-card"><div class="p-4">
+        <p class="h6 mb-2">@T("There is nowhere for these students to go.", "لا وجهة لهؤلاء الطلاب.")</p>
+        <p class="text-muted mb-0">
+            @string.Format(T("This is the grade's only active section and {0} student(s) are in it. Open another section for the grade first — a student belongs to exactly one section at a time (BR-SCN-005), so there is no valid state where this one closes today.", "هذه الشعبة الوحيدة النشطة في الصف وفيها {0} طالباً. افتح شعبة أخرى للصف أولاً — فالطالب ينتمي لشعبة واحدة في كل وقت (BR-SCN-005)، فلا حالة صحيحة تُغلق فيها هذه اليوم."), Model.Members.Count)
+        </p>
+    </div></div>
+    return;
+}
+
+<form method="post" asp-action="CloseWizard" asp-route-id="@Model.Section.Id" id="close-form"
+      onsubmit="return confirm('@T("Move these students and close the section?", "نقل هؤلاء الطلاب وإغلاق الشعبة؟")');">
+    <input type="hidden" name="placements" id="close-placements" />
+
+    <div class="sms-card mb-3">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0">@T("Where each student goes", "وجهة كل طالب")</h2>
+            <span class="small text-muted">@T("Defaults balance the sibling sections; change any row.", "الافتراضات توازن الشعب الشقيقة؛ غيّر أي سطر.")</span>
+        </div>
+
+        @if (blocked)
+        {
+            <div class="p-3 border-bottom small text-danger">
+                @T("No sibling section has compatible room for these students — raise a section's capacity or open another one before closing this:", "لا تتسع أي شعبة شقيقة لهؤلاء الطلاب — ارفع سعة شعبة أو افتح أخرى قبل الإغلاق:")
+                <strong>@string.Join("، ", Model.Unplaceable.Select(u => u.Name))</strong>
+            </div>
+        }
+
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+            <caption class="visually-hidden">@T("Where each student goes", "وجهة كل طالب")</caption>
+            <thead><tr><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("No.", "الرقم")</th><th scope="col">@T("Goes to", "ينتقل إلى")</th></tr></thead>
+            <tbody>
+            @foreach (var m in Model.Members)
+            {
+                <tr>
+                    <td>@m.Name <span class="badge text-bg-light border ms-1">@GenderTag(m.Gender)</span></td>
+                    <td dir="ltr">@m.StudentNo</td>
+                    <td>
+                        <select class="form-select form-select-sm sms-close-target" data-enrollment="@m.EnrollmentId" aria-label="@T("Target section", "الشعبة المقصد")">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                            @foreach (var t in Model.Targets)
+                            {
+                                var admits = t.GenderPolicy == GenderPolicy.Mixed
+                                    || (t.GenderPolicy == GenderPolicy.Boys && m.Gender == Gender.Male)
+                                    || (t.GenderPolicy == GenderPolicy.Girls && m.Gender == Gender.Female);
+                                <option value="@t.SectionId" selected="@(t.SectionId == m.SuggestedSectionId)" disabled="@(!admits)">
+                                    @t.Name (@t.Current / @t.Capacity)@(admits ? "" : T(" — gender policy bars this student", " — سياسة الجنس تمنع هذا الطالب"))
+                                </option>
+                            }
+                        </select>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+
+        <div class="p-3 border-top d-flex flex-wrap gap-2 align-items-end">
+            <div>
+                <label class="form-label small mb-1" for="close-reason">@T("Reason (BR-SCN-005)", "السبب (BR-SCN-005)")</label>
+                <select id="close-reason" name="reasonCode" class="form-select form-select-sm">
+                    @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code" selected="@(code == Model.ReasonCode)">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                </select>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="close-date">@T("Effective date", "تاريخ السريان")</label>
+                <input id="close-date" type="date" name="effectiveDate" class="form-control form-control-sm" value="@Model.EffectiveDate.ToString("yyyy-MM-dd")" />
+            </div>
+            <button class="btn btn-sm btn-danger" type="submit" id="close-submit">
+                @string.Format(T("Move {0} student(s) and close", "نقل {0} طالباً والإغلاق"), Model.Members.Count)
+            </button>
+            <div class="small text-danger" id="close-warning" hidden>@T("Every student needs a target section first.", "كل طالب يحتاج شعبة مقصد أولاً.")</div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    var form = document.getElementById('close-form');
+    if (!form) { return; }
+
+    var payload = document.getElementById('close-placements');
+    var submit = document.getElementById('close-submit');
+    var warning = document.getElementById('close-warning');
+    var selects = Array.prototype.slice.call(document.querySelectorAll('.sms-close-target'));
+
+    function refresh() {
+        var pairs = [];
+        var missing = 0;
+        selects.forEach(function (select) {
+            if (select.value) { pairs.push(select.dataset.enrollment + ':' + select.value); }
+            else { missing++; }
+        });
+
+        payload.value = pairs.join(',');
+        // The server refuses a close that leaves anybody behind (BR-SCN-007); the
+        // button is disabled so the refusal is not the first thing the user learns.
+        submit.disabled = missing > 0;
+        warning.hidden = missing === 0;
+    }
+
+    selects.forEach(function (select) { select.addEventListener('change', refresh); });
+    refresh();
+})();
+</script>
+}

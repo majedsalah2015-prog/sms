@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -102,7 +103,9 @@ namespace Sms.Infrastructure.Tests
         private int _nextStudentSeq = 1;
 
         /// <summary>Seeds a Student + an Active Enrollment for the fixture's year, returning the Enrollment id (real FK target since E-202).</summary>
-        private async Task<int> CreateEnrollment(AppDbContext db, int gradeYearProfileId = -1)
+        private async Task<int> CreateEnrollment(
+            AppDbContext db, int gradeYearProfileId = -1,
+            Sms.Domain.Common.Gender gender = Sms.Domain.Common.Gender.Male)
         {
             var profileId = gradeYearProfileId == -1 ? _profileId : gradeYearProfileId;
             var seq = _nextStudentSeq++;
@@ -111,7 +114,7 @@ namespace Sms.Infrastructure.Tests
                 StudentNo = $"STU-TEST-{seq}",
                 FirstNameAr = "طالب", FatherNameAr = "أب", GrandfatherNameAr = "جد", FamilyNameAr = "عائلة",
                 FirstNameEn = "Student", FatherNameEn = "Father", GrandfatherNameEn = "Grandfather", FamilyNameEn = "Family",
-                Gender = Sms.Domain.Common.Gender.Male,
+                Gender = gender,
                 DateOfBirth = new DateTime(2018, 1, 1),
                 NationalityLookupId = 1,
             };
@@ -387,6 +390,304 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Empty(await admin.DefineSectionsAsync(_profileId, 0, 3, GenderPolicy.Mixed));
             Assert.Empty(db.Sections.Where(s => s.GradeYearProfileId == _profileId));
+        }
+
+        // --- BR-SCN-003 on assignment, and §8.3's whole-board apply ------------
+
+        /// <summary>
+        /// A section's gender policy was checked when the section was defined and
+        /// never when a student was put in one, so the roster screen would seat a girl
+        /// in a boys' section without a word.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-003")]
+        public async Task A_student_cannot_be_assigned_to_a_section_their_gender_bars()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var boys = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Boys);
+            var girl = await CreateEnrollment(db, gender: Sms.Domain.Common.Gender.Female);
+
+            await Assert.ThrowsAsync<SectionGenderMismatchException>(
+                () => admin.AssignMembershipAsync(boys.Id, girl, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+            Assert.Empty(db.SectionMemberships.Where(m => m.SectionId == boys.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-003")]
+        public async Task A_transfer_cannot_land_a_student_in_a_section_their_gender_bars()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var mixed = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var boys = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Boys);
+            var girl = await CreateEnrollment(db, gender: Sms.Domain.Common.Gender.Female);
+            await admin.AssignMembershipAsync(mixed.Id, girl, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await Assert.ThrowsAsync<SectionGenderMismatchException>(
+                () => admin.TransferMembershipAsync(girl, boys.Id, "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Single(db.SectionMemberships.Where(m => m.EnrollmentId == girl && m.EffectiveToUtc == null));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-008")]
+        public async Task Applying_a_board_layout_seats_the_unassigned_and_transfers_the_rest()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var a = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var b = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+            var seated = await CreateEnrollment(db);
+            var fresh = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(a.Id, seated, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var moved = await admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [seated] = b.Id, [fresh] = a.Id },
+                "balancing", new DateTime(2026, 10, 1));
+
+            Assert.Equal(2, moved);
+            var seatedNow = db.SectionMemberships.Single(m => m.EnrollmentId == seated && m.EffectiveToUtc == null);
+            Assert.Equal(b.Id, seatedNow.SectionId);
+            Assert.Equal("balancing", seatedNow.TransferReasonCode);
+
+            // The old membership is closed, not erased — BR-SCN-005 keeps history.
+            Assert.Single(db.SectionMemberships.Where(m => m.EnrollmentId == seated && m.EffectiveToUtc != null));
+
+            // A first seat is not a transfer, so it carries no reason code.
+            Assert.Null(db.SectionMemberships.Single(m => m.EnrollmentId == fresh).TransferReasonCode);
+        }
+
+        /// <summary>
+        /// Capacity belongs to the section after every move lands. Checked per move,
+        /// this layout passes twice and then fails — leaving two children written and
+        /// the third refused, which is the worst of both outcomes.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-002")]
+        public async Task A_board_layout_that_overfills_a_section_is_refused_whole()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var a = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", capacity: 2, genderPolicy: GenderPolicy.Mixed);
+            var one = await CreateEnrollment(db);
+            var two = await CreateEnrollment(db);
+            var three = await CreateEnrollment(db);
+
+            await Assert.ThrowsAsync<SectionFullException>(() => admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [one] = a.Id, [two] = a.Id, [three] = a.Id },
+                "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Empty(db.SectionMemberships.Where(m => m.SectionId == a.Id));
+        }
+
+        /// <summary>
+        /// The students nobody is moving still occupy their seats — a layout checked
+        /// only against the students it names would fill a section twice over.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-002")]
+        public async Task A_board_layout_counts_the_students_it_is_not_moving()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var a = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", capacity: 2, genderPolicy: GenderPolicy.Mixed);
+            var b = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", capacity: 2, genderPolicy: GenderPolicy.Mixed);
+            var staying = await CreateEnrollment(db);
+            var alsoStaying = await CreateEnrollment(db);
+            var incoming = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(a.Id, staying, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+            await admin.AssignMembershipAsync(a.Id, alsoStaying, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+            await admin.AssignMembershipAsync(b.Id, incoming, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await Assert.ThrowsAsync<SectionFullException>(() => admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [incoming] = a.Id }, "balancing", new DateTime(2026, 10, 1)));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-003")]
+        public async Task A_board_layout_is_refused_whole_when_one_placement_breaks_gender_policy()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var mixed = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var boys = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Boys);
+            var boy = await CreateEnrollment(db);
+            var girl = await CreateEnrollment(db, gender: Sms.Domain.Common.Gender.Female);
+
+            await Assert.ThrowsAsync<SectionGenderMismatchException>(() => admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [boy] = mixed.Id, [girl] = boys.Id },
+                "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Empty(db.SectionMemberships);
+        }
+
+        /// <summary>
+        /// A student dragged out of a column and back into it is not a transfer, and
+        /// writing one would put a fictitious move on a child's record.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-005")]
+        public async Task A_placement_that_names_the_section_a_student_is_already_in_writes_nothing()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var a = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var seated = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(a.Id, seated, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var moved = await admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [seated] = a.Id }, "balancing", new DateTime(2026, 10, 1));
+
+            Assert.Equal(0, moved);
+            Assert.Single(db.SectionMemberships.Where(m => m.EnrollmentId == seated));
+        }
+
+        [Fact]
+        public async Task A_board_layout_naming_a_section_from_another_grade_is_refused()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var otherGrade = new GradeLevel { StageId = db.Stages.First().Id, Code = "G4", Name = new Sms.Domain.Common.LocalizedName("رابع", "Grade 4"), SequenceOrder = 4 };
+            db.GradeLevels.Add(otherGrade);
+            await db.SaveChangesAsync();
+            var otherProfile = new GradeYearProfile
+            {
+                GradeLevelId = otherGrade.Id, AcademicYearId = _yearId,
+                GenderPolicy = GenderPolicy.Mixed, TargetSections = 1, TargetSectionSize = 3,
+            };
+            db.GradeYearProfiles.Add(otherProfile);
+            await db.SaveChangesAsync();
+
+            var elsewhere = await admin.DefineSectionAsync(otherProfile.Id, "رابع-أ", "4-A", 3, GenderPolicy.Mixed);
+            var ourStudent = await CreateEnrollment(db);
+
+            await Assert.ThrowsAsync<SectionGradeMismatchException>(() => admin.ApplyDistributionAsync(
+                new Dictionary<int, int> { [ourStudent] = elsewhere.Id }, "balancing", new DateTime(2026, 10, 1)));
+        }
+
+        [Fact]
+        public async Task Applying_an_empty_layout_writes_nothing_and_does_not_throw()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+
+            Assert.Equal(0, await admin.ApplyDistributionAsync(
+                new Dictionary<int, int>(), "balancing", new DateTime(2026, 10, 1)));
+        }
+
+        // --- BR-SCN-007 merge / close ----------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-SCN-007")]
+        public async Task Merging_moves_every_student_out_and_closes_the_section_together()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var closing = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var target = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+            var one = await CreateEnrollment(db);
+            var two = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(closing.Id, one, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+            await admin.AssignMembershipAsync(closing.Id, two, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            var moved = await admin.MergeAndCloseSectionAsync(
+                closing.Id,
+                new Dictionary<int, int> { [one] = target.Id, [two] = target.Id },
+                "balancing", new DateTime(2026, 10, 1));
+
+            Assert.Equal(2, moved);
+            Assert.Equal(SectionStatus.Closed, db.Sections.Single(s => s.Id == closing.Id).Status);
+            Assert.Empty(db.SectionMemberships.Where(m => m.SectionId == closing.Id && m.EffectiveToUtc == null));
+            Assert.Equal(2, db.SectionMemberships.Count(m => m.SectionId == target.Id && m.EffectiveToUtc == null));
+
+            // Closed is not deleted — the old memberships still name the section, which
+            // is what keeps last year's records readable (BR-GLB-005).
+            Assert.Equal(2, db.SectionMemberships.Count(m => m.SectionId == closing.Id && m.EffectiveToUtc != null));
+        }
+
+        /// <summary>
+        /// A student left out of the mapping would end up recorded in a section that no
+        /// longer runs. The whole operation is refused rather than half-applied.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-007")]
+        public async Task Merging_refuses_when_a_student_has_nowhere_to_go()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var closing = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var target = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+            var one = await CreateEnrollment(db);
+            var two = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(closing.Id, one, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+            await admin.AssignMembershipAsync(closing.Id, two, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await Assert.ThrowsAsync<SectionCloseWithMembersException>(() => admin.MergeAndCloseSectionAsync(
+                closing.Id, new Dictionary<int, int> { [one] = target.Id }, "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Equal(SectionStatus.Active, db.Sections.Single(s => s.Id == closing.Id).Status);
+            Assert.Equal(2, db.SectionMemberships.Count(m => m.SectionId == closing.Id && m.EffectiveToUtc == null));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-007")]
+        public async Task Merging_refuses_a_mapping_that_sends_a_student_back_into_the_closing_section()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var closing = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", 3, GenderPolicy.Mixed);
+            var one = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(closing.Id, one, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await Assert.ThrowsAsync<SectionCloseWithMembersException>(() => admin.MergeAndCloseSectionAsync(
+                closing.Id, new Dictionary<int, int> { [one] = closing.Id }, "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Equal(SectionStatus.Active, db.Sections.Single(s => s.Id == closing.Id).Status);
+        }
+
+        /// <summary>
+        /// A teacher cannot go on being homeroom of a section that no longer runs, and
+        /// BR-SCN-004 keeps the assignment as history rather than removing it.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-004")]
+        public async Task Merging_ends_the_sections_homeroom_assignment_at_the_effective_date()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var closing = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            await admin.AssignHomeroomTeacherAsync(closing.Id, _teacherId, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await admin.MergeAndCloseSectionAsync(
+                closing.Id, new Dictionary<int, int>(), "balancing", new DateTime(2026, 10, 1));
+
+            var assignment = db.HomeroomAssignments.Single(h => h.SectionId == closing.Id);
+            Assert.Equal(new DateTime(2026, 10, 1), assignment.EffectiveToUtc);
+            Assert.Equal(SectionStatus.Closed, db.Sections.Single(s => s.Id == closing.Id).Status);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-002")]
+        public async Task Merging_refuses_when_the_target_section_has_no_room_for_everybody()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var closing = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var target = await admin.DefineSectionAsync(_profileId, "ثالث-ب", "3-B", capacity: 1, genderPolicy: GenderPolicy.Mixed);
+            var one = await CreateEnrollment(db);
+            var two = await CreateEnrollment(db);
+            await admin.AssignMembershipAsync(closing.Id, one, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+            await admin.AssignMembershipAsync(closing.Id, two, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
+
+            await Assert.ThrowsAsync<SectionFullException>(() => admin.MergeAndCloseSectionAsync(
+                closing.Id,
+                new Dictionary<int, int> { [one] = target.Id, [two] = target.Id },
+                "balancing", new DateTime(2026, 10, 1)));
+
+            Assert.Equal(SectionStatus.Active, db.Sections.Single(s => s.Id == closing.Id).Status);
         }
     }
 }

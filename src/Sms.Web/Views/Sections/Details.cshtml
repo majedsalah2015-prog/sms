@@ -30,7 +30,11 @@
         <h1 class="sms-page-title">@name @if (closed) { <span class="badge text-bg-secondary fs-6">@T("Closed", "مغلقة")</span> }</h1>
         <div class="d-flex align-items-center gap-3 small text-muted"><span>@Model.Members.Count / @Model.Section.Capacity @T("students", "طالب")</span><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Capacity", "السعة")" style="width:10rem"><span style="width:@(pct)%"></span></div><span>@Model.Section.GenderPolicy</span>@if (Model.RoomName != null) { <span><i class="bi bi-door-open me-1" aria-hidden="true"></i>@Model.RoomName</span> }</div></div>
     <div class="d-flex gap-2"><a class="btn btn-outline-secondary" asp-action="Index" asp-route-year="@Model.Year.Id"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
-        @if (!closed) { <form method="post" asp-action="Close" asp-route-id="@Model.Section.Id" onsubmit="return confirm('@T("Close this section? Only allowed with zero current students (BR-SCN-007).", "إغلاق الشعبة؟ مسموح فقط بدون طلاب حاليين (BR-SCN-007).")');"><button class="btn btn-outline-danger" type="submit"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>@T("Close section", "إغلاق الشعبة")</button></form> }
+        @* Goes to the wizard rather than posting a close straight off. A section with
+           students in it cannot close (BR-SCN-007), and a button whose whole answer is
+           "not allowed" leaves the reader no further forward — the wizard is where they
+           can see what closing costs and send everybody somewhere. *@
+        @if (!closed) { <a class="btn btn-outline-danger" asp-action="CloseWizard" asp-route-id="@Model.Section.Id"><i class="bi bi-x-circle me-1" aria-hidden="true"></i>@T("Close section", "إغلاق الشعبة")</a> }
         <partial name="_HelpModal" model="help" /></div>
 </div>
 

@@ -1,0 +1,332 @@
+@using System.Globalization
+@using Sms.Domain.Common
+@using Sms.Domain.Grades
+@model SectionBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Assignment board", "لوحة توزيع الطلاب");
+    ViewData["Breadcrumb"] = T("Sections / Board", "الشعب / لوحة التوزيع");
+    string Policy(GenderPolicy g) => Labels.Gender(g, isRtl);
+    string GenderTag(Gender g) => g == Gender.Female ? T("F", "أنثى") : T("M", "ذكر");
+    var yid = Model.Year?.Id;
+    var gid = Model.Grade?.ProfileId;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "board-help",
+        Title = T("Assignment board — help", "لوحة التوزيع — مساعدة"),
+        Intro = T("A whole grade's sections side by side, and the students in none of them. Drag a card into a section, or let the rules propose a distribution and read the diff before you commit to it.", "شعب الصف كلها جنباً إلى جنب، ومعها الطلاب غير المسندين. اسحب بطاقة إلى شعبة، أو دع القواعد تقترح توزيعاً واقرأ الفرق قبل أن تعتمده."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Nothing is saved until you press apply", "لا يُحفظ شيء قبل الاعتماد"), T("Dragging rearranges the screen only. Every move lands in one write, checked as a batch — so a layout that overfills a section is refused whole rather than half-written.", "السحب يعيد ترتيب الشاشة فقط. وتُكتب كل النقلات دفعة واحدة تُفحص ككل — فالتوزيع الذي يتجاوز سعة شعبة يُرفض كاملاً لا نصفه.")),
+            new HelpPanelViewModel.Item(T("Seat the unassigned vs. rebalance", "إسناد غير المسندين مقابل إعادة الموازنة"), T("Seating a student who has no section costs nothing. Moving one who has a section is a transfer — dated, reason-coded and carried on their record (BR-SCN-005) — so the two are separate buttons and rebalancing is never done silently.", "إسناد طالب بلا شعبة لا يكلّف شيئاً. أما نقل طالب له شعبة فهو نقل مؤرَّخ ومُعلَّل يُسجَّل في ملفه (BR-SCN-005)، لذا فُصل الزران ولا تُجرى إعادة الموازنة ضمناً.")),
+            new HelpPanelViewModel.Item(T("What the rules do and do not weigh", "ما تزنه القواعد وما لا تزنه"), T("Proposals balance size and honour gender policy. Sibling together/apart preferences, language or curriculum grouping and Discipline keep-apart pairs are part of BR-SCN-008 but are not applied here — the flags they read are not recorded yet.", "توازن المقترحات الأعداد وتحترم سياسة الجنس. أما تفضيلات جمع الإخوة أو تفريقهم والتجميع اللغوي أو المنهجي وأزواج «الإبعاد» السلوكية فهي من BR-SCN-008 ولا تُطبَّق هنا — لأن البيانات التي تقرؤها غير مسجّلة بعد.")),
+            new HelpPanelViewModel.Item(T("Capacity and gender are hard rules", "السعة والجنس قاعدتان صارمتان"), T("A card cannot be dropped into a full section or one whose gender policy bars the student, and a proposal never suggests either. A student no compatible section has room for is reported rather than squeezed in (BR-SCN-002/003).", "لا تُسقَط البطاقة في شعبة ممتلئة ولا في شعبة تمنع سياستُها الطالب، ولا يقترح المقترَح أياً منهما. والطالب الذي لا تتسع له شعبة مناسبة يُعلَن عنه بدل حشره (BR-SCN-002/003).")),
+            new HelpPanelViewModel.Item(T("Approval is not wired yet", "الاعتماد غير مربوط بعد"), T("Module 06 §4 asks for Vice-Principal approval on bulk transfers above a threshold. There is no workflow for it and the threshold is still an open question in the specification, so the board writes directly. That gap is known, not hidden.", "تطلب الوحدة 06 §4 اعتماد وكيل المدرسة للنقل الجماعي فوق حدّ معيّن. لا سير عمل لذلك بعد والحدّ ما زال سؤالاً مفتوحاً في المواصفة، فتكتب اللوحة مباشرة. وهذه ثغرة معلومة لا مخفية.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Drag students between a grade's sections, or auto-distribute and read the diff (doc/Modules/06 §8.3, BR-SCN-008).", "اسحب الطلاب بين شعب الصف، أو وزّع تلقائياً واقرأ الفرق (الوحدة 06 §8.3، BR-SCN-008).")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2 align-items-center">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Year", "العام")">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+            <select name="grade" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Grade", "الصف")">
+                @foreach (var g in Model.Grades) { <option value="@g.ProfileId" selected="@(g.ProfileId == gid)">@(isRtl ? g.NameAr : g.NameEn) · @g.Sections @T("sections", "شعبة") · @g.Students @T("students", "طالب")</option> }
+            </select>
+        </form>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index" asp-route-year="@yid">@T("List", "القائمة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.Grade == null)
+{
+    <div class="sms-card"><div class="p-4 text-center text-muted">@T("This year has no grade profiles yet — define them under Grades first.", "لا ملفات صفوف لهذا العام بعد — عرّفها من شاشة الصفوف أولاً.")</div></div>
+    return;
+}
+
+@if (Model.Proposal != null)
+{
+    var p = Model.Proposal;
+    <div class="sms-card mb-3 border-primary">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+            <h2 class="h6 mb-0">@(p.Rebalanced ? T("Proposed redistribution", "إعادة توزيع مقترحة") : T("Proposed seating", "إسناد مقترح"))</h2>
+            <span class="small text-muted">@T("Nothing has been written yet (BR-SCN-008).", "لم يُكتب شيء بعد (BR-SCN-008).")</span>
+        </div>
+
+        @if (p.Moves.Count == 0)
+        {
+            <div class="p-3 small text-muted">@T("The rules propose no change — this grade is already as level as capacity and gender policy allow.", "لا تقترح القواعد أي تغيير — الصف موزَّع بالفعل بقدر ما تسمح به السعة وسياسة الجنس.")</div>
+        }
+        else
+        {
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+                <caption class="visually-hidden">@T("Proposed moves", "النقلات المقترحة")</caption>
+                <thead><tr><th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("No.", "الرقم")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th></tr></thead>
+                <tbody>
+                @foreach (var row in p.Moves)
+                {
+                    <tr>
+                        <td>@row.StudentName</td>
+                        <td dir="ltr">@row.StudentNo</td>
+                        <td>@(row.FromSection ?? T("— not assigned —", "— غير مسند —"))</td>
+                        <td class="fw-semibold">@row.ToSection</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        }
+
+        <div class="p-3 border-top">
+            <div class="small text-muted mb-2">@T("Where the grade ends up", "أين ينتهي الصف")</div>
+            <div class="d-flex flex-wrap gap-2">
+                @foreach (var t in p.Tallies)
+                {
+                    <span class="badge @(t.After == t.Before ? "text-bg-light border" : "text-bg-primary")">
+                        @t.SectionName: @t.Before → @t.After / @t.Capacity
+                    </span>
+                }
+            </div>
+        </div>
+
+        @if (p.Unplaced.Count > 0)
+        {
+            <div class="p-3 border-top">
+                <div class="small text-danger mb-1">@T("No compatible section has room for these students (BR-SCN-002):", "لا تتسع أي شعبة مناسبة لهؤلاء الطلاب (BR-SCN-002):")</div>
+                <div class="small">@string.Join("، ", p.Unplaced.Select(u => u.StudentName))</div>
+            </div>
+        }
+
+        @if (p.Moves.Count > 0)
+        {
+            <div class="p-3 border-top d-flex flex-wrap gap-2 align-items-end">
+                <form method="post" asp-action="ApplyBoard" asp-route-year="@yid" asp-route-grade="@gid" class="d-flex flex-wrap gap-2 align-items-end">
+                    <input type="hidden" name="placements" value="@p.Payload" />
+                    <div>
+                        <label class="form-label small mb-1" for="proposal-reason">@T("Reason (BR-SCN-005)", "السبب (BR-SCN-005)")</label>
+                        <select id="proposal-reason" name="reasonCode" class="form-select form-select-sm">
+                            @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code" selected="@(code == Model.ReasonCode)">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-1" for="proposal-date">@T("Effective date", "تاريخ السريان")</label>
+                        <input id="proposal-date" type="date" name="effectiveDate" class="form-control form-control-sm" value="@Model.EffectiveDate.ToString("yyyy-MM-dd")" />
+                    </div>
+                    <button class="btn btn-sm btn-primary" type="submit">@string.Format(T("Apply {0} move(s)", "اعتماد {0} نقلة"), p.Moves.Count)</button>
+                </form>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Board" asp-route-year="@yid" asp-route-grade="@gid">@T("Discard", "إلغاء المقترح")</a>
+            </div>
+        }
+    </div>
+}
+
+<div class="sms-card mb-3">
+    <div class="p-3 d-flex flex-wrap gap-3 align-items-end">
+        <form method="post" asp-action="Propose" asp-route-year="@yid" asp-route-grade="@gid" class="d-flex flex-wrap gap-2 align-items-end">
+            <button class="btn btn-sm btn-outline-primary" type="submit" name="rebalance" value="false">
+                <i class="bi bi-person-plus me-1" aria-hidden="true"></i>@T("Seat the unassigned", "إسناد غير المسندين")
+            </button>
+            <button class="btn btn-sm btn-outline-primary" type="submit" name="rebalance" value="true">
+                <i class="bi bi-distribute-horizontal me-1" aria-hidden="true"></i>@T("Rebalance the whole grade", "إعادة موازنة الصف كله")
+            </button>
+        </form>
+        <div class="small text-muted flex-grow-1">
+            @T("Proposals balance size and honour gender policy only. Sibling and behavioural keep-apart rules are part of BR-SCN-008 and are not applied here.",
+               "توازن المقترحات الأعداد وتحترم سياسة الجنس فقط. أما قواعد الإخوة والإبعاد السلوكي فهي من BR-SCN-008 ولا تُطبَّق هنا.")
+        </div>
+        <div class="small">
+            <span class="text-muted">@T("Grade policy", "سياسة الصف"):</span> <span class="badge text-bg-light border">@Policy(Model.GradeGenderPolicy)</span>
+        </div>
+    </div>
+</div>
+
+<form method="post" asp-action="ApplyBoard" asp-route-year="@yid" asp-route-grade="@gid" id="board-form">
+    <input type="hidden" name="placements" id="board-placements" />
+    <div class="row g-3" id="board">
+        <div class="col-lg-3">
+            <div class="sms-card h-100" data-section="0" data-capacity="9999" data-policy="Mixed">
+                <div class="p-2 border-bottom">
+                    <div class="fw-semibold">@T("Not assigned", "غير مسندين")</div>
+                    <div class="small text-muted"><span class="sms-board-count">@Model.Unassigned.Count</span> @T("students", "طالب")</div>
+                </div>
+                <div class="sms-board-drop p-2" data-drop="0">
+                    @foreach (var card in Model.Unassigned)
+                    {
+                        <div class="sms-board-card" draggable="true" data-enrollment="@card.EnrollmentId" data-gender="@card.Gender">
+                            <span>@(isRtl ? card.NameAr : card.NameEn)</span>
+                            <span class="badge text-bg-light border ms-1">@GenderTag(card.Gender)</span>
+                            <div class="small text-muted" dir="ltr">@card.StudentNo</div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @foreach (var column in Model.Columns)
+        {
+            <div class="col-lg-3">
+                <div class="sms-card h-100" data-section="@column.Section.Id" data-capacity="@column.Capacity" data-policy="@column.Section.GenderPolicy">
+                    <div class="p-2 border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a class="fw-semibold" asp-action="Details" asp-route-id="@column.Section.Id">@(isRtl ? column.Section.NameAr : column.Section.NameEn)</a>
+                            <span class="badge text-bg-light border">@Policy(column.Section.GenderPolicy)</span>
+                        </div>
+                        <div class="small text-muted">
+                            <span class="sms-board-count">@column.Students.Count</span> / @column.Capacity
+                            @if (column.HomeroomTeacher != null) { <text>· @column.HomeroomTeacher</text> }
+                            @if (column.RoomName != null) { <text>· @column.RoomName</text> }
+                        </div>
+                    </div>
+                    <div class="sms-board-drop p-2" data-drop="@column.Section.Id">
+                        @foreach (var card in column.Students)
+                        {
+                            <div class="sms-board-card" draggable="true" data-enrollment="@card.EnrollmentId" data-gender="@card.Gender">
+                                <span>@(isRtl ? card.NameAr : card.NameEn)</span>
+                                <span class="badge text-bg-light border ms-1">@GenderTag(card.Gender)</span>
+                                <div class="small text-muted" dir="ltr">@card.StudentNo</div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (Model.Columns.Count == 0)
+    {
+        <div class="sms-card mt-3"><div class="p-4 text-center text-muted">@T("This grade has no active sections yet — open some from the sections list.", "لا شعب نشطة لهذا الصف بعد — افتح شعباً من قائمة الشعب.")</div></div>
+    }
+    else
+    {
+        <div class="sms-card mt-3" id="board-bar" hidden>
+            <div class="p-3 d-flex flex-wrap gap-2 align-items-end">
+                <div class="flex-grow-1">
+                    <div class="fw-semibold"><span id="board-changed">0</span> @T("student(s) moved on screen", "طالب نُقل على الشاشة")</div>
+                    <div class="small text-muted">@T("Nothing is written until you apply.", "لا يُكتب شيء حتى تعتمد.")</div>
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="board-reason">@T("Reason (BR-SCN-005)", "السبب (BR-SCN-005)")</label>
+                    <select id="board-reason" name="reasonCode" class="form-select form-select-sm">
+                        @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code" selected="@(code == Model.ReasonCode)">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small mb-1" for="board-date">@T("Effective date", "تاريخ السريان")</label>
+                    <input id="board-date" type="date" name="effectiveDate" class="form-control form-control-sm" value="@Model.EffectiveDate.ToString("yyyy-MM-dd")" />
+                </div>
+                <button class="btn btn-sm btn-primary" type="submit">@T("Apply", "اعتماد")</button>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="Board" asp-route-year="@yid" asp-route-grade="@gid">@T("Reset", "إعادة")</a>
+            </div>
+        </div>
+    }
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    var board = document.getElementById('board');
+    if (!board) { return; }
+
+    var form = document.getElementById('board-form');
+    var payload = document.getElementById('board-placements');
+    var bar = document.getElementById('board-bar');
+    var changedLabel = document.getElementById('board-changed');
+    var dragged = null;
+
+    // Where every card started. The apply posts only what actually moved, so a
+    // student dragged out of a column and back again is not written as a transfer.
+    var origin = {};
+    board.querySelectorAll('.sms-board-card').forEach(function (card) {
+        origin[card.dataset.enrollment] = card.closest('[data-drop]').dataset.drop;
+    });
+
+    function admits(policy, gender) {
+        if (policy === 'Boys') { return gender === 'Male'; }
+        if (policy === 'Girls') { return gender === 'Female'; }
+        return true;
+    }
+
+    function panelOf(drop) { return drop.closest('[data-section]'); }
+
+    function refresh() {
+        var moved = [];
+        board.querySelectorAll('[data-drop]').forEach(function (drop) {
+            var panel = panelOf(drop);
+            var cards = drop.querySelectorAll('.sms-board-card');
+            var capacity = parseInt(panel.dataset.capacity, 10);
+            panel.querySelector('.sms-board-count').textContent = cards.length;
+            panel.classList.toggle('border-danger', cards.length > capacity);
+
+            cards.forEach(function (card) {
+                if (origin[card.dataset.enrollment] !== drop.dataset.drop && drop.dataset.drop !== '0') {
+                    moved.push(card.dataset.enrollment + ':' + drop.dataset.drop);
+                }
+            });
+        });
+
+        payload.value = moved.join(',');
+        changedLabel.textContent = moved.length;
+        bar.hidden = moved.length === 0;
+    }
+
+    board.addEventListener('dragstart', function (e) {
+        var card = e.target.closest('.sms-board-card');
+        if (!card) { return; }
+        dragged = card;
+        card.classList.add('sms-board-card--dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    board.addEventListener('dragend', function () {
+        if (dragged) { dragged.classList.remove('sms-board-card--dragging'); }
+        dragged = null;
+        board.querySelectorAll('.sms-board-drop').forEach(function (d) { d.classList.remove('sms-board-drop--over', 'sms-board-drop--refuse'); });
+    });
+
+    board.addEventListener('dragover', function (e) {
+        var drop = e.target.closest('.sms-board-drop');
+        if (!drop || !dragged) { return; }
+        var panel = panelOf(drop);
+        var full = drop.querySelectorAll('.sms-board-card').length >= parseInt(panel.dataset.capacity, 10);
+        var barred = !admits(panel.dataset.policy, dragged.dataset.gender);
+        var here = dragged.closest('[data-drop]') === drop;
+
+        // The two hard rules, refused at the cursor rather than after a round trip
+        // (BR-SCN-002/003). The server re-checks both — this is a courtesy, not the
+        // enforcement point.
+        if (!here && (full || barred)) {
+            drop.classList.add('sms-board-drop--refuse');
+            return;
+        }
+
+        e.preventDefault();
+        drop.classList.add('sms-board-drop--over');
+    });
+
+    board.addEventListener('dragleave', function (e) {
+        var drop = e.target.closest('.sms-board-drop');
+        if (drop) { drop.classList.remove('sms-board-drop--over', 'sms-board-drop--refuse'); }
+    });
+
+    board.addEventListener('drop', function (e) {
+        var drop = e.target.closest('.sms-board-drop');
+        if (!drop || !dragged) { return; }
+        e.preventDefault();
+        drop.appendChild(dragged);
+        drop.classList.remove('sms-board-drop--over', 'sms-board-drop--refuse');
+        refresh();
+    });
+
+    form.addEventListener('submit', function () { refresh(); });
+    refresh();
+})();
+</script>
+}

@@ -100,6 +100,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Students,   Sc.Students.Directory,        "Student directory",    "دليل الطلاب",         "bi-mortarboard",       "Students",   "Index"),
                     new(Sc.Modules.Parents,    Sc.Parents.Directory,         "Parent directory",     "دليل أولياء الأمور",  "bi-people",            "Parents",    "Index"),
                     new(Sc.Modules.Sections,   Sc.Sections.Sections_,        "Sections",             "الشعب",               "bi-grid-3x3-gap",      "Sections",   "Index"),
+                    new(Sc.Modules.Sections,   Sc.Sections.Board,            "Assignment board",     "لوحة توزيع الطلاب",   "bi-columns-gap",       "Sections",   "Board"),
                     new(Sc.Modules.Attendance, Sc.Attendance.Capture,        "Attendance",           "الحضور والغياب",      "bi-check2-square",     "Attendance", "Index"),
                     new(Sc.Modules.Attendance, Sc.Attendance.Gate,           "Gate register",        "سجل البوابة",         "bi-door-open",         "Attendance", "Gate"),
                     new(Sc.Modules.Attendance, Sc.Attendance.Justifications, "Justifications",       "الأعذار",             "bi-file-earmark-text", "Attendance", "Justifications"),

@@ -470,3 +470,14 @@ input[type=number].form-control { min-width: 4.5rem; }
 .sms-heat-2 { background: rgba(37, 99, 235, .28); }
 .sms-heat-3 { background: rgba(37, 99, 235, .45); }
 .sms-heat-clash { background: rgba(220, 38, 38, .35); font-weight: 600; }
+
+/* Assignment board (doc/Modules/06 §8.3). The columns are fixed-height and scroll
+   on their own: a grade of four sections must stay comparable at a glance, and a
+   column that grows with its contents turns "which section is fuller" into a
+   scrolling exercise. */
+.sms-board-drop { min-height: 8rem; max-height: 26rem; overflow-y: auto; }
+.sms-board-drop--over { background: rgba(37, 99, 235, .10); outline: 2px dashed rgba(37, 99, 235, .5); outline-offset: -4px; }
+.sms-board-drop--refuse { background: rgba(220, 38, 38, .10); outline: 2px dashed rgba(220, 38, 38, .55); outline-offset: -4px; cursor: not-allowed; }
+.sms-board-card { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: .35rem; padding: .35rem .5rem; margin-bottom: .35rem; background: var(--bs-body-bg, #fff); cursor: grab; }
+.sms-board-card:active { cursor: grabbing; }
+.sms-board-card--dragging { opacity: .45; }

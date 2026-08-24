@@ -138,6 +138,9 @@ namespace Sms.Application.Security
         {
             public const string Sections_ = "Sections";
             public const string Roster = "Roster";
+
+            /// <summary>doc/Modules/06 §8.3 — drag-drop assignment board and rule-based auto-distribute across a grade's sections.</summary>
+            public const string Board = "Board";
         }
 
         public static class Subjects
@@ -381,6 +384,7 @@ namespace Sms.Application.Security
             // ---- Sections
             S(Modules.Sections, Sections.Sections_, "Sections", "الشعب", CrudApprove),
             S(Modules.Sections, Sections.Roster, "Section roster", "كشف الشعبة", ActionVerb.Edit),
+            S(Modules.Sections, Sections.Board, "Assignment board", "لوحة توزيع الطلاب", ActionVerb.View, ActionVerb.Edit),
 
             // ---- Subjects
             S(Modules.Subjects, Subjects.Subjects_, "Subjects", "المواد الدراسية", Crud),

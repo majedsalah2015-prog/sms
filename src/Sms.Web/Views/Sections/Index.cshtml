@@ -27,6 +27,7 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade and year: capacity meters, gender, homeroom, room, student counts (BR-SCN-001/002/004).", "لكل صف وعام: مقاييس السعة، الجنس، رائد الفصل، القاعة، عدد الطلاب (BR-SCN-001/002/004).")</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2 align-items-center"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Year", "العام")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select></form>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Board" asp-route-year="@yid"><i class="bi bi-columns-gap me-1" aria-hidden="true"></i>@T("Assignment board", "لوحة التوزيع")</a>
         <partial name="_HelpModal" model="help" />
     </div></div>
 

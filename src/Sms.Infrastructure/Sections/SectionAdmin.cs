@@ -6,7 +6,9 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Grades;
+using Sms.Application.Rollover;
 using Sms.Application.Sections;
+using Sms.Domain.Common;
 using Sms.Domain.Grades;
 using Sms.Domain.Sections;
 using Sms.Infrastructure.Persistence;
@@ -221,6 +223,7 @@ namespace Sms.Infrastructure.Sections
             int sectionId, int enrollmentId, DateTime effectiveFromUtc, CancellationToken cancellationToken = default)
         {
             var section = await EnsureCapacityAsync(sectionId, cancellationToken);
+            await EnsureGenderAsync(section, enrollmentId, cancellationToken);
 
             var membership = new SectionMembership
             {
@@ -239,6 +242,7 @@ namespace Sms.Infrastructure.Sections
             int enrollmentId, int targetSectionId, string transferReasonCode, DateTime effectiveDate, CancellationToken cancellationToken = default)
         {
             var targetSection = await EnsureCapacityAsync(targetSectionId, cancellationToken);
+            await EnsureGenderAsync(targetSection, enrollmentId, cancellationToken);
 
             var currentMembership = await _db.SectionMemberships.SingleOrDefaultAsync(
                 m => m.EnrollmentId == enrollmentId && m.EffectiveToUtc == null, cancellationToken);
@@ -273,6 +277,182 @@ namespace Sms.Infrastructure.Sections
 
             section.Status = SectionStatus.Closed;
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<int> ApplyDistributionAsync(
+            IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
+            CancellationToken cancellationToken = default)
+        {
+            if (placements.Count == 0)
+            {
+                return 0;
+            }
+
+            var moved = await StagePlacementsAsync(placements, transferReasonCode, effectiveDate, cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
+            return moved;
+        }
+
+        public async Task<int> MergeAndCloseSectionAsync(
+            int sectionId, IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
+            CancellationToken cancellationToken = default)
+        {
+            var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);
+
+            var members = await _db.SectionMemberships.AsNoTracking()
+                .Where(m => m.SectionId == sectionId && m.EffectiveToUtc == null)
+                .Select(m => m.EnrollmentId).ToListAsync(cancellationToken);
+
+            // Every member has to be given somewhere to go, and nobody may be sent back
+            // in. Either omission would end with the section closed and a student still
+            // recorded in it — a membership row pointing at a class that no longer runs.
+            var unplaced = members.Count(id => !placements.ContainsKey(id) || placements[id] == sectionId);
+            if (unplaced > 0)
+            {
+                throw new SectionCloseWithMembersException(sectionId, unplaced);
+            }
+
+            if (placements.Count > 0)
+            {
+                await StagePlacementsAsync(placements, transferReasonCode, effectiveDate, cancellationToken);
+            }
+
+            var homeroom = await _db.HomeroomAssignments
+                .SingleOrDefaultAsync(h => h.SectionId == sectionId && h.EffectiveToUtc == null, cancellationToken);
+            if (homeroom != null)
+            {
+                homeroom.EffectiveToUtc = effectiveDate;
+            }
+
+            section.Status = SectionStatus.Closed;
+            await _db.SaveChangesAsync(cancellationToken);
+            return members.Count;
+        }
+
+        /// <summary>
+        /// Validates a whole layout and stages it, without saving — so a caller that
+        /// has more to do in the same transaction (closing the section the students
+        /// came out of) commits all of it or none.
+        /// </summary>
+        private async Task<int> StagePlacementsAsync(
+            IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
+            CancellationToken cancellationToken)
+        {
+            var enrollmentIds = placements.Keys.ToList();
+            var sectionIds = placements.Values.Distinct().ToList();
+
+            var sections = await _db.Sections.Where(s => sectionIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, cancellationToken);
+            var missing = sectionIds.FirstOrDefault(id => !sections.ContainsKey(id));
+            if (missing != 0)
+            {
+                throw new SectionGradeMismatchException(missing, 0);
+            }
+
+            var enrollments = await _db.Enrollments.AsNoTracking()
+                .Where(e => enrollmentIds.Contains(e.Id)).ToDictionaryAsync(e => e.Id, cancellationToken);
+            var studentIds = enrollments.Values.Select(e => e.StudentId).Distinct().ToList();
+            var genders = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => studentIds.Contains(s.Id) && s.SchoolId == _db.CurrentSchoolId)
+                .ToDictionaryAsync(s => s.Id, s => s.Gender, cancellationToken);
+
+            var current = await _db.SectionMemberships
+                .Where(m => enrollmentIds.Contains(m.EnrollmentId) && m.EffectiveToUtc == null)
+                .ToListAsync(cancellationToken);
+            var currentBy = current.ToDictionary(m => m.EnrollmentId);
+
+            // A section keeps the students nobody is moving. Counting only the batch
+            // would let a layout drop three children into a section that already holds
+            // every seat it has.
+            var stayingCounts = await _db.SectionMemberships.AsNoTracking()
+                .Where(m => sectionIds.Contains(m.SectionId) && m.EffectiveToUtc == null && !enrollmentIds.Contains(m.EnrollmentId))
+                .GroupBy(m => m.SectionId)
+                .Select(g => new { g.Key, N = g.Count() })
+                .ToDictionaryAsync(x => x.Key, x => x.N, cancellationToken);
+
+            foreach (var (sectionId, section) in sections.OrderBy(s => s.Key))
+            {
+                var landing = placements.Count(p => p.Value == sectionId)
+                    + (stayingCounts.TryGetValue(sectionId, out var staying) ? staying : 0);
+                if (landing > section.Capacity)
+                {
+                    throw new SectionFullException(sectionId);
+                }
+            }
+
+            foreach (var (enrollmentId, sectionId) in placements.OrderBy(p => p.Key))
+            {
+                if (!enrollments.TryGetValue(enrollmentId, out var enrollment))
+                {
+                    throw new SectionGradeMismatchException(sectionId, 0);
+                }
+
+                var section = sections[sectionId];
+                if (section.GradeYearProfileId != enrollment.GradeYearProfileId)
+                {
+                    throw new SectionGradeMismatchException(sectionId, enrollment.GradeYearProfileId);
+                }
+
+                if (genders.TryGetValue(enrollment.StudentId, out var gender)
+                    && !SectionDistributor.IsGenderCompatible(section.GenderPolicy, gender))
+                {
+                    throw new SectionGenderMismatchException(sectionId, enrollment.StudentId);
+                }
+            }
+
+            var moved = 0;
+            foreach (var (enrollmentId, sectionId) in placements.OrderBy(p => p.Key))
+            {
+                currentBy.TryGetValue(enrollmentId, out var existing);
+                if (existing != null && existing.SectionId == sectionId)
+                {
+                    continue;
+                }
+
+                if (existing != null)
+                {
+                    existing.EffectiveToUtc = effectiveDate;
+                }
+
+                _db.SectionMemberships.Add(new SectionMembership
+                {
+                    AcademicYearId = sections[sectionId].AcademicYearId,
+                    SectionId = sectionId,
+                    EnrollmentId = enrollmentId,
+                    EffectiveFromUtc = effectiveDate,
+                    // A first seat is not a transfer and carries no reason: BR-SCN-005's
+                    // reason code answers "why was this child moved", and there is no
+                    // answer to give when they were not.
+                    TransferReasonCode = existing == null ? null : transferReasonCode,
+                });
+                moved++;
+            }
+
+            return moved;
+        }
+
+        /// <summary>
+        /// BR-SCN-003: the section's gender policy has to admit the student. This was
+        /// checked when a section was defined (its policy must narrow the grade's) but
+        /// never when a student was put in one, so a girl could be assigned to a boys'
+        /// section from the roster screen.
+        /// </summary>
+        private async Task EnsureGenderAsync(Section section, int enrollmentId, CancellationToken cancellationToken)
+        {
+            var studentId = await _db.Enrollments.AsNoTracking()
+                .Where(e => e.Id == enrollmentId).Select(e => (int?)e.StudentId).SingleOrDefaultAsync(cancellationToken);
+            if (studentId == null)
+            {
+                return;
+            }
+
+            var gender = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.Id == studentId.Value && s.SchoolId == _db.CurrentSchoolId)
+                .Select(s => (Gender?)s.Gender).SingleOrDefaultAsync(cancellationToken);
+
+            if (gender != null && !SectionDistributor.IsGenderCompatible(section.GenderPolicy, gender.Value))
+            {
+                throw new SectionGenderMismatchException(section.Id, studentId.Value);
+            }
         }
 
         private async Task<Section> EnsureCapacityAsync(int sectionId, CancellationToken cancellationToken)
