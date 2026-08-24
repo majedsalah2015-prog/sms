@@ -122,14 +122,14 @@ namespace Sms.Web.Controllers
             catch (GlPeriodOverlapException ex)
             {
                 TempData["Error"] = T(
-                    ex.Message,
+                    UserMessage.For(ex, IsArabic),
                     "تتداخل الفترة مع دفعة قائمة — يجب إلغاؤها أولاً حتى لا تصل المستندات نفسها إلى الأستاذ العام مرتين.");
             }
             catch (GlPostingRejectedException ex)
             {
                 TempData["Error"] = T(
-                    $"The ledger refused the batch [{ex.ErrorCode}]: {ex.Message}",
-                    $"رفض الأستاذ العام الدفعة [{ex.ErrorCode}]: {ex.Message}");
+                    $"The ledger refused the batch [{ex.ErrorCode}]: {UserMessage.For(ex, IsArabic)}",
+                    $"رفض الأستاذ العام الدفعة [{ex.ErrorCode}]: {UserMessage.For(ex, IsArabic)}");
             }
 
             return RedirectToAction(nameof(Index));
@@ -208,8 +208,8 @@ namespace Sms.Web.Controllers
             catch (GlPostingRejectedException ex)
             {
                 TempData["Error"] = T(
-                    $"The ledger refused the reversing entry [{ex.ErrorCode}]: {ex.Message}",
-                    $"رفض الأستاذ العام قيد العكس [{ex.ErrorCode}]: {ex.Message}");
+                    $"The ledger refused the reversing entry [{ex.ErrorCode}]: {UserMessage.For(ex, IsArabic)}",
+                    $"رفض الأستاذ العام قيد العكس [{ex.ErrorCode}]: {UserMessage.For(ex, IsArabic)}");
             }
 
             return RedirectToAction(nameof(Details), new { id });

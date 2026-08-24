@@ -1,0 +1,79 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model MyRequestsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My requests", "طلباتي");
+    ViewData["Breadcrumb"] = T("Approvals / My requests", "الموافقات / طلباتي");
+    var help = new HelpPanelViewModel
+    {
+        Id = "wf-mine-help", Title = T("My requests — help", "طلباتي — مساعدة"),
+        Intro = T("Everything you have submitted and where it has reached. The tracker answers the question that otherwise becomes a phone call: who is it with now?", "كل ما قدّمته وإلى أين وصل. يجيب المتتبِّع عن السؤال الذي يتحوّل بغيره إلى مكالمة: عند من الطلب الآن؟"),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Returned means it is yours again", "المُعاد صار لديك ثانية"), T("A returned request is back in your hands with the approver's reason on it. Correct it and submit again; the number of times a request has come back is recorded, and that count is deliberate.", "الطلب المُعاد عاد إلى يدك ومعه سبب المعتمِد. صحّحه وأعد تقديمه؛ وعدد مرات عودته مسجَّل، وهذا مقصود.")),
+            new HelpPanelViewModel.Item(T("Rejected is final", "المرفوض نهائي"), T("A rejection closes that request for good. What follows is a new request, not a re-opened one — so the record of what was asked and what was decided stays intact.", "الرفض يُغلق ذلك الطلب نهائياً. وما يليه طلب جديد لا طلب أُعيد فتحه — فيبقى سجل ما طُلب وما قُرِّر سليماً.")),
+            new HelpPanelViewModel.Item(T("Open the trail", "افتح المسار"), T("Every request links to its own history: each step, who took it, when, and the reason they gave.", "كل طلب يفتح على تاريخه: كل خطوة ومن اتخذها ومتى والسبب الذي أبداه.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("What you submitted, and the step each one is sitting at.", "ما قدّمته، والمرحلة التي يقف عندها كل طلب.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_ApprovalsNav" />
+
+@if (Model.Items.Count == 0)
+{
+    <div class="sms-card">
+        <div class="p-4 text-center">
+            <p class="h5 mb-2">@T("You have not submitted anything for approval.", "لم تقدّم شيئاً للاعتماد.")</p>
+            <p class="text-muted mb-0">@T("Requests appear here once a module raises one on your behalf — a discount grant, a refund, a marksheet, a correction.", "تظهر الطلبات هنا حين ترفع وحدةٌ طلباً باسمك — منح خصم، أو استرداد، أو كشف درجات، أو تصويب.")</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@ViewData["Title"]</caption>
+            <thead><tr>
+                <th scope="col">@T("Request", "الطلب")</th>
+                <th scope="col">@T("Workflow", "المسار")</th>
+                <th scope="col">@T("State", "الحالة")</th>
+                <th scope="col">@T("Sent back", "أُعيد")</th>
+                <th scope="col">@T("Started", "بدأ")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in Model.Items)
+            {
+                <tr>
+                    <td>
+                        <a asp-action="History" asp-route-id="@row.InstanceId">@row.EntityLabel</a>
+                        <div class="small text-muted">#@row.InstanceId</div>
+                    </td>
+                    <td>
+                        @row.WorkflowName
+                        <div class="small text-muted"><code>@row.WorkflowCode</code></div>
+                    </td>
+                    <td>
+                        <span class="badge @(row.IsClosed ? "text-bg-secondary" : "text-bg-light border")">@row.StateName</span>
+                        @if (row.IsEditableNow)
+                        {
+                            <div class="small text-warning-emphasis">@T("waiting on you", "بانتظارك")</div>
+                        }
+                    </td>
+                    <td>@(row.ReturnCount == 0 ? T("—", "—") : row.ReturnCount.ToString(CultureInfo.InvariantCulture))</td>
+                    <td>@row.StartedAtUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

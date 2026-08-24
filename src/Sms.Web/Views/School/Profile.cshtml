@@ -1,88 +1,632 @@
 @using System.Globalization
+@using Sms.Domain.Schools
 @model SchoolProfileViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("School profile", "ملف المدرسة");
     ViewData["Breadcrumb"] = T("Schools / School profile", "المدارس / ملف المدرسة");
-    var tabs = new (string Key, string En, string Ar)[] { ("identity", "Identity", "الهوية"), ("license", "License & Ministry", "الترخيص والوزارة"), ("contacts", "Contacts & Location", "التواصل والموقع"), ("branding", "Branding", "الهوية البصرية"), ("stages", "Stages offered", "المراحل المقدَّمة") };
+
+    var tabs = new (string Key, string En, string Ar, string Icon)[]
+    {
+        ("identity", "Identity", "الهوية", "bi-card-heading"),
+        ("licence", "Licence and ministry", "الترخيص والوزارة", "bi-patch-check"),
+        ("contacts", "Contacts and location", "التواصل والموقع", "bi-geo-alt"),
+        ("branding", "Branding", "الهوية البصرية", "bi-image"),
+        ("stages", "Stages offered", "المراحل المقدَّمة", "bi-diagram-3"),
+        ("history", "History", "سجل التغييرات", "bi-clock-history"),
+    };
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+
+    var displayName = (isRtl ? Model.NameAr : Model.NameEn) ?? (isRtl ? Model.NameEn : Model.NameAr);
+    var otherName = (isRtl ? Model.NameEn : Model.NameAr);
+    var days = Model.LicenceDaysRemaining(Model.TodayUtc);
+    var licenceTone = days == null ? "text-muted" : days < 0 ? "text-danger" : days <= 30 ? "text-danger" : days <= 90 ? "sms-amber" : "text-muted";
+    var licenceNote = days == null
+        ? T("No expiry date recorded", "لا تاريخ انتهاء مسجَّل")
+        : days < 0
+            ? T($"Expired {Math.Abs(days.Value)} days ago", $"انتهى قبل {Math.Abs(days.Value)} يوماً")
+            : T($"Expires in {days} days", $"ينتهي خلال {days} يوماً");
+
     var help = new HelpPanelViewModel
     {
         Id = "school-profile-help",
         Title = T("School profile — help", "ملف المدرسة — مساعدة"),
-        Intro = T("The school's own record (doc/Modules/02 §8). One school per deployment, so this screen is filled once and corrected rarely — but everything it holds is printed on official documents, which is why identity edits are audited and demand a reason.", "سجل المدرسة نفسها (الوثيقة 02 §8). مدرسة واحدة لكل تركيب، فتُملأ هذه الشاشة مرة وتُصحَّح نادراً — لكن ما تحمله يُطبع على المستندات الرسمية، ولذلك تُدقَّق تعديلات الهوية وتتطلب سبباً."),
+        Intro = T("The school's own record (doc/Modules/02 §8.1). One school per deployment, so this screen is filled once and corrected rarely — but everything it holds is printed on documents a ministry reads, which is why four of its fields refuse to change without a written reason.", "سجل المدرسة نفسها (الوثيقة 02 §8.1). مدرسة واحدة لكل تركيب، فتُملأ هذه الشاشة مرة وتُصحَّح نادراً — لكن ما تحمله يُطبع على مستندات تقرؤها الوزارة، ولذلك ترفض أربعة من حقولها التغيير بلا سبب مكتوب."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("Identity", "الهوية"), T("The Arabic and English official names are both required and are reproduced on certificates and letters exactly as typed (BR-SCH-001) — a trailing space or a spelling variant is what the ministry will read. Time zone and currency are shown disabled here because the Setup wizard owns them: currency in particular is what every stored amount means, so it is not a field to revise from a profile screen.", "الاسمان الرسميان بالعربية والإنجليزية كلاهما مطلوب، ويُنقلان إلى الشهادات والخطابات كما كُتبا تماماً (BR-SCH-001) — فمسافة زائدة أو اختلاف إملائي هو ما ستقرأه الوزارة. المنطقة الزمنية والعملة معطَّلتان هنا لأن معالج الإعداد يملكهما: والعملة تحديداً هي معنى كل مبلغ مخزَّن، فليست حقلاً يُراجَع من شاشة ملف.")),
-            new HelpPanelViewModel.Item(T("The reason field is not optional", "حقل السبب ليس اختيارياً"), T("Changing an identity field without a reason is refused (BR-SCH-002). The school is T1-audited: the old value, the new value and the reason are written in the same transaction as the change, and that record is what answers \"who renamed the school before the certificates were printed\" a year later.", "تغيير حقل هوية بلا سبب مرفوض (BR-SCH-002). والمدرسة مدقَّقة بمستوى T1: تُكتب القيمة القديمة والجديدة والسبب في المعاملة نفسها مع التغيير، وهذا السجل هو ما يجيب لاحقاً عن «من غيّر اسم المدرسة قبل طباعة الشهادات».")),
-            new HelpPanelViewModel.Item(T("License & Ministry", "الترخيص والوزارة"), T("License number, ministry code and expiry date. Nothing here blocks the system when it lapses — the product does not stop a school from teaching because a date passed — but these are the fields official documents and ministry exports quote, so an out-of-date expiry is a real reporting error.", "رقم الترخيص والرمز الوزاري وتاريخ الانتهاء. ولا شيء هنا يوقف النظام عند انتهائه — فالمنتج لا يمنع مدرسة من التدريس لأن تاريخاً مضى — لكن هذه هي الحقول التي تقتبسها المستندات الرسمية والتصدير الوزاري، فالتاريخ المنتهي خطأ تقريري حقيقي.")),
-            new HelpPanelViewModel.Item(T("Stages offered", "المراحل المقدَّمة"), T("A grade cannot be created outside a stage the school offers (BR-SCH-003). Today the list is read-only and every stage defined in Module 05 counts as offered; declaring a subset explicitly is a follow-up. Empty means the stage structure has not been entered yet — the Setup wizard's stage step is where it starts.", "لا يمكن إنشاء صف خارج مرحلة تقدّمها المدرسة (BR-SCH-003). واليوم القائمة للقراءة فقط وكل مرحلة معرَّفة في الوحدة 05 تُعدّ مقدَّمة؛ وتحديد مجموعة جزئية صراحةً عمل لاحق. والقائمة الفارغة تعني أن الهيكل الدراسي لم يُدخل بعد — وخطوة المراحل في معالج الإعداد هي البداية.")),
-            new HelpPanelViewModel.Item(T("What is not here yet", "ما لم يصل بعد"), T("Logo and seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) arrives with the attachment store screens in doc 10; templates render whatever branding is current at the moment a document is issued. The map pin picker behind latitude/longitude (BR-SCH-008) is also pending, which is why those two boxes are disabled rather than hidden.", "رفع الشعار والختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات مخزن المرفقات في الوثيقة 10؛ والقوالب تعرض الهوية البصرية السارية لحظة إصدار المستند. ومنتقي الخريطة خلف خطي العرض والطول (BR-SCH-008) لم يصل بعد، ولذلك الحقلان معطَّلان لا مخفيان.")),
+            new HelpPanelViewModel.Item(T("The marked fields are the audited ones", "الحقول المؤشَّرة هي المدقَّقة"), T("Four fields carry the \"reason required\" mark: both official names, the licence number and the ministry code (BR-SCH-002). Change any of them and the save is refused until you write why; change a phone number and nothing is asked, because a phone number is not what a certificate prints. The mark is on the field itself so you know which is which before you type, not after the save is rejected.", "أربعة حقول تحمل علامة «يتطلب سبباً»: الاسمان الرسميان ورقم الترخيص والرمز الوزاري (BR-SCH-002). غيّر أياً منها يُرفض الحفظ حتى تكتب السبب؛ وغيّر رقم هاتف فلا يُطلب شيء، لأن رقم الهاتف ليس ما تطبعه الشهادة. والعلامة على الحقل نفسه لتعرف الفرق قبل أن تكتب لا بعد رفض الحفظ.")),
+            new HelpPanelViewModel.Item(T("Creating asks for nothing; correcting asks for everything", "الإنشاء لا يطلب شيئاً والتصحيح يطلب كل شيء"), T("The first save of this record writes no reason — there is no previous value to explain. Every later change to a marked field writes the old value, the new value, your reason and your name in the same transaction as the change. That record is what answers \"who renamed the school before the certificates were printed\" a year afterwards, and the History tab is where you read it back.", "الحفظ الأول لهذا السجل لا يكتب سبباً — إذ لا قيمة سابقة تُفسَّر. أما كل تغيير لاحق لحقل مؤشَّر فيكتب القيمة القديمة والجديدة وسببك واسمك في المعاملة نفسها مع التغيير. وهذا السجل هو ما يجيب لاحقاً عن «من غيّر اسم المدرسة قبل طباعة الشهادات»، وتبويب «سجل التغييرات» هو موضع قراءته.")),
+            new HelpPanelViewModel.Item(T("What \"still missing\" means, and what it does not", "ما تعنيه «ما زال ناقصاً» وما لا تعنيه"), T("The list on the side separates two different things. The four red ones are a gate: BR-SCH-001 makes them mandatory before the school can be activated at all. The amber ones are advice with the consequence attached — no official email means notifications go out with no return address, no signatory means a certificate prints an empty signature block. Nothing on the amber list stops you working today.", "القائمة الجانبية تفصل أمرين مختلفين. الأربعة الحمراء بوابة: فـ BR-SCH-001 يجعلها إلزامية قبل تفعيل المدرسة أصلاً. أما الكهرمانية فنصيحة مقترنة بنتيجتها — فلا بريد رسمي يعني إشعارات بلا عنوان للرد، ولا موقّع يعني شهادة تُطبع بكتلة توقيع فارغة. ولا شيء في القائمة الكهرمانية يمنعك من العمل اليوم.")),
+            new HelpPanelViewModel.Item(T("Licence expiry warns, it does not stop", "انتهاء الترخيص يُنذر ولا يوقف"), T("The countdown beside the licence turns amber ninety days out and red thirty days out. Nothing in the product stops when the date passes — it will not refuse to teach a class because a licence lapsed — but the number is quoted in ministry exports and on official documents, so a stale one is a real reporting error with no other warning behind it.", "العدّ التنازلي بجانب الترخيص يتحول إلى الكهرماني قبل تسعين يوماً وإلى الأحمر قبل ثلاثين. ولا شيء في المنتج يتوقف عند مرور التاريخ — فلن يرفض تدريس صف لأن ترخيصاً انتهى — لكن الرقم يُقتبس في التصدير الوزاري وفي المستندات الرسمية، فالقديم منه خطأ تقريري حقيقي لا تحذير آخر خلفه.")),
+            new HelpPanelViewModel.Item(T("Time zone, currency and the stage list are owned elsewhere", "المنطقة الزمنية والعملة وقائمة المراحل تُملَك في مكان آخر"), T("Time zone and currency are shown read-only because the Setup wizard owns them, and currency in particular is what every stored amount already means — it is not a field to revise from a profile screen. The stages list is read-only for a different reason: it is Module 05's, and it is shown here so BR-SCH-003 (no grade outside a stage the school offers) has somewhere to be read.", "المنطقة الزمنية والعملة للقراءة فقط لأن معالج الإعداد يملكهما، والعملة تحديداً هي معنى كل مبلغ مخزَّن سلفاً — فليست حقلاً يُراجَع من شاشة ملف. أما قائمة المراحل فللقراءة لسبب آخر: فهي مِلك الوحدة 05، وتُعرض هنا ليكون لـ BR-SCH-003 (لا صف خارج مرحلة تقدّمها المدرسة) موضع يُقرأ فيه.")),
+            new HelpPanelViewModel.Item(T("What is not here yet, and why", "ما لم يصل بعد ولماذا"), T("Logo and seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) waits on the attachment screens of doc 10 and on a template renderer, which is also why the document preview below shows values rather than a real certificate. Latitude and longitude are read-only because no map provider is chosen anywhere in the specification and the save operation carries no coordinate parameters. Declaring a subset of stages explicitly (BR-SCH-003) needs a record type that does not exist yet.", "رفع الشعار والختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) ينتظر شاشات المرفقات في الوثيقة 10 ومحرّك القوالب، ولهذا أيضاً تعرض المعاينة أدناه القيم لا شهادة حقيقية. وخطا العرض والطول للقراءة لأن الوثائق لم تختر مزوّد خرائط ولأن عملية الحفظ لا تحمل معاملات إحداثيات. أما تحديد مجموعة جزئية من المراحل صراحةً (BR-SCH-003) فيحتاج نوع سجل غير موجود بعد.")),
         },
     };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@(Model.SchoolId == null ? T("New school", "مدرسة جديدة") : (isRtl ? Model.NameAr : Model.NameEn))</h1>
-    <p class="text-muted mb-0">@T("Module 02 — identity fields appear on official documents exactly as entered (BR-SCH-001) and later edits require a reason (BR-SCH-002).", "الوحدة 02 — حقول الهوية تظهر في المستندات الرسمية كما أُدخلت (BR-SCH-001) والتعديلات اللاحقة تتطلب سبباً (BR-SCH-002).")</p></div>
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@(Model.Exists ? displayName : T("New school profile", "ملف مدرسة جديد"))</h1>
+        <p class="text-muted mb-0">@T("Module 02 §8.1 — identity fields print on official documents exactly as entered (BR-SCH-001); changing one is audited and needs a reason (BR-SCH-002).", "الوحدة 02 §8.1 — حقول الهوية تُطبع على المستندات الرسمية كما أُدخلت (BR-SCH-001)؛ وتغيير أحدها مدقَّق ويتطلب سبباً (BR-SCH-002).")</p>
+    </div>
     <div class="d-flex align-items-center gap-2">
-        @if (Model.Status != null) { <span class="badge @(Model.Status == Sms.Domain.Schools.SchoolStatus.Active ? "text-bg-success" : "text-bg-secondary")">@Model.Status</span> }
+        @if (Model.Status is SchoolStatus st)
+        {
+            <a class="badge text-decoration-none @SchoolStatusLabels.Badge(st)" asp-action="Status" title="@SchoolStatusLabels.Summary(st, isRtl)">
+                <i class="bi @SchoolStatusLabels.Icon(st) me-1" aria-hidden="true"></i>@SchoolStatusLabels.Name(st, isRtl)
+            </a>
+        }
         <partial name="_HelpModal" model="help" />
     </div>
 </div>
 <partial name="_SchoolNav" />
 
-<form method="post" asp-action="Profile" novalidate>
-    <input type="hidden" asp-for="SchoolId" /><input type="hidden" asp-for="TimeZoneId" /><input type="hidden" asp-for="CurrencyCode" /><input type="hidden" asp-for="ActiveTab" id="ActiveTab" />
-    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
-    <div class="sms-card">
-        <ul class="nav nav-tabs px-3 pt-2" role="tablist">
-            @foreach (var t in tabs) { <li class="nav-item"><button class="nav-link @(Model.ActiveTab == t.Key ? "active" : "")" data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button" onclick="document.getElementById('ActiveTab').value='@t.Key'">@(isRtl ? t.Ar : t.En)</button></li> }
-        </ul>
-        <div class="tab-content p-4">
-            <div class="tab-pane fade @Show("identity")" id="tab-identity">
-                <div class="sms-bilingual mb-3">
-                    <div><label class="form-label" asp-for="NameAr">@T("Official name (Arabic)", "الاسم الرسمي (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-                    <div><label class="form-label" asp-for="NameEn">@T("Official name (English)", "الاسم الرسمي (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
+@* ---- Identity header (P-DETAIL): who this record is, before any field is edited ---- *@
+<div class="sms-card p-3 p-lg-4 mb-3">
+    <div class="row g-3 align-items-start">
+        <div class="col-lg-7">
+            <div class="d-flex gap-3 align-items-start">
+                <div class="sms-module-card__icon" aria-hidden="true"><i class="bi bi-building"></i></div>
+                <div class="flex-grow-1 overflow-hidden">
+                    <div class="fs-5 fw-bold" dir="auto">@(displayName ?? T("Not named yet", "بلا اسم بعد"))</div>
+                    <div class="text-muted small" dir="auto">@(otherName ?? T("The second official name is still blank", "الاسم الرسمي الآخر ما زال فارغاً"))</div>
+                    <div class="sms-factstrip mt-2">
+                        <span class="sms-fact"><span class="sms-fact__label">@T("Ministry code", "الرمز الوزاري")</span><code>@(Model.MinistryCode ?? "—")</code></span>
+                        <span class="sms-fact"><span class="sms-fact__label">@T("Licence", "الترخيص")</span><code>@(Model.LicenseNumber ?? "—")</code></span>
+                        <span class="sms-fact"><span class="sms-fact__label">@T("Expiry", "الانتهاء")</span><span class="@licenceTone">@(Model.LicenseExpiryDate?.ToString("yyyy-MM-dd") ?? "—") · @licenceNote</span></span>
+                        @if (Model.CurrencyCode != null)
+                        {
+                            <span class="sms-fact"><span class="sms-fact__label">@T("Currency", "العملة")</span><code>@Model.CurrencyCode</code></span>
+                        }
+                    </div>
                 </div>
-                <div class="row g-3"><div class="col-md-4"><label class="form-label" for="tz-display">@T("Time zone", "المنطقة الزمنية")</label><input id="tz-display" class="form-control" value="@Model.TimeZoneId" disabled /><div class="form-text">@T("Set in the Setup wizard.", "يُحدَّد في معالج الإعداد.")</div></div>
-                    <div class="col-md-4"><label class="form-label" for="currency-display">@T("Currency", "العملة")</label><input id="currency-display" class="form-control" value="@Model.CurrencyCode" disabled /></div></div>
-            </div>
-            <div class="tab-pane fade @Show("license")" id="tab-license">
-                <div class="row g-3">
-                    <div class="col-md-4"><label class="form-label" asp-for="LicenseNumber">@T("License number", "رقم الترخيص")</label><input asp-for="LicenseNumber" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label" asp-for="MinistryCode">@T("Ministry code", "الرمز الوزاري")</label><input asp-for="MinistryCode" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label" asp-for="LicenseExpiryDate">@T("License expiry", "انتهاء الترخيص")</label><input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
-                </div>
-            </div>
-            <div class="tab-pane fade @Show("contacts")" id="tab-contacts">
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label" asp-for="City">@T("City", "المدينة")</label><input asp-for="City" class="form-control" /></div>
-                    <div class="col-md-8"><label class="form-label" asp-for="AddressLine">@T("Address", "العنوان")</label><input asp-for="AddressLine" class="form-control" /></div>
-                </div>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label" asp-for="ContactEmail">@T("Official email", "البريد الرسمي")</label><input asp-for="ContactEmail" class="form-control" type="email" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label" asp-for="ContactPhone">@T("Phone", "الهاتف")</label><input asp-for="ContactPhone" class="form-control" dir="ltr" /></div>
-                    <div class="col-md-4"><label class="form-label" asp-for="Website">@T("Website", "الموقع الإلكتروني")</label><input asp-for="Website" class="form-control" dir="ltr" /></div>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-3"><label class="form-label" asp-for="Latitude">@T("Latitude", "خط العرض")</label><input asp-for="Latitude" class="form-control" dir="ltr" disabled /></div>
-                    <div class="col-md-3"><label class="form-label" asp-for="Longitude">@T("Longitude", "خط الطول")</label><input asp-for="Longitude" class="form-control" dir="ltr" disabled /></div>
-                    <div class="col-md-6"><div class="form-text mt-4">@T("Map pin picker pending (BR-SCH-008 geo validation).", "منتقي الخريطة لاحقاً (BR-SCH-008).")</div></div>
-                </div>
-            </div>
-            <div class="tab-pane fade @Show("branding")" id="tab-branding">
-                <div class="alert alert-info small mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Logo/seal upload (PNG/SVG ≤ 2 MB, BR-SCH-006) lands with the attachment store screens (doc 10). Templates render current branding at issue time.", "رفع الشعار/الختم (PNG/SVG ≤ 2 م.ب، BR-SCH-006) يأتي مع شاشات المرفقات (الوثيقة 10).")</div>
-            </div>
-            <div class="tab-pane fade @Show("stages")" id="tab-stages">
-                @if (Model.StagesOffered.Count == 0) { <div class="alert alert-warning small">@T("No stages defined yet — see the Setup wizard's Stage structure step or Module 05.", "لا مراحل بعد — انظر خطوة الهيكل الدراسي في المعالج أو الوحدة 05.")</div> }
-                else { <ul class="list-group">@foreach (var s in Model.StagesOffered) { <li class="list-group-item d-flex justify-content-between"><span>@(isRtl ? s.Ar : s.En)</span><span class="badge text-bg-light border">@s.Grades @T("grades", "صفوف")</span></li> }</ul> }
-                <div class="form-text mt-2">@T("BR-SCH-003: grades outside offered stages cannot be created (the explicit declaration UI is a follow-up; today every defined stage counts as offered).", "BR-SCH-003: لا يمكن إنشاء صفوف خارج المراحل المقدَّمة.")</div>
             </div>
         </div>
-        <div class="p-3 border-top d-flex gap-2 align-items-end">
-            <div style="max-width:420px" class="flex-grow-1"><label class="form-label small" asp-for="Reason">@T("Reason (required when changing identity fields)", "السبب (مطلوب عند تعديل حقول الهوية)")</label><input asp-for="Reason" class="form-control" /></div>
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+        <div class="col-lg-5">
+            <div class="d-flex justify-content-between small mb-1">
+                <span class="fw-semibold">@T("Profile completeness", "اكتمال الملف")</span>
+                <span class="sms-num">@Model.CompletionPercent%</span>
+            </div>
+            <div class="sms-progress" role="progressbar" aria-valuenow="@Model.CompletionPercent" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Profile completeness", "اكتمال الملف")">
+                <span style="width:@(Model.CompletionPercent)%;@(Model.IdentityComplete ? "" : "background:#dc2626")"></span>
+            </div>
+            <div class="small mt-2">
+                @if (!Model.Exists)
+                {
+                    <span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>@T("Nothing is saved yet — fill in the four marked fields and save to create the record.", "لم يُحفظ شيء بعد — املأ الحقول المؤشَّرة الأربعة واحفظ لإنشاء السجل.")</span>
+                }
+                else if (!Model.IdentityComplete)
+                {
+                    <span class="text-danger"><i class="bi bi-shield-exclamation me-1" aria-hidden="true"></i>@T($"{Model.RequiredMissing} mandatory field(s) blank in the saved record — the school cannot be activated until they are filled and saved (BR-SCH-001).", $"{Model.RequiredMissing} من الحقول الإلزامية فارغ في السجل المحفوظ — ولا تُفعَّل المدرسة قبل ملئها وحفظها (BR-SCH-001).")</span>
+                }
+                else
+                {
+                    <span class="text-success"><i class="bi bi-shield-check me-1" aria-hidden="true"></i>@T("The four fields BR-SCH-001 requires before activation are all present.", "الحقول الأربعة التي يشترطها BR-SCH-001 قبل التفعيل كلها موجودة.")</span>
+                }
+            </div>
+            @if (Model.Exists)
+            {
+                @* BR-GLB-007: every record shows created/modified inline, with one click to the history. *@
+                <div class="text-muted small mt-2">
+                    <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+                    @if (Model.ModifiedAtUtc != null)
+                    {
+                        <text>@T("Last changed", "آخر تغيير") <span class="sms-num">@Model.ModifiedAtUtc.Value.ToString("yyyy-MM-dd HH:mm")</span>@if (Model.ModifiedByUserName != null) { <text> · <bdi>@Model.ModifiedByUserName</bdi></text> } · <a asp-action="Profile" asp-route-tab="history">@T("see history", "انظر السجل")</a></text>
+                    }
+                    else
+                    {
+                        <text>@T("Created", "أُنشئ") <span class="sms-num">@(Model.CreatedAtUtc?.ToString("yyyy-MM-dd HH:mm") ?? "—")</span> · @T("never changed since", "ولم يُغيَّر منذئذ")</text>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<form method="post" asp-action="Profile" novalidate id="school-profile-form"
+      data-msg-unsaved="@T("Unsaved:", "غير محفوظ:")"
+      data-msg-reason-needed="@T("A reason is required — you changed:", "السبب مطلوب — غيّرت:")"
+      data-msg-reason-optional="@T("Only asked for when you change a field marked \"reason required\".", "لا يُطلب إلا عند تغيير حقل مؤشَّر بـ «يتطلب سبباً».")"
+      data-msg-saving="@T("Saving…", "جارٍ الحفظ…")"
+      data-sep="@T(", ", "، ")">
+    <input type="hidden" asp-for="SchoolId" />
+    <input type="hidden" asp-for="TimeZoneId" />
+    <input type="hidden" asp-for="CurrencyCode" />
+    <input type="hidden" asp-for="ActiveTab" id="ActiveTab" />
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+            <div class="sms-card">
+                <ul class="nav nav-tabs px-3 pt-2 flex-nowrap overflow-auto" role="tablist">
+                    @foreach (var t in tabs)
+                    {
+                        <li class="nav-item">
+                            <button class="nav-link text-nowrap @(Model.ActiveTab == t.Key ? "active" : "")" id="tabbtn-@t.Key" data-tab-key="@t.Key"
+                                    data-bs-toggle="tab" data-bs-target="#tab-@t.Key" type="button" role="tab" aria-controls="tab-@t.Key"
+                                    aria-selected="@(Model.ActiveTab == t.Key ? "true" : "false")">
+                                <i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)<span class="sms-tab-dot d-none" data-dot="@t.Key" title="@T("unsaved changes on this tab", "تغييرات غير محفوظة في هذا التبويب")"></span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+
+                <div class="tab-content p-3 p-lg-4">
+
+                    @* ------------------------------------------------ Identity *@
+                    <div class="tab-pane fade @Show("identity")" id="tab-identity" role="tabpanel" aria-labelledby="tabbtn-identity">
+                        <h2 class="sms-section-title mt-0">@T("Official names", "الاسمان الرسميان")</h2>
+                        <p class="text-muted small">@T("Reproduced on certificates and letters exactly as typed — a trailing space or a spelling variant is what the ministry will read.", "يُنقلان إلى الشهادات والخطابات كما كُتبا تماماً — فمسافة زائدة أو اختلاف إملائي هو ما ستقرأه الوزارة.")</p>
+                        <div class="sms-bilingual sms-name-pair mb-3">
+                            <div class="sms-name-ar">
+                                <label class="form-label" asp-for="NameAr">@T("Official name (Arabic)", "الاسم الرسمي (عربي)") <span class="text-danger" aria-hidden="true">*</span>
+                                    <span class="sms-fieldmark"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>@T("reason required", "يتطلب سبباً")</span>
+                                </label>
+                                <input asp-for="NameAr" class="form-control" dir="rtl" data-track data-tab="identity" data-audited="1" data-label="@T("Official name (Arabic)", "الاسم الرسمي (عربي)")" required aria-required="true" />
+                                <span asp-validation-for="NameAr" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="sms-name-en">
+                                <label class="form-label" asp-for="NameEn">@T("Official name (English)", "الاسم الرسمي (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span>
+                                    <span class="sms-fieldmark"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>@T("reason required", "يتطلب سبباً")</span>
+                                </label>
+                                <input asp-for="NameEn" class="form-control" dir="ltr" data-track data-tab="identity" data-audited="1" data-label="@T("Official name (English)", "الاسم الرسمي (إنجليزي)")" required aria-required="true" />
+                                <span asp-validation-for="NameEn" class="text-danger small d-block"></span>
+                            </div>
+                        </div>
+
+                        <h2 class="sms-section-title">@T("Owned by the Setup wizard", "يملكها معالج الإعداد")</h2>
+                        <dl class="row small sms-kv mb-2">
+                            <dt class="col-sm-4">@T("Time zone", "المنطقة الزمنية")</dt>
+                            <dd class="col-sm-8"><code>@(Model.TimeZoneId ?? "—")</code></dd>
+                            <dt class="col-sm-4">@T("Currency", "العملة")</dt>
+                            <dd class="col-sm-8"><code>@(Model.CurrencyCode ?? "—")</code> <span class="text-muted">@T("— what every amount already stored in this system means.", "— معنى كل مبلغ مخزَّن في هذا النظام سلفاً.")</span></dd>
+                            <dt class="col-sm-4">@T("Country pack", "حزمة الدولة")</dt>
+                            <dd class="col-sm-8">
+                                @if (Model.CountryPackCode != null)
+                                {
+                                    <span>@(isRtl ? Model.CountryPackNameAr : Model.CountryPackNameEn)</span> <code>@Model.CountryPackCode</code>
+                                }
+                                else
+                                {
+                                    <span class="sms-amber">@T("Not bound yet — VAT defaults, ID requirements and the statutory report set all come from it (BR-SET-004).", "غير مرتبطة بعد — ومنها تأتي نسبة الضريبة الافتراضية ومتطلبات الهوية ومجموعة التقارير النظامية (BR-SET-004).")</span>
+                                }
+                            </dd>
+                            <dt class="col-sm-4">@T("Setup declared complete", "إعلان اكتمال الإعداد")</dt>
+                            <dd class="col-sm-8">
+                                @if (Model.SetupCompletedAtUtc != null)
+                                {
+                                    <span class="text-success"><i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i><span class="sms-num">@Model.SetupCompletedAtUtc.Value.ToString("yyyy-MM-dd")</span></span>
+                                }
+                                else
+                                {
+                                    <span class="sms-amber">@T("Not yet — the first academic year cannot be activated until it is (BR-SET-003).", "ليس بعد — ولا يُفعَّل أول عام دراسي قبل ذلك (BR-SET-003).")</span>
+                                }
+                            </dd>
+                        </dl>
+                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Setup" asp-action="Index"><i class="bi bi-sliders me-1" aria-hidden="true"></i>@T("Open the Setup wizard", "افتح معالج الإعداد")</a>
+                    </div>
+
+                    @* ------------------------------------------------ Licence and ministry *@
+                    <div class="tab-pane fade @Show("licence")" id="tab-licence" role="tabpanel" aria-labelledby="tabbtn-licence">
+                        <h2 class="sms-section-title mt-0">@T("Registration", "التسجيل")</h2>
+                        <p class="text-muted small">@T("What official documents and ministry exports quote this school by. Nothing here stops the system when it lapses — the product does not refuse to teach because a date passed — but a stale value is a real reporting error.", "ما تقتبس به المستندات الرسمية والتصدير الوزاري هذه المدرسة. ولا شيء هنا يوقف النظام عند انتهائه — فالمنتج لا يرفض التدريس لأن تاريخاً مضى — لكن القيمة القديمة خطأ تقريري حقيقي.")</p>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="LicenseNumber">@T("Licence number", "رقم الترخيص") <span class="text-danger" aria-hidden="true">*</span>
+                                    <span class="sms-fieldmark"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>@T("reason required", "يتطلب سبباً")</span>
+                                </label>
+                                <input asp-for="LicenseNumber" class="form-control" dir="ltr" data-track data-tab="licence" data-audited="1" data-label="@T("Licence number", "رقم الترخيص")" required aria-required="true" />
+                                <span asp-validation-for="LicenseNumber" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="MinistryCode">@T("Ministry code", "الرمز الوزاري") <span class="text-danger" aria-hidden="true">*</span>
+                                    <span class="sms-fieldmark"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>@T("reason required", "يتطلب سبباً")</span>
+                                </label>
+                                <input asp-for="MinistryCode" class="form-control" dir="ltr" data-track data-tab="licence" data-audited="1" data-label="@T("Ministry code", "الرمز الوزاري")" required aria-required="true" />
+                                <span asp-validation-for="MinistryCode" class="text-danger small d-block"></span>
+                                <div class="form-text">@T("Mandatory whenever the country pack defines statutory exports.", "إلزامي متى عرّفت حزمة الدولة تصديراً نظامياً.")</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="LicenseExpiryDate">@T("Licence expiry", "انتهاء الترخيص")
+                                    <span class="sms-fieldmark sms-fieldmark--plain">@T("no reason needed", "لا يتطلب سبباً")</span>
+                                </label>
+                                <input asp-for="LicenseExpiryDate" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" data-track data-tab="licence" data-label="@T("Licence expiry", "انتهاء الترخيص")" />
+                                <span asp-validation-for="LicenseExpiryDate" class="text-danger small d-block"></span>
+                                <div class="form-text @licenceTone">@licenceNote</div>
+                            </div>
+                        </div>
+                        <div class="alert alert-light border small mt-3 mb-0">
+                            <i class="bi bi-bell me-1" aria-hidden="true"></i>@T("Automatic warnings ninety and thirty days before expiry are specified (doc 02 §12) but are not sent by this build — no notification channel is wired yet. The countdown above is the only warning there is.", "الإنذارات التلقائية قبل تسعين وثلاثين يوماً من الانتهاء منصوص عليها (الوثيقة 02 §12) لكن هذا الإصدار لا يرسلها — فلا قناة إشعار موصولة بعد. والعدّ التنازلي أعلاه هو التحذير الوحيد الموجود.")
+                        </div>
+                    </div>
+
+                    @* ------------------------------------------------ Contacts and location *@
+                    <div class="tab-pane fade @Show("contacts")" id="tab-contacts" role="tabpanel" aria-labelledby="tabbtn-contacts">
+                        <h2 class="sms-section-title mt-0">@T("Address", "العنوان")</h2>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="City">@T("City", "المدينة")</label>
+                                <input asp-for="City" class="form-control" data-track data-tab="contacts" data-label="@T("City", "المدينة")" />
+                                <span asp-validation-for="City" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label" asp-for="AddressLine">@T("Address", "العنوان")</label>
+                                <input asp-for="AddressLine" class="form-control" data-track data-tab="contacts" data-label="@T("Address", "العنوان")" />
+                                <span asp-validation-for="AddressLine" class="text-danger small d-block"></span>
+                            </div>
+                        </div>
+
+                        <h2 class="sms-section-title">@T("Official channels", "القنوات الرسمية")</h2>
+                        <p class="text-muted small">@T("These are not decoration: notifications go out under this identity (doc 09), and each is checked for shape before it is saved (BR-SCH-008).", "هذه ليست زينة: فالإشعارات تخرج بهذه الهوية (الوثيقة 09)، وتُفحص صيغة كلٍّ منها قبل الحفظ (BR-SCH-008).")</p>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="ContactEmail">@T("Official email", "البريد الرسمي")</label>
+                                <input asp-for="ContactEmail" class="form-control" type="email" dir="ltr" data-track data-tab="contacts" data-label="@T("Official email", "البريد الرسمي")" />
+                                <span asp-validation-for="ContactEmail" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="ContactPhone">@T("Phone", "الهاتف")</label>
+                                <input asp-for="ContactPhone" class="form-control" dir="ltr" data-track data-tab="contacts" data-label="@T("Phone", "الهاتف")" />
+                                <span asp-validation-for="ContactPhone" class="text-danger small d-block"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label" asp-for="Website">@T("Website", "الموقع الإلكتروني")</label>
+                                <input asp-for="Website" class="form-control" dir="ltr" data-track data-tab="contacts" data-label="@T("Website", "الموقع الإلكتروني")" placeholder="www.school.edu.sa" />
+                                <span asp-validation-for="Website" class="text-danger small d-block"></span>
+                            </div>
+                        </div>
+
+                        <h2 class="sms-section-title">@T("Map location", "الموقع على الخريطة")</h2>
+                        <dl class="row small sms-kv mb-2">
+                            <dt class="col-sm-4">@T("Latitude", "خط العرض")</dt>
+                            <dd class="col-sm-8"><span class="sms-num">@(Model.Latitude?.ToString(CultureInfo.InvariantCulture) ?? "—")</span></dd>
+                            <dt class="col-sm-4">@T("Longitude", "خط الطول")</dt>
+                            <dd class="col-sm-8"><span class="sms-num">@(Model.Longitude?.ToString(CultureInfo.InvariantCulture) ?? "—")</span></dd>
+                        </dl>
+                        <div class="alert alert-light border small mb-0">
+                            <i class="bi bi-pin-map me-1" aria-hidden="true"></i>@T("Read-only, and honestly so: the specification names no map provider, and the save operation carries no coordinate parameters, so there is nowhere for a value typed here to go (BR-SCH-008).", "للقراءة فقط، وبصراحة: فالوثائق لا تسمّي مزوّد خرائط، وعملية الحفظ لا تحمل معاملات إحداثيات، فلا موضع تذهب إليه قيمة تُكتب هنا (BR-SCH-008).")
+                        </div>
+                    </div>
+
+                    @* ------------------------------------------------ Branding *@
+                    <div class="tab-pane fade @Show("branding")" id="tab-branding" role="tabpanel" aria-labelledby="tabbtn-branding">
+                        <h2 class="sms-section-title mt-0">@T("Logo and seal", "الشعار والختم")</h2>
+                        <div class="alert alert-info small">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Not built yet. BR-SCH-006 wants a logo and a seal stored as attachments (PNG or SVG, 2 MB or less) that official templates render at the moment a document is issued — with issued-immutable documents keeping the branding they were issued under. It waits on the attachment screens of doc 10 and on a template renderer; neither exists in this build.", "لم يُبنَ بعد. يطلب BR-SCH-006 شعاراً وختماً محفوظين كمرفقات (PNG أو SVG، 2 م.ب أو أقل) تعرضهما القوالب الرسمية لحظة إصدار المستند — مع احتفاظ المستندات النهائية بالهوية البصرية التي صدرت بها. وهو ينتظر شاشات المرفقات في الوثيقة 10 ومحرّك القوالب، ولا وجود لأيٍّ منهما في هذا الإصدار.")
+                        </div>
+                        <h2 class="sms-section-title">@T("What a document carries today", "ما يحمله المستند اليوم")</h2>
+                        <div class="sms-doc-preview">
+                            <div class="sms-doc-preview__names sms-name-pair">
+                                <span class="sms-name-ar" dir="rtl">@(Model.NameAr ?? "…")</span>
+                                <span class="sms-name-en" dir="ltr">@(Model.NameEn ?? "…")</span>
+                            </div>
+                            <div class="sms-doc-preview__meta">
+                                <span class="sms-num">@(Model.MinistryCode ?? "—")</span> ·
+                                <span class="sms-num">@(Model.LicenseNumber ?? "—")</span>
+                                @if (Model.City != null) { <text> · </text>@Model.City }
+                                @if (Model.ContactPhone != null) { <text> · </text><span class="sms-num">@Model.ContactPhone</span> }
+                                @if (Model.ContactEmail != null) { <text> · </text><span class="sms-num">@Model.ContactEmail</span> }
+                            </div>
+                            <hr class="sms-doc-preview__rule" />
+                            <div class="sms-doc-preview__sign text-muted">
+                                @if (Model.DocumentClassesWithoutSignatory.Count == 0)
+                                {
+                                    @T("Signature block: the signatory in force for the document's class.", "كتلة التوقيع: الموقّع الساري لفئة المستند.")
+                                }
+                                else
+                                {
+                                    <span class="sms-amber">@T($"Signature block: empty for {Model.DocumentClassesWithoutSignatory.Count} document class(es) — no signatory is in force.", $"كتلة التوقيع: فارغة لـ {Model.DocumentClassesWithoutSignatory.Count} من فئات المستندات — لا موقّع سارٍ.")</span>
+                                    <text> </text><a asp-action="Signatories">@T("Define one", "عرّف موقّعاً")</a>
+                                }
+                            </div>
+                        </div>
+                        <div class="form-text mt-2">@T("An illustration of the values, not of a template's layout — the renderer that would produce the real thing is not built.", "معاينة للقيم لا لتخطيط القالب — فمحرّك العرض الذي ينتج الشكل الحقيقي غير مبنيّ.")</div>
+                    </div>
+
+                    @* ------------------------------------------------ Stages offered *@
+                    <div class="tab-pane fade @Show("stages")" id="tab-stages" role="tabpanel" aria-labelledby="tabbtn-stages">
+                        <h2 class="sms-section-title mt-0">@T("Stages offered", "المراحل المقدَّمة")</h2>
+                        @if (Model.StagesOffered.Count == 0)
+                        {
+                            <div class="alert alert-warning small">
+                                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("No stages are defined, so no grade can exist and nobody can be enrolled (BR-SCH-003). The Setup wizard's stage-structure step is where this starts.", "لا مراحل معرَّفة، فلا وجود لأي صف ولا يمكن قيد أحد (BR-SCH-003). وخطوة الهيكل الدراسي في معالج الإعداد هي البداية.")
+                                <div class="mt-2"><a class="btn btn-sm btn-outline-primary" asp-controller="Setup" asp-action="Index">@T("Open the Setup wizard", "افتح معالج الإعداد")</a></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm sms-table mb-0">
+                                    <caption class="visually-hidden">@T("Stages this school offers, with the number of grades in each", "المراحل التي تقدّمها هذه المدرسة وعدد الصفوف في كل منها")</caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">@T("Stage", "المرحلة")</th>
+                                            <th scope="col">@T("Grades", "الصفوف")</th>
+                                            <th scope="col">@T("State", "الحالة")</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var s in Model.StagesOffered)
+                                        {
+                                            <tr class="@(s.IsActive ? "" : "text-muted")">
+                                                <td>@(isRtl ? s.Ar : s.En)</td>
+                                                <td><span class="sms-num">@s.Grades</span></td>
+                                                <td>
+                                                    @if (s.IsActive)
+                                                    {
+                                                        <span class="badge text-bg-light border">@T("Active", "نشطة")</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge text-bg-secondary">@T("Retired", "متقاعدة")</span>
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-text mt-2">@T("Retired stages are listed rather than hidden: enrollments and grades still point at them, and a profile that dropped them would read as \"we never taught that\".", "المراحل المتقاعدة تُدرج ولا تُخفى: فالقيود والصفوف ما زالت تشير إليها، والملف الذي يُسقطها يُقرأ كأننا «لم ندرّس ذلك قط».")</div>
+                        }
+                        <div class="alert alert-light border small mt-3 mb-0">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Read-only here — the list belongs to Module 05. BR-SCH-003 also wants the school to declare which of them it offers as a subset; no record type for that exists yet, so today every defined stage counts as offered.", "للقراءة هنا — فالقائمة مِلك الوحدة 05. ويطلب BR-SCH-003 أيضاً أن تعلن المدرسة أيّها تقدّم بوصفها مجموعة جزئية؛ ولا نوع سجل لذلك بعد، فاليوم كل مرحلة معرَّفة تُعدّ مقدَّمة.")
+                        </div>
+                    </div>
+
+                    @* ------------------------------------------------ History *@
+                    <div class="tab-pane fade @Show("history")" id="tab-history" role="tabpanel" aria-labelledby="tabbtn-history">
+                        <h2 class="sms-section-title mt-0">@T("Change history", "سجل التغييرات")</h2>
+                        <p class="text-muted small">@T("Every change to this record, oldest at the bottom. Written in the same transaction as the change itself, so there is no version of events in which the change happened and the line below did not (BR-AUD-008).", "كل تغيير على هذا السجل، والأقدم في الأسفل. يُكتب في المعاملة نفسها مع التغيير، فلا رواية يقع فيها التغيير ولا يقع فيها السطر أدناه (BR-AUD-008).")</p>
+                        @if (Model.History.Count == 0)
+                        {
+                            <div class="alert alert-light border small mb-0">@T("Nothing recorded yet — the first save of this record writes the first line here.", "لا شيء مسجَّل بعد — والحفظ الأول لهذا السجل يكتب أول سطر هنا.")</div>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm sms-table mb-0 small">
+                                    <caption class="visually-hidden">@T("Change history of the school record", "سجل التغييرات على سجل المدرسة")</caption>
+                                    <thead>
+                                        <tr>
+                                            <th scope="col">@T("When", "متى")</th>
+                                            <th scope="col">@T("What changed", "ما الذي تغيّر")</th>
+                                            <th scope="col">@T("Before", "قبل")</th>
+                                            <th scope="col">@T("After", "بعد")</th>
+                                            <th scope="col">@T("Reason", "السبب")</th>
+                                            <th scope="col">@T("By", "بواسطة")</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var h in Model.History)
+                                        {
+                                            <tr>
+                                                <td class="text-nowrap"><span class="sms-num">@h.AtUtc.ToString("yyyy-MM-dd HH:mm")</span></td>
+                                                <td>
+                                                    @if (h.Field != null)
+                                                    {
+                                                        <span>@SchoolFieldLabels.Name(h.Field, isRtl)</span>
+                                                        @if (SchoolFieldLabels.RequiresReason(h.Field))
+                                                        {
+                                                            <i class="bi bi-shield-lock-fill ms-1 text-muted" aria-hidden="true" title="@T("reason required", "يتطلب سبباً")"></i>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">@SchoolFieldLabels.ActionName(h.Action, isRtl)</span>
+                                                    }
+                                                </td>
+                                                <td dir="auto">@SchoolFieldLabels.Display(h.Field, h.OldValue, isRtl)</td>
+                                                <td dir="auto" class="fw-semibold">@SchoolFieldLabels.Display(h.Field, h.NewValue, isRtl)</td>
+                                                <td dir="auto">@(h.Reason ?? "—")</td>
+                                                <td dir="auto">@(h.ActorName ?? ("#" + h.ActorUserId.ToString(CultureInfo.InvariantCulture)))</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="form-text mt-2">@T("The sixty most recent entries.", "أحدث ستين سطراً.")</div>
+                        }
+                    </div>
+                </div>
+
+                @* ---- The save bar: reachable from every tab, and it says what it is about to save ---- *@
+                <div class="sms-formbar p-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-lg-7">
+                            <label class="form-label small mb-1" asp-for="Reason">@T("Reason for the change", "سبب التغيير")</label>
+                            <input asp-for="Reason" class="form-control" id="Reason" autocomplete="off"
+                                   placeholder="@T("e.g. corrected per ministry letter 44/2026", "مثال: تصحيح بموجب خطاب الوزارة 44/2026")" />
+                            <span asp-validation-for="Reason" class="text-danger small d-block"></span>
+                            <div class="form-text" id="reason-hint">@T("Only asked for when you change a field marked \"reason required\".", "لا يُطلب إلا عند تغيير حقل مؤشَّر بـ «يتطلب سبباً».")</div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="d-flex gap-2 justify-content-lg-end align-items-center flex-wrap">
+                                <span class="small text-muted" id="sms-dirty" role="status" aria-live="polite"></span>
+                                <a class="btn btn-outline-secondary" asp-action="Profile" asp-route-tab="@Model.ActiveTab" id="school-discard">@T("Discard", "تجاهل")</a>
+                                <button type="submit" class="btn btn-primary" id="school-save"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ------------------------------------------------ Side panel *@
+        <div class="col-xl-4">
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6 mb-1">@T("Still missing", "ما زال ناقصاً")</h2>
+                <p class="text-muted small mb-2">@T("Red is a gate — the school cannot be activated. Amber is advice, with what it costs.", "الأحمر بوابة — لا تُفعَّل المدرسة. والكهرماني نصيحة مع ثمنها.")</p>
+                @if (!Model.Missing.Any())
+                {
+                    <div class="alert alert-success small mb-0"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Nothing is missing — every field this screen tracks is filled in.", "لا شيء ناقص — كل حقل تتابعه هذه الشاشة مملوء.")</div>
+                }
+                else
+                {
+                    <div>
+                        @foreach (var item in Model.Missing)
+                        {
+                            <div class="sms-checkitem @(item.Required ? "is-required" : "is-advisory")">
+                                <span class="sms-checkitem__icon" aria-hidden="true"><i class="bi @(item.Required ? "bi-exclamation-octagon-fill" : "bi-exclamation-circle")"></i></span>
+                                <div class="flex-grow-1">
+                                    <div class="small fw-semibold">
+                                        @if (item.Controller != null)
+                                        {
+                                            <a asp-controller="@item.Controller" asp-action="@item.Action">@(isRtl ? item.TitleAr : item.TitleEn)</a>
+                                        }
+                                        else if (item.Tab != null)
+                                        {
+                                            <a href="#tab-@item.Tab" data-goto-tab="@item.Tab">@(isRtl ? item.TitleAr : item.TitleEn)</a>
+                                        }
+                                        else
+                                        {
+                                            <span>@(isRtl ? item.TitleAr : item.TitleEn)</span>
+                                        }
+                                        <span class="visually-hidden">@(item.Required ? T("(required)", "(مطلوب)") : T("(advisory)", "(نصيحة)"))</span>
+                                    </div>
+                                    <div class="sms-checkitem__why">@(isRtl ? item.WhyAr : item.WhyEn)</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                @{ var done = Model.Checklist.Count(c => c.Done); }
+                <div class="text-muted small mt-2"><span class="sms-num">@done</span> / <span class="sms-num">@Model.Checklist.Count</span> @T("complete, as saved.", "مكتمل، بحسب المحفوظ.")</div>
+            </div>
+
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6 mb-2">@T("Reading the marks", "قراءة العلامات")</h2>
+                <p class="small mb-2">
+                    <span class="sms-fieldmark"><i class="bi bi-shield-lock-fill" aria-hidden="true"></i>@T("reason required", "يتطلب سبباً")</span>
+                    <span class="text-muted">@T("— changing this field is refused until you write why. The old value, the new one, your reason and your name are stored together (BR-SCH-002).", "— تغيير هذا الحقل مرفوض حتى تكتب السبب. وتُخزَّن القيمة القديمة والجديدة وسببك واسمك معاً (BR-SCH-002).")</span>
+                </p>
+                <p class="small mb-2">
+                    <span class="sms-fieldmark sms-fieldmark--plain">@T("no reason needed", "لا يتطلب سبباً")</span>
+                    <span class="text-muted">@T("— an operational field. The change is still recorded; it simply does not have to be justified.", "— حقل تشغيلي. والتغيير يُسجَّل مع ذلك؛ لكنه لا يحتاج تبريراً.")</span>
+                </p>
+                <p class="small text-muted mb-0"><span class="text-danger" aria-hidden="true">*</span> @T("Mandatory before the school can be activated (BR-SCH-001).", "إلزامي قبل تفعيل المدرسة (BR-SCH-001).")</p>
+            </div>
+
+            <div class="sms-card p-3">
+                <h2 class="h6 mb-2">@T("Where these values go", "إلى أين تذهب هذه القيم")</h2>
+                <ul class="small text-muted mb-0 ps-3">
+                    <li>@T("Certificates, transcripts and official letters print the names, the licence and the ministry code as typed.", "الشهادات وكشوف الدرجات والخطابات الرسمية تطبع الاسمين والترخيص والرمز الوزاري كما كُتبت.")</li>
+                    <li>@T("Notifications go out under the official email and phone (doc 09).", "الإشعارات تخرج بالبريد والهاتف الرسميين (الوثيقة 09).")</li>
+                    <li>@T("Ministry exports match this school by its ministry code.", "التصدير الوزاري يطابق هذه المدرسة برمزها الوزاري.")</li>
+                    <li>@T("The status decides the lifecycle, and is changed on its own screen.", "الحالة تقرّر دورة الحياة، وتُغيَّر في شاشتها الخاصة.")</li>
+                </ul>
+            </div>
         </div>
     </div>
 </form>
+
+<script>
+    // The profile is tabbed (P-DETAIL), which used to mean two things went wrong quietly:
+    // a refusal could land on a field behind a tab nobody was looking at, and the single
+    // reason box at the foot gave no clue which edits would demand one. This restores the
+    // three affordances docs/UI/01 §4 asks for — the active tab in the URL, a dirty dot per
+    // tab, and a guard on leaving — and adds the one this screen specifically needs: the
+    // reason box tells you, live, which audited field is asking for it. All of it is a
+    // mirror of the server's rules for speed, never the enforcement (BR-GLB-110).
+    (function () {
+        var form = document.getElementById('school-profile-form');
+        if (!form) { return; }
+
+        var sep = form.getAttribute('data-sep') || ', ';
+        var msgUnsaved = form.getAttribute('data-msg-unsaved') || '';
+        var msgNeeded = form.getAttribute('data-msg-reason-needed') || '';
+        var msgOptional = form.getAttribute('data-msg-reason-optional') || '';
+        var msgSaving = form.getAttribute('data-msg-saving') || '';
+
+        var tracked = Array.prototype.slice.call(form.querySelectorAll('[data-track]'));
+        var reason = document.getElementById('Reason');
+        var hint = document.getElementById('reason-hint');
+        var summary = document.getElementById('sms-dirty');
+        var activeTab = document.getElementById('ActiveTab');
+        var submitting = false;
+
+        tracked.forEach(function (el) { el.setAttribute('data-initial', el.value); });
+
+        function refresh() {
+            var dirtyLabels = [];
+            var auditedLabels = [];
+            var dirtyTabs = {};
+
+            tracked.forEach(function (el) {
+                var changed = el.value !== el.getAttribute('data-initial');
+                el.classList.toggle('sms-dirty', changed);
+                if (!changed) { return; }
+                var label = el.getAttribute('data-label') || '';
+                dirtyLabels.push(label);
+                dirtyTabs[el.getAttribute('data-tab')] = true;
+                if (el.getAttribute('data-audited')) { auditedLabels.push(label); }
+            });
+
+            Array.prototype.forEach.call(document.querySelectorAll('[data-dot]'), function (dot) {
+                dot.classList.toggle('d-none', !dirtyTabs[dot.getAttribute('data-dot')]);
+            });
+
+            summary.textContent = dirtyLabels.length ? (msgUnsaved + ' ' + dirtyLabels.join(sep)) : '';
+
+            if (auditedLabels.length) {
+                hint.textContent = msgNeeded + ' ' + auditedLabels.join(sep);
+                hint.className = 'form-text text-danger fw-semibold';
+                reason.setAttribute('required', 'required');
+                reason.setAttribute('aria-required', 'true');
+            } else {
+                hint.textContent = msgOptional;
+                hint.className = 'form-text';
+                reason.removeAttribute('required');
+                reason.removeAttribute('aria-required');
+            }
+
+            return dirtyLabels.length > 0;
+        }
+
+        form.addEventListener('input', refresh);
+        form.addEventListener('change', refresh);
+
+        // Deep-linkable tabs: the URL follows the tab so a colleague can be sent straight
+        // to the one being discussed, and a refusal reopens where it happened.
+        Array.prototype.forEach.call(document.querySelectorAll('[data-tab-key]'), function (btn) {
+            btn.addEventListener('shown.bs.tab', function () {
+                var key = btn.getAttribute('data-tab-key');
+                activeTab.value = key;
+                if (window.history && window.history.replaceState) {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('tab', key);
+                    window.history.replaceState({}, '', url.toString());
+                }
+            });
+        });
+
+        Array.prototype.forEach.call(document.querySelectorAll('[data-goto-tab]'), function (link) {
+            link.addEventListener('click', function (e) {
+                e.preventDefault();
+                var btn = document.getElementById('tabbtn-' + link.getAttribute('data-goto-tab'));
+                if (btn) { btn.click(); btn.focus(); }
+            });
+        });
+
+        form.addEventListener('submit', function () {
+            submitting = true;
+            var save = document.getElementById('school-save');
+            // Double-submit guard: a second POST would re-run an audited change and write a
+            // second history line for one edit.
+            if (save) { save.disabled = true; save.textContent = msgSaving; }
+            window.setTimeout(function () { if (save) { save.disabled = false; } }, 8000);
+        });
+
+        var discard = document.getElementById('school-discard');
+        if (discard) { discard.addEventListener('click', function () { submitting = true; }); }
+
+        window.addEventListener('beforeunload', function (e) {
+            if (submitting) { return; }
+            if (!refresh()) { return; }
+            e.preventDefault();
+            e.returnValue = '';
+        });
+
+        refresh();
+    })();
+</script>

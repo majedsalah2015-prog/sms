@@ -8,6 +8,8 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Discounts;
 using Sms.Application.Installments;
+using Sms.Application.Security;
+using Sms.Application.Workflow;
 using Sms.Domain.Common;
 using Sms.Domain.Discounts;
 using Sms.Domain.Employees;
@@ -18,7 +20,9 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Payments;
 using Sms.Domain.Schools;
+using Sms.Domain.Security;
 using Sms.Domain.Students;
+using Sms.Domain.Workflow;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Discounts;
 using Sms.Infrastructure.Fees;
@@ -27,6 +31,9 @@ using Sms.Infrastructure.Notifications;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Security;
+using Sms.Infrastructure.Seeding;
+using Sms.Infrastructure.Workflow;
 using Sms.Infrastructure.Statements;
 using Sms.TestSupport;
 using Xunit;
@@ -554,6 +561,200 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Contains(db.AuditEntries, e => e.EntityType == nameof(DiscountGrant) && e.FieldName == nameof(DiscountGrant.Status));
             Assert.Contains(db.AuditEntries, e => e.EntityType == nameof(DiscountDocument));
+        }
+
+        // --- WF-04 on the real engine (doc 05 §5, BR-DIS-003/005, BR-WF-003/005/009) --------------
+        //
+        // These run the seeded catalogue, the seeded role matrix and the real
+        // PermissionService, because the thing worth testing is not that a status
+        // changed — it is that the right person changed it, at the right level, and
+        // that nothing was applied until the chain actually ended.
+
+        private const int ProposerUserId = 11;
+        private const int FinanceUserId = 12;
+        private const int PrincipalUserId = 13;
+
+        private async Task SeedWorkflowFixtureAsync()
+        {
+            using var db = CreateContext();
+
+            // The catalogue seeder refuses to run before a tenant exists, and this
+            // fixture builds a year and a student without ever creating the school
+            // they belong to.
+            db.Schools.Add(new School { NameAr = "مدرسة", NameEn = "School", LicenseNumber = "LIC-1", MinistryCode = "MIN-1" });
+            await db.SaveChangesAsync();
+
+            await new RoleTemplateSeedContributor(db).SeedAsync();
+            await new PermissionSeedContributor(db).SeedAsync();
+            await new WorkflowCatalogSeedContributor(db).SeedAsync();
+
+            foreach (var (userId, roleCode) in new[]
+                     {
+                         // The proposer holds the approving role too, deliberately: BR-WF-003
+                         // blocks the person, not the role, and a finance officer raising a
+                         // grant for a colleague to sign is the ordinary case.
+                         (ProposerUserId, "FINANCE_MANAGER"), (FinanceUserId, "FINANCE_MANAGER"), (PrincipalUserId, "PRINCIPAL"),
+                     })
+            {
+                var role = await db.Roles.SingleAsync(r => r.Code == roleCode);
+                db.UserAccounts.Add(new UserAccount { Id = userId, UserName = $"user{userId}", AccountType = AccountType.Staff });
+                db.RoleAssignments.Add(new RoleAssignment { UserAccountId = userId, RoleId = role.Id });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        private WorkflowService CreateWorkflow(AppDbContext db)
+        {
+            var admin = CreateAdmin(db);
+            return new WorkflowService(
+                db, _user, _tenant, _clock, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit),
+                new PermissionService(db, _user),
+                new IWorkflowFinalEffect[] { new DiscountGrantApprovalEffect(admin, _user) },
+                new IWorkflowClosureEffect[] { new DiscountGrantClosureEffect(admin, _user) });
+        }
+
+        /// <summary>Proposes a grant and raises it into WF-04, exactly as the grant desk does.</summary>
+        private async Task<(int GrantId, int InstanceId)> RaiseGrantAsync(AppDbContext db, decimal percent)
+        {
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var type = await admin.DefineTypeAsync("تفاوضي", "Negotiated", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+
+            _user.UserId = ProposerUserId;
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, percent, "negotiated", ProposerUserId);
+            var workflow = CreateWorkflow(db);
+            var instance = await workflow.StartAsync(
+                DiscountWorkflow.Code, DiscountWorkflow.EntityTypeName, grant.Id, $"grant {grant.Id}", percent);
+            await workflow.ExecuteAsync(instance.Id, WorkflowActionType.Submit, "raised");
+            return (grant.Id, instance.Id);
+        }
+
+        [Fact]
+        [BusinessRule("BR-DIS-005")]
+        public async Task A_small_grant_is_applied_by_the_finance_managers_approval()
+        {
+            await SeedWorkflowFixtureAsync();
+            using var db = CreateContext();
+            var (grantId, instanceId) = await RaiseGrantAsync(db, 5m);
+
+            _user.UserId = FinanceUserId;
+            var result = await CreateWorkflow(db).ExecuteAsync(instanceId, WorkflowActionType.Approve);
+
+            Assert.True(result.ToState.IsFinal);
+            Assert.Equal("Approved", result.ToState.Code);
+
+            using var after = CreateContext();
+            var grant = await after.DiscountGrants.SingleAsync(g => g.Id == grantId);
+            Assert.Equal(DiscountGrantStatus.Approved, grant.Status);
+            Assert.Equal(FinanceUserId, grant.ApprovedByUserId);
+            Assert.True(grant.AppliedAmount > 0m);
+            Assert.Contains(after.DiscountDocuments, d => d.DiscountGrantId == grantId);
+        }
+
+        /// <summary>
+        /// The failure this whole arrangement exists to prevent: a first-level
+        /// approval on a large discount must move the request, not apply the money.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-WF-005")]
+        public async Task A_large_grant_escalates_and_nothing_is_applied_at_the_first_level()
+        {
+            await SeedWorkflowFixtureAsync();
+            using var db = CreateContext();
+            var (grantId, instanceId) = await RaiseGrantAsync(db, 40m);
+
+            _user.UserId = FinanceUserId;
+            var escalated = await CreateWorkflow(db).ExecuteAsync(instanceId, WorkflowActionType.Approve);
+
+            Assert.False(escalated.ToState.IsFinal);
+            Assert.Equal("UnderReview", escalated.ToState.Code);
+
+            using (var mid = CreateContext())
+            {
+                var pending = await mid.DiscountGrants.SingleAsync(g => g.Id == grantId);
+                Assert.Equal(DiscountGrantStatus.Proposed, pending.Status);
+                Assert.Equal(0m, pending.AppliedAmount);
+                Assert.DoesNotContain(mid.DiscountDocuments, d => d.DiscountGrantId == grantId);
+            }
+
+            _user.UserId = PrincipalUserId;
+            using var second = CreateContext();
+            var final = await CreateWorkflow(second).ExecuteAsync(instanceId, WorkflowActionType.Approve);
+            Assert.True(final.ToState.IsFinal);
+
+            using var after = CreateContext();
+            var grant = await after.DiscountGrants.SingleAsync(g => g.Id == grantId);
+            Assert.Equal(DiscountGrantStatus.Approved, grant.Status);
+            Assert.Equal(PrincipalUserId, grant.ApprovedByUserId);
+        }
+
+        [Fact]
+        [BusinessRule("BR-WF-003")]
+        public async Task The_proposer_cannot_approve_their_own_grant()
+        {
+            await SeedWorkflowFixtureAsync();
+            using var db = CreateContext();
+            var (grantId, instanceId) = await RaiseGrantAsync(db, 5m);
+
+            // The proposer holds the approving role: the block is on the person, not
+            // on the role, which is the whole point of segregation of duties.
+            _user.UserId = ProposerUserId;
+            await Assert.ThrowsAsync<WorkflowSelfApprovalException>(
+                () => CreateWorkflow(db).ExecuteAsync(instanceId, WorkflowActionType.Approve));
+
+            using var after = CreateContext();
+            Assert.Equal(DiscountGrantStatus.Proposed, (await after.DiscountGrants.SingleAsync(g => g.Id == grantId)).Status);
+        }
+
+        [Fact]
+        [BusinessRule("BR-WF-010")]
+        public async Task Rejecting_the_request_rejects_the_grant_with_the_reason()
+        {
+            await SeedWorkflowFixtureAsync();
+            using var db = CreateContext();
+            var (grantId, instanceId) = await RaiseGrantAsync(db, 5m);
+
+            _user.UserId = FinanceUserId;
+            await Assert.ThrowsAsync<WorkflowReasonRequiredException>(
+                () => CreateWorkflow(db).ExecuteAsync(instanceId, WorkflowActionType.Reject));
+
+            using var second = CreateContext();
+            await CreateWorkflow(second).ExecuteAsync(instanceId, WorkflowActionType.Reject, "not within policy");
+
+            using var after = CreateContext();
+            var grant = await after.DiscountGrants.SingleAsync(g => g.Id == grantId);
+            Assert.Equal(DiscountGrantStatus.Rejected, grant.Status);
+            Assert.DoesNotContain(after.DiscountDocuments, d => d.DiscountGrantId == grantId);
+        }
+
+        /// <summary>
+        /// BR-WF-009 the hard way: when the module's own operation refuses, the
+        /// transition must not survive it. Without the transaction the service owns,
+        /// the step trail would say approved while the register said proposed.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-WF-009")]
+        public async Task A_refusal_inside_the_effect_rolls_the_transition_back()
+        {
+            await SeedWorkflowFixtureAsync();
+            using var db = CreateContext();
+            var (grantId, instanceId) = await RaiseGrantAsync(db, 5m);
+
+            // Decide the grant behind the workflow's back, so the effect's own guard
+            // (grant must be Proposed) refuses when the chain completes.
+            await CreateAdmin(db).RejectGrantAsync(grantId, PrincipalUserId, "decided elsewhere");
+
+            _user.UserId = FinanceUserId;
+            await Assert.ThrowsAsync<InvalidDiscountGrantStateException>(
+                () => CreateWorkflow(db).ExecuteAsync(instanceId, WorkflowActionType.Approve));
+
+            using var after = CreateContext();
+            var instance = await after.WorkflowInstances.SingleAsync(i => i.Id == instanceId);
+            var submitted = await after.WorkflowStates.SingleAsync(s => s.WorkflowDefinitionId == instance.WorkflowDefinitionId && s.Code == "Submitted");
+            Assert.Equal(submitted.Id, instance.CurrentStateId);
+            Assert.False(instance.IsClosed);
+            Assert.DoesNotContain(after.WorkflowSteps, s => s.WorkflowInstanceId == instanceId && s.Action == WorkflowActionType.Approve);
         }
     }
 }

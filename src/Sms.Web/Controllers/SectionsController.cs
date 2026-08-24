@@ -95,7 +95,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Section created.", "تم إنشاء الشعبة.");
                 return RedirectToAction(nameof(Details), new { id = s.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -118,7 +118,7 @@ namespace Sms.Web.Controllers
                 await _sections.AssignHomeroomTeacherAsync(id, teacherUserId.Value, DateTime.SpecifyKind(effectiveFrom ?? _clock.UtcNow.Date, DateTimeKind.Utc));
                 TempData["Flash"] = T("Homeroom teacher assigned; the previous assignment was closed (BR-SCN-004).", "تم تعيين رائد الفصل وإغلاق التعيين السابق (BR-SCN-004).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -133,7 +133,7 @@ namespace Sms.Web.Controllers
                 await _sections.AssignMembershipAsync(id, enrollmentId.Value, DateTime.SpecifyKind(effectiveFrom ?? _clock.UtcNow.Date, DateTimeKind.Utc));
                 TempData["Flash"] = T("Student assigned.", "تم إسناد الطالب.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -149,7 +149,7 @@ namespace Sms.Web.Controllers
                 await _sections.TransferMembershipAsync(enrollmentId, targetSectionId.Value, reasonCode!, effectiveDate ?? _clock.UtcNow.Date);
                 TempData["Flash"] = T("Student transferred; history kept (BR-SCN-005/006).", "تم نقل الطالب مع حفظ السجل (BR-SCN-005/006).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -186,7 +186,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 var model = (await BuildEditAsync(id))!;
                 model.NameAr = form.NameAr; model.NameEn = form.NameEn; model.Capacity = form.Capacity; model.GenderPolicy = form.GenderPolicy; model.DefaultClassroomId = form.DefaultClassroomId;
                 return View(model);
@@ -204,7 +204,7 @@ namespace Sms.Web.Controllers
                 await _sections.DeleteSectionAsync(id);
                 TempData["Flash"] = T("Section deleted.", "تم حذف الشعبة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year = section?.AcademicYearId });
         }
 
@@ -237,7 +237,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Section closed.", "تم إغلاق الشعبة.");
                 return RedirectToAction(nameof(Index), new { year = section?.AcademicYearId });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 

@@ -422,7 +422,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is PlanTemplateNotApprovedException or NoChargesToScheduleException or PlanAssignmentExistsException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Assign), new { year, studentId });
             }
         }
@@ -534,7 +534,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is PromiseDateOutOfRangeException or InvalidOperationException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return Back(returnUrl);
@@ -552,7 +552,7 @@ namespace Sms.Web.Controllers
             }
             catch (PdcNotCoverableException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return Back(returnUrl);
@@ -586,7 +586,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Schedule), new { id });
@@ -643,7 +643,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is RescheduleRemainderMismatchException or ArgumentException or InvalidOperationException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Reschedule), new { id });
             }
         }
@@ -694,7 +694,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Cases));

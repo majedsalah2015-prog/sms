@@ -36,8 +36,11 @@
                     {
                         var fid = $"edit{c.Id}";
                         <tr class="table-warning">
-                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" required aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /></td>
-                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" required aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></td>
+                            <td><input id="cat-ar-@c.Id" form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@c.NameAr" required aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /></td>
+                            @* The English half fills itself from the Arabic one, but only while it
+                               is still empty — an existing category already has an English name a
+                               school chose, and retyping the Arabic must not overwrite it. *@
+                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@c.NameEn" required aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#cat-ar-@c.Id" data-translit-mode="term" /></td>
                             <td><input form="@fid" name="vatRate" class="form-control form-control-sm" style="width:5.5rem" value="@(c.VatRate == null ? "" : (c.VatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" placeholder="15" aria-label="@T("VAT %", "الضريبة %")" /></td>
                             <td class="text-nowrap small">
                                 <label class="me-2"><input form="@fid" type="checkbox" name="isMandatory" value="true" class="form-check-input" checked="@c.IsMandatory" /> @T("mandatory", "إلزامي")</label>
@@ -77,7 +80,8 @@
         <div class="sms-card p-3">
             <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New category", "فئة جديدة")</h2>
             <form method="post" asp-action="CreateCategory" class="d-grid gap-2">
-                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                <div class="sms-bilingual"><input id="cat-new-ar" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#cat-new-ar" data-translit-mode="term" /></div>
+                <div class="form-text">@T("Type the Arabic name and the English one fills itself — a fee category's English name is what a parent reads on an invoice, so it is translated, not spelled out letter by letter. Correct it whenever the suggestion is wrong.", "اكتب الاسم بالعربية ويُملأ الإنجليزي تلقائياً — فالاسم الإنجليزي لفئة الرسوم هو ما يقرأه ولي الأمر على الفاتورة، ولذلك يُترجَم ولا يُكتب بحروف لاتينية. صحّحه متى كان الاقتراح خاطئاً.")</div>
                 <div class="input-group input-group-sm"><span class="input-group-text" id="cat-vat-lbl">@T("VAT %", "الضريبة %")</span><input name="vatRate" class="form-control" aria-labelledby="cat-vat-lbl" placeholder="@(Model.DefaultVatRate == null ? "15" : (Model.DefaultVatRate.Value * 100m).ToString("0.##", CultureInfo.InvariantCulture))" /><span class="input-group-text text-muted small">@T("blank = exempt", "فارغ = معفاة")</span></div>
                 <div class="d-flex flex-wrap gap-3 small">
                     <label><input type="checkbox" name="isMandatory" value="true" class="form-check-input" /> @T("Mandatory", "إلزامي")</label>

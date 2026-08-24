@@ -215,7 +215,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Index));
             }
         }
@@ -349,7 +349,7 @@ namespace Sms.Web.Controllers
                 // Catches the engine's own ReportPermissionDenied / MissingRequiredParameters /
                 // ReportExportNotAllowed too — they all derive from InvalidOperationException, and their
                 // messages are the last word when a screen's pre-check and the engine disagree.
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Run), new { id, estimatedRowCount });
@@ -369,7 +369,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return Back(returnUrl, nameof(Log));
@@ -483,7 +483,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
             catch (DbUpdateException)
             {

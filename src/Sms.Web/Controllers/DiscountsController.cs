@@ -6,8 +6,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Common.Exceptions;
 using Sms.Application.Discounts;
+using Sms.Application.Workflow;
 using Sms.Domain.Discounts;
+using Sms.Domain.Workflow;
 using Sms.Domain.Fees;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
@@ -24,9 +27,28 @@ namespace Sms.Web.Controllers
     /// (policy, stacking, eligibility rules), 8.3 Scholarship board
     /// (programs + envelope + nominations), 8.4 Renewal queue (BR-DIS-007),
     /// 8.5 Waiver desk (BR-DIS-006, a register separate from pricing
-    /// discounts). Every approval chain here is a recorded ApprovalTier —
-    /// the routing decision is real, the inbox routing is not (same
-    /// status-only workflow substitution as every other WF in this build).
+    /// discounts).
+    /// <para>
+    /// <b>Manual grants run on the workflow engine (WF-04), not on a status
+    /// field.</b> Proposing one raises a real request routed by BR-DIS-003's own
+    /// percentage: at or under 10% the finance manager is the whole chain, above
+    /// it the request moves to the principal, and it appears in both approvers'
+    /// unified inbox (BR-WF-011). Approving here and approving from the inbox are
+    /// the same call — the engine authorises the step (role, bound permission,
+    /// data scope, no self-approval) and its final effect applies the grant
+    /// through <see cref="IDiscountAdmin"/>, so BR-DIS-005 has one implementation
+    /// and approved-but-not-applied cannot happen (BR-WF-009).
+    /// </para>
+    /// <para>
+    /// Two paths deliberately keep the direct call: <b>automatic proposals</b>,
+    /// because BR-DIS-002 decides an enumerated batch under one approval rather
+    /// than one chain per child, and <b>scholarship nominations</b>, because
+    /// BR-DIS-004 routes those to a committee (P5) which the seeded WF-04 does not
+    /// model. Both still record their <c>ApprovalTier</c>. The doc's third tier —
+    /// BR-DIS-003 sends anything over 25% to the Owner — has no chain either:
+    /// doc 06 §4.3's seeded role list contains no Owner role, so the tier is
+    /// recorded on the grant and the chain stops at the principal.
+    /// </para>
     /// Deferred: family-level caps (no family entity), mid-year pro-ration,
     /// hardship-document attachment linkage (the checkbox is an operator
     /// attestation, not a real attachment link), sponsor billing links.
@@ -35,17 +57,24 @@ namespace Sms.Web.Controllers
     public class DiscountsController : Controller
     {
         private readonly IDiscountAdmin _discounts;
+        private readonly IWorkflowService _workflow;
         private readonly AppDbContext _db;
         private readonly IWorkingYearContext _workingYear;
         private readonly ICurrentUser _user;
 
-        public DiscountsController(IDiscountAdmin discounts, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user)
+        public DiscountsController(
+            IDiscountAdmin discounts, IWorkflowService workflow, AppDbContext db,
+            IWorkingYearContext workingYear, ICurrentUser user)
         {
             _discounts = discounts;
+            _workflow = workflow;
             _db = db;
             _workingYear = workingYear;
             _user = user;
         }
+
+        /// <summary>How many grants one page of the desk shows; the header says how many matched.</summary>
+        private const int PageSize = 500;
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
 
@@ -65,25 +94,48 @@ namespace Sms.Web.Controllers
             var query = _db.DiscountGrants.AsNoTracking().Where(g => g.AcademicYearId == yid);
             if (status != null) query = query.Where(g => g.Status == status);
             if (typeId != null) query = query.Where(g => g.DiscountTypeId == typeId);
-            var grants = await query.OrderByDescending(g => g.Id).Take(500).ToListAsync();
 
-            var studentIds = grants.Select(g => g.StudentId).Distinct().ToList();
-            var students = await _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => studentIds.Contains(s.Id)).ToListAsync();
-
-            var rows = grants.Select(g => new GrantDeskViewModel.Row(g,
-                m.Types.FirstOrDefault(t => t.Id == g.DiscountTypeId) ?? new DiscountType { NameAr = "?", NameEn = "?" },
-                students.FirstOrDefault(s => s.Id == g.StudentId) ?? new Student { StudentNo = "?" })).ToList();
-
+            // The search runs in the database, before the page is cut. It used to run
+            // in memory over the newest 500 grants, which meant a school past its
+            // five-hundredth grant could type a student's number and be told, quite
+            // confidently, that they have none — the worst possible answer on a screen
+            // where the next thing the operator does is grant a second discount.
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var term = q.Trim();
-                rows = rows.Where(r => r.Student.StudentNo.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    || r.Student.FirstNameAr.Contains(term) || r.Student.FamilyNameAr.Contains(term)
-                    || r.Student.FirstNameEn.Contains(term, StringComparison.OrdinalIgnoreCase) || r.Student.FamilyNameEn.Contains(term, StringComparison.OrdinalIgnoreCase)
-                    || r.Type.NameAr.Contains(term) || r.Type.NameEn.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+
+                // Every part of the name, not just the first and the family: a parent
+                // asks about "أحمد محمد" and the register holds four name columns.
+                var studentIds = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                    .Where(s => s.SchoolId == _db.CurrentSchoolId
+                        && (s.StudentNo.Contains(term)
+                            || s.FirstNameAr.Contains(term) || s.FatherNameAr.Contains(term)
+                            || s.GrandfatherNameAr.Contains(term) || s.FamilyNameAr.Contains(term)
+                            || s.FirstNameEn.Contains(term) || s.FatherNameEn.Contains(term)
+                            || s.GrandfatherNameEn.Contains(term) || s.FamilyNameEn.Contains(term)))
+                    .Select(s => s.Id)
+                    .ToListAsync();
+
+                // IgnoreQueryFilters on the types too: a grant keeps pointing at its
+                // type after the school retires it, and searching by that type's name
+                // must still find the grants that carry it.
+                var matchedTypeIds = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking()
+                    .Where(t => t.SchoolId == _db.CurrentSchoolId && (t.NameAr.Contains(term) || t.NameEn.Contains(term)))
+                    .Select(t => t.Id)
+                    .ToListAsync();
+
+                query = query.Where(g => studentIds.Contains(g.StudentId) || matchedTypeIds.Contains(g.DiscountTypeId));
             }
 
-            m.Rows = rows;
+            m.MatchCount = await query.CountAsync();
+            var grants = await query.OrderByDescending(g => g.Id).Take(PageSize).ToListAsync();
+
+            var shownStudentIds = grants.Select(g => g.StudentId).Distinct().ToList();
+            var students = await _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => shownStudentIds.Contains(s.Id)).ToListAsync();
+
+            m.Rows = grants.Select(g => new GrantDeskViewModel.Row(g,
+                m.Types.FirstOrDefault(t => t.Id == g.DiscountTypeId) ?? new DiscountType { NameAr = "?", NameEn = "?" },
+                students.FirstOrDefault(s => s.Id == g.StudentId) ?? new Student { StudentNo = "?" })).ToList();
             m.StudentOptions = await EnrolledStudentOptionsAsync(yid);
             return View(m);
         }
@@ -98,9 +150,10 @@ namespace Sms.Web.Controllers
                 if (basisValue <= 0) throw new InvalidOperationException(T("Enter a positive basis value.", "أدخل قيمة أساس موجبة."));
                 if (string.IsNullOrWhiteSpace(reason)) throw new InvalidOperationException(T("A reason is required to propose a grant.", "السبب مطلوب لاقتراح المنحة."));
                 var grant = await _discounts.ProposeManualGrantAsync(studentId, discountTypeId, basisValue, reason.Trim(), _user.UserId, hasHardshipDocumentation);
-                TempData["Flash"] = T($"Grant proposed — routed to {DiscountLabels.Tier(grant.RequiredTier, false)} for approval.", $"اقتُرحت المنحة — وُجّهت إلى {DiscountLabels.Tier(grant.RequiredTier, true)} للاعتماد.");
+                await StartGrantChainAsync(grant, reason.Trim());
+                TempData["Flash"] = RoutedMessage(grant.RequiredTier);
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -116,7 +169,7 @@ namespace Sms.Web.Controllers
                     ? T("No new eligible students found — everyone already has a grant of this type, or nobody qualifies.", "لا طلاب مؤهلون جدد — الجميع لديه منحة من هذا النوع مسبقاً، أو لا أحد مستحق.")
                     : T($"{proposed.Count} grant(s) proposed — review and approve below.", $"اقتُرح {proposed.Count} منحة — راجعها واعتمدها أدناه.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year, typeId = discountTypeId, status = DiscountGrantStatus.Proposed });
         }
 
@@ -127,10 +180,27 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await _discounts.ApproveGrantAsync(id, _user.UserId, Blank(envelopeOverrideReason));
-                TempData["Flash"] = T("Grant approved — discount document(s) issued.", "اعتُمدت المنحة — صدرت مستندات الخصم.");
+                var chain = await OpenGrantChainAsync(id);
+                if (chain == null)
+                {
+                    // No chain: an automatic batch proposal (BR-DIS-002) or a scholarship
+                    // nomination, neither of which WF-04 routes. The direct path also
+                    // carries the envelope override, which has no field in a generic inbox.
+                    await _discounts.ApproveGrantAsync(id, _user.UserId, Blank(envelopeOverrideReason));
+                    TempData["Flash"] = T("Grant approved — discount document(s) issued.", "اعتُمدت المنحة — صدرت مستندات الخصم.");
+                }
+                else
+                {
+                    var result = await _workflow.ExecuteAsync(chain.Id, WorkflowActionType.Approve, cancellationToken: HttpContext.RequestAborted);
+                    var to = IsArabic ? result.ToState.Name.NameAr : result.ToState.Name.NameEn;
+                    TempData["Flash"] = result.ToState.IsFinal
+                        ? T("Grant approved — discount document(s) issued.", "اعتُمدت المنحة — صدرت مستندات الخصم.")
+                        : T($"Approved at your level — the request now waits at {to}.", $"اعتُمدت عند مستواك — والطلب الآن ينتظر عند {to}.");
+                }
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (WorkflowSelfApprovalException) { TempData["Error"] = SelfApprovalMessage; }
+            catch (WorkflowActorNotAuthorizedException) { TempData["Error"] = NotTheApproverMessage; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -142,10 +212,31 @@ namespace Sms.Web.Controllers
             try
             {
                 if (ids == null || ids.Count == 0) throw new InvalidOperationException(T("Select at least one grant.", "اختر منحة واحدة على الأقل."));
-                await _discounts.ApproveGrantsAsync(ids, _user.UserId);
-                TempData["Flash"] = T($"{ids.Count} grant(s) approved.", $"اعتُمد {ids.Count} منحة.");
+
+                // BR-DIS-002's batch approval is for automatic proposals — one decision
+                // over an enumerated set. A manual grant is not one of those: it is
+                // running a WF-04 chain, and approving it here would apply a 40%
+                // discount without the principal the routing sent it to, leave its
+                // request open in their inbox forever, and make that request
+                // un-completable (the effect would then refuse an already-approved
+                // grant). So the selection is split and the chained ones are named.
+                var chained = await _db.WorkflowInstances.AsNoTracking()
+                    .Where(i => !i.IsClosed && i.EntityTypeName == DiscountWorkflow.EntityTypeName && ids.Contains((int)i.EntityId))
+                    .Select(i => (int)i.EntityId)
+                    .ToListAsync(HttpContext.RequestAborted);
+
+                var direct = ids.Where(id => !chained.Contains(id)).ToList();
+                if (direct.Count > 0)
+                {
+                    await _discounts.ApproveGrantsAsync(direct, _user.UserId);
+                }
+
+                TempData["Flash"] = chained.Count == 0
+                    ? T($"{direct.Count} grant(s) approved.", $"اعتُمد {direct.Count} منحة.")
+                    : T($"{direct.Count} grant(s) approved. {chained.Count} of them are running an approval chain and were left alone — decide those one at a time, so each goes to the approver its percentage routes it to (BR-DIS-003).",
+                        $"اعتُمد {direct.Count} منحة. و{chained.Count} منها تسير في سلسلة اعتماد فتُركت — ابتّ فيها واحدة واحدة ليصل كلٌّ منها إلى المعتمِد الذي توجّهه إليه نسبته (BR-DIS-003).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -157,10 +248,23 @@ namespace Sms.Web.Controllers
             try
             {
                 if (string.IsNullOrWhiteSpace(reason)) throw new InvalidOperationException(T("A reason is required to reject a grant.", "السبب مطلوب لرفض المنحة."));
-                await _discounts.RejectGrantAsync(id, _user.UserId, reason.Trim());
+
+                var chain = await OpenGrantChainAsync(id);
+                if (chain == null)
+                {
+                    await _discounts.RejectGrantAsync(id, _user.UserId, reason.Trim());
+                }
+                else
+                {
+                    // The closure effect is what sets the grant to Rejected, so the
+                    // register and the request cannot end up disagreeing.
+                    await _workflow.ExecuteAsync(chain.Id, WorkflowActionType.Reject, reason.Trim(), cancellationToken: HttpContext.RequestAborted);
+                }
+
                 TempData["Flash"] = T("Grant rejected.", "رُفضت المنحة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (WorkflowActorNotAuthorizedException) { TempData["Error"] = NotTheApproverMessage; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -177,7 +281,7 @@ namespace Sms.Web.Controllers
                     ? T("Grant revoked — a claw-back charge was posted for the forward fraction.", "أُلغيت المنحة — رُحّلت فاتورة استرجاع عن الجزء المتبقي من العام.")
                     : T("Grant revoked — past discount documents stand (BR-DIS-008 default: forgive the past).", "أُلغيت المنحة — مستندات الخصم السابقة تبقى كما هي (سياسة BR-DIS-008: العفو عن الماضي).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -217,7 +321,7 @@ namespace Sms.Web.Controllers
                     isStackable, maxCombinedPercent <= 0 ? 100m : maxCombinedPercent, renewalMode, requiresHardshipDocumentation, rules);
                 TempData["Flash"] = T("Discount type added.", "أُضيف نوع الخصم.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Types));
         }
 
@@ -257,7 +361,7 @@ namespace Sms.Web.Controllers
                 await _discounts.DefineScholarshipProgramAsync(nameAr.Trim(), nameEn.Trim(), discountTypeId, maxAwards, maxTotalAmount);
                 TempData["Flash"] = T("Scholarship program defined.", "عُرّف برنامج المنحة الدراسية.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scholarships), new { year });
         }
 
@@ -273,7 +377,7 @@ namespace Sms.Web.Controllers
                 await _discounts.NominateForScholarshipAsync(studentId, scholarshipProgramId, basisValue, reason.Trim(), _user.UserId, Blank(sponsorNote));
                 TempData["Flash"] = T("Nomination recorded — routed to the committee.", "سُجّل الترشيح — وُجّه إلى اللجنة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scholarships), new { year });
         }
 
@@ -317,7 +421,7 @@ namespace Sms.Web.Controllers
                     ? T("Nothing to queue — no eligible manual/scholarship grants, or everything is already queued.", "لا شيء ليُدرج — لا منح يدوية/دراسية مؤهلة، أو أُدرج كل شيء مسبقاً.")
                     : T($"{items.Count} grant(s) queued for renewal review.", $"أُدرج {items.Count} منحة لمراجعة التجديد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Renewals), new { fromYear, toYear });
         }
 
@@ -331,7 +435,7 @@ namespace Sms.Web.Controllers
                 await _discounts.DecideRenewalAsync(id, decision, _user.UserId, decision == RenewalDecision.Adjusted ? adjustedBasisValue : null);
                 TempData["Flash"] = T($"Renewal item {DiscountLabels.RenewalDecisionLabel(decision, false).ToLowerInvariant()}.", $"عولجت مادة التجديد ({DiscountLabels.RenewalDecisionLabel(decision, true)}).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Renewals), new { fromYear, toYear });
         }
 
@@ -381,7 +485,7 @@ namespace Sms.Web.Controllers
                 var waiver = await _discounts.ProposeWaiverAsync(chargeId, kind, amount, reason.Trim(), _user.UserId);
                 TempData["Flash"] = T($"Waiver proposed — routed to {DiscountLabels.Tier(waiver.RequiredTier, false)}.", $"اقتُرح الإعفاء — وُجّه إلى {DiscountLabels.Tier(waiver.RequiredTier, true)}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Waivers), new { chargeQ });
         }
 
@@ -397,7 +501,7 @@ namespace Sms.Web.Controllers
                     ? T("Waiver approved — a credit note was issued against the charge.", "اعتُمد الإعفاء — صدر إشعار دائن على الفاتورة.")
                     : T("Waiver rejected.", "رُفض الإعفاء.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Waivers));
         }
 
@@ -420,5 +524,76 @@ namespace Sms.Web.Controllers
         }
 
         private static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        // ================================================================== WF-04 (doc 05 §5, BR-DIS-003)
+
+        /// <summary>
+        /// What the operator is told a proposal was routed to. BR-DIS-003 sends
+        /// anything over 25% to the Owner, and the tier is recorded on the grant —
+        /// but doc 06 §4.3 seeds no Owner role, so WF-04's chain stops at the
+        /// principal. Naming an approver who will never be asked would be the worse
+        /// half of that gap: the register keeps the tier, the message says who is
+        /// actually going to sign, and says the rest is missing.
+        /// </summary>
+        private static string RoutedMessage(ApprovalTier tier)
+            => tier == ApprovalTier.Owner
+                ? T("Grant proposed. It exceeds the principal's threshold, so BR-DIS-003 routes it to the Owner — a role this deployment does not have, so it waits with the principal and the owner tier is recorded on the grant.",
+                    "اقتُرحت المنحة. وهي تتجاوز حدّ المدير، فتوجّهها BR-DIS-003 إلى المالك — وهو دور غير موجود في هذا التركيب، فتنتظر عند المدير ويُسجَّل مستوى المالك على المنحة.")
+                : T($"Grant proposed — routed to {DiscountLabels.Tier(tier, false)} for approval.",
+                    $"اقتُرحت المنحة — وُجّهت إلى {DiscountLabels.Tier(tier, true)} للاعتماد.");
+
+        private static string SelfApprovalMessage => T(
+            "You proposed this grant, so you cannot approve it (BR-WF-003). It waits for another holder of the approving role.",
+            "أنت من اقترح هذه المنحة، فلا يمكنك اعتمادها (BR-WF-003). تنتظر شخصاً آخر يحمل دور الاعتماد.");
+
+        private static string NotTheApproverMessage => T(
+            "This request is waiting at a level your roles do not decide.",
+            "هذا الطلب ينتظر عند مستوى لا تبتّ فيه أدوارك.");
+
+        /// <summary>
+        /// The open WF-04 request for a grant, or null when it has none — automatic
+        /// batch proposals (BR-DIS-002 approves an enumerated batch under one
+        /// decision) and scholarship nominations (BR-DIS-004 routes them to a
+        /// committee, which the seeded chain does not model) keep the direct path.
+        /// </summary>
+        private async Task<WorkflowInstance?> OpenGrantChainAsync(int grantId)
+            => await _db.WorkflowInstances.AsNoTracking()
+                .Where(i => !i.IsClosed && i.EntityTypeName == DiscountWorkflow.EntityTypeName && i.EntityId == grantId)
+                .OrderByDescending(i => i.Id)
+                .FirstOrDefaultAsync(HttpContext.RequestAborted);
+
+        /// <summary>
+        /// Raises the grant into WF-04 and submits it in one step. The routing value
+        /// is the grant's own percentage equivalent — the same number BR-DIS-003
+        /// routed the tier from, read back through the port so the chain and the
+        /// recorded tier cannot disagree about who signs.
+        /// <para>
+        /// A school whose catalogue has not been seeded has no WF-04 to start. The
+        /// grant is still proposed and still approvable from this screen, so a
+        /// missing definition degrades to the old behaviour instead of losing the
+        /// operator's work — but it is reported, because a chain nobody notices is
+        /// missing is how an approval requirement quietly stops being enforced.
+        /// </para>
+        /// </summary>
+        private async Task StartGrantChainAsync(DiscountGrant grant, string reason)
+        {
+            try
+            {
+                var percent = await _discounts.GetGrantPercentEquivalentAsync(grant.Id, HttpContext.RequestAborted);
+                var label = string.Format(
+                    CultureInfo.InvariantCulture, "{0} {1}% · student #{2}",
+                    DiscountWorkflow.Code, percent.ToString("0.##", CultureInfo.InvariantCulture), grant.StudentId);
+
+                var instance = await _workflow.StartAsync(
+                    DiscountWorkflow.Code, DiscountWorkflow.EntityTypeName, grant.Id, label, percent, HttpContext.RequestAborted);
+                await _workflow.ExecuteAsync(instance.Id, WorkflowActionType.Submit, reason, cancellationToken: HttpContext.RequestAborted);
+            }
+            catch (WorkflowDefinitionMissingException)
+            {
+                TempData["Error"] = T(
+                    "The grant was proposed, but no WF-04 workflow is defined for this school, so it is not on anyone's approvals queue — approve it from this screen.",
+                    "اقتُرحت المنحة، لكن لا يوجد مسار WF-04 معرَّف لهذه المدرسة، فهي ليست في طابور موافقات أحد — اعتمدها من هذه الشاشة.");
+            }
+        }
     }
 }

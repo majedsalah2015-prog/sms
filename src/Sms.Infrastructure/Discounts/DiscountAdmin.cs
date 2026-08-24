@@ -354,6 +354,21 @@ namespace Sms.Infrastructure.Discounts
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task<decimal> GetGrantPercentEquivalentAsync(int discountGrantId, CancellationToken cancellationToken = default)
+        {
+            var grant = await _db.DiscountGrants.AsNoTracking().SingleAsync(g => g.Id == discountGrantId, cancellationToken);
+
+            // IgnoreQueryFilters: a grant keeps pointing at its type after the type is
+            // retired, and the chain that decides who signs must not fall over the day
+            // somebody stops offering that discount to new students.
+            var type = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId)
+                .SingleAsync(t => t.Id == grant.DiscountTypeId, cancellationToken);
+
+            var charges = await LoadChargeInputsAsync(grant.StudentId, grant.AcademicYearId, type.FeeCategoryId, cancellationToken);
+            return PercentEquivalent(type, grant.BasisValue, charges);
+        }
+
         public async Task RevokeGrantAsync(int discountGrantId, DateTime effectiveDate, string reason, bool clawBack = false, CancellationToken cancellationToken = default)
         {
             var grant = await _db.DiscountGrants.SingleAsync(g => g.Id == discountGrantId, cancellationToken);

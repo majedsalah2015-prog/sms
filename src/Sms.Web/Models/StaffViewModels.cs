@@ -48,6 +48,15 @@ namespace Sms.Web.Models
         public string? PrimaryIdNo { get; set; }
         public DateTime? PrimaryIdExpiry { get; set; }
         public int? UserAccountId { get; set; }
+
+        /// <summary>
+        /// The photograph taken while the new employee is still at the HR desk (doc/Modules/12 §8.1,
+        /// doc 10 §4 — the employee document catalogue's own addition to its starter set). Not
+        /// carried back into a redisplayed form — a browser never re-sends a file it already
+        /// posted — so the screen says to choose it again rather than pretending it is still there.
+        /// </summary>
+        public Microsoft.AspNetCore.Http.IFormFile? Photo { get; set; }
+
         public string? Reason { get; set; }
 
         // first position (optional at registration)

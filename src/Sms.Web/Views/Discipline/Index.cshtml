@@ -1,0 +1,156 @@
+@using System.Globalization
+@using Sms.Domain.Discipline
+@using Sms.Web.Models
+@model CaseBoardViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Case board", "لوحة القضايا");
+    ViewData["Breadcrumb"] = T("Behaviour / Case board", "السلوك / لوحة القضايا");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-board-help", Title = T("Case board — help", "لوحة القضايا — مساعدة"),
+        Intro = T("A case exists because an incident was serious enough to open one: severity 1 is resolved by the teacher who recorded it and never appears here (BR-DCP-002). Each column is a state in the WF-11 sequence, and a case only ever moves to the next one.", "توجد القضية لأن المخالفة كانت من الجسامة التي تفتح قضية: المخالفة البسيطة يعالجها المعلم الذي سجّلها ولا تظهر هنا (BR-DCP-002). وكل عمود حالة في مسار WF-11، والقضية لا تنتقل إلا إلى التالية."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The sequence", "المسار"), T("Reported → under investigation → decided → action applied → appeal window → closed. Investigation may be skipped when nothing needs investigating, but nothing else may: a decision cannot precede its case, and a case cannot close while an appeal is undecided (BR-DCP-003, BR-DCP-006).", "مُبلَّغ عنها ← قيد التحقيق ← صدر القرار ← نُفِّذ الإجراء ← مهلة التظلّم ← مغلقة. ويمكن تجاوز التحقيق حين لا شيء يحتاج تحقيقاً، ولا يُتجاوز غيره: لا قرار قبل قضيته، ولا إغلاق وتظلّم لم يُبتّ فيه (BR-DCP-003، BR-DCP-006).")),
+            new HelpPanelViewModel.Item(T("Ageing", "التقادم"), T("The day count is measured from the incident, not from the last time somebody touched the case — a case that sat unopened for a week is exactly what this board exists to show. Past five days it is marked.", "عدّ الأيام من تاريخ المخالفة، لا من آخر مرة لمس أحد القضية — فالقضية التي بقيت أسبوعاً بلا فتح هي ما وُجدت هذه اللوحة لإظهاره. وبعد خمسة أيام تُعلَّم.")),
+            new HelpPanelViewModel.Item(T("The proposal", "المقترح"), T("Where a card shows a proposed consequence, that is the code's own ladder answering \"this severity, this many times\" (BR-DCP-005). It is advisory: the decider may go lighter with a reason, and heavier only with the Principal.", "حين تُظهر البطاقة إجراءً مقترحاً فذلك سلّم اللائحة نفسه يجيب عن «هذه الجسامة، بهذا التكرار» (BR-DCP-005). وهو استرشادي: للمقرِّر أن يخفّف بسبب، وأن يشدّد بالمدير فقط.")),
+            new HelpPanelViewModel.Item(T("Who sees this", "من يرى هذا"), T("Behaviour data is restricted (BR-DCP-008). Recording an incident is open to any teacher; this board is not — and a teacher who reported an incident deliberately cannot steer the case that follows it.", "بيانات السلوك مقيَّدة (BR-DCP-008). تسجيل المخالفة متاح لأي معلم، وهذه اللوحة ليست كذلك — والمعلم الذي أبلغ عن مخالفة لا يستطيع قصداً توجيه القضية التي تليها.")),
+        },
+    };
+
+    var cardsByStatus = Model.Cards.GroupBy(c => c.Case.Status).ToDictionary(g => g.Key, g => g.ToList());
+    var closed = Model.Cards.Where(c => c.Case.Status == CaseStatus.Closed).ToList();
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Every open case, in the state it is actually in. Nothing on this board decides anything — opening a case file is where a decision is taken, and every gate the code imposes is checked there.",
+               "كل قضية مفتوحة، في حالتها الفعلية. ولا شيء في هذه اللوحة يقرّر شيئاً — القرار يُتَّخذ في ملف القضية، وهناك تُفحَص كل الضوابط التي تفرضها اللائحة.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+<form method="get" class="sms-card p-3 mb-4 row g-2 align-items-end">
+    <div class="col-6 col-md-3">
+        <label class="form-label" for="sev">@T("Severity", "الجسامة")</label>
+        <select id="sev" name="severity" class="form-select">
+            <option value="">@T("All levels", "كل المستويات")</option>
+            @for (var s = 1; s <= 4; s++)
+            {
+                <option value="@s" selected="@(Model.SeverityFilter == s)">@s — @DisciplineLabels.Severity(s, isRtl)</option>
+            }
+        </select>
+    </div>
+    <div class="col-6 col-md-3 form-check mt-4">
+        <input class="form-check-input" type="checkbox" id="closed" name="closed" value="true" checked="@Model.IncludeClosed" />
+        <label class="form-check-label" for="closed">@T("Include closed cases", "إظهار القضايا المغلقة")</label>
+    </div>
+    <div class="col-12 col-md-2">
+        <button type="submit" class="btn btn-outline-primary w-100">@T("Apply", "تطبيق")</button>
+    </div>
+</form>
+
+@if (Model.Cards.Count == 0)
+{
+    <div class="sms-card p-4 text-center text-muted">
+        @T("No cases. Either nothing serious has been recorded, or every case has been closed — the record desk is where an incident starts.",
+           "لا قضايا. فإمّا لم يُسجَّل شيء جسيم، أو أُغلقت كل القضايا — ومكتب التسجيل هو حيث تبدأ المخالفة.")
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <div class="d-flex gap-3 align-items-start" style="min-width:60rem">
+            @foreach (var status in Model.Columns)
+            {
+                var cards = cardsByStatus.TryGetValue(status, out var list) ? list : new List<CaseBoardViewModel.Card>();
+                <section class="flex-fill" style="min-width:11rem" aria-label="@DisciplineLabels.CaseStatus(status, isRtl)">
+                    <h2 class="sms-section-title d-flex justify-content-between align-items-baseline">
+                        <span>@DisciplineLabels.CaseStatus(status, isRtl)</span>
+                        <span class="badge text-bg-light">@cards.Count</span>
+                    </h2>
+                    @if (cards.Count == 0)
+                    {
+                        <p class="text-muted small">@T("Nothing here.", "لا شيء هنا.")</p>
+                    }
+                    @foreach (var card in cards)
+                    {
+                        var aged = card.AgeDays >= CaseBoardViewModel.AgingThresholdDays;
+                        <a class="sms-card p-3 mb-2 d-block text-decoration-none" asp-action="Case" asp-route-id="@card.Case.Id">
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+                                <span class="badge @DisciplineLabels.SeverityClass(card.Case.Severity)">
+                                    @DisciplineLabels.Severity(card.Case.Severity, isRtl)
+                                </span>
+                                <span class="small @(aged ? "text-danger fw-semibold" : "text-muted")" title="@T("Days since the incident", "الأيام منذ المخالفة")">
+                                    @if (aged)
+                                    {
+                                        <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                                    }
+                                    @card.AgeDays@T("d", "ي")
+                                </span>
+                            </div>
+                            <div class="fw-semibold">@(isRtl ? card.Student.NameAr : card.Student.NameEn)</div>
+                            <div class="small text-muted">@card.Student.StudentNo · @card.IncidentNo</div>
+                            <div class="small mt-1">@(isRtl ? card.ViolationAr : card.ViolationEn)</div>
+                            @if (card.ProposedEn != null && card.Case.DecidedConsequenceTypeId == null)
+                            {
+                                <div class="small text-muted mt-1">
+                                    <i class="bi bi-signpost" aria-hidden="true"></i>
+                                    @T("proposed:", "المقترح:") @(isRtl ? card.ProposedAr : card.ProposedEn)
+                                </div>
+                            }
+                            @if (card.Case.RequiresPrincipal)
+                            {
+                                <span class="badge text-bg-dark mt-2">@T("Principal required", "يلزم المدير")</span>
+                            }
+                            @if (card.HasPendingAppeal)
+                            {
+                                <span class="badge text-bg-warning mt-2">@T("appeal pending", "تظلّم قائم")</span>
+                            }
+                        </a>
+                    }
+                </section>
+            }
+        </div>
+    </div>
+
+    @if (Model.IncludeClosed && closed.Count > 0)
+    {
+        <h2 class="sms-section-title mt-4">@T("Closed", "المغلقة")</h2>
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Closed cases", "القضايا المغلقة")</caption>
+                <thead>
+                <tr>
+                    <th scope="col">@T("Incident", "المخالفة")</th>
+                    <th scope="col">@T("Student", "الطالب")</th>
+                    <th scope="col">@T("Violation", "المخالفة المرتكبة")</th>
+                    <th scope="col">@T("Severity", "الجسامة")</th>
+                    <th scope="col">@T("Closed", "أُغلقت")</th>
+                    <th scope="col"></th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var card in closed)
+                {
+                    <tr>
+                        <td>@card.IncidentNo</td>
+                        <td>@(isRtl ? card.Student.NameAr : card.Student.NameEn)</td>
+                        <td>@(isRtl ? card.ViolationAr : card.ViolationEn)</td>
+                        <td><span class="badge @DisciplineLabels.SeverityClass(card.Case.Severity)">@DisciplineLabels.Severity(card.Case.Severity, isRtl)</span></td>
+                        <td>@(card.Case.ClosedAtUtc?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Case" asp-route-id="@card.Case.Id">@T("Open", "فتح")</a></td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    }
+}

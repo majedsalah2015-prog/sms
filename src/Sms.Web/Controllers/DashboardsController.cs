@@ -11,6 +11,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Dashboards;
 using Sms.Application.ReadModels;
 using Sms.Application.Security;
+using Sms.Application.Setup;
 using Sms.Domain.Certificates;
 using Sms.Domain.Dashboards;
 using Sms.Domain.Discipline;
@@ -18,6 +19,7 @@ using Sms.Domain.Grades;
 using Sms.Domain.Schools;
 using Sms.Domain.Sections;
 using Sms.Domain.Security;
+using Sms.Domain.Setup;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Web.Security;
@@ -58,6 +60,7 @@ namespace Sms.Web.Controllers
         private const string ParentRoleCode = "PARENT";
         private const string StudentRoleCode = "STUDENT";
 
+        private readonly ISystemSetupAdmin _setup;
         private readonly IDashboardAdmin _dashboards;
         private readonly IDashboardQuery _widgets;
         private readonly IReadModelQuery _readModels;
@@ -69,9 +72,10 @@ namespace Sms.Web.Controllers
         private readonly IClock _clock;
 
         public DashboardsController(
-            IDashboardAdmin dashboards, IDashboardQuery widgets, IReadModelQuery readModels, ISnapshotRefreshService snapshots,
+            ISystemSetupAdmin setup, IDashboardAdmin dashboards, IDashboardQuery widgets, IReadModelQuery readModels, ISnapshotRefreshService snapshots,
             IPermissionService permissions, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, IClock clock)
         {
+            _setup = setup;
             _dashboards = dashboards;
             _widgets = widgets;
             _readModels = readModels;
@@ -106,6 +110,16 @@ namespace Sms.Web.Controllers
             };
 
             await ResolvePanelsAsync(m);
+
+            // Before the no-year return, deliberately: a deployment still in setup has
+            // no academic year (BR-SET-003 keeps the first one shut), which is exactly
+            // the state this panel exists to report on. Computing it after the return
+            // rendered its card with an empty body on the only screen that needed it.
+            if (m.Rendered.Any(p => p.Panel.Code == DashboardPanels.SetupCompleteness))
+            {
+                m.Setup = await SetupCompletenessAsync();
+            }
+
             if (m.Year == null)
             {
                 return View(m);
@@ -153,6 +167,30 @@ namespace Sms.Web.Controllers
             }
 
             return View(m);
+        }
+
+        /// <summary>
+        /// doc/Modules/01 §11. Reads the wizard's own evaluator rather than counting
+        /// checklist rows here, so the dashboard's percentage and the wizard's cannot
+        /// disagree — BR-DSH-002's one-computation-source rule, applied to the one
+        /// figure on this screen that is about the deployment rather than the school.
+        /// </summary>
+        private async Task<SetupCompletenessView> SetupCompletenessAsync()
+        {
+            var steps = await _setup.GetChecklistAsync(HttpContext.RequestAborted);
+            var mandatory = steps.Where(s => s.Step.IsMandatory).ToList();
+            var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _db.CurrentSchoolId, HttpContext.RequestAborted);
+
+            return new SetupCompletenessView(
+                SetupWizardEvaluator.CompletionPercent(steps),
+                mandatory.Count,
+                mandatory.Count(s => s.Status == SetupStepStatus.Completed),
+                school?.SetupCompletedAtUtc != null,
+                school?.SetupCompletedAtUtc,
+                mandatory.Where(s => s.Status != SetupStepStatus.Completed)
+                    .OrderBy(s => s.Step.Order)
+                    .Select(s => new SetupPendingStepView(s.Step.Code, s.Step.TitleEn, s.Step.TitleAr))
+                    .ToList());
         }
 
         /// <summary>

@@ -110,7 +110,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T($"Receipt {receipt.ReceiptNo} issued for {receipt.Amount:N2} and allocated oldest-first (BR-PAY-003).", $"صدر السند {receipt.ReceiptNo} بمبلغ {receipt.Amount:N2} وخُصّص للأقدم أولاً (BR-PAY-003).");
                 return RedirectToAction(nameof(Receipt), new { id = receipt.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { q, payerId, amount });
         }
 
@@ -173,7 +173,7 @@ namespace Sms.Web.Controllers
                 var session = await _payments.OpenTillSessionAsync(_user.UserId, tillCode.Trim(), floatAmount);
                 TempData["Flash"] = T($"Session opened on till {session.TillCode} with float {session.FloatAmount:N2}.", $"فُتحت الجلسة على الصندوق {session.TillCode} بعهدة {session.FloatAmount:N2}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Till));
         }
 
@@ -189,7 +189,7 @@ namespace Sms.Web.Controllers
                 await _payments.CloseTillSessionAsync(id, countedTotal, string.IsNullOrWhiteSpace(varianceReason) ? null : varianceReason.Trim());
                 TempData["Flash"] = countedTotal == system ? T("Session closed — no variance.", "أُغلقت الجلسة — لا فرق.") : T($"Session closed with variance {countedTotal - system:+#,0.00;-#,0.00}.", $"أُغلقت الجلسة بفرق {countedTotal - system:+#,0.00;-#,0.00}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Till));
         }
 
@@ -228,7 +228,7 @@ namespace Sms.Web.Controllers
                 var pdc = await _payments.LodgePdcAsync(payerId, bankName.Trim(), chequeNo.Trim(), chequeDate.Value.Date, amount);
                 TempData["Flash"] = T($"Cheque {pdc.ChequeNo} lodged for {pdc.Amount:N2}, due {pdc.ChequeDate:yyyy-MM-dd}.", $"سُجّل الشيك {pdc.ChequeNo} بمبلغ {pdc.Amount:N2}، يستحق {pdc.ChequeDate:yyyy-MM-dd}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Pdc));
         }
 
@@ -247,7 +247,7 @@ namespace Sms.Web.Controllers
                     _ => T($"Cheque is now {FinanceLabels.PdcStatus(target, false)}.", $"أصبح الشيك بحالة {FinanceLabels.PdcStatus(target, true)}."),
                 };
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Pdc), new { status = filter });
         }
 
@@ -289,7 +289,7 @@ namespace Sms.Web.Controllers
                 var v = await _payments.RequestRefundAsync(payerId, amount, method, reason.Trim());
                 TempData["Flash"] = T($"Refund voucher {v.VoucherNo} requested for {v.Amount:N2} — awaiting approval.", $"طُلب سند الاسترداد {v.VoucherNo} بمبلغ {v.Amount:N2} — بانتظار الاعتماد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Refunds), new { payerId });
         }
 
@@ -303,7 +303,7 @@ namespace Sms.Web.Controllers
                 await _payments.ChangeRefundVoucherStatusAsync(id, target);
                 TempData["Flash"] = T($"Voucher is now {FinanceLabels.RefundStatus(target, false)}.", $"أصبح السند بحالة {FinanceLabels.RefundStatus(target, true)}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Refunds), new { payerId, status = filter });
         }
 

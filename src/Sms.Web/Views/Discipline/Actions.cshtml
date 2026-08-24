@@ -1,0 +1,137 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model ActionTrackerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Action tracker", "متابعة الإجراءات");
+    ViewData["Breadcrumb"] = T("Behaviour / Actions", "السلوك / الإجراءات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-actions-help", Title = T("Action tracker — help", "متابعة الإجراءات — مساعدة"),
+        Intro = T("Consequences that have been decided and applied, and are now supposed to be happening. A decision nobody carries out is the ordinary way a discipline system stops meaning anything, which is what this screen exists to prevent.", "الإجراءات التي صدرت وطُبِّقت ويُفترض أنها جارية الآن. والقرار الذي لا ينفّذه أحد هو الطريق المعتاد لأن يفقد نظام السلوك معناه، وهذا ما وُجدت هذه الشاشة لمنعه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Overdue", "المتأخّر"), T("An action whose last day has passed and which nobody marked as served is flagged. It is not evidence of anything by itself — a detention may well have been served and simply not recorded — but an unmarked action is not a served one until somebody says so.", "الإجراء الذي مضى آخر أيامه ولم يسجّل أحد تنفيذه يُعلَّم. وهذا ليس دليلاً بذاته على شيء — فقد يكون الاحتجاز نُفِّذ ولم يُسجَّل — لكن الإجراء غير المُعلَّم ليس منفَّذاً حتى يقول أحد ذلك.")),
+            new HelpPanelViewModel.Item(T("Suspensions are separated", "الفصل مفصول"), T("Suspension-class actions are listed apart because they are the ones with a legal limit, a Principal's approval behind them, and a child out of school while they run (BR-DCP-004). They are worth looking at as a list of their own.", "تُدرَج إجراءات الفصل على حدة لأنها ما له حدّ نظامي واعتماد من المدير وطفل خارج المدرسة أثناء سريانه (BR-DCP-004). وهي جديرة بأن تُرى قائمةً مستقلة.")),
+            new HelpPanelViewModel.Item(T("Contracts", "التعهّدات"), T("A behaviour contract is only in force once both the parent has signed and the student has acknowledged it. One shown as unsigned is not binding on anybody, and is also what feeds keep-apart handling when sections are balanced (BR-DCP-009).", "لا يسري التعهّد السلوكي إلا بتوقيع ولي الأمر وإقرار الطالب معاً. وغير الموقَّع لا يُلزِم أحداً، وهو أيضاً ما يغذّي مراعاة الفصل بين الطلاب عند موازنة الشعب (BR-DCP-009).")),
+        },
+    };
+
+    async Task Section(string titleEn, string titleAr, IReadOnlyList<ActionTrackerViewModel.Row> rows, string icon)
+    {
+        <h2 class="sms-section-title"><i class="bi @icon me-1" aria-hidden="true"></i>@T(titleEn, titleAr) <span class="badge text-bg-light">@rows.Count</span></h2>
+        <div class="sms-card mb-4"><div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@T(titleEn, titleAr)</caption>
+            <thead><tr>
+                <th scope="col">@T("Student", "الطالب")</th>
+                <th scope="col">@T("Consequence", "الإجراء")</th>
+                <th scope="col">@T("Starts", "يبدأ")</th>
+                <th scope="col">@T("Ends", "ينتهي")</th>
+                <th scope="col">@T("State", "الحالة")</th>
+                <th scope="col"></th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in rows)
+            {
+                <tr class="@(row.IsOverdue ? "table-warning" : "")">
+                    <td>
+                        <span class="fw-semibold">@(isRtl ? row.Student.NameAr : row.Student.NameEn)</span>
+                        <span class="text-muted small d-block">@row.Student.StudentNo</span>
+                    </td>
+                    <td>@(isRtl ? row.Consequence.NameAr : row.Consequence.NameEn)</td>
+                    <td>@row.Action.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                    <td>@(row.EndsOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</td>
+                    <td>
+                        @if (row.Action.CompletedAtUtc.HasValue)
+                        {
+                            <span class="badge text-bg-success">@T("served", "نُفِّذ")</span>
+                        }
+                        else if (row.IsOverdue)
+                        {
+                            <span class="badge text-bg-warning">@T("overdue", "متأخّر")</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">@T("in force", "ساري")</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Case" asp-route-id="@row.CaseId">@T("Case", "القضية")</a>
+                        @if (!row.Action.CompletedAtUtc.HasValue)
+                        {
+                            <form method="post" asp-action="CompleteAction" asp-route-id="@row.Action.Id" asp-route-completed="@Model.ShowCompleted" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">@T("Mark served", "تسجيل التنفيذ")</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            @if (rows.Count == 0)
+            {
+                <tr><td colspan="6" class="text-muted text-center py-4">@T("Nothing in force here.", "لا شيء ساري هنا.")</td></tr>
+            }
+            </tbody>
+        </table></div></div>
+    }
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("What was decided, and whether it is actually being carried out.", "ما صدر من قرارات، وهل يُنفَّذ فعلاً.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+<form method="get" class="sms-card p-3 mb-4 d-flex gap-3 align-items-center flex-wrap">
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="completed" name="completed" value="true" checked="@Model.ShowCompleted" />
+        <label class="form-check-label" for="completed">@T("Include actions already served", "إظهار الإجراءات المنفَّذة")</label>
+    </div>
+    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Apply", "تطبيق")</button>
+    <span class="text-muted small ms-auto">@T("As of", "حتى") @Model.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
+</form>
+
+@{ await Section("Suspensions", "الفصل", Model.Suspensions, "bi-door-closed"); }
+@{ await Section("Detentions and community service", "الاحتجاز والخدمة المجتمعية", Model.Detentions, "bi-clock-history"); }
+@{ await Section("Other consequences", "إجراءات أخرى", Model.Other, "bi-list-check"); }
+
+<h2 class="sms-section-title"><i class="bi bi-file-earmark-text me-1" aria-hidden="true"></i>@T("Behaviour contracts", "التعهّدات السلوكية") <span class="badge text-bg-light">@Model.Contracts.Count</span></h2>
+<div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+    <caption class="visually-hidden">@T("Behaviour contracts", "التعهّدات السلوكية")</caption>
+    <thead><tr>
+        <th scope="col">@T("Student", "الطالب")</th>
+        <th scope="col">@T("Terms", "البنود")</th>
+        <th scope="col">@T("Ends", "ينتهي")</th>
+        <th scope="col">@T("Signed", "التوقيع")</th>
+    </tr></thead>
+    <tbody>
+    @foreach (var row in Model.Contracts)
+    {
+        <tr>
+            <td>@(isRtl ? row.Student.NameAr : row.Student.NameEn)</td>
+            <td>@row.Contract.Terms</td>
+            <td>@(row.Contract.EndsOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? T("open-ended", "غير محدّد"))</td>
+            <td>
+                @if (row.FullySigned)
+                {
+                    <span class="badge text-bg-success">@T("in force", "ساري")</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-warning">@T("awaiting signatures", "بانتظار التوقيع")</span>
+                }
+            </td>
+        </tr>
+    }
+    @if (Model.Contracts.Count == 0)
+    {
+        <tr><td colspan="4" class="text-muted text-center py-4">@T("No contracts are in force. Drafting one is not yet available from a screen — the engine supports it and the screen is pending.", "لا تعهّدات سارية. وصياغة تعهّد غير متاحة من شاشة بعد — المحرّك يدعمها والشاشة مؤجَّلة.")</td></tr>
+    }
+    </tbody>
+</table></div></div>

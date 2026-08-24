@@ -114,6 +114,11 @@
                     {
                         <a class="btn btn-sm sms-icon-btn" href="@erpUrl" target="_blank" rel="noopener" title="@erpTitle" aria-label="@erpTitle"><i class="bi bi-building"></i></a>
                     }
+                    @* The approvals inbox belongs to no module (doc 05 §7), so it lives in the top bar
+                       rather than the sidebar. No pending count here on purpose: a badge would cost a
+                       query on every page render, and it belongs with the notification bell when that
+                       lands, not bolted on ahead of it. *@
+                    <a class="btn btn-sm sms-icon-btn" asp-controller="Approvals" asp-action="Index" title="@(isRtl ? "موافقاتي" : "My approvals")" aria-label="@(isRtl ? "موافقاتي" : "My approvals")"><i class="bi bi-inbox" aria-hidden="true"></i></a>
                     <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="@(isRtl ? "المهام الخلفية" : "Background jobs")" aria-label="@(isRtl ? "المهام الخلفية" : "Background jobs")"><i class="bi bi-activity" aria-hidden="true"></i></a>
                     <div class="dropdown">
                         <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@(isRtl ? "حساب المستخدم" : "User menu")">

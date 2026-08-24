@@ -188,6 +188,44 @@ namespace Sms.Infrastructure.Seeding
             new("PRINCIPAL", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Subscriptions, new[] { ActionVerb.Approve }),
             new("PRINCIPAL", ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Safety, new[] { ActionVerb.Approve }),
 
+            // Module 25. BR-DCP-008 makes behaviour data restricted, and BR-DCP-002 makes recording
+            // it wide: those two pull opposite ways, and the split below is where they meet. Any
+            // teacher may record what they saw. Almost nobody may decide what follows from it.
+            //
+            // There is no discipline-officer role among doc 06 §4.3's twenty-one, so the officer's
+            // work lands on the Vice Principal, which is where a school of this size actually puts
+            // it. A school that appoints a dedicated officer makes the role in the role designer and
+            // copies these grants — that is the screen's purpose.
+            new("VICE_PRINCIPAL", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Code, new[] { ActionVerb.View, ActionVerb.Configure }),
+            new("VICE_PRINCIPAL", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Incidents, null),
+            new("VICE_PRINCIPAL", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Cases, null),
+            new("VICE_PRINCIPAL", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Actions, null),
+
+            // Publishing the code to families is the Principal's, and so is every decision the
+            // module reserves — both arrive through the blanket Oversight grant above, which is why
+            // neither is repeated here. Deciding a case needs Approve, and Approve is what Oversight
+            // is.
+
+            // Runs the cases in their stage, cannot rewrite the code they are decided against.
+            new("STAGE_SUPERVISOR", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Code, Read),
+            new("STAGE_SUPERVISOR", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Incidents, null),
+            new("STAGE_SUPERVISOR", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Cases, new[] { ActionVerb.View, ActionVerb.Edit }),
+            new("STAGE_SUPERVISOR", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Actions, null),
+            new("STAGE_SUPERVISOR", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Analytics, Read),
+
+            // BR-DCP-002: records what they witnessed, and reads the code they are recording against.
+            // Deliberately no Cases grant — a teacher who reported an incident is the last person who
+            // should be able to steer the case that follows it (BR-DCP-010's protection cuts both ways).
+            new("TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Code, Read),
+            new("TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Incidents, null),
+
+            // The homeroom teacher additionally sees where their own class stands — BR-DCP-008 names
+            // homeroom as a reader of their own students, and the scope grant is what narrows "own".
+            new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Code, Read),
+            new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Incidents, null),
+            new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Cases, Read),
+            new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Analytics, Read),
+
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, null),

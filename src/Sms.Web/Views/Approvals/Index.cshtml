@@ -1,0 +1,134 @@
+@using System.Globalization
+@using Sms.Domain.Workflow
+@using Sms.Web.Models
+@model ApprovalInboxViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My approvals", "موافقاتي");
+    ViewData["Breadcrumb"] = T("Approvals", "الموافقات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "wf-inbox-help", Title = T("My approvals — help", "موافقاتي — مساعدة"),
+        Intro = T("One queue for every module. What appears here is what your own roles may decide on right now — nothing else in the school is visible from this screen.", "طابور واحد لكل الوحدات. ما يظهر هنا هو ما تستطيع أدوارك البتّ فيه الآن — ولا شيء آخر في المدرسة يظهر من هذه الشاشة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("You cannot approve your own request", "لا تعتمد طلبك بنفسك"), T("Even when your role is the approving one, a request you submitted is never yours to approve (BR-WF-003). It waits for someone else who holds the same role.", "حتى لو كان دورك هو المعتمِد، فالطلب الذي قدّمته أنت لا تعتمده أنت (BR-WF-003). ينتظر شخصاً آخر يحمل الدور نفسه.")),
+            new HelpPanelViewModel.Item(T("Reject ends it, return sends it back", "الرفض ينهي والإعادة تُرجع"), T("A rejected request is finished; a new one must be raised. A returned request goes back to whoever submitted it, to correct and send again — and the number of times that happens is counted. Both always need a reason, and the submitter is told what it was (BR-WF-010).", "الطلب المرفوض منتهٍ، ويلزم تقديم طلب جديد. أما المُعاد فيرجع إلى مقدّمه ليصحّحه ويرسله ثانية — وعدد المرات يُحصى. وكلاهما يحتاج سبباً دائماً، ويُبلَّغ به مقدّم الطلب (BR-WF-010).")),
+            new HelpPanelViewModel.Item(T("Approving may not finish it", "الاعتماد قد لا ينهي الطلب"), T("Some chains have more than one level, and some route by value: a small discount ends with the finance manager, a large one goes on to the principal (BR-WF-005). The state after your decision tells you which happened.", "بعض السلاسل أكثر من مستوى، وبعضها يوجَّه بالقيمة: فالخصم الصغير ينتهي عند المدير المالي، والكبير يمضي إلى المدير (BR-WF-005). والحالة بعد قرارك تخبرك بأيّهما جرى.")),
+            new HelpPanelViewModel.Item(T("Age, not SLA", "المدة لا مؤشر الالتزام"), T("The column shows how long an item has waited. Per-step SLA targets are not configured anywhere yet, so nothing here claims a breach it cannot measure.", "يعرض العمود مدة الانتظار. أما مستهدفات زمن الاستجابة لكل مرحلة فلم تُضبَط بعد في أي مكان، فلا شيء هنا يدّعي تجاوزاً لا يستطيع قياسه.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Everything waiting on a decision from you, across every module — with the reason panel where the decision is made, not on a screen after it.",
+               "كل ما ينتظر قراراً منك في كل الوحدات — ومعه خانة السبب في موضع القرار نفسه، لا في شاشة بعده.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_ApprovalsNav" />
+
+@if (Model.Items.Count == 0)
+{
+    <div class="sms-card">
+        <div class="p-4 text-center">
+            <p class="h5 mb-2"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Nothing is waiting on you.", "لا شيء ينتظر قرارك.")</p>
+            @if (Model.CatalogueCount == 0)
+            {
+                <p class="text-muted mb-0">
+                    @T("This school has no workflow definitions yet, so nothing can be routed for approval at all. Seeding the catalogue is what puts WF-01 to WF-15 in place.",
+                       "لا توجد في هذه المدرسة تعريفات مسارات بعد، فلا شيء يمكن توجيهه للاعتماد أصلاً. وبذر الفهرس هو ما يضع WF-01 إلى WF-15 في مكانها.")
+                </p>
+            }
+            else if (Model.OpenInstanceCount == 0)
+            {
+                <p class="text-muted mb-1">
+                    @string.Format(T("{0} workflows are catalogued and none has been started yet.", "هناك {0} مساراً مفهرساً ولم يبدأ أيٌّ منها بعد."), Model.CatalogueCount)
+                </p>
+                <p class="text-muted mb-0">
+                    @T("A module's approval becomes a request in this queue once that module raises it through the workflow engine rather than by changing a status.",
+                       "تصبح موافقة الوحدة طلباً في هذا الطابور حين ترفعها الوحدة عبر محرّك المسارات بدل تغيير حالة.")
+                    <a asp-action="Catalog">@T("See what is catalogued", "انظر ما هو مفهرس")</a>
+                </p>
+            }
+            else
+            {
+                <p class="text-muted mb-0">
+                    @string.Format(T("{0} request(s) are open elsewhere in the school; none of them is at a step your roles decide.", "هناك {0} طلباً مفتوحاً في مواضع أخرى بالمدرسة، وليس أيٌّ منها في مرحلة تبتّ فيها أدوارك."), Model.OpenInstanceCount)
+                </p>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@ViewData["Title"]</caption>
+            <thead><tr>
+                <th scope="col">@T("Request", "الطلب")</th>
+                <th scope="col">@T("Workflow", "المسار")</th>
+                <th scope="col">@T("State", "الحالة")</th>
+                <th scope="col">@T("Requested by", "مقدّم الطلب")</th>
+                <th scope="col">@T("Waiting", "الانتظار")</th>
+                <th scope="col">@T("Decision", "القرار")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in Model.Items)
+            {
+                <tr>
+                    <td>
+                        <a asp-action="History" asp-route-id="@row.InstanceId">@row.EntityLabel</a>
+                        <div class="small text-muted">#@row.InstanceId</div>
+                    </td>
+                    <td>
+                        @row.WorkflowName
+                        <div class="small text-muted"><code>@row.WorkflowCode</code></div>
+                    </td>
+                    <td><span class="badge text-bg-light border">@row.StateName</span></td>
+                    <td>@(row.RequestedBy ?? T("—", "—"))</td>
+                    <td>
+                        @ApprovalLabels.Age(row.AgeDays, isRtl)
+                        <div class="small text-muted">@row.PendingSinceUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</div>
+                    </td>
+                    <td>
+                        <form method="post" asp-action="Act" asp-route-id="@row.InstanceId" class="d-flex flex-column gap-2" style="min-width:18rem">
+                            <label class="visually-hidden" for="reason-@row.InstanceId">@T("Reason", "السبب")</label>
+                            <input id="reason-@row.InstanceId" name="reason" class="form-control form-control-sm" maxlength="500"
+                                   placeholder="@(row.ApprovalNeedsReason ? T("Reason (required)", "السبب (مطلوب)") : T("Reason — required to reject or return", "السبب — مطلوب للرفض أو الإعادة"))" />
+                            <div class="d-flex gap-1">
+                                @if (row.CanApprove)
+                                {
+                                    <button type="submit" name="action" value="@WorkflowActionType.Approve" class="btn btn-sm btn-success"
+                                            disabled="@row.IsOwnSubmission"
+                                            title="@(row.IsOwnSubmission ? T("You submitted this request (BR-WF-003).", "أنت من قدّم هذا الطلب (BR-WF-003).") : null)">
+                                        <i class="bi bi-check2 me-1" aria-hidden="true"></i>@ApprovalLabels.Action(WorkflowActionType.Approve, isRtl)
+                                    </button>
+                                }
+                                @if (row.CanReturn)
+                                {
+                                    <button type="submit" name="action" value="@WorkflowActionType.Return" class="btn btn-sm btn-outline-warning">
+                                        <i class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></i>@ApprovalLabels.Action(WorkflowActionType.Return, isRtl)
+                                    </button>
+                                }
+                                @if (row.CanReject)
+                                {
+                                    <button type="submit" name="action" value="@WorkflowActionType.Reject" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-x-lg me-1" aria-hidden="true"></i>@ApprovalLabels.Action(WorkflowActionType.Reject, isRtl)
+                                    </button>
+                                }
+                            </div>
+                        </form>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

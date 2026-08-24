@@ -125,7 +125,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -162,7 +162,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 return View(form);
             }
         }
@@ -239,7 +239,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 return View(form);
             }
         }
@@ -257,7 +257,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -288,7 +288,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Details), new { id });
@@ -311,7 +311,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Details), new { id });

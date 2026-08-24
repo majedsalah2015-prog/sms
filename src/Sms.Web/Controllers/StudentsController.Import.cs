@@ -81,7 +81,7 @@ namespace Sms.Web.Controllers
                 }
             }
             catch (OdbcException ex) { TempData["Error"] = Explain(ex); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return View(nameof(Import), await BuildImportAsync(m));
         }
@@ -119,7 +119,7 @@ namespace Sms.Web.Controllers
                 }
             }
             catch (OdbcException ex) { TempData["Error"] = Explain(ex); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return View(nameof(Import), await BuildImportAsync(form));
         }
@@ -171,7 +171,7 @@ namespace Sms.Web.Controllers
                         // One bad row does not stop the register: it is counted, named, and the rest
                         // go in. A half-finished import that reported success would be worse.
                         skipped++;
-                        if (failed.Count < 5) { failed.Add($"#{candidate.Number} {candidate.FirstName} {candidate.FamilyName} — {ex.Message}"); }
+                        if (failed.Count < 5) { failed.Add($"#{candidate.Number} {candidate.FirstName} {candidate.FamilyName} — {UserMessage.For(ex, IsArabic)}"); }
                     }
                 }
 
@@ -185,7 +185,7 @@ namespace Sms.Web.Controllers
                 return RedirectToAction(nameof(Index));
             }
             catch (OdbcException ex) { TempData["Error"] = Explain(ex); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return View(nameof(Import), await BuildImportAsync(form));
         }
@@ -220,7 +220,7 @@ namespace Sms.Web.Controllers
 
         private string Explain(OdbcException ex) => AccessRegisterReader.IsMissingDriver(ex)
             ? AccessRegisterReader.MissingDriverMessage(IsArabic)
-            : T("The Access file could not be read: ", "تعذّرت قراءة ملف أكسس: ") + ex.Message;
+            : T("The Access file could not be read: ", "تعذّرت قراءة ملف أكسس: ") + UserMessage.For(ex, IsArabic);
 
         /// <summary>
         /// Fills any mapping the operator has not chosen, by looking for the column names Arabic

@@ -124,6 +124,9 @@ namespace Sms.Web.Models
         public const string TeacherLoad = "DSH-TCH-001";
         public const string Restricted = "DSH-DIS-001";
 
+        /// <summary>doc/Modules/01 §11 — the Sys Admin dashboard's setup-completeness figure.</summary>
+        public const string SetupCompleteness = "DSH-SET-001";
+
         public static readonly IReadOnlyList<DashboardPanel> All = new[]
         {
             new DashboardPanel(Attendance, "ATT", "Attendance today", "حضور اليوم", "bi-check2-square", WidgetRefreshClass.Cached15Min, false, false, "col-xl-7", "Attendance", "Index"),
@@ -132,6 +135,7 @@ namespace Sms.Web.Models
             new DashboardPanel(Collections, "INS", "Collection calendar", "تقويم التحصيل", "bi-calendar-check", WidgetRefreshClass.Daily, false, false, "col-xl-5", "Installments", "Family"),
             new DashboardPanel(Seats, "GRD", "Seats and pipeline", "المقاعد وخط القبول", "bi-layers", WidgetRefreshClass.Daily, false, false, "col-xl-7", "Grades", "Index"),
             new DashboardPanel(TeacherLoad, "TCH", "Teacher load", "نصاب المعلمين", "bi-person-workspace", WidgetRefreshClass.Daily, false, false, "col-xl-5", "Teachers", "Load"),
+            new DashboardPanel(SetupCompleteness, "SET", "Setup completeness", "اكتمال الإعداد", "bi-list-check", WidgetRefreshClass.Live, false, false, "col-xl-5", "Setup", "Index"),
             new DashboardPanel(Restricted, "DIS", "Restricted categories", "الفئات المقيَّدة", "bi-shield-lock", WidgetRefreshClass.Live, false, true, "col-xl-12"),
         };
 
@@ -198,6 +202,8 @@ namespace Sms.Web.Models
         public TeacherLoadView? TeacherLoad { get; set; }
 
         public RestrictedView? Restricted { get; set; }
+
+        public SetupCompletenessView? Setup { get; set; }
 
         /// <summary>
         /// True when a snapshot-backed panel rendered and not one of them carries an
@@ -284,6 +290,26 @@ namespace Sms.Web.Models
 
     /// <summary>BR-DSH-007: null means the real count was below the threshold and is masked, not that it was zero.</summary>
     public sealed record RestrictedView(int? ClinicVisitsToday, int? OpenDisciplineCases, int Threshold);
+
+    /// <summary>
+    /// doc/Modules/01 §11. The one figure on this dashboard that is about the
+    /// product's own readiness rather than the school's day: how much of the setup
+    /// wizard is done, and which mandatory step is still holding the first academic
+    /// year shut (BR-SET-003). It reads live because it changes by hand, not by
+    /// snapshot, and because a stale "83%" is worse than none.
+    /// </summary>
+    public sealed record SetupCompletenessView(
+        int Percent,
+        int MandatoryTotal,
+        int MandatoryDone,
+        bool IsDeclaredComplete,
+        DateTime? DeclaredAtUtc,
+        IReadOnlyList<SetupPendingStepView> Pending);
+
+    public sealed record SetupPendingStepView(string Code, string TitleEn, string TitleAr)
+    {
+        public string Title(bool ar) => ar ? TitleAr : TitleEn;
+    }
 
     // ---- §8.2 Layout administrator — widget registry half (BR-DSH-001) ----
 

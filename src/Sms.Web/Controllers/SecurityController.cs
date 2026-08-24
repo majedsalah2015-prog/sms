@@ -26,6 +26,8 @@ namespace Sms.Web.Controllers
     [Route("security")]
     public class SecurityController : Controller
     {
+        private static bool IsArabic => System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+
         private readonly ISecurityAdmin _security;
         private readonly IAuditContext _audit;
 
@@ -73,7 +75,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Index));
             }
         }
@@ -91,7 +93,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Role), new { id });
@@ -109,7 +111,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -126,7 +128,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index), new { includeInactive = true });
@@ -150,7 +152,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Role), new { id });
@@ -178,7 +180,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Users), new { q });
@@ -195,7 +197,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Users), new { q });

@@ -87,7 +87,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DefineSubjectAsync(form.Code!.Trim().ToUpperInvariant(), form.NameAr!, form.NameEn!, form.Category ?? "core", form.DepartmentId);
                 TempData["Flash"] = T("Subject created.", "تم إنشاء المادة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { tab = "catalog" });
         }
 
@@ -149,7 +149,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DefineDepartmentAsync(form.DeptNameAr!, form.DeptNameEn!, form.HeadTeacherUserId);
                 TempData["Flash"] = T("Department created.", "تم إنشاء القسم.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { tab = "departments" });
         }
 
@@ -184,7 +184,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Departments = await _db.Departments.AsNoTracking().OrderBy(d => d.Name.NameEn).ToListAsync();
                 form.CurrentOfferings = await _db.CurriculumOfferings.CountAsync(o => o.SubjectId == id && o.EffectiveToUtc == null);
                 return View(form);
@@ -201,7 +201,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DeactivateSubjectAsync(id);
                 TempData["Flash"] = T("Subject removed (deactivated; history kept).", "تم حذف المادة (إلغاء تفعيل مع حفظ السجل).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { tab = "catalog" });
         }
 
@@ -234,7 +234,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Teachers = await TeacherOptionsAsync();
                 form.SubjectCount = await _db.Subjects.CountAsync(s => s.DepartmentId == id);
                 return View(form);
@@ -251,7 +251,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DeactivateDepartmentAsync(id);
                 TempData["Flash"] = T("Department removed (deactivated).", "تم حذف القسم (إلغاء تفعيل).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { tab = "departments" });
         }
 
@@ -266,7 +266,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DefineQualificationAsync(form.QTeacherUserId.Value, form.QSubjectId.Value, form.QStageId, form.QSource);
                 TempData["Flash"] = T("Qualification recorded (BR-SUB-006).", "تم تسجيل التأهيل (BR-SUB-006).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { tab = "matrix" });
         }
 
@@ -292,7 +292,7 @@ namespace Sms.Web.Controllers
                 await _subjects.DefineOfferingAsync(profile, form.SubjectId.Value, form.WeeklyPeriods ?? 1, form.IsAssessable, form.GpaWeight ?? 0m, form.IsElective, string.IsNullOrWhiteSpace(form.ElectiveGroupTag) ? null : form.ElectiveGroupTag.Trim(), yr.StartDate);
                 TempData["Flash"] = T("Offering added.", "تمت إضافة المادة للخطة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Plan), new { year, profile, slots });
         }
 
@@ -307,7 +307,7 @@ namespace Sms.Web.Controllers
                 await _subjects.EndDateOfferingAsync(id, effectiveTo ?? yr.EndDate);
                 TempData["Flash"] = T("Offering end-dated (BR-SUB-004: never removed).", "تم إنهاء المادة بتاريخ (BR-SUB-004: لا تُحذف).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Plan), new { year, profile, slots });
         }
 
@@ -330,7 +330,7 @@ namespace Sms.Web.Controllers
 
                 TempData["Flash"] = T($"{copied} offering(s) copied.", $"تم نسخ {copied} مادة/مواد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message + (copied > 0 ? T($" ({copied} copied before the error.)", $" (نُسخت {copied} قبل الخطأ.)") : ""); }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic) + (copied > 0 ? T($" ({copied} copied before the error.)", $" (نُسخت {copied} قبل الخطأ.)") : ""); }
             return RedirectToAction(nameof(Plan), new { year, profile, slots });
         }
 

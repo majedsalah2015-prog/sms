@@ -1,0 +1,18 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? string.Empty;
+
+    // "History" is the detail screen of the inbox; it keeps the inbox tab marked so a
+    // person reading one request's trail still knows which part of the app they are in.
+    bool On(params string[] actions) => actions.Any(a => string.Equals(a, action, StringComparison.OrdinalIgnoreCase));
+}
+
+<nav class="mb-3" aria-label="@T("Approval sections", "أقسام الموافقات")">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><a class="nav-link @(On("Index", "History") ? "active" : "")" asp-action="Index"><i class="bi bi-inbox me-1" aria-hidden="true"></i>@T("My approvals", "موافقاتي")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Mine") ? "active" : "")" asp-action="Mine"><i class="bi bi-send me-1" aria-hidden="true"></i>@T("My requests", "طلباتي")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Catalog") ? "active" : "")" asp-action="Catalog"><i class="bi bi-diagram-2 me-1" aria-hidden="true"></i>@T("Workflow catalogue", "فهرس المسارات")</a></li>
+    </ul>
+</nav>

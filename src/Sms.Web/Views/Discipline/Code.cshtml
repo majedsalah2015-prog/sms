@@ -1,0 +1,382 @@
+@using System.Globalization
+@using Sms.Domain.Discipline
+@using Sms.Web.Models
+@model BehaviorCodeViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Behaviour code", "لائحة السلوك");
+    ViewData["Breadcrumb"] = T("Behaviour / Code", "السلوك / اللائحة");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-code-help", Title = T("Behaviour code — help", "لائحة السلوك — مساعدة"),
+        Intro = T("The code is what every incident is judged against: the violations and their levels, the merits, the consequences available, and the ladder that proposes one from the other. It is versioned per year and never edited in place (BR-DCP-001).", "اللائحة هي ما تُقاس عليه كل مخالفة: المخالفات ومستوياتها، والتميّز، والإجراءات المتاحة، والسلّم الذي يقترح أحدها من الآخر. وهي مُصدَّرة لكل عام ولا تُعدَّل في مكانها أبداً (BR-DCP-001)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Why saving makes a new version", "لماذا يُنشئ الحفظ نسخة جديدة"), T("An incident already recorded was judged against the text that stood that day, and that text has to stay readable — a school that later softens an article must not appear to have judged a child under the softer one. So saving supersedes the current version rather than overwriting it, and the old one stays.", "المخالفة المسجَّلة سابقاً حُوكمت بالنص القائم يومها، وذلك النص يجب أن يبقى مقروءاً — فالمدرسة التي تخفّف مادةً لاحقاً لا ينبغي أن تبدو وكأنها حاكمت طفلاً بالمخفَّفة. لذلك يُحلّ الحفظ نسخة محلّ الحالية ولا يمحوها، وتبقى القديمة.")),
+            new HelpPanelViewModel.Item(T("The ladder", "السلّم"), T("For each level and each repetition, the ladder names the consequence the code proposes. It is a proposal, not a rule: a decider may go lighter with a written reason, and heavier only with the Principal (BR-DCP-005).", "لكل مستوى ولكل تكرار يسمّي السلّم الإجراء الذي تقترحه اللائحة. وهو اقتراح لا قاعدة: للمقرِّر أن يخفّف بسبب مكتوب، وأن يشدّد بالمدير فقط (BR-DCP-005).")),
+            new HelpPanelViewModel.Item(T("The suspension cap", "سقف الفصل"), T("The maximum suspension days is the regulation's limit, not the school's preference — the engine refuses a longer suspension outright (BR-DCP-004). Leave it empty only if no legal cap applies.", "الحدّ الأقصى لأيام الفصل هو حدّ النظام لا تفضيل المدرسة — والمحرّك يرفض فصلاً أطول رفضاً قاطعاً (BR-DCP-004). ولا تتركه فارغاً إلا إن لم يكن ثمّة سقف نظامي.")),
+            new HelpPanelViewModel.Item(T("What cannot be entered", "ما لا يمكن إدخاله"), T("Corporal punishment is not in the consequence kinds and cannot be added — the system has no way to represent it, deliberately. In-school and external suspension are always treated as suspension-class whatever the checkbox says, so the Principal gate and the cap cannot be cleared by mistake.", "العقاب البدني ليس ضمن أنواع الإجراءات ولا يمكن إضافته — فالنظام لا سبيل لديه لتمثيله، قصداً. والفصل الداخلي والخارجي يُعامَلان دائماً كفصل مهما قال المربّع، فلا يسقط شرط المدير ولا السقف سهواً.")),
+            new HelpPanelViewModel.Item(T("Publishing", "النشر"), T("Defining the code and publishing it are separate acts by separate people. Publishing is what puts the handbook in front of families, and families cannot be held to a code they were never shown.", "تعريف اللائحة ونشرها فعلان منفصلان لشخصين مختلفين. والنشر هو ما يضع الدليل أمام أولياء الأمور، ولا يُلزَم أولياء الأمور بلائحة لم تُعرض عليهم.")),
+        },
+    };
+
+    var violationRows = Model.Violations.Count + BehaviorCodeViewModel.BlankRows;
+    var meritRows = Model.Merits.Count + BehaviorCodeViewModel.BlankRows;
+    var consequenceRows = Model.Consequences.Count + BehaviorCodeViewModel.BlankRows;
+    var consequenceList = Model.Consequences.ToList();
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Every incident, every case and every consequence in this module reads back to a row on this page. Nothing can be recorded against a rule that is not written here.",
+               "كل مخالفة وكل قضية وكل إجراء في هذه الوحدة يعود إلى سطر في هذه الصفحة. ولا يُسجَّل شيء استناداً إلى قاعدة غير مكتوبة هنا.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+@if (Model.Active == null)
+{
+    <div class="alert alert-info" role="alert">
+        @T("No behaviour code exists for this year. Nothing can be recorded until one does — fill the form below.",
+           "لا توجد لائحة سلوك لهذا العام. ولا يُسجَّل شيء حتى توجد — املأ النموذج أدناه.")
+    </div>
+}
+else
+{
+    <div class="sms-card p-3 mb-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h2 class="h5 mb-1">@(isRtl ? Model.Active.NameAr : Model.Active.NameEn)</h2>
+                <p class="text-muted small mb-0">
+                    @T("Version", "النسخة") @Model.Active.Version ·
+                    @T("appeal window", "مهلة التظلّم") @Model.Active.AppealWindowDays @T("days", "يوماً") ·
+                    @(Model.Active.MaxSuspensionDays.HasValue
+                        ? T($"suspension cap {Model.Active.MaxSuspensionDays} days", $"سقف الفصل {Model.Active.MaxSuspensionDays} يوماً")
+                        : T("no suspension cap", "بلا سقف للفصل")) ·
+                    @T("incidents judged under it", "مخالفات حُكمت بها"): @Model.IncidentsRecorded
+                </p>
+            </div>
+            <div>
+                @if (Model.Active.IsPublished)
+                {
+                    <span class="badge text-bg-success">@T("published to families", "منشورة لأولياء الأمور")</span>
+                }
+                else
+                {
+                    <form method="post" asp-action="PublishCode" asp-route-id="@Model.Active.Id" class="d-inline">
+                        <button type="submit" class="btn btn-sm btn-primary">@T("Publish to families", "نشر لأولياء الأمور")</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-6">
+            <h2 class="sms-section-title">@T("Violations", "المخالفات")</h2>
+            <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Violations in the current code", "المخالفات في اللائحة الحالية")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Article", "المادة")</th>
+                    <th scope="col">@T("Violation", "المخالفة")</th>
+                    <th scope="col">@T("Level", "المستوى")</th>
+                    <th scope="col" class="text-center">@T("Points", "النقاط")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var v in Model.Violations)
+                {
+                    <tr>
+                        <td class="text-muted">@v.ArticleRef</td>
+                        <td>@(isRtl ? v.NameAr : v.NameEn)</td>
+                        <td><span class="badge @DisciplineLabels.SeverityClass(v.Severity)">@DisciplineLabels.Severity(v.Severity, isRtl)</span></td>
+                        <td class="text-center">@v.Points</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div></div>
+        </div>
+
+        <div class="col-12 col-lg-6">
+            <h2 class="sms-section-title">@T("Consequences", "الإجراءات")</h2>
+            <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Consequences in the current code", "الإجراءات في اللائحة الحالية")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Consequence", "الإجراء")</th>
+                    <th scope="col">@T("Kind", "النوع")</th>
+                    <th scope="col" class="text-center">@T("Rank", "الترتيب")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var c in Model.Consequences)
+                {
+                    <tr>
+                        <td>
+                            @(isRtl ? c.NameAr : c.NameEn)
+                            @if (c.IsSuspensionClass)
+                            {
+                                <span class="badge text-bg-dark ms-1">@T("suspension", "فصل")</span>
+                            }
+                        </td>
+                        <td class="text-muted">@DisciplineLabels.ConsequenceKind(c.Kind, isRtl)</td>
+                        <td class="text-center">@c.SeverityRank</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div></div>
+
+            @if (Model.Merits.Count > 0)
+            {
+                <h2 class="sms-section-title mt-4">@T("Merits", "أنواع التميّز")</h2>
+                <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+                    <caption class="visually-hidden">@T("Merits in the current code", "أنواع التميّز في اللائحة الحالية")</caption>
+                    <thead><tr>
+                        <th scope="col">@T("Merit", "التميّز")</th>
+                        <th scope="col" class="text-center">@T("Points", "النقاط")</th>
+                        <th scope="col" class="text-center">@T("Max per award", "الحد الأقصى للمنحة")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var m in Model.Merits)
+                    {
+                        <tr><td>@(isRtl ? m.NameAr : m.NameEn)</td><td class="text-center">@m.Points</td><td class="text-center">@m.MaxPointsPerAward</td></tr>
+                    }
+                    </tbody>
+                </table></div></div>
+            }
+        </div>
+    </div>
+
+    <h2 class="sms-section-title">@T("The ladder", "السلّم")</h2>
+    <div class="sms-card mb-4"><div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Proposed consequence per level and repetition", "الإجراء المقترح لكل مستوى وتكرار")</caption>
+        <thead><tr>
+            <th scope="col">@T("Level", "المستوى")</th>
+            @for (var r = 1; r <= BehaviorCodeViewModel.MaxRepetition; r++)
+            {
+                <th scope="col">@T($"Occurrence {r}", $"المرة {r}")@(r == BehaviorCodeViewModel.MaxRepetition ? "+" : "")</th>
+            }
+        </tr></thead>
+        <tbody>
+        @for (var s = 1; s <= BehaviorCodeViewModel.MaxSeverity; s++)
+        {
+            <tr>
+                <th scope="row"><span class="badge @DisciplineLabels.SeverityClass(s)">@DisciplineLabels.Severity(s, isRtl)</span></th>
+                @for (var r = 1; r <= BehaviorCodeViewModel.MaxRepetition; r++)
+                {
+                    <td>
+                        @if (Model.Ladder.TryGetValue((s, r), out var step))
+                        {
+                            @(isRtl ? step.NameAr : step.NameEn)
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table></div></div>
+}
+
+<h2 class="sms-section-title">@(Model.Active == null ? T("Define the code", "تعريف اللائحة") : T("Supersede with a new version", "إحلال نسخة جديدة"))</h2>
+<div class="sms-card p-3">
+    <p class="text-muted small">
+        @T("The form arrives holding the current version, so changing one article does not mean retyping the code. Empty rows are ignored; clearing a row removes it from the new version. Saving retires the current version and starts the next.",
+           "يصل النموذج حاملاً النسخة الحالية، فتغيير مادة واحدة لا يعني إعادة كتابة اللائحة. وتُتجاهَل الأسطر الفارغة؛ وإفراغ سطر يحذفه من النسخة الجديدة. والحفظ يُقاعِد النسخة الحالية ويبدأ التالية.")
+    </p>
+
+    <form method="post" asp-action="DefineCode">
+        <div class="row g-2 mb-3">
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="nameAr">@T("Name (Arabic)", "الاسم بالعربية")</label>
+                <input id="nameAr" name="nameAr" class="form-control" value="@Model.Active?.NameAr" required />
+            </div>
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="nameEn">@T("Name (English)", "الاسم بالإنجليزية")</label>
+                <input id="nameEn" name="nameEn" class="form-control" value="@Model.Active?.NameEn" required />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="maxSusp">@T("Suspension cap (days)", "سقف الفصل بالأيام")</label>
+                <input id="maxSusp" type="number" min="1" name="maxSuspensionDays" class="form-control" value="@Model.Active?.MaxSuspensionDays" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label" for="appealWin">@T("Appeal window (days)", "مهلة التظلّم بالأيام")</label>
+                <input id="appealWin" type="number" min="1" name="appealWindowDays" class="form-control" value="@(Model.Active?.AppealWindowDays ?? 7)" required />
+            </div>
+        </div>
+
+        <h3 class="h6 mt-4">@T("Violations", "المخالفات")</h3>
+        <div class="table-responsive"><table class="table table-sm align-middle">
+            <caption class="visually-hidden">@T("Violation rows for the new version", "أسطر المخالفات للنسخة الجديدة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Article", "المادة")</th>
+                <th scope="col">@T("Arabic name", "الاسم بالعربية")</th>
+                <th scope="col">@T("English name", "الاسم بالإنجليزية")</th>
+                <th scope="col">@T("Level", "المستوى")</th>
+                <th scope="col">@T("Points", "النقاط")</th>
+            </tr></thead>
+            <tbody>
+            @for (var i = 0; i < violationRows; i++)
+            {
+                var row = i < Model.Violations.Count ? Model.Violations[i] : null;
+                <tr>
+                    <td><input name="vArticle" class="form-control form-control-sm" value="@row?.ArticleRef" aria-label="@T("Article", "المادة")" /></td>
+                    <td><input name="vNameAr" class="form-control form-control-sm" value="@row?.NameAr" aria-label="@T("Arabic name", "الاسم بالعربية")" /></td>
+                    <td><input name="vNameEn" class="form-control form-control-sm" value="@row?.NameEn" aria-label="@T("English name", "الاسم بالإنجليزية")" /></td>
+                    <td>
+                        <select name="vSeverity" class="form-select form-select-sm" aria-label="@T("Level", "المستوى")">
+                            @for (var s = 1; s <= BehaviorCodeViewModel.MaxSeverity; s++)
+                            {
+                                <option value="@s" selected="@(row != null && row.Severity == s)">@s — @DisciplineLabels.Severity(s, isRtl)</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input name="vPoints" type="number" min="0" class="form-control form-control-sm" value="@(row?.Points ?? 0)" aria-label="@T("Points", "النقاط")" /></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+
+        <h3 class="h6 mt-4">@T("Consequences", "الإجراءات")</h3>
+        <div class="table-responsive"><table class="table table-sm align-middle">
+            <caption class="visually-hidden">@T("Consequence rows for the new version", "أسطر الإجراءات للنسخة الجديدة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Kind", "النوع")</th>
+                <th scope="col">@T("Arabic name", "الاسم بالعربية")</th>
+                <th scope="col">@T("English name", "الاسم بالإنجليزية")</th>
+                <th scope="col">@T("Rank", "الترتيب")</th>
+                <th scope="col">@T("Suspension", "فصل")</th>
+            </tr></thead>
+            <tbody>
+            @for (var i = 0; i < consequenceRows; i++)
+            {
+                var row = i < Model.Consequences.Count ? Model.Consequences[i] : null;
+                <tr>
+                    <td>
+                        <select name="cKind" class="form-select form-select-sm" aria-label="@T("Kind", "النوع")">
+                            @foreach (ConsequenceKind k in Enum.GetValues(typeof(ConsequenceKind)))
+                            {
+                                <option value="@k" selected="@(row != null && row.Kind == k)">@DisciplineLabels.ConsequenceKind(k, isRtl)</option>
+                            }
+                        </select>
+                    </td>
+                    <td><input name="cNameAr" class="form-control form-control-sm" value="@row?.NameAr" aria-label="@T("Arabic name", "الاسم بالعربية")" /></td>
+                    <td><input name="cNameEn" class="form-control form-control-sm" value="@row?.NameEn" aria-label="@T("English name", "الاسم بالإنجليزية")" /></td>
+                    <td><input name="cRank" type="number" min="1" class="form-control form-control-sm" value="@(row?.SeverityRank ?? i + 1)" aria-label="@T("Rank", "الترتيب")" /></td>
+                    <td>
+                        @* A select, not a checkbox: an unchecked checkbox posts nothing, which would
+                           shift every later row's flag onto the wrong consequence. *@
+                        <select name="cSuspension" class="form-select form-select-sm" aria-label="@T("Suspension", "فصل")">
+                            <option value="false" selected="@(!(row?.IsSuspensionClass ?? false))">@T("no", "لا")</option>
+                            <option value="true" selected="@(row?.IsSuspensionClass ?? false)">@T("yes", "نعم")</option>
+                        </select>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+        <p class="form-text">
+            @T("The suspension flag is derived from the kind — in-school and external suspension are always suspension-class, so the Principal gate and the regulation's cap cannot be dropped here (BR-DCP-004).",
+               "تُشتَقّ صفة الفصل من النوع — فالفصل الداخلي والخارجي فصل دائماً، ولا يسقط هنا شرط المدير ولا سقف النظام (BR-DCP-004).")
+        </p>
+
+        <h3 class="h6 mt-4">@T("Merits", "أنواع التميّز")</h3>
+        <div class="table-responsive"><table class="table table-sm align-middle">
+            <caption class="visually-hidden">@T("Merit rows for the new version", "أسطر التميّز للنسخة الجديدة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Arabic name", "الاسم بالعربية")</th>
+                <th scope="col">@T("English name", "الاسم بالإنجليزية")</th>
+                <th scope="col">@T("Points", "النقاط")</th>
+                <th scope="col">@T("Max per award", "الحد الأقصى للمنحة")</th>
+            </tr></thead>
+            <tbody>
+            @for (var i = 0; i < meritRows; i++)
+            {
+                var row = i < Model.Merits.Count ? Model.Merits[i] : null;
+                <tr>
+                    <td><input name="mNameAr" class="form-control form-control-sm" value="@row?.NameAr" aria-label="@T("Arabic name", "الاسم بالعربية")" /></td>
+                    <td><input name="mNameEn" class="form-control form-control-sm" value="@row?.NameEn" aria-label="@T("English name", "الاسم بالإنجليزية")" /></td>
+                    <td><input name="mPoints" type="number" min="1" class="form-control form-control-sm" value="@(row?.Points ?? 1)" aria-label="@T("Points", "النقاط")" /></td>
+                    <td><input name="mMax" type="number" min="1" class="form-control form-control-sm" value="@(row?.MaxPointsPerAward ?? 1)" aria-label="@T("Max per award", "الحد الأقصى للمنحة")" /></td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+
+        <h3 class="h6 mt-4">@T("The ladder", "السلّم")</h3>
+        <p class="form-text">
+            @T("Each cell names the consequence proposed for that level at that occurrence, by its row number in the consequence table above.",
+               "تسمّي كل خانة الإجراء المقترح لذلك المستوى في تلك المرة، برقم سطره في جدول الإجراءات أعلاه.")
+        </p>
+        <div class="table-responsive"><table class="table table-sm align-middle">
+            <caption class="visually-hidden">@T("Ladder grid for the new version", "شبكة السلّم للنسخة الجديدة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Level", "المستوى")</th>
+                @for (var r = 1; r <= BehaviorCodeViewModel.MaxRepetition; r++)
+                {
+                    <th scope="col">@T($"Occurrence {r}", $"المرة {r}")@(r == BehaviorCodeViewModel.MaxRepetition ? "+" : "")</th>
+                }
+            </tr></thead>
+            <tbody>
+            @for (var s = 1; s <= BehaviorCodeViewModel.MaxSeverity; s++)
+            {
+                <tr>
+                    <th scope="row"><span class="badge @DisciplineLabels.SeverityClass(s)">@DisciplineLabels.Severity(s, isRtl)</span></th>
+                    @for (var r = 1; r <= BehaviorCodeViewModel.MaxRepetition; r++)
+                    {
+                        var current = Model.Ladder.TryGetValue((s, r), out var step) ? step : null;
+                        var currentIndex = current == null ? -1 : consequenceList.FindIndex(x => x.Id == current.Id);
+                        <td>
+                            <select name="ladder" class="form-select form-select-sm" aria-label="@T($"Level {s}, occurrence {r}", $"المستوى {s}، المرة {r}")">
+                                <option value="-1" selected="@(currentIndex < 0)">@T("— none —", "— لا شيء —")</option>
+                                @for (var i = 0; i < consequenceRows; i++)
+                                {
+                                    var label = i < Model.Consequences.Count
+                                        ? (isRtl ? Model.Consequences[i].NameAr : Model.Consequences[i].NameEn)
+                                        : T($"row {i + 1}", $"السطر {i + 1}");
+                                    <option value="@i" selected="@(currentIndex == i)">@label</option>
+                                }
+                            </select>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table></div>
+
+        <button type="submit" class="btn btn-primary mt-3">
+            @(Model.Active == null ? T("Define the code", "تعريف اللائحة") : T("Save as a new version", "الحفظ كنسخة جديدة"))
+        </button>
+    </form>
+</div>
+
+@if (Model.Versions.Count > 1)
+{
+    <h2 class="sms-section-title mt-4">@T("Earlier versions", "النسخ السابقة")</h2>
+    <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Earlier versions of the behaviour code", "النسخ السابقة من لائحة السلوك")</caption>
+        <thead><tr>
+            <th scope="col">@T("Version", "النسخة")</th>
+            <th scope="col">@T("Name", "الاسم")</th>
+            <th scope="col">@T("Published", "منشورة")</th>
+            <th scope="col">@T("State", "الحالة")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var v in Model.Versions)
+        {
+            <tr class="@(v.IsActive ? "" : "text-muted")">
+                <td>@v.Version</td>
+                <td>@(isRtl ? v.NameAr : v.NameEn)</td>
+                <td>@(v.IsPublished ? T("yes", "نعم") : T("no", "لا"))</td>
+                <td>@(v.IsActive ? T("current", "الحالية") : T("superseded", "مُحَلّ محلّها"))</td>
+            </tr>
+        }
+        </tbody>
+    </table></div></div>
+}

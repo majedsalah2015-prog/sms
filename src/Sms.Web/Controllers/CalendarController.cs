@@ -97,7 +97,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index), new { year = form.AcademicYearId });
@@ -134,7 +134,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index), new { year = form.AcademicYearId });
@@ -152,7 +152,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index), new { year = academicYearId });

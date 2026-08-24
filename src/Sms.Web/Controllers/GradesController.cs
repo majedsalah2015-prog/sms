@@ -59,7 +59,7 @@ namespace Sms.Web.Controllers
                 await _grades.DefineStageAsync(form.StageNameAr!, form.StageNameEn!, form.StageOrder ?? 1, form.StageGender);
                 TempData["Flash"] = T("Stage created.", "تم إنشاء المرحلة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -77,7 +77,7 @@ namespace Sms.Web.Controllers
                 await _grades.DefineGradeLevelAsync(form.GradeStageId.Value, form.GradeCode!.Trim(), form.GradeNameAr!, form.GradeNameEn!, form.GradeOrder ?? 1, form.PromotionTargetId, form.IsGraduating);
                 TempData["Flash"] = T("Grade created.", "تم إنشاء الصف.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -91,7 +91,7 @@ namespace Sms.Web.Controllers
                 await _grades.SetPromotionPathAsync(id, target, graduating);
                 TempData["Flash"] = T("Promotion path updated.", "تم تحديث مسار الترفيع.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -108,7 +108,7 @@ namespace Sms.Web.Controllers
                     form.CurriculumId, form.MinAge, form.MaxAge, form.AgeCutoff);
                 TempData["Flash"] = T("Grade-year profile saved.", "تم حفظ ملف الصف السنوي.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -143,7 +143,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.GradeCount = await _db.GradeLevels.CountAsync(g => g.StageId == id);
                 return View(form);
             }
@@ -159,7 +159,7 @@ namespace Sms.Web.Controllers
                 await _grades.DeactivateStageAsync(id);
                 TempData["Flash"] = T("Stage removed (deactivated).", "تم حذف المرحلة (إلغاء تفعيل).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -194,7 +194,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Stages = await _db.Stages.AsNoTracking().OrderBy(s => s.SequenceOrder).ToListAsync();
                 return View(form);
             }
@@ -210,7 +210,7 @@ namespace Sms.Web.Controllers
                 await _grades.DeactivateGradeLevelAsync(id);
                 TempData["Flash"] = T("Grade removed (deactivated, BR-GRD-007).", "تم حذف الصف (إلغاء تفعيل، BR-GRD-007).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -224,7 +224,7 @@ namespace Sms.Web.Controllers
                 await _grades.RemoveGradeYearProfileAsync(id);
                 TempData["Flash"] = T("Grade-year profile removed.", "تم حذف ملف الصف السنوي.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 

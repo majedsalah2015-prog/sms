@@ -60,7 +60,7 @@ namespace Sms.Web.Navigation
             // Services
             M("TRN", "23", "Transportation", "النقل المدرسي", "bi-bus-front", "services", "E-501", "23-Transportation.md", "Transport", "Index"),
             M("HLT", "24", "Health", "الصحة المدرسية", "bi-heart-pulse", "services", "E-502", "24-Health.md"),
-            M("DIS", "25", "Discipline", "السلوك والانضباط", "bi-shield-exclamation", "services", "E-503", "25-Discipline.md"),
+            M("DIS", "25", "Discipline", "السلوك والانضباط", "bi-shield-exclamation", "services", "E-503", "25-Discipline.md", "Discipline", "Index"),
             M("LIB", "26", "Library", "المكتبة", "bi-book", "services", "E-601", "26-Library.md"),
             M("CAF", "27", "Cafeteria", "المقصف", "bi-cup-hot", "services", "E-602", "27-Cafeteria.md", "Cafeteria", "Index"),
             M("STO", "28", "School Store", "المتجر المدرسي", "bi-bag", "services", "E-603", "28-School-Store.md"),

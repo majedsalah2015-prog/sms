@@ -5,57 +5,287 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Signatories", "الموقّعون");
     ViewData["Breadcrumb"] = T("Schools / Signatories", "المدارس / الموقّعون");
+    var total = SignatoriesViewModel.DocumentClasses.Length;
+    var covered = Model.CoveredClasses;
+    var coveragePercent = total == 0 ? 0 : (int)Math.Round(covered * 100.0 / total);
+
     var help = new HelpPanelViewModel
     {
         Id = "school-signatories-help",
         Title = T("Signatories — help", "الموقّعون — مساعدة"),
-        Intro = T("Who signs each class of official document, and from when (doc/Modules/02 §8, BR-SCH-004). This is a history, not a setting: the table keeps every signatory the school has ever had, because a document reissued in 2030 must carry the name that was in force on its original issue date.", "من يوقّع كل فئة من المستندات الرسمية، ومنذ متى (الوثيقة 02 §8، BR-SCH-004). وهذا سجل تاريخي لا إعداد: يحتفظ الجدول بكل موقّع مرّ على المدرسة، لأن مستنداً يُعاد إصداره عام 2030 يجب أن يحمل الاسم الساري في تاريخ إصداره الأصلي."),
+        Intro = T("Who signs each class of official document, and from when (doc/Modules/02 §8.2, BR-SCH-004). This is a history, not a setting: the table keeps every signatory the school has ever had, because a document reissued in 2030 must carry the name that was in force on its original issue date.", "من يوقّع كل فئة من المستندات الرسمية، ومنذ متى (الوثيقة 02 §8.2، BR-SCH-004). وهذا سجل تاريخي لا إعداد: يحتفظ الجدول بكل موقّع مرّ على المدرسة، لأن مستنداً يُعاد إصداره عام 2030 يجب أن يحمل الاسم الساري في تاريخ إصداره الأصلي."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("Effective dating does the closing for you", "تاريخ السريان يُغلق نيابةً عنك"), T("Saving a new signatory for a document class ends the current one automatically, dated the day the new one begins. There is no \"end this signatory\" button and there should not be — a gap with nobody in force is what would leave a certificate unsigned.", "حفظ موقّع جديد لفئة مستند يُنهي الحالي تلقائياً بتاريخ بدء الجديد. ولا يوجد زر «إنهاء هذا الموقّع» ولا ينبغي — فالفجوة التي لا يسري فيها أحد هي ما يترك شهادة بلا توقيع.")),
-            new HelpPanelViewModel.Item(T("Reading the table", "قراءة الجدول"), T("The bold row with no \"effective to\" date is the one signing today; greyed rows are closed history. A class showing \"None defined\" will print its documents without a signatory block — define one before the first certificate run, not after.", "الصف الغامق الذي لا تاريخ انتهاء له هو الموقّع اليوم؛ والصفوف الباهتة تاريخ مغلق. والفئة التي تُظهر «غير معرَّف» ستطبع مستنداتها بلا كتلة توقيع — عرِّف واحداً قبل أول دفعة شهادات لا بعدها.")),
-            new HelpPanelViewModel.Item(T("Name and title, in both languages", "الاسم والمسمى بكلتا اللغتين"), T("Both are required (BR-GLB-001), and both are printed — an Arabic certificate carries the Arabic name and title, an English transcript the English pair. The title is the office (\"Principal\", \"مدير المدرسة\"), not the person's academic rank; it is what appears under the signature line.", "كلاهما مطلوب (BR-GLB-001)، وكلاهما يُطبع — فالشهادة العربية تحمل الاسم والمسمى بالعربية، وكشف الدرجات الإنجليزي يحمل النظير الإنجليزي. والمسمى هو المنصب («مدير المدرسة»، \"Principal\") لا الرتبة العلمية للشخص؛ وهو ما يظهر تحت سطر التوقيع.")),
-            new HelpPanelViewModel.Item(T("Effective from is a real date", "«ساري من» تاريخ حقيقي"), T("Backdate it to when the person actually took office rather than to today, and documents issued in between will reissue correctly. Dates are Gregorian in both languages — the Arabic interface does not switch the calendar.", "أرجِعه إلى اليوم الذي تولّى فيه الشخص المنصب فعلاً لا إلى اليوم، فتُعاد المستندات الصادرة بينهما إصداراً صحيحاً. والتواريخ ميلادية في اللغتين — فالواجهة العربية لا تبدّل التقويم.")),
+            new HelpPanelViewModel.Item(T("Effective dating does the closing for you", "تاريخ السريان يُغلق نيابةً عنك"), T("Saving a new signatory for a document class ends the current one automatically, dated the day the new one begins. There is no \"end this signatory\" button and there should not be — a gap with nobody in force is what would leave a certificate unsigned. Use \"Replace\" on a class to start from the right place: it selects the class and sets the earliest date the save will accept.", "حفظ موقّع جديد لفئة مستند يُنهي الحالي تلقائياً بتاريخ بدء الجديد. ولا يوجد زر «إنهاء هذا الموقّع» ولا ينبغي — فالفجوة التي لا يسري فيها أحد هي ما يترك شهادة بلا توقيع. واستخدم «استبدال» على الفئة لتبدأ من الموضع الصحيح: فهو يختار الفئة ويضبط أبكر تاريخ يقبله الحفظ.")),
+            new HelpPanelViewModel.Item(T("Why a date can be refused", "لماذا قد يُرفض تاريخ"), T("Saving closes the current signatory on the date you give. Choose a date earlier than the day that signatory began and the closing date would land before the opening one — a period that ends before it starts, which no reissued document could resolve. The form refuses it and names the earliest date it will take. Backdating to any day on or after that is fine, and is the right thing to do when someone took office weeks before anyone entered it here.", "الحفظ يغلق الموقّع الحالي بالتاريخ الذي تكتبه. فإن اخترت تاريخاً أسبق من يوم بدء ذلك الموقّع لوقع تاريخ الإغلاق قبل تاريخ الفتح — فترة تنتهي قبل أن تبدأ، ولا مستند يُعاد إصداره يمكنه حلّها. والنموذج يرفض ذلك ويسمّي أبكر تاريخ يقبله. أما الإرجاع إلى أي يوم من ذلك التاريخ فصاعداً فصحيح، وهو الصواب حين يتولى شخص منصبه قبل أسابيع من إدخاله هنا.")),
+            new HelpPanelViewModel.Item(T("Reading the tables", "قراءة الجداول"), T("The bold row with no \"effective to\" date is the one signing today; greyed rows are closed history. A class showing \"nobody in force\" will print its documents with an empty signature block — define one before the first certificate run, not after, because a document already issued keeps what it was issued with.", "الصف الغامق الذي لا تاريخ انتهاء له هو الموقّع اليوم؛ والصفوف الباهتة تاريخ مغلق. والفئة التي تُظهر «لا موقّع سارٍ» ستطبع مستنداتها بكتلة توقيع فارغة — عرِّف واحداً قبل أول دفعة شهادات لا بعدها، فالمستند الصادر يحتفظ بما صدر به.")),
+            new HelpPanelViewModel.Item(T("Name and title, in both languages", "الاسم والمسمى بكلتا اللغتين"), T("Both are required (BR-GLB-001), and both are printed — an Arabic certificate carries the Arabic name and title, an English transcript the English pair. The title is the office (\"Principal\", \"مدير المدرسة\"), not the person's academic rank; it is what appears under the signature line, and the preview beside the form shows exactly what that will be.", "كلاهما مطلوب (BR-GLB-001)، وكلاهما يُطبع — فالشهادة العربية تحمل الاسم والمسمى بالعربية، وكشف الدرجات الإنجليزي يحمل النظير الإنجليزي. والمسمى هو المنصب («مدير المدرسة»، \"Principal\") لا الرتبة العلمية للشخص؛ وهو ما يظهر تحت سطر التوقيع، والمعاينة بجانب النموذج تعرض ما سيكون بالضبط.")),
+            new HelpPanelViewModel.Item(T("Dates are Gregorian in both languages", "التواريخ ميلادية في اللغتين"), T("The Arabic interface does not switch the calendar — a date typed here is the same date read anywhere else in the product, which is what keeps a reissued document faithful to the day it was first issued.", "الواجهة العربية لا تبدّل التقويم — فالتاريخ المكتوب هنا هو التاريخ نفسه المقروء في أي موضع آخر من المنتج، وهذا ما يُبقي المستند المعاد إصداره وفياً ليوم صدوره الأول.")),
         },
     };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per document class, effective-dated: defining a new signatory closes out the current one; reissued documents show the signatory in force at issue (BR-SCH-004).", "لكل فئة مستند بتاريخ سريان: تعريف موقّع جديد يغلق الحالي؛ المستندات المعاد إصدارها تعرض الموقّع الساري وقت الإصدار (BR-SCH-004).")</p></div>
-    <partial name="_HelpModal" model="help" /></div>
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Module 02 §8.2 — per document class and effective-dated: defining a new signatory closes out the current one, and a reissued document shows whoever was in force at issue (BR-SCH-004).", "الوحدة 02 §8.2 — لكل فئة مستند وبتاريخ سريان: تعريف موقّع جديد يغلق الحالي، والمستند المعاد إصداره يعرض من كان سارياً وقت الإصدار (BR-SCH-004).")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
 <partial name="_SchoolNav" />
 
+<div class="sms-card p-3 mb-3">
+    <div class="row g-3 align-items-center">
+        <div class="col-lg-7">
+            <div class="d-flex justify-content-between small mb-1">
+                <span class="fw-semibold">@T("Document classes with a signatory in force", "فئات المستندات التي لها موقّع سارٍ")</span>
+                <span><span class="sms-num">@covered</span> / <span class="sms-num">@total</span></span>
+            </div>
+            <div class="sms-progress" role="progressbar" aria-valuenow="@coveragePercent" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Signatory coverage", "تغطية الموقّعين")">
+                <span style="width:@(coveragePercent)%;@(covered == total ? "background:#16a34a" : "background:#d97706")"></span>
+            </div>
+        </div>
+        <div class="col-lg-5 small">
+            @if (covered == total)
+            {
+                <span class="text-success"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Every class has someone signing. Documents issued today will carry a signature block.", "لكل فئة من يوقّعها. والمستندات الصادرة اليوم ستحمل كتلة توقيع.")</span>
+            }
+            else
+            {
+                <span class="sms-amber"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T($"{total - covered} class(es) would print with an empty signature block today.", $"{total - covered} من الفئات ستُطبع اليوم بكتلة توقيع فارغة.")</span>
+            }
+        </div>
+    </div>
+</div>
+
 <div class="row g-3">
-    <div class="col-lg-8">
+    <div class="col-xl-8">
         @foreach (var cls in SignatoriesViewModel.DocumentClasses)
         {
-            var rows = Model.Signatories.Where(s => s.DocumentClassCode == cls.Code).ToList();
+            var rows = Model.ForClass(cls.Code).ToList();
+            var currentSignatory = Model.Current(cls.Code);
             <div class="sms-card mb-3">
-                <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@(isRtl ? cls.Ar : cls.En) <code class="small text-muted">@cls.Code</code></h2>
-                    @if (rows.FirstOrDefault(r => r.EffectiveToUtc == null) is { } cur) { <span class="badge text-bg-success">@T("Current", "الحالي"): @(isRtl ? cur.NameAr : cur.NameEn)</span> } else { <span class="badge text-bg-warning">@T("None defined", "غير معرَّف")</span> }</div>
+                <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h2 class="h6 mb-0">@(isRtl ? cls.Ar : cls.En) <code class="small text-muted">@cls.Code</code></h2>
+                    <div class="d-flex align-items-center gap-2">
+                        @if (currentSignatory != null)
+                        {
+                            <span class="badge text-bg-success"><i class="bi bi-pen-fill me-1" aria-hidden="true"></i><span dir="auto">@(isRtl ? currentSignatory.NameAr : currentSignatory.NameEn)</span></span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-warning"><i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>@T("Nobody in force", "لا موقّع سارٍ")</span>
+                        }
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Signatories" asp-route-cls="@cls.Code">
+                            <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@(currentSignatory == null ? T("Define", "تعريف") : T("Replace", "استبدال"))
+                        </a>
+                    </div>
+                </div>
+
+                @if (currentSignatory != null)
+                {
+                    <div class="p-3 border-bottom">
+                        <div class="sms-doc-preview">
+                            <div class="sms-doc-preview__sign">
+                                <div class="text-muted">@T("Signature block on documents of this class today", "كتلة التوقيع على مستندات هذه الفئة اليوم")</div>
+                                <hr class="sms-doc-preview__rule" />
+                                <div class="sms-bilingual sms-name-pair">
+                                    <div class="sms-name-ar" dir="rtl">
+                                        <div class="fw-semibold">@currentSignatory.NameAr</div>
+                                        <div class="text-muted">@currentSignatory.TitleAr</div>
+                                    </div>
+                                    <div class="sms-name-en" dir="ltr">
+                                        <div class="fw-semibold">@currentSignatory.NameEn</div>
+                                        <div class="text-muted">@currentSignatory.TitleEn</div>
+                                    </div>
+                                </div>
+                                <div class="sms-doc-preview__meta">@T("In force since", "سارٍ منذ") <span class="sms-num">@currentSignatory.EffectiveFromUtc.ToString("yyyy-MM-dd")</span></div>
+                            </div>
+                        </div>
+                    </div>
+                }
+
                 @if (rows.Count > 0)
                 {
-                    <div class="table-responsive"><table class="table table-sm sms-table mb-0">
-                        <caption class="visually-hidden">@T("Signatories", "الموقّعون") — @(isRtl ? cls.Ar : cls.En)</caption>
-                        <thead><tr><th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Title", "المسمى")</th><th scope="col">@T("Effective from", "ساري من")</th><th scope="col">@T("Effective to", "ساري إلى")</th></tr></thead>
-                        <tbody>@foreach (var s in rows) { <tr class="@(s.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@(isRtl ? s.NameAr : s.NameEn)</td><td>@(isRtl ? s.TitleAr : s.TitleEn)</td><td>@s.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(s.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? "—")</td></tr> }</tbody>
-                    </table></div>
+                    <div class="table-responsive">
+                        <table class="table table-sm sms-table mb-0">
+                            <caption class="visually-hidden">@T("Signatories for", "الموقّعون لفئة") @(isRtl ? cls.Ar : cls.En)</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">@T("Name", "الاسم")</th>
+                                    <th scope="col">@T("Title", "المسمى")</th>
+                                    <th scope="col">@T("Effective from", "ساري من")</th>
+                                    <th scope="col">@T("Effective to", "ساري إلى")</th>
+                                    <th scope="col">@T("State", "الحالة")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var s in rows)
+                                {
+                                    <tr class="@(s.EffectiveToUtc == null ? "fw-semibold" : "text-muted")">
+                                        <td dir="auto">@(isRtl ? s.NameAr : s.NameEn)</td>
+                                        <td dir="auto">@(isRtl ? s.TitleAr : s.TitleEn)</td>
+                                        <td><span class="sms-num">@s.EffectiveFromUtc.ToString("yyyy-MM-dd")</span></td>
+                                        <td>@if (s.EffectiveToUtc != null) { <span class="sms-num">@s.EffectiveToUtc.Value.ToString("yyyy-MM-dd")</span> } else { <span>—</span> }</td>
+                                        <td>
+                                            @if (s.EffectiveToUtc == null)
+                                            {
+                                                <span class="badge text-bg-success">@T("In force", "سارٍ")</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-light border">@T("Closed", "مغلق")</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-3 small text-muted">
+                        @T("Nobody has ever signed this class. Documents of this class printed today carry an empty signature block, and a document once issued keeps what it was issued with — so define a signatory before the first run, not after it.", "لم يوقّع أحد هذه الفئة قط. ومستندات هذه الفئة المطبوعة اليوم تحمل كتلة توقيع فارغة، والمستند الصادر يحتفظ بما صدر به — فعرّف موقّعاً قبل أول دفعة لا بعدها.")
+                    </div>
                 }
             </div>
         }
     </div>
-    <div class="col-lg-4">
-        <div class="sms-card p-4">
-            <h2 class="h6">@T("Define signatory", "تعريف موقّع")</h2>
-            <form method="post" asp-action="Signatories" novalidate>
+
+    <div class="col-xl-4">
+        <div class="sms-card p-3 p-lg-4" id="signatory-form-card">
+            <h2 class="h6">@T("Define a signatory", "تعريف موقّع")</h2>
+            <p class="text-muted small">@T("Saving adds the new signatory and closes the current one for that class on the same date. Nothing is overwritten and nothing is deleted.", "الحفظ يضيف الموقّع الجديد ويغلق الحالي لتلك الفئة بالتاريخ نفسه. ولا يُستبدل شيء ولا يُحذف شيء.")</p>
+
+            <form method="post" asp-action="Signatories" novalidate id="signatory-form">
                 <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
-                <div class="mb-2"><label class="form-label" asp-for="DocumentClassCode">@T("Document class", "فئة المستند")</label><select asp-for="DocumentClassCode" class="form-select">@foreach (var c in SignatoriesViewModel.DocumentClasses) { <option value="@c.Code">@(isRtl ? c.Ar : c.En)</option> }</select></div>
-                <div class="mb-2"><label class="form-label" asp-for="NameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input asp-for="NameAr" class="form-control" dir="rtl" /></div>
-                <div class="mb-2"><label class="form-label" asp-for="NameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input asp-for="NameEn" class="form-control" dir="ltr" /></div>
-                <div class="mb-2"><label class="form-label" asp-for="TitleAr">@T("Title (Arabic)", "المسمى (عربي)")</label><input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" /></div>
-                <div class="mb-2"><label class="form-label" asp-for="TitleEn">@T("Title (English)", "المسمى (إنجليزي)")</label><input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" /></div>
-                <div class="mb-3"><label class="form-label" asp-for="EffectiveFrom">@T("Effective from", "ساري من")</label><input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" /></div>
-                <button class="btn btn-primary w-100" type="submit"><i class="bi bi-pen me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+
+                <div class="mb-2">
+                    <label class="form-label" asp-for="DocumentClassCode">@T("Document class", "فئة المستند") <span class="text-danger" aria-hidden="true">*</span></label>
+                    <select asp-for="DocumentClassCode" class="form-select" id="DocumentClassCode">
+                        <option value="">@T("— choose —", "— اختر —")</option>
+                        @foreach (var c in SignatoriesViewModel.DocumentClasses)
+                        {
+                            var cur = Model.Current(c.Code);
+                            <option value="@c.Code" data-min="@(cur?.EffectiveFromUtc.ToString("yyyy-MM-dd"))" data-holder="@(cur == null ? "" : (isRtl ? cur.NameAr : cur.NameEn))">@(isRtl ? c.Ar : c.En)</option>
+                        }
+                    </select>
+                    <span asp-validation-for="DocumentClassCode" class="text-danger small d-block"></span>
+                    <div class="form-text" id="class-hint"
+                         data-replacing="@T("Replacing {0}. Saving closes that record on the date you choose, so it cannot be earlier than {1}.", "استبدال {0}. والحفظ يغلق ذلك السجل بالتاريخ الذي تختاره، فلا يمكن أن يكون أسبق من {1}.")"
+                         data-first="@T("No signatory has ever been defined for this class, so any date is accepted.", "لم يُعرَّف موقّع لهذه الفئة قط، فأي تاريخ مقبول.")"></div>
+                </div>
+
+                <div class="sms-bilingual sms-name-pair mb-2">
+                    <div class="sms-name-ar">
+                        <label class="form-label" asp-for="NameAr">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input asp-for="NameAr" class="form-control" dir="rtl" data-preview="name-ar" />
+                        <span asp-validation-for="NameAr" class="text-danger small d-block"></span>
+                    </div>
+                    <div class="sms-name-en">
+                        <label class="form-label" asp-for="NameEn">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input asp-for="NameEn" class="form-control" dir="ltr" data-preview="name-en" />
+                        <span asp-validation-for="NameEn" class="text-danger small d-block"></span>
+                    </div>
+                </div>
+
+                <div class="sms-bilingual sms-name-pair mb-2">
+                    <div class="sms-name-ar">
+                        <label class="form-label" asp-for="TitleAr">@T("Title (Arabic)", "المسمى (عربي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input asp-for="TitleAr" class="form-control" dir="rtl" placeholder="مدير المدرسة" data-preview="title-ar" />
+                        <span asp-validation-for="TitleAr" class="text-danger small d-block"></span>
+                    </div>
+                    <div class="sms-name-en">
+                        <label class="form-label" asp-for="TitleEn">@T("Title (English)", "المسمى (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input asp-for="TitleEn" class="form-control" dir="ltr" placeholder="Principal" data-preview="title-en" />
+                        <span asp-validation-for="TitleEn" class="text-danger small d-block"></span>
+                    </div>
+                </div>
+                <div class="form-text mb-2">@T("The title is the office, not an academic rank — it is what prints under the signature line.", "المسمى هو المنصب لا الرتبة العلمية — وهو ما يُطبع تحت سطر التوقيع.")</div>
+
+                <div class="mb-3">
+                    <label class="form-label" asp-for="EffectiveFrom">@T("Effective from", "ساري من") <span class="text-danger" aria-hidden="true">*</span></label>
+                    <input asp-for="EffectiveFrom" asp-format="{0:yyyy-MM-dd}" class="form-control" type="date" id="EffectiveFrom" />
+                    <span asp-validation-for="EffectiveFrom" class="text-danger small d-block"></span>
+                    <div class="form-text">@T("Backdate it to when the person actually took office, and documents issued in between reissue correctly. Gregorian in both languages.", "أرجِعه إلى اليوم الذي تولّى فيه الشخص المنصب فعلاً، فتُعاد المستندات الصادرة بينهما إصداراً صحيحاً. والتقويم ميلادي في اللغتين.")</div>
+                </div>
+
+                <h3 class="sms-section-title">@T("Preview", "المعاينة")</h3>
+                <div class="sms-doc-preview mb-3">
+                    <div class="sms-doc-preview__sign">
+                        <div class="text-muted">@T("Signature block", "كتلة التوقيع")</div>
+                        <hr class="sms-doc-preview__rule" />
+                        <div class="sms-bilingual sms-name-pair">
+                            <div class="sms-name-ar" dir="rtl">
+                                <div class="fw-semibold" data-preview-out="name-ar">…</div>
+                                <div class="text-muted" data-preview-out="title-ar">…</div>
+                            </div>
+                            <div class="sms-name-en" dir="ltr">
+                                <div class="fw-semibold" data-preview-out="name-en">…</div>
+                                <div class="text-muted" data-preview-out="title-en">…</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100" type="submit" id="signatory-save"><i class="bi bi-pen me-1" aria-hidden="true"></i>@T("Save signatory", "حفظ الموقّع")</button>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+    // Two mirrors of what the server already decides, for speed only (BR-GLB-110): the
+    // earliest date the save will accept for the chosen class, and what the signature
+    // block will read once saved. Neither is the rule — the POST re-checks both.
+    (function () {
+        var form = document.getElementById('signatory-form');
+        if (!form) { return; }
+
+        var select = document.getElementById('DocumentClassCode');
+        var date = document.getElementById('EffectiveFrom');
+        var hint = document.getElementById('class-hint');
+        var save = document.getElementById('signatory-save');
+
+        function syncClass() {
+            var option = select.options[select.selectedIndex];
+            var min = option ? option.getAttribute('data-min') : '';
+            var holder = option ? option.getAttribute('data-holder') : '';
+            if (min) {
+                date.setAttribute('min', min);
+                hint.textContent = (hint.getAttribute('data-replacing') || '').replace('{0}', holder || '').replace('{1}', min);
+            } else {
+                date.removeAttribute('min');
+                hint.textContent = option && option.value ? (hint.getAttribute('data-first') || '') : '';
+            }
+        }
+
+        function syncPreview() {
+            Array.prototype.forEach.call(form.querySelectorAll('[data-preview]'), function (input) {
+                var key = input.getAttribute('data-preview');
+                var out = form.querySelector('[data-preview-out="' + key + '"]');
+                if (out) { out.textContent = input.value || '…'; }
+            });
+        }
+
+        select.addEventListener('change', syncClass);
+        form.addEventListener('input', syncPreview);
+        form.addEventListener('submit', function () {
+            if (save) { save.disabled = true; }
+            window.setTimeout(function () { if (save) { save.disabled = false; } }, 8000);
+        });
+
+        syncClass();
+        syncPreview();
+
+        // Arriving from a class's "Replace" button: put the operator in the form rather than
+        // leaving them to find it below four cards on a narrow screen.
+        if (window.location.search.indexOf('cls=') >= 0) {
+            var card = document.getElementById('signatory-form-card');
+            if (card) { card.scrollIntoView({ block: 'start' }); }
+            var firstName = form.querySelector('[data-preview="name-ar"]');
+            if (firstName) { firstName.focus(); }
+        }
+    })();
+</script>

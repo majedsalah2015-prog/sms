@@ -54,7 +54,8 @@
         <div class="sms-card p-3 mb-3">
             <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New program", "برنامج جديد")</h2>
             <form method="post" asp-action="CreateScholarshipProgram" asp-route-year="@yid" class="d-grid gap-2">
-                <div class="sms-bilingual"><input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" /></div>
+                <div class="sms-bilingual"><input id="sch-prog-ar" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#sch-prog-ar" data-translit-mode="term" /></div>
+                <div class="form-text">@T("Type the Arabic name and the English one fills itself — correct it whenever the suggestion is wrong.", "اكتب الاسم بالعربية ويُملأ الإنجليزي تلقائياً — صحّحه متى كان الاقتراح خاطئاً.")</div>
                 <select name="discountTypeId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Discount type", "نوع الخصم")">
                     <option value="">@T("— choose type —", "— اختر نوعاً —")</option>
                     @foreach (var t in Model.ScholarshipTypes) { <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn)</option> }

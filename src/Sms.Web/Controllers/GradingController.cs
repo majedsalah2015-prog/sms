@@ -124,7 +124,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Marksheet created — one row per current section member.", "أُنشئ كشف الدرجات — صف لكل طالب حالي في الشعبة.");
                 return RedirectToAction(nameof(Marksheet), new { id = sheet.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -172,7 +172,7 @@ namespace Sms.Web.Controllers
                 await _grading.EnterMarksAsync(id, inputs);
                 TempData["Flash"] = T("Progress saved.", "تم حفظ التقدم.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Marksheet), new { id });
         }
 
@@ -188,7 +188,7 @@ namespace Sms.Web.Controllers
                     ? T("Published — term results computed for every student (BR-GRA-003).", "نُشر — حُسبت نتائج الفترة لكل طالب (BR-GRA-003).")
                     : T($"Marksheet is now {target}.", $"أصبح الكشف بحالة {GradingLabels.MarksheetStatus(target, true)}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Marksheet), new { id });
         }
 
@@ -203,7 +203,7 @@ namespace Sms.Web.Controllers
                 await _grading.CorrectPublishedMarksheetAsync(id, reason.Trim());
                 TempData["Flash"] = T("Reopened as Draft — re-enter and re-publish; results are recomputed on publish (WF-08).", "أُعيد فتحه كمسودة — أعد الإدخال والنشر؛ تُعاد النتائج عند النشر (WF-08).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Marksheet), new { id });
         }
 
@@ -218,7 +218,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Marksheet deleted.", "حُذف كشف الدرجات.");
                 return RedirectToAction(nameof(Index), new { year });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Marksheet), new { id });
         }
 
@@ -276,7 +276,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Scale created — add its bands.", "أُنشئ السلم — أضف نطاقاته.");
                 return RedirectToAction(nameof(Scales), new { year, id = scale.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year });
         }
 
@@ -292,7 +292,7 @@ namespace Sms.Web.Controllers
                 await _grading.UpdateScaleAsync(id, nameAr.Trim(), nameEn.Trim());
                 TempData["Flash"] = T("Scale renamed.", "أُعيدت تسمية السلم.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -302,7 +302,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteScale(int id, int? year)
         {
             try { await _grading.DeleteScaleAsync(id); TempData["Flash"] = T("Scale deleted.", "حُذف السلم."); return RedirectToAction(nameof(Scales), new { year }); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -319,7 +319,7 @@ namespace Sms.Web.Controllers
                 await _grading.LockScaleAsync(id);
                 TempData["Flash"] = T("Scale locked — bands are now frozen (BR-GRA-001).", "قُفل السلم — النطاقات مجمّدة الآن (BR-GRA-001).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -334,7 +334,7 @@ namespace Sms.Web.Controllers
                 await _grading.AddScaleBandAsync(id, min!.Value, max!.Value, code!.Trim(), labelAr!.Trim(), labelEn!.Trim(), isPassing, sortOrder ?? 0, gpa);
                 TempData["Flash"] = T("Band added.", "أُضيف النطاق.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -349,7 +349,7 @@ namespace Sms.Web.Controllers
                 await _grading.UpdateScaleBandAsync(bandId, min!.Value, max!.Value, code!.Trim(), labelAr!.Trim(), labelEn!.Trim(), isPassing, sortOrder ?? 0, gpa);
                 TempData["Flash"] = T("Band updated.", "حُدّث النطاق.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -359,7 +359,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteBand(int id, int bandId, int? year)
         {
             try { await _grading.RemoveScaleBandAsync(bandId); TempData["Flash"] = T("Band removed.", "أُزيل النطاق."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Scales), new { year, id });
         }
 
@@ -413,7 +413,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Blueprint created — add components until weights sum to 100, then finalize.", "أُنشئ المخطط — أضف المكوّنات حتى يبلغ مجموع الأوزان 100 ثم اعتمده.");
                 return RedirectToAction(nameof(Blueprint), new { id = bp.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprints), new { year, profile, term });
         }
 
@@ -451,7 +451,7 @@ namespace Sms.Web.Controllers
                 await _grading.AddBlueprintComponentAsync(id, nameAr!.Trim(), nameEn!.Trim(), weight!.Value, maxScore!.Value);
                 TempData["Flash"] = T("Component added.", "أُضيف المكوّن.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprint), new { id });
         }
 
@@ -466,7 +466,7 @@ namespace Sms.Web.Controllers
                 await _grading.UpdateBlueprintComponentAsync(componentId, nameAr!.Trim(), nameEn!.Trim(), weight!.Value, maxScore!.Value);
                 TempData["Flash"] = T("Component updated.", "حُدّث المكوّن.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprint), new { id });
         }
 
@@ -476,7 +476,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteComponent(int id, int componentId)
         {
             try { await _grading.RemoveBlueprintComponentAsync(componentId); TempData["Flash"] = T("Component removed.", "أُزيل المكوّن."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprint), new { id });
         }
 
@@ -486,7 +486,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> LockBlueprint(int id)
         {
             try { await _grading.LockBlueprintAsync(id); TempData["Flash"] = T("Blueprint finalized — marksheets can now be created from it.", "اعتُمد المخطط — يمكن الآن إنشاء كشوف الدرجات منه."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprint), new { id });
         }
 
@@ -496,7 +496,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteBlueprint(int id, int? year, int? profile, int? term)
         {
             try { await _grading.DeleteBlueprintAsync(id); TempData["Flash"] = T("Blueprint deleted.", "حُذف المخطط."); return RedirectToAction(nameof(Blueprints), new { year, profile, term }); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Blueprint), new { id });
         }
 
@@ -537,7 +537,7 @@ namespace Sms.Web.Controllers
                 await _grading.DefinePromotionCriteriaAsync(profileId, passMark.Value, maxFailed.Value);
                 TempData["Flash"] = T("Criteria saved.", "حُفظت المعايير.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Criteria), new { year });
         }
 
@@ -608,7 +608,7 @@ namespace Sms.Web.Controllers
                 foreach (var e in targets) { await _grading.ComputeYearResultAsync(e.Id, yid, e.GradeYearProfileId); n++; }
                 TempData["Flash"] = T($"Year result computed for {n} student(s) (BR-GRA-006/007).", $"حُسبت نتيجة العام لـ {n} طالباً (BR-GRA-006/007).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Results), new { year, section, term });
         }
 

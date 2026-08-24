@@ -114,7 +114,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -131,7 +131,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Index));
@@ -203,7 +203,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Staff));
@@ -227,7 +227,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Staff));
@@ -339,7 +339,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Routes));
             }
         }
@@ -360,7 +360,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Route), new { id });
@@ -454,7 +454,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Subscriptions));
@@ -472,7 +472,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Subscriptions));
@@ -490,7 +490,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Subscriptions));
@@ -512,7 +512,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Subscriptions));
@@ -561,7 +561,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
                 return RedirectToAction(nameof(Trips), new { date });
             }
         }
@@ -660,7 +660,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Trip), new { id });
@@ -677,7 +677,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Trip), new { id });
@@ -719,7 +719,7 @@ namespace Sms.Web.Controllers
             }
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
-                TempData["Error"] = ex.Message;
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
             return RedirectToAction(nameof(Safety));

@@ -165,7 +165,7 @@ namespace Sms.Web.Controllers
                     ? T("Nothing to close — every captured row for this day was already locked.", "لا شيء لإقفاله — كل السجلات المرصودة لهذا اليوم مقفلة سلفاً.")
                     : string.Format(T("Day closed — {0} record(s) locked. Later changes need a correction reason (WF-14).", "أُقفل اليوم — {0} سجل مقفل. أي تعديل لاحق يحتاج سبب تصحيح (WF-14)."), locked);
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year, date = date.ToString("yyyy-MM-dd") });
         }
 
@@ -280,7 +280,7 @@ namespace Sms.Web.Controllers
                         ? " — " + T("locked rows must go through the correction screen.", "الصفوف المقفلة تُعدَّل من شاشة التصحيح.")
                         : string.Empty);
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Capture), redirect);
         }
 
@@ -367,7 +367,7 @@ namespace Sms.Web.Controllers
                 }
                 TempData["Flash"] = T("Late arrival logged.", "سُجّل الوصول المتأخر.") + note;
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Gate), new { year, date = date.ToString("yyyy-MM-dd"), enrollment = enrollmentId });
         }
 
@@ -420,7 +420,7 @@ namespace Sms.Web.Controllers
                     ? T("Released with an authorization override — logged with your reason.", "تم التسليم مع تجاوز التصريح — سُجّل مع السبب.")
                     : T("Release logged.", "سُجّل الخروج.")) + note;
             }
-            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = ex.Message; }
+            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Gate), new { year, date = date.ToString("yyyy-MM-dd"), enrollment = enrollmentId });
         }
 
@@ -437,7 +437,7 @@ namespace Sms.Web.Controllers
                 await _attendance.RequestLeavePassAsync(enrollmentId, reason.Trim(), _clock.UtcNow);
                 TempData["Flash"] = T("Leave pass requested — a supervisor approves it before release (P2).", "تم طلب الاستئذان — يعتمده المشرف قبل الخروج (P2).");
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Gate), new { year, date = date.ToString("yyyy-MM-dd"), enrollment = enrollmentId });
         }
 
@@ -451,7 +451,7 @@ namespace Sms.Web.Controllers
                 await _attendance.ChangeLeavePassStatusAsync(id, target, _clock.UtcNow);
                 TempData["Flash"] = string.Format(T("Leave pass → {0}.", "الاستئذان ← {0}."), AttendanceLabels.LeavePass(target, IsArabic));
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Gate), new { year, date = date.ToString("yyyy-MM-dd") });
         }
 
@@ -514,7 +514,7 @@ namespace Sms.Web.Controllers
                 await _attendance.SubmitJustificationAsync(attendanceDayId, type, _clock.UtcNow);
                 TempData["Flash"] = T("Excuse recorded — it now waits in the review queue.", "سُجّل العذر — وهو الآن في قائمة المراجعة.");
             }
-            catch (Exception ex) { TempData["Error"] = ex.Message; }
+            catch (Exception ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Justifications), new { year });
         }
 
@@ -539,7 +539,7 @@ namespace Sms.Web.Controllers
                     ? T("Accepted — the absence is now excused.", "قُبل — أصبح الغياب بعذر.")
                     : T("Rejected — the absence stays unexcused.", "رُفض — يبقى الغياب بدون عذر.");
             }
-            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = ex.Message; }
+            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Justifications), new { year, state });
         }
 
@@ -611,7 +611,7 @@ namespace Sms.Web.Controllers
                 _audit.Reason = null;
                 TempData["Flash"] = string.Format(T("Corrected to {0} — the change is in the register below.", "صُحّح إلى {0} — التغيير مُدرج في السجل أدناه."), AttendanceLabels.Status(status, IsArabic));
             }
-            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = ex.Message; }
+            catch (Exception ex) { _audit.Reason = null; TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Corrections), new
             {
                 year,

@@ -15,8 +15,10 @@ using Sms.Application.Fees;
 using Sms.Application.Health;
 using Sms.Application.Grades;
 using Sms.Application.Lookups;
+using Sms.Application.Dashboards;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
+using Sms.Application.Reports;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
 using Sms.Application.Security;
@@ -36,9 +38,11 @@ using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Lookups;
+using Sms.Infrastructure.Dashboards;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Reports;
 using Sms.Infrastructure.Schools;
 using Sms.Infrastructure.Security;
 using Sms.Infrastructure.Notifications;
@@ -118,6 +122,12 @@ namespace Sms.Seeder
             services.AddScoped<IHealthAdmin, HealthAdmin>();
             services.AddScoped<INotificationPublisher, NotificationPublisher>();
 
+            // E-701/E-702 registries — the report catalogue and the widget registry are
+            // written through their own admin ports, same as every other seeded catalogue.
+            services.AddScoped<IReportAdmin, ReportAdmin>();
+            services.AddScoped<IDashboardAdmin, DashboardAdmin>();
+            services.AddScoped<INotificationConfigAdmin, NotificationConfigAdmin>();
+
             services.AddScoped<ISeedContributor, JobDefinitionSeedContributor>();
             services.AddScoped<ISeedContributor, LookupProductSeedContributor>();
             services.AddScoped<ISeedContributor, GeographySeedContributor>();
@@ -126,6 +136,10 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, SysAdminAccountSeedContributor>();
             services.AddScoped<ISeedContributor, Ksa01ContentPackSeedContributor>();
             services.AddScoped<ISeedContributor, NumberingCatalogSeedContributor>();
+            services.AddScoped<ISeedContributor, ReportCatalogSeedContributor>();
+            services.AddScoped<ISeedContributor, WidgetRegistrySeedContributor>();
+            services.AddScoped<ISeedContributor, WorkflowCatalogSeedContributor>();
+            services.AddScoped<ISeedContributor, NotificationDefaultsSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
             services.AddScoped<ISeedContributor, CafeteriaDemoSeedContributor>();

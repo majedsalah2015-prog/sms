@@ -1,0 +1,19 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? string.Empty;
+
+    // "Case" is the detail screen of the board, so the board tab stays marked while a case is open.
+    bool On(params string[] actions) => actions.Any(a => string.Equals(a, action, StringComparison.OrdinalIgnoreCase));
+}
+
+<nav class="mb-3" aria-label="@T("Behaviour sections", "أقسام السلوك")">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><a class="nav-link @(On("Index", "Case") ? "active" : "")" asp-action="Index"><i class="bi bi-kanban me-1" aria-hidden="true"></i>@T("Case board", "لوحة القضايا")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Record") ? "active" : "")" asp-action="Record"><i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Record", "التسجيل")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Actions") ? "active" : "")" asp-action="Actions"><i class="bi bi-clipboard-check me-1" aria-hidden="true"></i>@T("Actions", "الإجراءات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Analytics") ? "active" : "")" asp-action="Analytics"><i class="bi bi-graph-up me-1" aria-hidden="true"></i>@T("Analytics", "التحليلات")</a></li>
+        <li class="nav-item"><a class="nav-link @(On("Code") ? "active" : "")" asp-action="Code"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Behaviour code", "لائحة السلوك")</a></li>
+    </ul>
+</nav>

@@ -202,6 +202,15 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<LookupValue> Values { get; set; } = Array.Empty<LookupValue>();
 
+        /// <summary>
+        /// doc/Modules/01 §9: "deactivation of a lookup shows usage count and requires
+        /// confirmation". Keyed by lookup value id; an absent or empty entry means
+        /// nothing in the product points at that value, which is the one case where
+        /// retiring it costs nothing.
+        /// </summary>
+        public IReadOnlyDictionary<int, IReadOnlyList<Sms.Application.Lookups.LookupUsage>> Usage { get; set; }
+            = new Dictionary<int, IReadOnlyList<Sms.Application.Lookups.LookupUsage>>();
+
         // new value form
         public string? Code { get; set; }
 

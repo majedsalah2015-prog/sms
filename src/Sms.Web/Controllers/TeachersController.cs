@@ -98,7 +98,7 @@ namespace Sms.Web.Controllers
                 await _teachers.DesignateTeacherAsync(employeeId.Value, maxWeeklyPeriods.Value);
                 TempData["Flash"] = T("Teacher designated (BR-TCH-001).", "عُيِّن المعلم (BR-TCH-001).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -112,7 +112,7 @@ namespace Sms.Web.Controllers
                 await _teachers.RemoveDesignationAsync(teacherProfileId);
                 TempData["Flash"] = T("Teacher designation removed (the employee record is kept).", "أُزيل تعيين المعلم (سجل الموظف محفوظ).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -137,7 +137,7 @@ namespace Sms.Web.Controllers
                 await _teachers.AssignAsync(teacherProfileId.Value, offeringId.Value, sectionId.Value, role, DateTime.SpecifyKind(effectiveFrom ?? _clock.UtcNow.Date, DateTimeKind.Utc), overrideLoad);
                 TempData["Flash"] = T("Teacher assigned.", "تم إسناد المعلم.") + (overrideLoad ? " " + T("(load override logged, BR-TCH-004)", "(تجاوز النصاب مسجَّل، BR-TCH-004)") : "");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Matrix), new { year, profile });
         }
 
@@ -151,7 +151,7 @@ namespace Sms.Web.Controllers
                 await _teachers.EndAssignmentAsync(assignmentId, DateTime.SpecifyKind(effectiveTo ?? _clock.UtcNow.Date, DateTimeKind.Utc));
                 TempData["Flash"] = T("Assignment ended (history kept, BR-TCH-007). Marksheet/timetable re-pointing and parent notification arrive with the reassignment wizard.", "أُنهي الإسناد مع حفظ السجل (BR-TCH-007). إعادة توجيه الكشوف/الجدول وإشعار أولياء الأمور مع معالج إعادة الإسناد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Matrix), new { year, profile });
         }
 
@@ -180,7 +180,7 @@ namespace Sms.Web.Controllers
                 }
                 TempData["Flash"] = T($"Copied {copied} assignment(s); {skipped} skipped (no matching offering/section, duplicate primary, inactive contract or over load).", $"نُسخ {copied} إسناداً؛ تُخطي {skipped} (لا مادة/شعبة مطابقة، أساسي مكرر، عقد غير ساري أو تجاوز النصاب).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Matrix), new { year, profile });
         }
 

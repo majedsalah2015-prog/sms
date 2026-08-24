@@ -198,11 +198,11 @@ namespace Sms.Web.Controllers
             {
                 // The engine's own words: which rule refused and why. Rewriting them here would give
                 // the operator a second, vaguer account of a decision they need to act on.
-                TempData["Error"] = T($"Refused: {ex.Message}", $"مرفوض: {ex.Message}");
+                TempData["Error"] = T($"Refused: {UserMessage.For(ex, IsArabic)}", $"مرفوض: {UserMessage.For(ex, IsArabic)}");
             }
             catch (InvalidOperationException ex)
             {
-                TempData["Error"] = T($"Refused: {ex.Message}", $"مرفوض: {ex.Message}");
+                TempData["Error"] = T($"Refused: {UserMessage.For(ex, IsArabic)}", $"مرفوض: {UserMessage.For(ex, IsArabic)}");
             }
 
             return RedirectToAction(nameof(Index), new { holder = holderId, kind });

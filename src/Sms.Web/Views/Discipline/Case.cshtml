@@ -1,0 +1,332 @@
+@using System.Globalization
+@using Sms.Domain.Discipline
+@using Sms.Web.Models
+@model CaseFileViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T($"Case {Model.Incident.IncidentNo}", $"القضية {Model.Incident.IncidentNo}");
+    ViewData["Breadcrumb"] = T("Behaviour / Case file", "السلوك / ملف القضية");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-case-help", Title = T("Case file — help", "ملف القضية — مساعدة"),
+        Intro = T("Everything the case has been through, and the one step it can take next. The conditions are shown before you act rather than as a refusal afterwards — if a statement is missing or the Principal is needed, it says so above the decision form.", "كل ما مرّت به القضية، والخطوة الواحدة التي يمكنها اتخاذها تالياً. وتُعرض الشروط قبل التنفيذ لا كرفض بعده — فإن غابت إفادة أو لزم المدير، قيل ذلك فوق نموذج القرار."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Due process", "ضمانات التحقيق"), T("A serious case — severity 3 or 4 — cannot be decided until the student or a parent has given a statement (BR-DCP-003). This is not a warning that can be dismissed: the decision is refused without it.", "القضية الجسيمة — الجسامة 3 أو 4 — لا يُبتّ فيها قبل إفادة الطالب أو ولي الأمر (BR-DCP-003). وهذا ليس تنبيهاً يُهمَل: القرار يُرفَض بدونها.")),
+            new HelpPanelViewModel.Item(T("Deviating from the proposal", "مخالفة المقترح"), T("Going lighter than the code's ladder needs a written reason, and the reason is kept with the decision (BR-DCP-005). Going heavier needs the Principal — as does any suspension and any gravest-level case (BR-DCP-004).", "التخفيف عن سلّم اللائحة يحتاج سبباً مكتوباً، ويُحفظ السبب مع القرار (BR-DCP-005). والتشديد يحتاج المدير — وكذلك أي فصل وأي قضية بالغة (BR-DCP-004).")),
+            new HelpPanelViewModel.Item(T("Consequences come from the code", "الإجراءات من اللائحة"), T("The list offers only what this version of the behaviour code defines — there are no free-form punishments (BR-DCP-004). Corporal punishment is not in the list because the system cannot represent it at all.", "تعرض القائمة ما تحدّده هذه النسخة من لائحة السلوك فقط — ولا عقوبات مُرتجلة (BR-DCP-004). والعقاب البدني ليس في القائمة لأن النظام لا يستطيع تمثيله أصلاً.")),
+            new HelpPanelViewModel.Item(T("Appeals", "التظلّم"), T("A parent may appeal a case of severity 2 or above, once, within the window (BR-DCP-006). The appeal is reviewed by somebody other than whoever decided the case — the system refuses the same person doing both.", "لولي الأمر أن يتظلّم على قضية بجسامة 2 أو أعلى، مرة واحدة، خلال المهلة (BR-DCP-006). ويراجع التظلّم شخص غير من أصدر القرار — والنظام يرفض أن يكون الاثنان واحداً.")),
+            new HelpPanelViewModel.Item(T("The reporter is not shown", "المُبلِّغ لا يُعرض"), T("The trail records what happened, not who reported it (BR-DCP-010). The identity is in the audit record, which is where a question about it belongs — and is why a parent never sees a teacher's name on a case.", "يسجّل المسار ما حدث لا من أبلغ عنه (BR-DCP-010). والهوية في سجل التدقيق، وهو موضع أي سؤال عنها — ولذلك لا يرى ولي الأمر اسم معلم في قضية.")),
+        },
+    };
+
+    var c = Model.Case;
+    var canInvestigate = c.Status == CaseStatus.Reported;
+    var canDecide = c.Status == CaseStatus.Reported || c.Status == CaseStatus.UnderInvestigation;
+    var canApply = c.Status == CaseStatus.Decided;
+    var canClose = c.Status == CaseStatus.AppealWindow;
+    var canAppeal = c.DecidedAtUtc.HasValue && c.Severity >= 2 && Model.Appeal == null;
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            <span class="badge @DisciplineLabels.SeverityClass(c.Severity)">@DisciplineLabels.Severity(c.Severity, isRtl)</span>
+            <span class="badge text-bg-light">@DisciplineLabels.CaseStatus(c.Status, isRtl)</span>
+            @(isRtl ? Model.Student.NameAr : Model.Student.NameEn) · @Model.Student.StudentNo
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+<div class="row g-4">
+    <div class="col-12 col-lg-7">
+        <h2 class="sms-section-title">@T("What happened", "ما حدث")</h2>
+        <div class="sms-card p-3 mb-4">
+            <dl class="row mb-0">
+                <dt class="col-5 col-sm-4">@T("Violation", "المخالفة")</dt>
+                <dd class="col-7 col-sm-8">@(isRtl ? Model.Violation.NameAr : Model.Violation.NameEn) <span class="text-muted">(@Model.Violation.ArticleRef)</span></dd>
+                <dt class="col-5 col-sm-4">@T("Occurred", "وقعت")</dt>
+                <dd class="col-7 col-sm-8">@Model.Incident.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</dd>
+                <dt class="col-5 col-sm-4">@T("Code proposes", "تقترح اللائحة")</dt>
+                <dd class="col-7 col-sm-8">
+                    @if (Model.Proposed != null)
+                    {
+                        @(isRtl ? Model.Proposed.NameAr : Model.Proposed.NameEn)
+                    }
+                    else
+                    {
+                        <span class="text-muted">@T("no ladder step for this severity and repetition", "لا خطوة في السلّم لهذه الجسامة والتكرار")</span>
+                    }
+                </dd>
+                @if (Model.Decided != null)
+                {
+                    <dt class="col-5 col-sm-4">@T("Decided", "القرار")</dt>
+                    <dd class="col-7 col-sm-8">
+                        @(isRtl ? Model.Decided.NameAr : Model.Decided.NameEn)
+                        <span class="text-muted">(@c.DecisionArticleRef)</span>
+                    </dd>
+                }
+                @if (!string.IsNullOrWhiteSpace(c.DeviationReason))
+                {
+                    <dt class="col-5 col-sm-4">@T("Deviation reason", "سبب المخالفة للمقترح")</dt>
+                    <dd class="col-7 col-sm-8">@c.DeviationReason</dd>
+                }
+            </dl>
+        </div>
+
+        <h2 class="sms-section-title">@T("Trail", "المسار")</h2>
+        <div class="sms-card p-3 mb-4">
+            <ol class="list-unstyled mb-0">
+                @foreach (var e in Model.Timeline)
+                {
+                    <li class="d-flex gap-3 pb-3">
+                        <i class="bi @e.Icon fs-5 text-muted" aria-hidden="true"></i>
+                        <div>
+                            <div class="fw-semibold">@(isRtl ? e.TitleAr : e.TitleEn)</div>
+                            <div class="small text-muted">@e.AtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</div>
+                            @{ var body = isRtl ? e.BodyAr : e.BodyEn; }
+                            @if (!string.IsNullOrWhiteSpace(body))
+                            {
+                                <div class="mt-1">@body</div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+        <h2 class="sms-section-title">@T("Next step", "الخطوة التالية")</h2>
+
+        @if (canInvestigate)
+        {
+            <div class="sms-card p-3 mb-3">
+                <p class="small text-muted">@T("Opening an investigation assigns the case to you and lets statements be taken. A case that needs no investigation may be decided directly.", "فتح التحقيق يُسند القضية إليك ويسمح بأخذ الإفادات. والقضية التي لا تحتاج تحقيقاً يمكن أن يُبتّ فيها مباشرة.")</p>
+                <form method="post" asp-action="StartInvestigation" asp-route-id="@c.Id">
+                    <button type="submit" class="btn btn-outline-primary w-100">@T("Open investigation", "فتح التحقيق")</button>
+                </form>
+            </div>
+        }
+
+        @if (canDecide || c.Status == CaseStatus.UnderInvestigation)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Record a statement", "تسجيل إفادة")</h3>
+                <form method="post" asp-action="AddStatement" asp-route-id="@c.Id" class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label" for="skind">@T("Whose statement", "إفادة من")</label>
+                        <select id="skind" name="kind" class="form-select">
+                            @foreach (StatementKind k in Enum.GetValues(typeof(StatementKind)))
+                            {
+                                <option value="@k">@DisciplineLabels.StatementKind(k, isRtl)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="stext">@T("Statement", "نصّ الإفادة")</label>
+                        <textarea id="stext" name="text" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-outline-secondary w-100">@T("Record statement", "تسجيل الإفادة")</button></div>
+                </form>
+            </div>
+        }
+
+        @if (canDecide)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Decide", "إصدار القرار")</h3>
+                @if (!Model.DueProcessSatisfied)
+                {
+                    <div class="alert alert-warning small" role="alert">
+                        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+                        @T("This case is serious enough that the student or a parent must give a statement first. The decision will be refused until one is recorded (BR-DCP-003).",
+                           "هذه القضية من الجسامة التي تُوجب إفادة الطالب أو ولي الأمر أولاً. وسيُرفَض القرار حتى تُسجَّل إحداهما (BR-DCP-003).")
+                    </div>
+                }
+                @if (Model.DecisionNeedsPrincipal)
+                {
+                    <div class="alert alert-dark small" role="alert">
+                        <i class="bi bi-person-badge me-1" aria-hidden="true"></i>
+                        @T("A gravest-level case requires the Principal whatever is decided (BR-DCP-004).",
+                           "القضية البالغة تحتاج المدير أيّاً كان القرار (BR-DCP-004).")
+                    </div>
+                }
+                <form method="post" asp-action="Decide" asp-route-id="@c.Id" class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label" for="cons">@T("Consequence", "الإجراء")</label>
+                        <select id="cons" name="consequenceTypeId" class="form-select" required>
+                            @foreach (var option in Model.Consequences)
+                            {
+                                <option value="@option.Id" selected="@(Model.Proposed != null && option.Id == Model.Proposed.Id)">
+                                    @(isRtl ? option.NameAr : option.NameEn)@(option.IsSuspensionClass ? T(" — suspension", " — فصل") : "")
+                                </option>
+                            }
+                        </select>
+                        <div class="form-text">@T("Only what the behaviour code defines (BR-DCP-004).", "ما تحدّده لائحة السلوك فقط (BR-DCP-004).")</div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="article">@T("Code article", "مادة اللائحة")</label>
+                        <input id="article" name="articleRef" class="form-control" value="@Model.Violation.ArticleRef" required />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="dev">@T("Reason, if lighter than proposed", "السبب، إن كان أخفّ من المقترح")</label>
+                        <input id="dev" name="deviationReason" class="form-control" />
+                    </div>
+                    <div class="col-12 form-check ms-2">
+                        <input class="form-check-input" type="checkbox" id="princ" name="principalApproves" value="true" />
+                        <label class="form-check-label" for="princ">@T("I am approving this as Principal", "أعتمد هذا بصفتي المدير")</label>
+                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-primary w-100">@T("Record decision", "تسجيل القرار")</button></div>
+                </form>
+            </div>
+        }
+
+        @if (canApply)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Apply the action", "تنفيذ الإجراء")</h3>
+                @if (Model.Decided?.IsSuspensionClass == true)
+                {
+                    <p class="small text-muted">
+                        @(Model.MaxSuspensionDays.HasValue
+                            ? T($"A suspension may not exceed {Model.MaxSuspensionDays} days under this code (BR-DCP-004).", $"لا يتجاوز الفصل {Model.MaxSuspensionDays} يوماً بموجب هذه اللائحة (BR-DCP-004).")
+                            : T("No suspension cap is configured on this code, so the days are not bounded here (BR-DCP-004).", "لا سقف للفصل مُعرَّف في هذه اللائحة، فالأيام غير مقيَّدة هنا (BR-DCP-004)."))
+                    </p>
+                }
+                <form method="post" asp-action="ApplyAction" asp-route-id="@c.Id" class="row g-2">
+                    <div class="col-12 col-sm-7">
+                        <label class="form-label" for="start">@T("Starts", "يبدأ")</label>
+                        <input id="start" type="date" name="startDate" class="form-control" required />
+                    </div>
+                    <div class="col-12 col-sm-5">
+                        <label class="form-label" for="days">@T("Days", "الأيام")</label>
+                        <input id="days" type="number" min="1" max="@(Model.MaxSuspensionDays ?? 365)" name="days" class="form-control" />
+                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-primary w-100">@T("Apply", "تنفيذ")</button></div>
+                </form>
+            </div>
+        }
+
+        @if (Model.Action != null)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Action in force", "الإجراء الساري")</h3>
+                <dl class="row mb-0 small">
+                    <dt class="col-5">@T("Starts", "يبدأ")</dt>
+                    <dd class="col-7">@Model.Action.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+                    @if (Model.Action.Days.HasValue)
+                    {
+                        <dt class="col-5">@T("Days", "الأيام")</dt>
+                        <dd class="col-7">@Model.Action.Days</dd>
+                    }
+                    <dt class="col-5">@T("Served", "نُفِّذ")</dt>
+                    <dd class="col-7">@(Model.Action.CompletedAtUtc?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? T("not yet", "لم يُنفَّذ بعد"))</dd>
+                </dl>
+            </div>
+        }
+
+        @if (canAppeal)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("File an appeal at the counter", "تقديم تظلّم في المكتب")</h3>
+                <p class="small text-muted">
+                    @T("The appeal is the parent's, and the portal is where they will make it. This records one brought in on paper — the guardian is named because the system records who appealed, and a staff member is not that person.",
+                       "التظلّم لولي الأمر، والبوابة هي حيث سيقدّمه. وهذا يسجّل تظلّماً جاء ورقاً — ويُسمّى ولي الأمر لأن النظام يسجّل من تظلّم، والموظف ليس ذاك الشخص.")
+                    @(Model.AppealWindowClosesAtUtc.HasValue
+                        ? T($" The window closes {Model.AppealWindowClosesAtUtc:yyyy-MM-dd}.", $" وتنقضي المهلة في {Model.AppealWindowClosesAtUtc:yyyy-MM-dd}.")
+                        : "")
+                </p>
+                <form method="post" asp-action="FileAppeal" asp-route-id="@c.Id" class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label" for="guardian">@T("Guardian", "ولي الأمر")</label>
+                        <select id="guardian" name="parentId" class="form-select" required>
+                            @foreach (var g in Model.Guardians)
+                            {
+                                <option value="@g.ParentId">@(isRtl ? g.NameAr : g.NameEn)</option>
+                            }
+                        </select>
+                        @if (Model.Guardians.Count == 0)
+                        {
+                            <div class="form-text text-danger">@T("This student has no guardian on file, so an appeal cannot be attributed to anyone.", "لا ولي أمر مسجَّل لهذا الطالب، فلا يمكن نسبة التظلّم إلى أحد.")</div>
+                        }
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="grounds">@T("Grounds", "أسباب التظلّم")</label>
+                        <textarea id="grounds" name="grounds" class="form-control" rows="2" required></textarea>
+                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-outline-secondary w-100">@T("File appeal", "تقديم التظلّم")</button></div>
+                </form>
+            </div>
+        }
+
+        @if (Model.Appeal != null)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Appeal", "التظلّم")</h3>
+                <p class="small mb-2">@Model.Appeal.Grounds</p>
+                <p class="small text-muted">@T("Outcome:", "النتيجة:") @DisciplineLabels.AppealOutcome(Model.Appeal.Outcome, isRtl)</p>
+                @if (Model.Appeal.Outcome == AppealOutcome.Pending)
+                {
+                    <div class="alert alert-info small" role="alert">
+                        @T("The reviewer must not be whoever decided the case (BR-DCP-006). If you took the decision, the system will refuse this.",
+                           "لا يكون المراجع هو من أصدر القرار (BR-DCP-006). فإن كنت من قرّر، سيرفض النظام ذلك.")
+                    </div>
+                    <form method="post" asp-action="DecideAppeal" asp-route-id="@c.Id" class="row g-2">
+                        <input type="hidden" name="appealId" value="@Model.Appeal.Id" />
+                        <div class="col-12">
+                            <label class="form-label" for="outcome">@T("Outcome", "النتيجة")</label>
+                            <select id="outcome" name="outcome" class="form-select">
+                                <option value="@AppealOutcome.Upheld">@DisciplineLabels.AppealOutcome(AppealOutcome.Upheld, isRtl)</option>
+                                <option value="@AppealOutcome.Modified">@DisciplineLabels.AppealOutcome(AppealOutcome.Modified, isRtl)</option>
+                                <option value="@AppealOutcome.Dismissed">@DisciplineLabels.AppealOutcome(AppealOutcome.Dismissed, isRtl)</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="modified">@T("If modified, the new consequence", "إن عُدِّل، الإجراء الجديد")</label>
+                            <select id="modified" name="modifiedConsequenceTypeId" class="form-select">
+                                <option value="">@T("— unchanged —", "— بلا تغيير —")</option>
+                                @foreach (var option in Model.Consequences)
+                                {
+                                    <option value="@option.Id">@(isRtl ? option.NameAr : option.NameEn)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="note">@T("Note", "ملاحظة")</label>
+                            <input id="note" name="note" class="form-control" />
+                        </div>
+                        <div class="col-12"><button type="submit" class="btn btn-primary w-100">@T("Decide appeal", "البتّ في التظلّم")</button></div>
+                    </form>
+                }
+            </div>
+        }
+
+        @if (canClose)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h3 class="h6">@T("Close", "الإغلاق")</h3>
+                <p class="small text-muted">
+                    @T("A case closes once the appeal window has elapsed, or the appeal has been decided (BR-DCP-006). Closing early is refused rather than warned about.",
+                       "تُغلَق القضية بانقضاء مهلة التظلّم أو بالبتّ في التظلّم (BR-DCP-006). والإغلاق المبكر يُرفَض لا يُنبَّه عليه.")
+                </p>
+                <form method="post" asp-action="CloseCase" asp-route-id="@c.Id">
+                    <button type="submit" class="btn btn-outline-danger w-100">@T("Close case", "إغلاق القضية")</button>
+                </form>
+            </div>
+        }
+
+        @if (c.Status == CaseStatus.Closed)
+        {
+            <div class="sms-card p-3 text-muted">
+                <i class="bi bi-lock me-1" aria-hidden="true"></i>
+                @T("This case is closed. The record stays readable and is never removed (BR-GLB-005).", "هذه القضية مغلقة. ويبقى السجلّ قابلاً للقراءة ولا يُحذف أبداً (BR-GLB-005).")
+            </div>
+        }
+    </div>
+</div>

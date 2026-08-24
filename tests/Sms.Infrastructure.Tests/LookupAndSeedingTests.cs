@@ -113,6 +113,74 @@ namespace Sms.Infrastructure.Tests
             Assert.False(stored.IsActive);
         }
 
+        /// <summary>
+        /// The soft-active lookup trap, inside the lookup module itself. The admin
+        /// read its own rows through the active filter, so a retired value was
+        /// invisible to it: reactivating one tried to insert a second row with the
+        /// same (category, code) and died on the unique index, and the operator got a
+        /// raw DbUpdateException that the controller's catch did not even match.
+        /// The reactivate button on the lookups screen was a 500.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SET-002")]
+        public async Task Reactivating_a_retired_value_revives_the_same_row_instead_of_duplicating_it()
+        {
+            using var db = CreateContext();
+            var admin = new LookupAdmin(db);
+            await admin.DefineCategoryAsync("IdType", LookupCategoryTier.ProductSeeded, "نوع الهوية", "ID Type");
+            var value = await admin.DefineValueAsync("IdType", "Passport", "جواز سفر", "Passport", sortOrder: 1);
+            await admin.DeactivateValueAsync(value.Id);
+
+            // What the screen's Reactivate button does: upsert by the same code.
+            var revived = await admin.DefineValueAsync("IdType", "Passport", "جواز سفر", "Passport", sortOrder: 1);
+
+            Assert.Equal(value.Id, revived.Id);
+            Assert.True(revived.IsActive);
+            Assert.Single(db.LookupValues.IgnoreQueryFilters().Where(v => v.Code == "Passport").ToList());
+        }
+
+        /// <summary>
+        /// The same trap from the other side: retiring an already-retired value threw
+        /// "sequence contains no elements", in English, at whoever clicked twice.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SET-002")]
+        public async Task Deactivating_an_already_retired_value_is_a_no_op_not_a_crash()
+        {
+            using var db = CreateContext();
+            var admin = new LookupAdmin(db);
+            await admin.DefineCategoryAsync("IdType", LookupCategoryTier.ProductSeeded, "نوع الهوية", "ID Type");
+            var value = await admin.DefineValueAsync("IdType", "Passport", "جواز سفر", "Passport", sortOrder: 1);
+
+            await admin.DeactivateValueAsync(value.Id);
+            await admin.DeactivateValueAsync(value.Id);
+
+            Assert.False(db.LookupValues.IgnoreQueryFilters().Single(v => v.Id == value.Id).IsActive);
+        }
+
+        /// <summary>
+        /// Editing a value under a category the school has retired must still work —
+        /// the category lookup had the same defect, and a retired category is exactly
+        /// when someone needs to correct what is filed under it.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SET-002")]
+        public async Task A_value_under_a_retired_category_can_still_be_edited()
+        {
+            using var db = CreateContext();
+            var admin = new LookupAdmin(db);
+            var category = await admin.DefineCategoryAsync("Housing", LookupCategoryTier.SchoolManaged, "السكن", "Housing");
+            await admin.DefineValueAsync("Housing", "Owned", "ملك", "Owned", sortOrder: 1);
+
+            category.IsActive = false;
+            await db.SaveChangesAsync();
+
+            var edited = await admin.DefineValueAsync("Housing", "Owned", "ملك", "Owned outright", sortOrder: 2);
+
+            Assert.Equal("Owned outright", edited.Name.NameEn);
+            Assert.Equal(2, edited.SortOrder);
+        }
+
         // --- SeedRunner + contributors -----------------------------------------
 
         [Fact]

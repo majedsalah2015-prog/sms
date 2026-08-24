@@ -1,0 +1,170 @@
+@using System.Globalization
+@using Sms.Domain.Attachments
+@using Sms.Web.Models
+@model DocumentTypeCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Document types", "أنواع المستندات");
+    ViewData["Breadcrumb"] = T("System Setup / Document types", "إعداد النظام / أنواع المستندات");
+
+    string Formats(DocumentFormat f)
+    {
+        var parts = new List<string>();
+        if (f.HasFlag(DocumentFormat.Pdf)) parts.Add("PDF");
+        if (f.HasFlag(DocumentFormat.Jpg)) parts.Add("JPG");
+        if (f.HasFlag(DocumentFormat.Png)) parts.Add("PNG");
+        if (f.HasFlag(DocumentFormat.Docx)) parts.Add("DOCX");
+        if (f.HasFlag(DocumentFormat.Xlsx)) parts.Add("XLSX");
+        return parts.Count == 0 ? T("none", "لا شيء") : string.Join(" · ", parts);
+    }
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "doc-help", Title = T("Document types — help", "أنواع المستندات — مساعدة"),
+        Intro = T("Every file the system accepts is filed under a type defined here, and the type is what decides which formats are allowed, how large a file may be, whether it expires, and who may open it.", "كل ملف يقبله النظام يُصنَّف تحت نوع معرَّف هنا، والنوع هو الذي يقرّر الصيغ المسموحة وحجم الملف وهل ينتهي وله تاريخ ومن يحق له فتحه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Restricted is not a label", "«مقيَّد» ليس وسماً"), T("A restricted type inherits the access rules of a restricted category (BR-ATT-004, BR-GLB-072): medical files, identity documents, hardship evidence. Marking a type restricted narrows who can open every file already filed under it, immediately.", "النوع المقيَّد يرث قواعد وصول الفئات المقيَّدة (BR-ATT-004, BR-GLB-072): الملفات الطبية ووثائق الهوية وأدلة الحالة الاجتماعية. ووسم النوع بأنه مقيَّد يُضيّق فوراً من يستطيع فتح كل ملف صُنِّف تحته من قبل.")),
+            new HelpPanelViewModel.Item(T("Size and formats are enforced, not suggested", "الحجم والصيغ يُفرَضان لا يُقترحان"), T("The upload is refused server-side when a file breaks either rule (BR-ATT-002/003). Leaving the size blank uses the product default; the product ceiling applies regardless of what is typed here.", "يُرفض الرفع من الخادم إذا خالف الملف أياً من القاعدتين (BR-ATT-002/003). وترك الحجم فارغاً يستخدم الافتراضي، ويظل سقف المنتج سارياً مهما كُتب هنا.")),
+            new HelpPanelViewModel.Item(T("Expiry tracking", "تتبّع الانتهاء"), T("A type marked expiry-tracked asks for an expiry date on every upload and feeds the expiring-documents lists (BR-ATT-008) — passports, licences, insurance. Leave it off for anything that does not expire, or the list fills with noise.", "النوع الموسوم بتتبّع الانتهاء يطلب تاريخ انتهاء عند كل رفع ويغذّي قوائم المستندات المنتهية (BR-ATT-008) — كجوازات السفر والرخص والتأمين. أطفئه لما لا ينتهي، وإلا امتلأت القائمة بما لا يعني.")),
+            new HelpPanelViewModel.Item(T("Types are retired, never removed", "الأنواع تُتقاعد ولا تُحذف"), T("A type with files behind it stays in the catalogue when it stops being offered, because those files still have to be explicable. The count beside each row is what already came in under it.", "النوع الذي خلفه ملفات يبقى في الفهرس حين يتوقف عرضه، لأن تلك الملفات ما زالت بحاجة إلى تفسير. والعدد بجانب كل سطر هو ما ورد تحته من قبل.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("The catalogue every attachment in the product is filed under — what may be uploaded, how big, whether it expires, and whether it is restricted.",
+               "الفهرس الذي يُصنَّف تحته كل مرفق في النظام — ما الذي يُرفع، وبأي حجم، وهل ينتهي، وهل هو مقيَّد.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_SetupNav" />
+
+<form method="get" class="mb-3 d-flex gap-2 align-items-end flex-wrap">
+    <div>
+        <label class="form-label" for="module">@T("Module", "الوحدة")</label>
+        <select id="module" name="module" class="form-select form-select-sm">
+            <option value="">@T("all modules", "كل الوحدات")</option>
+            @foreach (var code in Model.Modules)
+            {
+                <option value="@code" selected="@(string.Equals(code, Model.ModuleFilter, StringComparison.OrdinalIgnoreCase))">@code</option>
+            }
+        </select>
+    </div>
+    <div class="form-check mb-2">
+        <input class="form-check-input" type="checkbox" id="includeInactive" name="includeInactive" value="true" checked="@Model.IncludeInactive" />
+        <label class="form-check-label" for="includeInactive">@T("show retired", "أظهر المتقاعدة")</label>
+    </div>
+    <button type="submit" class="btn btn-sm btn-outline-secondary mb-2">@T("Filter", "تصفية")</button>
+</form>
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("Type", "النوع")</th>
+            <th scope="col">@T("Module", "الوحدة")</th>
+            <th scope="col">@T("Formats", "الصيغ")</th>
+            <th scope="col">@T("Max size", "أقصى حجم")</th>
+            <th scope="col">@T("Rules", "القواعد")</th>
+            <th scope="col">@T("Files", "الملفات")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="6" class="p-3 text-muted">@T("No document type is defined, so nothing can be attached anywhere in the product yet.", "لا يوجد نوع مستند معرَّف، فلا يمكن إرفاق شيء في أي مكان بالنظام بعد.")</td></tr>
+        }
+        else
+        {
+            @foreach (var row in Model.Rows)
+            {
+                <tr class="@(row.Type.IsActive ? "" : "text-muted")">
+                    <td>
+                        @(isRtl ? row.Type.Name.NameAr : row.Type.Name.NameEn)
+                        <div class="small text-muted"><code>@row.Type.Code</code></div>
+                        @if (!row.Type.IsActive)
+                        {
+                            <span class="badge text-bg-secondary">@T("retired", "متقاعد")</span>
+                        }
+                    </td>
+                    <td><code>@row.Type.ModuleCode</code></td>
+                    <td class="small">@Formats(row.Type.AllowedFormats)</td>
+                    <td>@(row.Type.MaxSizeBytes is int b ? $"{b / 1024 / 1024} MB" : T("product default", "الافتراضي"))</td>
+                    <td class="small">
+                        @if (row.Type.IsRestricted)
+                        {
+                            <span class="badge text-bg-danger"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i>@T("restricted", "مقيَّد")</span>
+                        }
+                        @if (row.Type.IsMandatoryByDefault)
+                        {
+                            <span class="badge text-bg-light border">@T("mandatory", "إلزامي")</span>
+                        }
+                        @if (row.Type.IsExpiryTracked)
+                        {
+                            <span class="badge text-bg-light border">@T("expires", "له انتهاء")</span>
+                        }
+                    </td>
+                    <td>@(row.AttachmentCount == 0 ? T("—", "—") : row.AttachmentCount.ToString(CultureInfo.InvariantCulture))</td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<div class="sms-card">
+    <div class="p-3">
+        <h2 class="h6 mb-3">@T("Define a document type", "تعريف نوع مستند")</h2>
+        <form method="post" asp-action="Documents" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" for="Code">@T("Code", "الرمز") *</label>
+                <input id="Code" name="Code" class="form-control" maxlength="30" required aria-required="true" dir="ltr" placeholder="STU-BIRTH-CERT" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="ModuleCode">@T("Module", "الوحدة") *</label>
+                <input id="ModuleCode" name="ModuleCode" class="form-control" maxlength="6" required aria-required="true" dir="ltr" placeholder="STU" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="NameAr">@T("Name (Arabic)", "الاسم (عربي)") *</label>
+                <input id="NameAr" name="NameAr" class="form-control" maxlength="80" required aria-required="true" dir="rtl" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="NameEn">@T("Name (English)", "الاسم (إنجليزي)") *</label>
+                <input id="NameEn" name="NameEn" class="form-control" maxlength="80" required aria-required="true" dir="ltr" />
+            </div>
+
+            <div class="col-md-5">
+                <span class="form-label d-block">@T("Allowed formats", "الصيغ المسموحة")</span>
+                <div class="d-flex gap-3 flex-wrap">
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPdf" name="AllowPdf" value="true" checked /><label class="form-check-label" for="AllowPdf">PDF</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowJpg" name="AllowJpg" value="true" checked /><label class="form-check-label" for="AllowJpg">JPG</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPng" name="AllowPng" value="true" checked /><label class="form-check-label" for="AllowPng">PNG</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowDocx" name="AllowDocx" value="true" /><label class="form-check-label" for="AllowDocx">DOCX</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowXlsx" name="AllowXlsx" value="true" /><label class="form-check-label" for="AllowXlsx">XLSX</label></div>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="MaxSizeMb">@T("Max size (MB)", "أقصى حجم (م.ب)")</label>
+                <input id="MaxSizeMb" name="MaxSizeMb" type="number" min="1" max="25" class="form-control" />
+            </div>
+            <div class="col-md-5">
+                <span class="form-label d-block">@T("Rules", "القواعد")</span>
+                <div class="d-flex gap-3 flex-wrap">
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsMandatoryByDefault" name="IsMandatoryByDefault" value="true" /><label class="form-check-label" for="IsMandatoryByDefault">@T("mandatory by default", "إلزامي افتراضاً")</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsExpiryTracked" name="IsExpiryTracked" value="true" /><label class="form-check-label" for="IsExpiryTracked">@T("tracks expiry", "يتتبّع الانتهاء")</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsRestricted" name="IsRestricted" value="true" /><label class="form-check-label" for="IsRestricted">@T("restricted category", "فئة مقيَّدة")</label></div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+            </div>
+        </form>
+    </div>
+</div>

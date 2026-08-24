@@ -110,7 +110,7 @@ namespace Sms.Web.Controllers
                 await _timetable.DefineShapeAsync(stageId, year);
                 TempData["Flash"] = T("Shape created — add the day's period slots (BR-TTB-001).", "أُنشئ شكل الجدول — أضف حصص اليوم (BR-TTB-001).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Shape), new { year, stage = stageId });
         }
 
@@ -135,7 +135,7 @@ namespace Sms.Web.Controllers
                 }
                 TempData["Flash"] = T($"{added} slot(s) added; {skipped} skipped (sequence taken or time overlap).", $"أُضيفت {added} حصة؛ تُخطيت {skipped} (الترتيب مستخدم أو تداخل وقت).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Shape), new { year, stage });
         }
 
@@ -145,7 +145,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> RemoveSlot(int slotId, int year, int stage)
         {
             try { await _timetable.RemovePeriodSlotAsync(slotId); TempData["Flash"] = T("Slot removed.", "حُذفت الحصة."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Shape), new { year, stage });
         }
 
@@ -169,7 +169,7 @@ namespace Sms.Web.Controllers
                 }
                 TempData["Flash"] = T($"Copied {added} slot(s) to {TimetableLabels.Day(toDay, false)}.", $"نُسخت {added} حصة إلى {TimetableLabels.Day(toDay, true)}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Shape), new { year, stage });
         }
 
@@ -246,7 +246,7 @@ namespace Sms.Web.Controllers
         {
             TimetableVersion? v = null;
             try { v = await _timetable.DefineVersionAsync(year, termId); TempData["Flash"] = T($"Draft version v{v.Id} created.", $"أُنشئت المسودة v{v.Id}."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(returnTo == "publish" ? nameof(Publish) : nameof(Builder), new { year, version = v?.Id });
         }
 
@@ -263,7 +263,7 @@ namespace Sms.Web.Controllers
                 await _timetable.PlaceAsync(version, section, slot, offering, teacher, room);
                 TempData["Flash"] = T("Placed.", "وُضعت الحصة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Builder), new { year, version, section });
         }
 
@@ -273,7 +273,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> RemovePlacement(int id, int year, int version, int? section, string? mode, int? teacher, int? room)
         {
             try { await _timetable.RemovePlacementAsync(id); TempData["Flash"] = T("Placement removed.", "أُزيلت الحصة."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Builder), new { year, version, section, mode, teacher, room });
         }
 
@@ -298,7 +298,7 @@ namespace Sms.Web.Controllers
                 }
                 TempData["Flash"] = T($"Copied {copied} placement(s); {skipped} skipped (no assigned teacher, or a teacher/section conflict). Rooms are not copied.", $"نُسخت {copied} حصة؛ تُخطيت {skipped} (لا معلم مُسنَد أو تعارض معلم/شعبة). لا تُنسخ القاعات.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Builder), new { year, version, section });
         }
 
@@ -339,7 +339,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> ValidateVersion(int id, int year, string? returnTo)
         {
             try { await _timetable.ValidateVersionAsync(id); TempData["Flash"] = T("Version validated — zero hard-constraint violations, every placed section complete (BR-TTB-002/003). Editing is now locked; reopen to change.", "تم التحقق من الإصدار — لا مخالفات صارمة وكل شعبة موضوعة مكتملة (BR-TTB-002/003). التحرير مقفل الآن؛ أعد الفتح للتعديل."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(returnTo == "publish" ? nameof(Publish) : nameof(Validation), new { year, version = id });
         }
 
@@ -349,7 +349,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> ReopenVersion(int id, int year, string? returnTo)
         {
             try { await _timetable.ReopenVersionAsync(id); TempData["Flash"] = T("Version reopened for editing.", "أُعيد فتح الإصدار للتحرير."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(returnTo == "publish" ? nameof(Publish) : returnTo == "builder" ? nameof(Builder) : nameof(Validation), new { year, version = id });
         }
 
@@ -429,7 +429,7 @@ namespace Sms.Web.Controllers
                 var n = await (from s in _db.Sessions join p in _db.Placements on s.PlacementId equals p.Id where p.TimetableVersionId == id select s.Id).CountAsync();
                 TempData["Flash"] = T($"Published — {n} dated sessions generated on working days (BR-TTB-006). Portal and personal views now read this version.", $"تم النشر — وُلِّدت {n} حصة مؤرخة في أيام العمل (BR-TTB-006). البوابة والعروض الشخصية تقرأ هذا الإصدار الآن.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Publish), new { year, version = id });
         }
 
@@ -501,7 +501,7 @@ namespace Sms.Web.Controllers
                 await _timetable.AssignSubstituteAsync(id, substituteProfileId.Value, reason.Trim(), superviseOnly, !notCounted);
                 TempData["Flash"] = T("Substitute assigned for this dated session only (BR-TTB-007)." + (superviseOnly ? " Supervise-only — flagged, not marked qualified teaching." : ""), "عُيِّن البديل لهذه الحصة المؤرخة فقط (BR-TTB-007)." + (superviseOnly ? " إشراف فقط — مُعلَّم، لا يُعد تدريساً مؤهلاً." : ""));
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Cover), new { date = date.ToString("yyyy-MM-dd"), teacher });
         }
 
@@ -517,7 +517,7 @@ namespace Sms.Web.Controllers
                 await _timetable.ChangeSessionRoomAsync(id, roomId.Value, reason.Trim());
                 TempData["Flash"] = T("Room changed for this session (BR-TTB-008) — visible on every view immediately.", "غُيِّرت القاعة لهذه الحصة (BR-TTB-008) — تظهر في كل العروض فوراً.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return returnTo == "conflicts" ? RedirectToAction(nameof(Conflicts), new { from = date?.ToString("yyyy-MM-dd"), days }) : RedirectToAction(nameof(Cover), new { date = date?.ToString("yyyy-MM-dd"), teacher });
         }
 
@@ -532,7 +532,7 @@ namespace Sms.Web.Controllers
                 await _timetable.CancelSessionAsync(id, reason.Trim());
                 TempData["Flash"] = T("Session cancelled (logged with reason).", "أُلغيت الحصة (سُجِّلت مع السبب).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return returnTo == "conflicts" ? RedirectToAction(nameof(Conflicts), new { from = date?.ToString("yyyy-MM-dd"), days }) : RedirectToAction(nameof(Cover), new { date = date?.ToString("yyyy-MM-dd"), teacher });
         }
 

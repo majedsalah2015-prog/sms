@@ -61,10 +61,22 @@
                            retired but never fixed — and the school's list then carried both. *@
                         if (readOnly)
                         {
+                            // The product-seeded lists are the heavily referenced ones — a nationality
+                            // or an ID type is held by half the register — so the count belongs here
+                            // too, even though nothing on this row can retire it.
+                            var readOnlyUses = Model.Usage.TryGetValue(v.Id, out var ru) ? ru : Array.Empty<Sms.Application.Lookups.LookupUsage>();
+                            var readOnlyTotal = readOnlyUses.Sum(x => x.Count);
                             <tr class="@(v.IsActive ? "" : "text-muted")">
                                 <td>@v.SortOrder</td><td><code>@v.Code</code></td><td dir="rtl">@v.Name.NameAr</td><td dir="ltr">@v.Name.NameEn</td>
                                 <td><span aria-hidden="true">@(v.IsActive ? "✓" : "—")</span><span class="visually-hidden">@(v.IsActive ? T("Active", "فعّال") : T("Inactive", "معطَّل"))</span></td>
-                                <td></td>
+                                <td>
+                                    @if (readOnlyTotal > 0)
+                                    {
+                                        <span class="badge text-bg-light border text-nowrap" title="@LookupUsageLabels.Summarize(readOnlyUses, isRtl)">
+                                            <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>@readOnlyTotal
+                                        </span>
+                                    }
+                                </td>
                             </tr>
                         }
                         else
@@ -80,10 +92,27 @@
                                             <input name="nameEn" value="@v.Name.NameEn" dir="ltr" class="form-control form-control-sm" aria-label="@T("English name", "الاسم بالإنجليزية")" />
                                             <button class="btn btn-sm btn-outline-primary text-nowrap" type="submit" title="@T("Save this value", "حفظ هذه القيمة")"><i class="bi bi-check2" aria-hidden="true"></i></button>
                                         </form>
-                                        <div class="col-auto d-flex gap-1">
+                                        <div class="col-auto d-flex gap-1 align-items-center">
+                                            @{
+                                                // doc §9: what already points at this value, said before the
+                                                // click rather than discovered after it.
+                                                var uses = Model.Usage.TryGetValue(v.Id, out var u) ? u : Array.Empty<Sms.Application.Lookups.LookupUsage>();
+                                                var total = uses.Sum(x => x.Count);
+                                                var summary = LookupUsageLabels.Summarize(uses, isRtl);
+                                            }
+                                            @if (total > 0)
+                                            {
+                                                <span class="badge @(v.IsActive ? "text-bg-light border" : "text-bg-secondary") text-nowrap" title="@summary">
+                                                    <i class="bi bi-link-45deg me-1" aria-hidden="true"></i>@total
+                                                </span>
+                                            }
                                             @if (v.IsActive)
                                             {
-                                                <form method="post" asp-action="DeactivateLookupValue" class="mb-0" onsubmit="return confirm('@T("Deactivate this value? It stays visible in historical records (BR-GLB-006).", "إلغاء تفعيل هذه القيمة؟ ستبقى ظاهرة في السجلات التاريخية (BR-GLB-006).")');">
+                                                var confirmText = total == 0
+                                                    ? T("Deactivate this value? Nothing refers to it, so nothing will change except that it stops being offered.", "إلغاء تفعيل هذه القيمة؟ لا شيء يشير إليها، فلن يتغير سوى أنها تتوقف عن الظهور في الخيارات.")
+                                                    : T($"Deactivate this value? {summary} already refer to it. Those records keep it — it only stops being offered to new ones (BR-SET-002).",
+                                                        $"إلغاء تفعيل هذه القيمة؟ يشير إليها بالفعل: {summary}. وتلك السجلات تحتفظ بها — وإنما تتوقف عن الظهور للسجلات الجديدة (BR-SET-002).");
+                                                <form method="post" asp-action="DeactivateLookupValue" class="mb-0" onsubmit="return confirm('@Html.Raw(confirmText.Replace("'", "\\'"))');">
                                                     <input type="hidden" name="id" value="@v.Id" /><input type="hidden" name="category" value="@Model.Selected.Code" />
                                                     <button class="btn btn-sm btn-outline-danger text-nowrap" type="submit">@T("Deactivate", "إلغاء التفعيل")</button>
                                                 </form>

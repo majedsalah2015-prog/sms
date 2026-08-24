@@ -55,6 +55,16 @@ namespace Sms.Application.Discounts
 
         Task RejectGrantAsync(int discountGrantId, int decidedByUserId, string reason, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// The grant's percentage-of-applicable-charges equivalent — the number
+        /// BR-DIS-003 routes the approval chain on, and the only honest way to
+        /// compare a fixed-amount grant against a percentage threshold. Exposed
+        /// because WF-04's routing value has to be the <em>same</em> number the
+        /// tier was computed from: two derivations of it would eventually disagree,
+        /// and the disagreement would be about who signs.
+        /// </summary>
+        Task<decimal> GetGrantPercentEquivalentAsync(int discountGrantId, CancellationToken cancellationToken = default);
+
         /// <summary>BR-DIS-008: effective date ≥ today (<see cref="Common.Exceptions.RevocationDateInPastException"/>); reason mandatory (T1). Default forgives consumed portions; <paramref name="clawBack"/> posts a manual charge for the forward fraction.</summary>
         Task RevokeGrantAsync(int discountGrantId, DateTime effectiveDate, string reason, bool clawBack = false, CancellationToken cancellationToken = default);
 

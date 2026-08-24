@@ -99,7 +99,7 @@ namespace Sms.Web.Controllers
                 await _admissions.DefineCampaignAsync(form.GradeYearProfileId.Value, form.OpenDate.Value, form.CloseDate.Value, form.RequiresAssessment, form.ApplicationFeeAmount);
                 TempData["Flash"] = T("Campaign created.", "تم إنشاء حملة القبول.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -114,7 +114,7 @@ namespace Sms.Web.Controllers
                 await _admissions.UpdateCampaignAsync(id, openDate.Value, closeDate.Value, requiresAssessment, applicationFeeAmount);
                 TempData["Flash"] = T("Campaign updated.", "تم تحديث الحملة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -134,7 +134,7 @@ namespace Sms.Web.Controllers
                         ? T($"Campaign and its {applications} application(s) deleted.", $"تم حذف الحملة و{applications} طلب/طلبات.")
                         : T($"Campaign and its {applications} application(s) deleted; the {registered} student(s) already registered from it were kept.", $"تم حذف الحملة و{applications} طلب/طلبات؛ تم الإبقاء على {registered} طالب/طلاب سبق تسجيلهم منها.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -183,7 +183,7 @@ namespace Sms.Web.Controllers
                 await _admissions.ChangeStatusAsync(id, target);
                 TempData["Flash"] = T($"Application moved to {target}.", $"انتقل الطلب إلى {target}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return returnTo is "board" or "grid" ? RedirectToAction(nameof(Board), new { campaign = (await _db.Applications.AsNoTracking().SingleAsync(a => a.Id == id)).CampaignId, view = returnTo }) : RedirectToAction(nameof(Details), new { id });
         }
 
@@ -244,7 +244,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 var model = await BuildApplyAsync(c);
                 CopyForm(form, model);
                 return View(model);
@@ -319,7 +319,7 @@ namespace Sms.Web.Controllers
                 await _admissions.UpdateApplicationAsync(id, form.FirstNameAr!, form.FatherNameAr!, form.GrandfatherNameAr!, form.FamilyNameAr!, form.FirstNameEn!, form.FatherNameEn!, form.GrandfatherNameEn!, form.FamilyNameEn!, form.Gender, form.DateOfBirth.Value, form.NationalityLookupId.Value, form.ParentId);
                 TempData["Flash"] = T("Application updated.", "تم تحديث الطلب.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -335,7 +335,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Application deleted.", "تم حذف الطلب.");
                 return RedirectToAction(nameof(Board), new { campaign = app?.CampaignId });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -350,7 +350,7 @@ namespace Sms.Web.Controllers
                 await _admissions.RecordAssessmentAsync(id, score.Value, _currentUser.UserId, notes);
                 TempData["Flash"] = T("Assessment recorded.", "تم تسجيل التقييم.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -386,7 +386,7 @@ namespace Sms.Web.Controllers
                     TempData["Flash"] = T($"Added to the waiting list at rank {e.OrderRank}.", $"أُضيف إلى قائمة الانتظار بالترتيب {e.OrderRank}.");
                 }
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -401,7 +401,7 @@ namespace Sms.Web.Controllers
                 var student = await _admissions.RegisterAsync(id, sectionId.Value, enrollmentDate ?? _clock.UtcNow.Date, relationshipId.Value);
                 TempData["Flash"] = T($"Registered — student number {student.StudentNo} issued (BR-ADM-007, one transaction).", $"تم التسجيل — صدر رقم الطالب {student.StudentNo} (BR-ADM-007، معاملة واحدة).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -444,7 +444,7 @@ namespace Sms.Web.Controllers
                 await _admissions.OfferSeatAsync(entryId, DateTime.SpecifyKind(expires ?? _clock.UtcNow.Date.AddDays(7), DateTimeKind.Utc));
                 TempData["Flash"] = T("Seat offered.", "تم عرض المقعد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(WaitingList), new { profile });
         }
 
@@ -458,7 +458,7 @@ namespace Sms.Web.Controllers
                 await _admissions.RespondToOfferAsync(entryId, accepted);
                 TempData["Flash"] = accepted ? T("Offer accepted — application Approved; proceed to registration.", "قُبل العرض — الطلب معتمد؛ تابع التسجيل.") : T("Offer declined — application Lapsed.", "رُفض العرض — الطلب ساقط.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(WaitingList), new { profile });
         }
 
@@ -472,7 +472,7 @@ namespace Sms.Web.Controllers
                 await _admissions.RemoveFromWaitingListAsync(entryId);
                 TempData["Flash"] = T("Removed from the waiting list.", "تمت الإزالة من قائمة الانتظار.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(WaitingList), new { profile });
         }
 

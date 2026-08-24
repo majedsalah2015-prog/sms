@@ -281,6 +281,13 @@ namespace Sms.Web
             services.AddScoped<IWorkflowService, WorkflowService>();
             services.AddScoped<IApprovalInboxQuery, ApprovalInboxQuery>();
 
+            // WF-04 (doc 05 §5, BR-DIS-003): the first module actually routed through
+            // the engine rather than substituting a status change. Both effects call
+            // IDiscountAdmin, so BR-DIS-005 keeps one implementation; the workflow
+            // decides when and by whom, not what.
+            services.AddScoped<IWorkflowFinalEffect, DiscountGrantApprovalEffect>();
+            services.AddScoped<IWorkflowClosureEffect, DiscountGrantClosureEffect>();
+
             // E-006 numbering framework (doc 08): gap-free issuance for
             // strict/normal series + admin definition and cutover.
             services.AddScoped<INumberIssuer, NumberIssuer>();
@@ -302,7 +309,17 @@ namespace Sms.Web
             // mandatory scan gate. No virus-scan vendor/ICAP adapter chosen yet
             // (doc 10 §9 Q3) — NullVirusScanner always reports Clean so the
             // quarantine pipeline is exercised without overclaiming real scanning.
-            var attachmentsRoot = Path.Combine(Configuration.GetValue("Attachments:RootPath", Path.Combine(Path.GetTempPath(), "sms-attachments")));
+
+            // A school's uploaded files are not temporary. The default was the machine's temp
+            // directory, which Windows disk cleanup is entitled to empty and which no backup job
+            // looks at — while BR-BAK-003 counts attachment storage as part of the backup scope.
+            // They live under the app's own App_Data now, still overridable per deployment, and a
+            // relative setting is resolved against the content root rather than against whichever
+            // directory the host happened to be started from.
+            var configuredAttachmentsRoot = Configuration.GetValue("Attachments:RootPath", "App_Data/Attachments");
+            var attachmentsRoot = Path.IsPathRooted(configuredAttachmentsRoot)
+                ? configuredAttachmentsRoot
+                : Path.Combine(this.Environment.ContentRootPath, configuredAttachmentsRoot);
             services.AddSingleton<IFileStore>(new LocalDiskFileStore(attachmentsRoot));
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
             services.AddScoped<IAttachmentService, AttachmentService>();
@@ -314,6 +331,10 @@ namespace Sms.Web
             // the standalone Sms.Seeder tool, not here — seeding must never run
             // as a side effect of the web app starting.
             services.AddScoped<ILookupAdmin, LookupAdmin>();
+
+            // doc/Modules/01 §9: a lookup value is deactivated, never deleted — so the
+            // operator has to be told what is already pointing at it first.
+            services.AddScoped<ILookupUsageQuery, LookupUsageQuery>();
 
             // E-011 background jobs (doc 02 T-6, Hangfire per IP-02 §2). Every
             // recurring job calls IJobRunner — the single path that records

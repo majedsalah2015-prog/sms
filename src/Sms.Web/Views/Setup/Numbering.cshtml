@@ -1,0 +1,167 @@
+@using System.Globalization
+@using Sms.Domain.Numbering
+@using Sms.Web.Models
+@model NumberingRegistryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Numbering series", "سلاسل الترقيم");
+    ViewData["Breadcrumb"] = T("System Setup / Numbering", "إعداد النظام / الترقيم");
+
+    string Reset(ResetPolicy p) => p switch
+    {
+        ResetPolicy.PerAcademicYear => T("each academic year", "كل عام دراسي"),
+        ResetPolicy.PerCalendarYear => T("each calendar year", "كل سنة ميلادية"),
+        _ => T("never", "لا يُصفَّر"),
+    };
+    string Gap(GapPolicy p) => p == GapPolicy.Strict ? T("gap-free", "بلا فجوات") : T("gaps allowed", "تُسمح الفجوات");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "num-help", Title = T("Numbering series — help", "سلاسل الترقيم — مساعدة"),
+        Intro = T("Every numbered document in the product — student file, receipt, credit note, certificate — draws from a series defined here. The format is a template; the system fills the tokens.", "كل مستند مرقَّم في النظام — ملف الطالب والإيصال والإشعار الدائن والشهادة — يسحب رقمه من سلسلة معرَّفة هنا. والصيغة قالب، والنظام هو من يملأ رموزها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The tokens", "الرموز"), T("{SEQ:5} is the running number padded to five digits and it is mandatory — without it every issued number would be identical. {YEAR} is the academic year's label, {GYEAR} the Gregorian year, {SCHOOL} the school's ministry code. Anything else in the template is printed as written.", "‏{SEQ:5} هو الرقم المتسلسل مكمَّلاً إلى خمس خانات وهو إلزامي — فبدونه يصدر الرقم نفسه في كل مرة. و{YEAR} عنوان العام الدراسي، و{GYEAR} السنة الميلادية، و{SCHOOL} الرمز الوزاري للمدرسة. وما عدا ذلك يُطبع كما كُتب.")),
+            new HelpPanelViewModel.Item(T("Gap-free is a promise to an auditor", "«بلا فجوات» وعدٌ للمدقق"), T("A gap-free series never skips a number: if the document that would have used it fails to save, the number is not burned. Receipts, refunds, credit notes and GL batches are gap-free for that reason and should stay that way.", "السلسلة بلا فجوات لا تتخطى رقماً أبداً: فإن فشل حفظ المستند الذي كان سيأخذه، لا يُحرَق الرقم. ولهذا السبب تكون الإيصالات والاستردادات والإشعارات الدائنة ودفعات الترحيل بلا فجوات، ومن الأفضل أن تبقى كذلك.")),
+            new HelpPanelViewModel.Item(T("Editing after the first number", "التعديل بعد أول رقم"), T("Before a series issues anything it is edited in place. After that, saving a change does not rewrite it — it retires the version and opens the next one from the date you choose. Numbers already issued keep meaning what they meant, which is the only way a receipt from three years ago can still be explained.", "قبل أن تُصدر السلسلة أي رقم تُعدَّل في مكانها. وبعد ذلك لا يعيد الحفظ كتابتها — بل يتقاعد الإصدار ويفتح التالي من التاريخ الذي تختاره. وتبقى الأرقام الصادرة على معناها، وهو السبيل الوحيد لتفسير إيصال صدر قبل ثلاث سنوات.")),
+            new HelpPanelViewModel.Item(T("Changing a format needs a reason", "تغيير الصيغة يحتاج سبباً"), T("The format is audited at the highest tier, so a change is refused until you write why. That text is what the next auditor reads.", "الصيغة مُدقَّقة بأعلى فئة، فيُرفض التغيير حتى تكتب سببه. وهذا النص هو ما يقرأه المدقق التالي.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Where every numbered document in the product gets its number, what each series will produce next, and what changing one now would cost.",
+               "من هنا يأخذ كل مستند مرقَّم رقمه، ومعه ما ستُنتجه كل سلسلة تالياً، وما يكلّفه تغييرها الآن.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_SetupNav" />
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("Series", "السلسلة")</th>
+            <th scope="col">@T("Numbers", "الأرقام")</th>
+            <th scope="col">@T("Next", "التالي")</th>
+            <th scope="col">@T("Resets", "التصفير")</th>
+            <th scope="col">@T("Continuity", "التسلسل")</th>
+            <th scope="col">@T("Issued this period", "أُصدر هذه الفترة")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="7" class="p-3 text-muted">@T("No series is defined yet — nothing in the product can issue a number until one is.", "لا توجد سلسلة معرَّفة بعد — ولا شيء في النظام يستطيع إصدار رقم قبل ذلك.")</td></tr>
+        }
+        else
+        {
+            @foreach (var row in Model.Rows)
+            {
+                <tr class="@(row.IsCurrent ? "" : "text-muted")">
+                    <td>
+                        <code>@row.Series.Code</code>
+                        @if (!row.IsCurrent)
+                        {
+                            <span class="badge text-bg-secondary ms-1">@T("superseded", "مستبدَل")</span>
+                        }
+                        <div class="small text-muted">@row.Series.EntityName · @T("v", "إصدار ")@(row.Series.Version)</div>
+                    </td>
+                    <td><code dir="ltr">@row.Series.FormatTemplate</code></td>
+                    <td><span dir="ltr">@row.Preview</span></td>
+                    <td>@Reset(row.Series.ResetPolicy)</td>
+                    <td>
+                        <span class="badge @(row.Series.GapPolicy == GapPolicy.Strict ? "text-bg-success" : "text-bg-light border")">@Gap(row.Series.GapPolicy)</span>
+                    </td>
+                    <td>
+                        @row.IssuedThisPeriod
+                        @if (row.IssuedEver != row.IssuedThisPeriod)
+                        {
+                            <div class="small text-muted">@string.Format(T("{0} across all periods", "{0} في كل الفترات"), row.IssuedEver)</div>
+                        }
+                        @if (row.Series.IsLocked)
+                        {
+                            <div class="small text-muted"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("locked", "مقفلة")</div>
+                        }
+                    </td>
+                    <td class="text-end">
+                        @if (row.IsCurrent)
+                        {
+                            <a class="small" asp-action="Numbering" asp-route-code="@row.Series.Code">@(row.Series.IsLocked ? T("New version", "إصدار جديد") : T("Edit", "تعديل"))</a>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<div class="sms-card" id="edit">
+    <div class="p-3">
+        <h2 class="h6 mb-3">@(string.IsNullOrWhiteSpace(Model.Code) ? T("Define a series", "تعريف سلسلة") : T($"Series {Model.Code}", $"السلسلة {Model.Code}"))</h2>
+
+        @if (Model.WouldCutOver)
+        {
+            <div class="alert alert-warning" role="alert">
+                @T("This series has already issued numbers. Saving will retire the current version and open the next one — it will not rewrite what was issued.",
+                   "أصدرت هذه السلسلة أرقاماً بالفعل. والحفظ سيتقاعد الإصدار الحالي ويفتح التالي — ولن يعيد كتابة ما صدر.")
+            </div>
+        }
+
+        <form method="post" asp-action="Numbering" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label" for="Code">@T("Code", "الرمز") *</label>
+                <input id="Code" name="Code" class="form-control" value="@Model.Code" maxlength="10" required aria-required="true" dir="ltr" />
+                <div class="form-text">@T("Short and stable — STU, RCP, CERT.", "قصير وثابت — STU وRCP وCERT.")</div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="EntityName">@T("Numbers what", "يرقّم ماذا")</label>
+                <input id="EntityName" name="EntityName" class="form-control" value="@Model.EntityName" maxlength="40" dir="ltr" />
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="FormatTemplate">@T("Format", "الصيغة") *</label>
+                <input id="FormatTemplate" name="FormatTemplate" class="form-control" value="@Model.FormatTemplate" maxlength="60" required aria-required="true" dir="ltr" placeholder="RCP/{GYEAR}/{SEQ:6}" />
+                <div class="form-text">@T("Must contain {SEQ:n}. Tokens: {SEQ:n} {YEAR} {GYEAR} {SCHOOL}.", "يجب أن تحتوي {SEQ:n}. الرموز: {SEQ:n} و{YEAR} و{GYEAR} و{SCHOOL}.")</div>
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label" for="ResetPolicy">@T("Resets", "التصفير")</label>
+                <select id="ResetPolicy" name="ResetPolicy" class="form-select">
+                    @foreach (ResetPolicy p in Enum.GetValues(typeof(ResetPolicy)))
+                    {
+                        <option value="@p" selected="@(Model.ResetPolicy == p)">@Reset(p)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="GapPolicy">@T("Continuity", "التسلسل")</label>
+                <select id="GapPolicy" name="GapPolicy" class="form-select">
+                    @foreach (GapPolicy p in Enum.GetValues(typeof(GapPolicy)))
+                    {
+                        <option value="@p" selected="@(Model.GapPolicy == p)">@Gap(p)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="EffectiveFrom">@T("Effective from", "ساري من")</label>
+                <input id="EffectiveFrom" name="EffectiveFrom" type="date" class="form-control" value="@Model.EffectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="reason">@T("Reason", "السبب")</label>
+                <input id="reason" name="reason" class="form-control" maxlength="300" placeholder="@T("required when changing a format", "مطلوب عند تغيير الصيغة")" />
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                <a class="btn btn-outline-secondary" asp-action="Numbering">@T("Clear", "مسح")</a>
+            </div>
+        </form>
+    </div>
+</div>

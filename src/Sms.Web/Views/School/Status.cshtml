@@ -6,66 +6,340 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("School status", "حالة المدرسة");
     ViewData["Breadcrumb"] = T("Schools / School status", "المدارس / حالة المدرسة");
-    string Name(SchoolStatus s) => s switch { SchoolStatus.Setup => T("Setup", "إعداد"), SchoolStatus.Active => T("Active", "نشطة"), SchoolStatus.Suspended => T("Suspended", "موقوفة"), SchoolStatus.Closed => T("Closed", "مغلقة"), _ => s.ToString() };
-    string Badge(SchoolStatus s) => s switch { SchoolStatus.Active => "text-bg-success", SchoolStatus.Suspended => "text-bg-warning", SchoolStatus.Closed => "text-bg-dark", _ => "text-bg-secondary" };
+    var order = new[] { SchoolStatus.Setup, SchoolStatus.Active, SchoolStatus.Suspended, SchoolStatus.Closed };
+    var current = Model.School?.Status;
+    var gateUnmet = current == SchoolStatus.Setup && Model.ActivationReadiness.Any(r => r.Required && !r.Done);
+
     var help = new HelpPanelViewModel
     {
         Id = "school-status-help",
         Title = T("School status — help", "حالة المدرسة — مساعدة"),
-        Intro = T("The school's lifecycle (doc/Modules/02 §8, BR-SCH-005). Four states, and the only one you cannot leave is the last. Status is not a label: it decides who can sign in and what the system will accept, so a move made to tidy a list has operational consequences the same afternoon.", "دورة حياة المدرسة (الوثيقة 02 §8، BR-SCH-005). أربع حالات، والوحيدة التي لا يمكن مغادرتها هي الأخيرة. والحالة ليست وسماً: فهي تقرّر من يستطيع الدخول وما يقبله النظام، فالانتقال الذي يُجرى لترتيب قائمة له أثر تشغيلي في العصر نفسه."),
+        Intro = T("The school's lifecycle (doc/Modules/02 §8.3, BR-SCH-005). Four states, and the only one you cannot leave is the last. Status is not a label — it is the product's statement about whether this school is trading, paused or finished, and it is the first thing an auditor reads.", "دورة حياة المدرسة (الوثيقة 02 §8.3، BR-SCH-005). أربع حالات، والوحيدة التي لا يمكن مغادرتها هي الأخيرة. والحالة ليست وسماً — بل هي إعلان المنتج عمّا إذا كانت هذه المدرسة عاملة أو موقوفة أو منتهية، وهي أول ما يقرؤه المدقّق."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("The picker only offers legal moves", "القائمة تعرض الانتقالات المشروعة فقط"), T("\"Move to\" is filled from the transitions allowed out of the current state, so an illegal move is not something you can pick and be refused for — it simply is not listed. An empty list with the button disabled means the school is Closed.", "تُملأ «الانتقال إلى» من الانتقالات المسموحة من الحالة الحالية، فالانتقال غير المشروع ليس شيئاً تختاره ثم تُرفض عليه — بل لا يُعرض أصلاً. والقائمة الفارغة مع تعطُّل الزر تعني أن المدرسة مغلقة.")),
-            new HelpPanelViewModel.Item(T("Suspended is reversible; Closed is not", "الموقوفة قابلة للرجوع؛ المغلقة لا"), T("Suspended blocks the parent/student portal and new transactions while staff reading and fee collection stay available, and the school can be reactivated. Closed is terminal and read-only forever — there is no path back, and no screen anywhere in the product will reopen it.", "الموقوفة تحجب بوابة أولياء الأمور والطلاب والمعاملات الجديدة بينما تبقى القراءة للموظفين وتحصيل الرسوم متاحة، ويمكن إعادة تفعيل المدرسة. أما المغلقة فنهائية وللقراءة فقط دائماً — لا طريق للعودة، ولا شاشة في المنتج كله تعيد فتحها.")),
-            new HelpPanelViewModel.Item(T("Setup is a gate, not a stage of decoration", "الإعداد بوابة لا مرحلة شكلية"), T("While the school sits in Setup the first academic year cannot be activated (BR-SET-003). Leaving Setup is what the wizard's \"declare setup complete\" is for; if this screen still shows Setup, the wizard has unfinished mandatory steps.", "ما دامت المدرسة في حالة الإعداد لا يمكن تفعيل أول عام دراسي (BR-SET-003). ومغادرة الإعداد هي غاية «إعلان اكتمال الإعداد» في المعالج؛ فإن كانت هذه الشاشة لا تزال تعرض «إعداد» فللمعالج خطوات إلزامية لم تكتمل.")),
-            new HelpPanelViewModel.Item(T("The reason is mandatory and permanent", "السبب إلزامي ودائم"), T("Every move is T1-audited: the old state, the new state and your reason are written in the same transaction as the change. Write the reason for the person who reads it in two years — \"suspended pending licence renewal, ref 44/2026\" survives; \"test\" does not.", "كل انتقال مدقَّق بمستوى T1: تُكتب الحالة القديمة والجديدة وسببك في المعاملة نفسها مع التغيير. اكتب السبب لمن يقرؤه بعد سنتين — «موقوفة لحين تجديد الترخيص، مرجع 44/2026» يبقى نافعاً، و«تجربة» لا.")),
+            new HelpPanelViewModel.Item(T("Every move is listed, including the refused ones", "كل الانتقالات مدرجة بما فيها المرفوضة"), T("The map below shows all four states and says, for each, whether you can move there from where the school is now and why not when you cannot. A console that quietly omits a move leaves you unable to tell a rule from a missing button, so nothing is hidden — the refusal is shown with its reason and the picker offers only what would be accepted.", "تعرض الخريطة أدناه الحالات الأربع كلها وتقول عن كل واحدة هل يمكن الانتقال إليها من موضع المدرسة الآن ولماذا لا إن تعذّر. فالشاشة التي تُسقط انتقالاً بصمت تتركك عاجزاً عن التمييز بين قاعدة وزر مفقود، ولذلك لا يُخفى شيء — يُعرض الرفض مع سببه، ولا تعرض القائمة إلا ما سيُقبل.")),
+            new HelpPanelViewModel.Item(T("Suspended can be undone; Closed cannot", "الموقوفة يمكن التراجع عنها والمغلقة لا"), T("Suspended is a pause the school comes back from — reactivation is a legal move and is listed as one. Closed is terminal: no screen anywhere in this product reopens a closed school, and the confirmation is asked for precisely because there is no second chance to reconsider. Read the object name in the confirmation before you tick it.", "الموقوفة إيقاف تعود منه المدرسة — فإعادة التفعيل انتقال مشروع ومدرج كذلك. أما المغلقة فنهائية: لا شاشة في هذا المنتج تعيد فتح مدرسة مغلقة، والتأكيد يُطلب لأنه لا فرصة ثانية لإعادة النظر. اقرأ اسم المدرسة في التأكيد قبل أن تعلّمه.")),
+            new HelpPanelViewModel.Item(T("What the states are meant to do, and what this build actually does", "ما يُفترض أن تفعله الحالات وما يفعله هذا الإصدار فعلاً"), T("The effects panel marks each rule with whether the product enforces it today. The transitions themselves are enforced. The consequences of Suspended and Closed — the portal closing, writes stopping — are specified in doc 02 §4 and are not yet performed by any part of this build: nothing in the request pipeline reads the school's status. That is stated on the screen rather than implied away, because an operator who suspends a school expecting the portal to close would be planning around something that does not happen.", "تؤشّر لوحة الآثار على كل قاعدة بما إذا كان المنتج يفرضها اليوم. الانتقالات نفسها مفروضة. أما نتائج «الموقوفة» و«المغلقة» — إغلاق البوابة وتوقّف الكتابة — فمنصوص عليها في الوثيقة 02 §4 ولا ينفّذها أي جزء من هذا الإصدار: فلا شيء في مسار الطلبات يقرأ حالة المدرسة. وهذا مذكور على الشاشة لا مطويّ عنها، لأن من يوقف مدرسة متوقعاً إغلاق البوابة سيخطط بناءً على ما لا يحدث.")),
+            new HelpPanelViewModel.Item(T("Activation has a checklist behind it", "خلف التفعيل قائمة تحقّق"), T("Doc 02 §4 gates Setup → Active on the setup wizard being declared complete (BR-SET-003) and on the four identity fields being filled (BR-SCH-001). The engine that decides legal moves does not check that gate — it was written before the wizard existed — so this screen shows the checklist and asks you to acknowledge an override rather than either blocking you or pretending the requirement is not there.", "تشترط الوثيقة 02 §4 لانتقال «إعداد ← نشطة» إعلانَ اكتمال معالج الإعداد (BR-SET-003) وملءَ حقول الهوية الأربعة (BR-SCH-001). والمحرّك الذي يقرّر الانتقالات المشروعة لا يفحص هذا الشرط — إذ كُتب قبل وجود المعالج — فتعرض هذه الشاشة قائمة التحقق وتطلب إقراراً بالتجاوز، بدل أن تمنعك أو تتظاهر بأن الشرط غير موجود.")),
+            new HelpPanelViewModel.Item(T("The reason is mandatory and permanent", "السبب إلزامي ودائم"), T("Every move is audited at tier one: the old state, the new state, your reason and your name are written in the same transaction as the change, and the table at the foot of this screen reads them back. Write the reason for the person who reads it in two years — \"suspended pending licence renewal, ref 44/2026\" survives; \"test\" does not.", "كل انتقال مدقَّق بالمستوى الأول: تُكتب الحالة القديمة والجديدة وسببك واسمك في المعاملة نفسها مع التغيير، ويقرؤها الجدول في أسفل هذه الشاشة. اكتب السبب لمن يقرؤه بعد سنتين — «موقوفة لحين تجديد الترخيص، مرجع 44/2026» يبقى نافعاً، و«تجربة» لا.")),
         },
     };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Setup → Active → Suspended → Closed; Suspended blocks portal and transactions, Closed is terminal (BR-SCH-005). Every move is T1-audited with a reason.", "إعداد → نشطة → موقوفة → مغلقة؛ الموقوفة تحجب البوابة والمعاملات، والمغلقة نهائية (BR-SCH-005). كل انتقال مدقَّق T1 مع سبب.")</p></div>
-    <partial name="_HelpModal" model="help" /></div>
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Module 02 §8.3 — Setup, Active, Suspended, Closed. Closed is terminal (BR-SCH-005), and every move is audited at tier 1 with a reason.", "الوحدة 02 §8.3 — إعداد، نشطة، موقوفة، مغلقة. والمغلقة نهائية (BR-SCH-005)، وكل انتقال مدقَّق بالمستوى الأول مع سبب.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
 <partial name="_SchoolNav" />
 
 @if (Model.School == null)
 {
-    <div class="alert alert-warning">@T("No school profile yet.", "لا يوجد ملف مدرسة بعد.")</div>
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("There is no school record yet", "لا يوجد سجل مدرسة بعد")</h2>
+        <p class="text-muted small">@T("A status belongs to a school, and this deployment has none saved. Fill in the profile — both official names, the licence number and the ministry code — and the record is created in the Setup state.", "الحالة تخصّ مدرسة، وهذا التركيب لا يحمل مدرسة محفوظة. أكمل الملف — الاسمين الرسميين ورقم الترخيص والرمز الوزاري — فيُنشأ السجل في حالة «إعداد».")</p>
+        <a class="btn btn-primary btn-sm" asp-action="Profile"><i class="bi bi-building me-1" aria-hidden="true"></i>@T("Open the school profile", "افتح ملف المدرسة")</a>
+    </div>
 }
 else
 {
-    <div class="row g-3">
-        <div class="col-lg-5">
-            <div class="sms-card p-4">
+    <div class="sms-card p-3 p-lg-4 mb-3">
+        <div class="row g-3 align-items-center">
+            <div class="col-lg-5">
+                @{ var cur = Model.School.Status; }
                 <div class="text-muted small">@T("Current status", "الحالة الحالية")</div>
-                <div class="d-flex align-items-center gap-2 mb-3"><span class="badge fs-6 @Badge(Model.School.Status)">@Name(Model.School.Status)</span> <span class="text-muted small">@(isRtl ? Model.School.NameAr : Model.School.NameEn)</span></div>
-                <div class="d-flex flex-wrap gap-2 align-items-center small text-muted mb-3">
-                    @foreach (var s in new[] { SchoolStatus.Setup, SchoolStatus.Active, SchoolStatus.Suspended, SchoolStatus.Closed })
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <span class="badge fs-6 @SchoolStatusLabels.Badge(cur)"><i class="bi @SchoolStatusLabels.Icon(cur) me-1" aria-hidden="true"></i>@SchoolStatusLabels.Name(cur, isRtl)</span>
+                    <span class="text-muted small" dir="auto">@(isRtl ? Model.School.NameAr : Model.School.NameEn)</span>
+                </div>
+                <p class="text-muted small mb-0 mt-2">@SchoolStatusLabels.Summary(cur, isRtl)</p>
+            </div>
+            <div class="col-lg-7">
+                <div class="sms-lifecycle" aria-label="@T("Lifecycle", "دورة الحياة")">
+                    @for (var i = 0; i < order.Length; i++)
                     {
-                        <span class="badge @(s == Model.School.Status ? Badge(s) : "text-bg-light border")">@Name(s)</span>@if (s != SchoolStatus.Closed) { <i class="bi bi-arrow-right @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i> }
+                        var s = order[i];
+                        <span class="sms-lifecycle__node @(s == current ? "is-current" : "")">
+                            <i class="bi @SchoolStatusLabels.Icon(s)" aria-hidden="true"></i>@SchoolStatusLabels.Name(s, isRtl)
+                            @if (s == current)
+                            {
+                                <span class="visually-hidden">@T("(current)", "(الحالية)")</span>
+                            }
+                        </span>
+                        @if (i < order.Length - 1)
+                        {
+                            <i class="bi bi-arrow-right text-muted @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>
+                        }
                     }
                 </div>
-                <form method="post" asp-action="Status" novalidate>
-                    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
-                    <div class="mb-2"><label class="form-label" asp-for="Target">@T("Move to", "الانتقال إلى") <span class="text-danger" aria-hidden="true">*</span></label>
-                        <select asp-for="Target" class="form-select" required aria-required="true">
-                            <option value="">—</option>
-                            @foreach (var t in Model.AllowedTargets) { <option value="@t">@Name(t)</option> }
-                        </select></div>
-                    <div class="mb-3"><label class="form-label" asp-for="Reason">@T("Reason (mandatory)", "السبب (إلزامي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="Reason" class="form-control" required aria-required="true" /></div>
-                    <button class="btn btn-primary" type="submit" @(Model.AllowedTargets.Count == 0 ? "disabled" : "")><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Change status", "تغيير الحالة")</button>
-                </form>
-            </div>
-        </div>
-        <div class="col-lg-7">
-            <div class="sms-card p-4 sms-kv">
-                <h2 class="h6 text-muted">@T("Effects", "الآثار")</h2>
-                <dl class="row small mb-0">
-                    <dt class="col-sm-3">@Name(SchoolStatus.Setup)</dt><dd class="col-sm-9">@T("Wizard phase; the first academic year can't activate until Setup Complete (BR-SET-003).", "مرحلة المعالج؛ لا يُفعَّل أول عام دراسي قبل اكتمال الإعداد (BR-SET-003).")</dd>
-                    <dt class="col-sm-3">@Name(SchoolStatus.Active)</dt><dd class="col-sm-9">@T("Normal operation.", "التشغيل العادي.")</dd>
-                    <dt class="col-sm-3">@Name(SchoolStatus.Suspended)</dt><dd class="col-sm-9">@T("Portal and transactions blocked; staff read + finance collection stay available (configurable). Reactivation allowed.", "حجب البوابة والمعاملات؛ تبقى القراءة للموظفين والتحصيل المالي (قابل للضبط). يمكن إعادة التفعيل.")</dd>
-                    <dt class="col-sm-3">@Name(SchoolStatus.Closed)</dt><dd class="col-sm-9">@T("Terminal — read-only forever.", "نهائية — للقراءة فقط دائماً.")</dd>
-                </dl>
+                <div class="form-text mt-1">@T("Reactivation from Suspended back to Active runs against this arrow and is allowed; nothing runs back out of Closed.", "إعادة التفعيل من «موقوفة» إلى «نشطة» تسير عكس هذا السهم وهي مسموحة؛ ولا شيء يعود من «مغلقة».")</div>
             </div>
         </div>
     </div>
+
+    <div class="row g-3">
+        <div class="col-xl-5">
+            <div class="sms-card p-3 p-lg-4 mb-3">
+                <h2 class="h6">@T("Move the school", "نقل المدرسة")</h2>
+
+                @if (Model.ActivationReadiness.Count > 0)
+                {
+                    <div class="mb-3">
+                        <div class="small fw-semibold mb-1">@T("Before activation", "قبل التفعيل")</div>
+                        @foreach (var r in Model.ActivationReadiness)
+                        {
+                            <div class="sms-checkitem @(r.Done ? "is-done" : "is-required")">
+                                <span class="sms-checkitem__icon" aria-hidden="true"><i class="bi @(r.Done ? "bi-check-circle-fill" : "bi-exclamation-octagon-fill")"></i></span>
+                                <div class="flex-grow-1">
+                                    <div class="small fw-semibold">
+                                        @if (r.Controller != null)
+                                        {
+                                            <a asp-controller="@r.Controller" asp-action="@r.Action">@(isRtl ? r.TitleAr : r.TitleEn)</a>
+                                        }
+                                        else
+                                        {
+                                            <span>@(isRtl ? r.TitleAr : r.TitleEn)</span>
+                                        }
+                                        <span class="visually-hidden">@(r.Done ? T("(done)", "(منجز)") : T("(outstanding)", "(غير منجز)"))</span>
+                                    </div>
+                                    <div class="sms-checkitem__why">@(isRtl ? r.WhyAr : r.WhyEn)</div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+
+                <form method="post" asp-action="Status" novalidate id="school-status-form"
+                      data-ack-closed="@T("I understand that closing is permanent and that no screen reopens a closed school.", "أفهم أن الإغلاق نهائي وأن لا شاشة تعيد فتح مدرسة مغلقة.")"
+                      data-ack-gate="@T("I am activating with the readiness list unmet, deliberately.", "أُفعّل وقائمة الجاهزية غير مستوفاة، عن قصد.")"
+                      data-ctx-closed="@T("Closing is the end of this school's lifecycle. There is no screen anywhere in the product that reopens it.", "الإغلاق نهاية دورة حياة هذه المدرسة. ولا توجد شاشة في المنتج كله تعيد فتحها.")"
+                      data-ctx-gate="@T("The documents gate activation on the readiness list above (BR-SCH-001, BR-SET-003). This build does not enforce that gate, so the move will go through if you override it.", "الوثائق تشترط قائمة الجاهزية أعلاه قبل التفعيل (BR-SCH-001، BR-SET-003). وهذا الإصدار لا يفرض الشرط، فالانتقال سيتم إن تجاوزته.")"
+                      data-gate-unmet="@(gateUnmet ? "1" : "")">
+                    <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Target">@T("Move to", "الانتقال إلى") <span class="text-danger" aria-hidden="true">*</span></label>
+                        @* No explicit id: the tag helper's own "Target" is what asp-for's label points at. *@
+                        <select asp-for="Target" class="form-select" aria-describedby="status-target-help">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                            @foreach (var t in Model.AllowedTargets)
+                            {
+                                <option value="@t" data-irreversible="@(SchoolStatusLabels.IsIrreversible(t) ? "1" : "")">@SchoolStatusLabels.Name(t, isRtl)</option>
+                            }
+                        </select>
+                        <span asp-validation-for="Target" class="text-danger small d-block"></span>
+                        <div class="form-text" id="status-target-help">
+                            @if (Model.AllowedTargets.Count == 0)
+                            {
+                                @T("Nothing is listed because the school is Closed, and Closed is terminal.", "لا شيء مدرج لأن المدرسة مغلقة، والمغلقة نهائية.")
+                            }
+                            else
+                            {
+                                @T("Only legal moves are listed — an illegal one is not something you can pick and then be refused for.", "لا تُدرج إلا الانتقالات المشروعة — فغير المشروع ليس شيئاً تختاره ثم تُرفض عليه.")
+                            }
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" asp-for="Reason">@T("Reason", "السبب") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <input asp-for="Reason" class="form-control" autocomplete="off"
+                               placeholder="@T("e.g. suspended pending licence renewal, ref 44/2026", "مثال: موقوفة لحين تجديد الترخيص، مرجع 44/2026")" />
+                        <span asp-validation-for="Reason" class="text-danger small d-block"></span>
+                        <div class="form-text">@T("Stored with the old and new state and your name, in the same transaction as the move.", "يُخزَّن مع الحالة القديمة والجديدة واسمك، في المعاملة نفسها مع الانتقال.")</div>
+                    </div>
+
+                    <div class="mb-3 @(Model.Acknowledged || gateUnmet || Model.Target == SchoolStatus.Closed ? "" : "d-none")" id="ack-row">
+                        <div class="alert alert-warning py-2 mb-2 small">
+                            <i class="bi bi-exclamation-triangle-fill me-1" aria-hidden="true"></i>
+                            <span id="ack-context">@T("This move needs an explicit confirmation.", "هذا الانتقال يحتاج تأكيداً صريحاً.")</span>
+                            <div class="mt-1">@T("School:", "المدرسة:") <strong dir="auto">@(isRtl ? Model.School.NameAr : Model.School.NameEn)</strong></div>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" asp-for="Acknowledged" id="Acknowledged" />
+                            <label class="form-check-label small" for="Acknowledged" id="ack-label">@T("I understand.", "أفهم ذلك.")</label>
+                        </div>
+                        <span asp-validation-for="Acknowledged" class="text-danger small d-block"></span>
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" id="status-submit" @(Model.AllowedTargets.Count == 0 ? "disabled" : "")>
+                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Change status", "تغيير الحالة")
+                    </button>
+                </form>
+            </div>
+
+            <div class="sms-card p-3 p-lg-4">
+                <h2 class="h6">@T("Moves from here", "الانتقالات من هنا")</h2>
+                @foreach (var t in Model.Transitions)
+                {
+                    <div class="sms-move @(t.Allowed ? "" : "is-blocked")">
+                        <span class="sms-move__icon @(t.Allowed ? "text-success" : "text-muted")" aria-hidden="true"><i class="bi @(t.Allowed ? "bi-arrow-right-circle-fill" : "bi-slash-circle")"></i></span>
+                        <div class="flex-grow-1">
+                            <div class="small fw-semibold">@SchoolStatusLabels.Name(t.Target, isRtl)
+                                @if (t.Irreversible)
+                                {
+                                    <span class="badge text-bg-dark ms-1">@T("no way back", "بلا عودة")</span>
+                                }
+                            </div>
+                            <div class="sms-checkitem__why">
+                                @if (t.Allowed)
+                                {
+                                    @T("Allowed from the current state.", "مسموح من الحالة الحالية.")
+                                }
+                                else if (current == SchoolStatus.Closed)
+                                {
+                                    @T("Refused: Closed is terminal, so nothing is reachable from it.", "مرفوض: المغلقة نهائية، فلا شيء يُبلغ منها.")
+                                }
+                                else if (t.Target == SchoolStatus.Setup)
+                                {
+                                    @T("Refused: Setup is where a school begins, never somewhere it returns to.", "مرفوض: «إعداد» موضع تبدأ منه المدرسة لا موضع تعود إليه.")
+                                }
+                                else
+                                {
+                                    @T("Refused: not a legal move out of the current state (BR-SCH-005).", "مرفوض: ليس انتقالاً مشروعاً من الحالة الحالية (BR-SCH-005).")
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="col-xl-7">
+            <div class="sms-card p-3 p-lg-4 mb-3">
+                <h2 class="h6">@T("What each state allows and forbids", "ما تسمح به كل حالة وما تمنعه")</h2>
+                <p class="text-muted small">@T("From doc 02 §4 and BR-SCH-005. Each block says whether this build performs the rule or only records the state.", "من الوثيقة 02 §4 و BR-SCH-005. ويقول كل قسم هل ينفّذ هذا الإصدار القاعدة أم يسجّل الحالة فقط.")</p>
+                <div class="row g-3">
+                    @foreach (var s in order)
+                    {
+                        var enforced = SchoolStatusLabels.EnforcedToday(s);
+                        <div class="col-md-6">
+                            <div class="border rounded p-3 h-100 @(s == current ? "border-primary" : "")">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="badge @SchoolStatusLabels.Badge(s)">@SchoolStatusLabels.Name(s, isRtl)</span>
+                                    @if (s == current)
+                                    {
+                                        <span class="small text-muted">@T("current", "الحالية")</span>
+                                    }
+                                </div>
+                                <p class="small text-muted">@SchoolStatusLabels.Summary(s, isRtl)</p>
+                                <div class="small fw-semibold text-success">@T("Allows", "تسمح بـ")</div>
+                                <ul class="small mb-2 ps-3">
+                                    @foreach (var a in SchoolStatusLabels.Allows(s, isRtl))
+                                    {
+                                        <li>@a</li>
+                                    }
+                                </ul>
+                                @{ var forbids = SchoolStatusLabels.Forbids(s, isRtl); }
+                                <div class="small fw-semibold text-danger">@T("Forbids", "تمنع")</div>
+                                @if (forbids.Count == 0)
+                                {
+                                    <p class="small text-muted mb-2">@T("Nothing — this is the state everything else is measured against.", "لا شيء — فهذه هي الحالة التي يُقاس عليها ما سواها.")</p>
+                                }
+                                else
+                                {
+                                    <ul class="small mb-2 ps-3">
+                                        @foreach (var f in forbids)
+                                        {
+                                            <li>@f</li>
+                                        }
+                                    </ul>
+                                }
+                                @if (!enforced)
+                                {
+                                    <div class="sms-unenforced small sms-amber">
+                                        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Declared, not enforced: nothing in this build reads the school's status, so these restrictions are not applied. Treat them as policy to follow, not as a control the product performs.", "معلَنة لا مفروضة: لا شيء في هذا الإصدار يقرأ حالة المدرسة، فهذه القيود غير مطبَّقة. عاملها بوصفها سياسة تُتَّبع لا ضابطاً ينفّذه المنتج.")
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="small text-muted"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("The transitions into and out of this state are enforced.", "الانتقالات إلى هذه الحالة ومنها مفروضة.")</div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="sms-card p-3 p-lg-4">
+                <h2 class="h6">@T("Status history", "سجل الحالات")</h2>
+                @if (Model.History.Count == 0)
+                {
+                    <div class="alert alert-light border small mb-0">@T("The school has not moved since it was created — the first change writes the first line here.", "لم تنتقل المدرسة منذ إنشائها — وأول تغيير يكتب أول سطر هنا.")</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm sms-table mb-0 small">
+                            <caption class="visually-hidden">@T("Every recorded change of the school's status, with its reason", "كل تغيير مسجَّل لحالة المدرسة مع سببه")</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">@T("When", "متى")</th>
+                                    <th scope="col">@T("From", "من")</th>
+                                    <th scope="col">@T("To", "إلى")</th>
+                                    <th scope="col">@T("Reason", "السبب")</th>
+                                    <th scope="col">@T("By", "بواسطة")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var h in Model.History)
+                                {
+                                    <tr>
+                                        <td class="text-nowrap"><span class="sms-num">@h.AtUtc.ToString("yyyy-MM-dd HH:mm")</span></td>
+                                        <td>@SchoolFieldLabels.Display(h.Field, h.OldValue, isRtl)</td>
+                                        <td class="fw-semibold">@SchoolFieldLabels.Display(h.Field, h.NewValue, isRtl)</td>
+                                        <td dir="auto">@(h.Reason ?? "—")</td>
+                                        <td dir="auto"><bdi>@(h.ActorName ?? ("#" + h.ActorUserId.ToString(CultureInfo.InvariantCulture)))</bdi></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // The confirmation is asked for only where it means something: a move that cannot be
+        // undone, or an activation with the readiness list unmet. Showing it on every move
+        // would teach the operator to tick it without reading, which is the failure the
+        // confirmation exists to prevent. The server demands it in exactly the same two
+        // cases — this only decides what is visible.
+        (function () {
+            var form = document.getElementById('school-status-form');
+            if (!form) { return; }
+            var select = document.getElementById('Target');
+            var row = document.getElementById('ack-row');
+            var label = document.getElementById('ack-label');
+            var context = document.getElementById('ack-context');
+            var box = document.getElementById('Acknowledged');
+            var submit = document.getElementById('status-submit');
+            var gateUnmet = form.getAttribute('data-gate-unmet') === '1';
+            var textClosed = form.getAttribute('data-ack-closed') || '';
+            var textGate = form.getAttribute('data-ack-gate') || '';
+            var ctxClosed = form.getAttribute('data-ctx-closed') || '';
+            var ctxGate = form.getAttribute('data-ctx-gate') || '';
+
+            function sync() {
+                var option = select.options[select.selectedIndex];
+                var irreversible = option && option.getAttribute('data-irreversible') === '1';
+                var activating = option && option.value === 'Active';
+                var needed = irreversible || (gateUnmet && activating);
+
+                row.classList.toggle('d-none', !needed);
+                if (!needed) { box.checked = false; return; }
+                label.textContent = irreversible ? textClosed : textGate;
+                context.textContent = irreversible ? ctxClosed : ctxGate;
+            }
+
+            select.addEventListener('change', sync);
+            form.addEventListener('submit', function () {
+                if (submit) { submit.disabled = true; }
+                window.setTimeout(function () { if (submit) { submit.disabled = false; } }, 8000);
+            });
+            sync();
+        })();
+    </script>
 }

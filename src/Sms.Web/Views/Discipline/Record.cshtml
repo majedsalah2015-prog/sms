@@ -1,0 +1,200 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model RecordBehaviorViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Record behaviour", "تسجيل السلوك");
+    ViewData["Breadcrumb"] = T("Behaviour / Record", "السلوك / التسجيل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-record-help", Title = T("Recording behaviour — help", "تسجيل السلوك — مساعدة"),
+        Intro = T("Pick a section, find the child, say what happened. What follows is not your decision: a minor violation is resolved here and closed, and anything more serious opens a case for the discipline officer (BR-DCP-002).", "اختر الشعبة، وجد الطالب، واكتب ما حدث. وما يلي ليس قرارك: المخالفة البسيطة تُعالَج هنا وتُغلَق، وما هو أجسم يفتح قضية لمسؤول السلوك (BR-DCP-002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Severity decides what happens next", "الجسامة تحدّد ما يلي"), T("Severity 1 is recorded, the parent is notified, and it ends there — no case, nobody else involved. Severity 2 and above opens a case automatically and routes it away from you. You do not choose which: the violation you pick carries its own level from the code.", "الجسامة 1 تُسجَّل ويُبلَّغ ولي الأمر وتنتهي عندها — بلا قضية ولا طرف آخر. والجسامة 2 فأعلى تفتح قضية تلقائياً وتوجّهها بعيداً عنك. ولست من يختار: المخالفة التي تنتقيها تحمل مستواها من اللائحة.")),
+            new HelpPanelViewModel.Item(T("The narrative is the record", "السرد هو السجلّ"), T("Write what you saw, not what you concluded. This text is read later by an officer deciding a case, and possibly by a committee — a sentence describing behaviour survives that reading, a judgement about a child does not.", "اكتب ما رأيت لا ما استنتجت. فهذا النص يقرأه لاحقاً مسؤول يبتّ في قضية، وربما لجنة — والجملة التي تصف سلوكاً تصمد لتلك القراءة، والحكم على طفل لا يصمد.")),
+            new HelpPanelViewModel.Item(T("Merits are not the opposite of violations", "التميّز ليس نقيض المخالفة"), T("A merit records freely and adds points; it does not cancel a violation and is not a bargaining chip. Both aggregate per term, and the term totals are what the behaviour grade is derived from (BR-DCP-007).", "التميّز يُسجَّل بحرية ويضيف نقاطاً؛ ولا يلغي مخالفة ولا يُقايَض بها. وكلاهما يتجمّع لكل فصل، ومجاميع الفصل هي ما تُشتَقّ منه درجة السلوك (BR-DCP-007).")),
+            new HelpPanelViewModel.Item(T("Your name is protected", "اسمك محميّ"), T("The reporter is recorded in the audit trail but never shown to parents — a parent sees the school's decision, not the teacher who reported it (BR-DCP-010).", "يُسجَّل المُبلِّغ في أثر التدقيق ولا يُعرض لأولياء الأمور أبداً — فولي الأمر يرى قرار المدرسة لا المعلم الذي أبلغ (BR-DCP-010).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Any teacher may record what they witnessed. What the record then becomes is the code's decision, not the recorder's.",
+               "لأي معلم أن يسجّل ما شهده. وما يصير إليه السجلّ بعد ذلك قرار اللائحة لا قرار المسجِّل.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+@if (Model.Violations.Count == 0)
+{
+    <div class="sms-card p-4 text-center">
+        <p class="mb-2">@T("There is no behaviour code for this year yet, so there is nothing to record against.", "لا توجد لائحة سلوك لهذا العام بعد، فلا شيء يُسجَّل بالاستناد إليه.")</p>
+        <a class="btn btn-outline-primary" asp-action="Code">@T("Define the behaviour code", "تعريف لائحة السلوك")</a>
+    </div>
+}
+else
+{
+    @if (!Model.HasPublishedCode)
+    {
+        <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+            @T("The code exists but has not been published to families. Recording works; the handbook parents are held to does not exist yet (BR-DCP-001).",
+               "اللائحة موجودة ولم تُنشَر لأولياء الأمور. التسجيل يعمل؛ أما الدليل الذي يُلزَم به أولياء الأمور فلا وجود له بعد (BR-DCP-001).")
+        </div>
+    }
+
+    <form method="get" class="sms-card p-3 mb-4 row g-2 align-items-end">
+        <div class="col-12 col-md-6">
+            <label class="form-label" for="section">@T("Section", "الشعبة")</label>
+            <select id="section" name="section" class="form-select">
+                <option value="">@T("— pick a section —", "— اختر شعبة —")</option>
+                @foreach (var s in Model.Sections)
+                {
+                    <option value="@s.Id" selected="@(Model.SectionId == s.Id)">@(isRtl ? s.NameAr : s.NameEn)</option>
+                }
+            </select>
+        </div>
+        <div class="col-12 col-md-3"><button type="submit" class="btn btn-outline-primary w-100">@T("Show roster", "عرض الكشف")</button></div>
+    </form>
+
+    @if (Model.SectionId.HasValue && Model.Roster.Count == 0)
+    {
+        <div class="sms-card p-4 text-center text-muted">@T("No students are in this section today.", "لا طلاب في هذه الشعبة اليوم.")</div>
+    }
+
+    @foreach (var entry in Model.Roster)
+    {
+        <div class="sms-card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
+                <div>
+                    <span class="fw-semibold">@(isRtl ? entry.Label.NameAr : entry.Label.NameEn)</span>
+                    <span class="text-muted small">@entry.Label.StudentNo</span>
+                </div>
+                <div class="small">
+                    @if (entry.MeritPoints > 0)
+                    {
+                        <span class="badge text-bg-success">@T("merit points", "نقاط تميّز"): @entry.MeritPoints</span>
+                    }
+                    @if (entry.ViolationCount > 0)
+                    {
+                        <span class="badge text-bg-secondary">@T("incidents this year", "مخالفات هذا العام"): @entry.ViolationCount</span>
+                    }
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-12 col-lg-7">
+                    <form method="post" asp-action="RecordIncident" asp-route-section="@Model.SectionId" class="row g-2">
+                        <input type="hidden" name="studentId" value="@entry.StudentId" />
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label" for="v-@entry.StudentId">@T("Violation", "المخالفة")</label>
+                            <select id="v-@entry.StudentId" name="violationTypeId" class="form-select form-select-sm" required>
+                                @foreach (var v in Model.Violations)
+                                {
+                                    <option value="@v.Id">@(isRtl ? v.NameAr : v.NameEn) — @DisciplineLabels.Severity(v.Severity, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label" for="w-@entry.StudentId">@T("When", "متى")</label>
+                            <input id="w-@entry.StudentId" type="datetime-local" name="occurredAt" class="form-control form-control-sm"
+                                   value="@Model.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)T08:00" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="n-@entry.StudentId">@T("What happened", "ما حدث")</label>
+                            <textarea id="n-@entry.StudentId" name="narrative" class="form-control form-control-sm" rows="2" required></textarea>
+                        </div>
+                        <div class="col-12 d-flex gap-2 align-items-center">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="p-@entry.StudentId" name="notifyParent" value="true" checked />
+                                <label class="form-check-label small" for="p-@entry.StudentId">@T("Notify the parent", "إبلاغ ولي الأمر")</label>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-outline-danger ms-auto">@T("Record incident", "تسجيل المخالفة")</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="col-12 col-lg-5 border-start">
+                    <form method="post" asp-action="RecordMerit" asp-route-section="@Model.SectionId" class="row g-2">
+                        <input type="hidden" name="studentId" value="@entry.StudentId" />
+                        <div class="col-12">
+                            <label class="form-label" for="m-@entry.StudentId">@T("Merit", "تميّز")</label>
+                            <select id="m-@entry.StudentId" name="meritTypeId" class="form-select form-select-sm" required>
+                                @foreach (var m in Model.Merits)
+                                {
+                                    <option value="@m.Id">@(isRtl ? m.NameAr : m.NameEn) (+@m.Points)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="mn-@entry.StudentId">@T("Note", "ملاحظة")</label>
+                            <input id="mn-@entry.StudentId" name="note" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sm btn-outline-success w-100" @(Model.Merits.Count == 0 ? "disabled" : "")>
+                                <i class="bi bi-star me-1" aria-hidden="true"></i>@T("Award merit", "منح التميّز")
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<h2 class="sms-section-title mt-4">@T("Recently recorded", "المسجَّل حديثاً")</h2>
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Recently recorded behaviour", "السلوك المسجَّل حديثاً")</caption>
+        <thead>
+        <tr>
+            <th scope="col">@T("When", "متى")</th>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("What", "ماذا")</th>
+            <th scope="col">@T("Outcome", "النتيجة")</th>
+        </tr>
+        </thead>
+        <tbody>
+        @foreach (var r in Model.Recent)
+        {
+            <tr>
+                <td>@r.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                <td>@(isRtl ? r.Student.NameAr : r.Student.NameEn)</td>
+                <td>
+                    @if (r.IsMerit)
+                    {
+                        <i class="bi bi-star text-success me-1" aria-hidden="true"></i>
+                    }
+                    @r.What
+                </td>
+                <td>
+                    @if (r.IsMerit)
+                    {
+                        <span class="text-success">@T("merit", "تميّز")</span>
+                    }
+                    else if (r.CaseId.HasValue)
+                    {
+                        <a asp-action="Case" asp-route-id="@r.CaseId">@T("case opened", "فُتحت قضية")</a>
+                    }
+                    else
+                    {
+                        <span class="text-muted">@T("resolved at teacher level", "عُولجت على مستوى المعلم")</span>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Recent.Count == 0)
+        {
+            <tr><td colspan="4" class="text-muted text-center py-4">@T("Nothing recorded yet this year.", "لم يُسجَّل شيء هذا العام بعد.")</td></tr>
+        }
+        </tbody>
+    </table></div>
+</div>

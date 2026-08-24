@@ -30,6 +30,23 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>
+    /// No active definition exists for the code a module named. Distinct from the
+    /// other four because it is not a refusal of an action — it means the school's
+    /// catalogue was never seeded, and the caller's honest response is to fall back
+    /// to its own screen rather than to tell the operator they were denied.
+    /// </summary>
+    public class WorkflowDefinitionMissingException : InvalidOperationException
+    {
+        public WorkflowDefinitionMissingException(string workflowCode)
+            : base($"No active workflow definition for code '{workflowCode}'.")
+        {
+            WorkflowCode = workflowCode;
+        }
+
+        public string WorkflowCode { get; }
+    }
+
     /// <summary>Reason missing where the policy or the hard rules demand one (BR-WF-010, BR-GLB-032).</summary>
     public class WorkflowReasonRequiredException : InvalidOperationException
     {

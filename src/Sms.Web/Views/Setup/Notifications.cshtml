@@ -1,0 +1,250 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model NotificationDefaultsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Notification defaults", "الإشعارات الافتراضية");
+    ViewData["Breadcrumb"] = T("System Setup / Notification defaults", "إعداد النظام / الإشعارات الافتراضية");
+
+    string Channel(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("In-app", "داخل النظام"),
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        NotificationChannel.WhatsApp => T("WhatsApp", "واتساب"),
+        _ => T("Channel", "قناة"),
+    };
+
+    string ChannelIcon(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => "bi-bell",
+        NotificationChannel.Email => "bi-envelope",
+        NotificationChannel.Sms => "bi-chat-left-text",
+        _ => "bi-whatsapp",
+    };
+
+    string Timing(NotificationTiming t) => t == NotificationTiming.Digest
+        ? T("daily digest", "ملخص يومي")
+        : T("immediate", "فوري");
+
+    var deliverable = Model.Channels.Where(NotificationEventCatalog.ChannelDelivers).Select(Channel).ToList();
+    var stubbed = Model.Channels.Where(c => !NotificationEventCatalog.ChannelDelivers(c)).Select(Channel).ToList();
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "ntf-help",
+        Title = T("Notification defaults — help", "الإشعارات الافتراضية — مساعدة"),
+        Intro = T("Each row is something the product can tell somebody about; each column is a way of telling them. The product ships with these already decided, and this screen is where a school adjusts that decision — it is not where new events are invented (BR-SET-008).",
+                  "كل سطر شيء يستطيع النظام إبلاغ أحدهم به، وكل عمود وسيلة للإبلاغ. ويأتي المنتج وقد حُسمت هذه الخيارات، وهذه الشاشة هي حيث تعدّلها المدرسة — لا حيث تُخترع أحداث جديدة (BR-SET-008)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("What the product decided for you", "ما قرره المنتج نيابة عنك"),
+                T("BR-NOT-003 ships every event in this catalogue enabled: in-app and email everywhere, plus SMS for absence and overdue. A cell marked as a product default is what the doc asks for; a cell switched on is what this school actually does.",
+                  "تُفعِّل القاعدة BR-NOT-003 كل حدث في هذه القائمة: داخل النظام والبريد في كل مكان، مع رسالة نصية للغياب والتأخر في السداد. والخلية الموسومة بأنها الافتراض تعني ما يطلبه الدليل، والخلية المُشغَّلة تعني ما تفعله هذه المدرسة فعلاً.")),
+            new HelpPanelViewModel.Item(
+                T("Some rows cannot be switched off", "بعض الأسطر لا يمكن إيقافها"),
+                T("BR-NOT-007 puts a floor under the statutory and safety classes — a same-day absence, a child who did not board the bus, a mark changed after publication, a password that changed. Those rows show a lock and the sentence explaining why. Recipients cannot opt out of them from the portal either.",
+                  "تضع القاعدة BR-NOT-007 حداً أدنى للأصناف النظامية وأصناف السلامة — غياب اليوم نفسه، وطفل لم يصعد الحافلة، ودرجة عُدِّلت بعد نشرها، وكلمة مرور تغيّرت. وتظهر هذه الأسطر بقفل ومعه الجملة التي تشرح السبب. ولا يستطيع المستقبِلون إلغاء الاشتراك بها من البوابة أيضاً.")),
+            new HelpPanelViewModel.Item(
+                T("Immediate or daily digest", "فوري أو ملخص يومي"),
+                T("BR-NOT-005 exists because a parent of three children should not get three overdue reminders. Late arrivals, due-soon and overdue installments, library loans and expiring documents default to a digest; everything urgent stays immediate.",
+                  "وُضعت القاعدة BR-NOT-005 لأن ولي أمر ثلاثة أبناء لا ينبغي أن يتلقى ثلاث مطالبات. فالتأخر عن الدوام، والأقساط المستحقة والمتأخرة، والإعارات، والمستندات التي تقارب الانتهاء تبدأ بملخص يومي؛ ويبقى كل عاجل فورياً.")),
+            new HelpPanelViewModel.Item(
+                T("Which channels can actually deliver", "أي القنوات تستطيع فعلاً الإيصال"),
+                T("Only in-app delivers today. Email, SMS and WhatsApp have no provider chosen yet, so a rule on one of them is a decision recorded ahead of time and not a message anybody receives. Those columns are marked, and the product does not ship them switched on.",
+                  "القناة الوحيدة التي تُوصِل اليوم هي «داخل النظام». أما البريد والرسائل النصية وواتساب فلم يُختر لها مزوّد بعد، فالقاعدة على أي منها قرار مسجَّل مسبقاً لا رسالة يستلمها أحد. وهذه الأعمدة موسومة، ولا يأتي المنتج بها مُشغَّلة.")),
+            new HelpPanelViewModel.Item(
+                T("Nothing is sent until the wording exists", "لا يُرسل شيء قبل وجود النص"),
+                T("A subscription says who should hear about what. The text they read is a template, and templates are authored separately (doc 09 §5). Until a template exists for an event and channel, the system records the intention and quietly sends nothing — by design, not by failure.",
+                  "الاشتراك يحدد من يُبلَّغ وبماذا. أما النص الذي يقرؤونه فهو قالب، والقوالب تُكتب على حدة (الوثيقة ٩ §٥). وإلى أن يوجد قالب لحدث وقناة، يسجّل النظام النية ولا يرسل شيئاً بهدوء — تصميماً لا عطلاً.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Every event the product can notify on, every channel it could use, and what this school has decided about each pair.",
+               "كل حدث يستطيع النظام الإشعار به، وكل قناة يمكنه استخدامها، وما قررته هذه المدرسة في كل اقتران بينهما.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_SetupNav" />
+
+<div class="sms-card mb-4">
+    <div class="p-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="small text-muted">@T("Configured", "مُعرَّف")</div>
+                <div class="h5 mb-0">
+                    <span dir="ltr">@Model.EnabledCount / @Model.ConfiguredCount</span>
+                </div>
+                <div class="small text-muted">
+                    @T("switched on, out of the rules this school has", "مُشغَّل، من أصل القواعد الموجودة لدى هذه المدرسة")
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">@T("Channels that deliver", "القنوات التي تُوصِل")</div>
+                <div class="h5 mb-0">@string.Join("، ", deliverable)</div>
+                <div class="small text-muted">
+                    @T("No provider is configured for", "لا يوجد مزوّد مُهيَّأ لـ") @string.Join("، ", stubbed)@T(".", ".")
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">@T("Message templates", "قوالب الرسائل")</div>
+                <div class="h5 mb-0"><span dir="ltr">@Model.TemplateCount</span></div>
+                <div class="small text-muted">
+                    @(Model.TemplateCount == 0
+                        ? T("none authored — every rule below is an intention until one is", "لم يُكتب أي قالب — وكل قاعدة أدناه نيّة إلى أن يوجد قالب")
+                        : T("authored (doc 09 §5)", "مكتوبة (الوثيقة ٩ §٥)"))
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.TemplateCount == 0)
+{
+    <div class="alert alert-info" role="status">
+        @T("No notification template has been written yet, so nothing on this page is being delivered to anyone right now. The subscriptions below still matter: they are what the product will act on the moment the wording exists.",
+           "لم يُكتب أي قالب إشعار بعد، فلا شيء في هذه الصفحة يُسلَّم لأحد الآن. وتبقى الاشتراكات أدناه ذات معنى: فهي ما سيعمل به النظام فور وجود النص.")
+    </div>
+}
+
+@foreach (var group in Model.Groups)
+{
+    <div class="sms-card mb-4">
+        <div class="p-3 border-bottom">
+            <h2 class="h6 mb-0">@(isRtl ? group.Module.TitleAr : group.Module.TitleEn)</h2>
+        </div>
+        <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+            <caption class="visually-hidden">
+                @T($"Notification subscriptions for {group.Module.TitleEn}", $"اشتراكات الإشعارات لـ {group.Module.TitleAr}")
+            </caption>
+            <thead><tr>
+                <th scope="col">@T("Event", "الحدث")</th>
+                @foreach (var channel in Model.Channels)
+                {
+                    <th scope="col" class="text-center" style="min-width:9rem">
+                        <i class="bi @ChannelIcon(channel) me-1" aria-hidden="true"></i>@Channel(channel)
+                        @if (!NotificationEventCatalog.ChannelDelivers(channel))
+                        {
+                            <div class="small fw-normal text-warning-emphasis">@T("no provider", "بلا مزوّد")</div>
+                        }
+                    </th>
+                }
+            </tr></thead>
+            <tbody>
+            @foreach (var row in group.Rows)
+            {
+                <tr>
+                    <th scope="row" class="fw-normal">
+                        <div>
+                            @(isRtl ? row.Event.TitleAr : row.Event.TitleEn)
+                            @if (row.Event.IsStatutory)
+                            {
+                                <span class="badge text-bg-warning ms-1"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("cannot be switched off", "لا يمكن إيقافه")</span>
+                            }
+                            @if (!row.Event.HasPublisher)
+                            {
+                                <span class="badge text-bg-light border ms-1">@T("no module raises it yet", "لا وحدة تُطلقه بعد")</span>
+                            }
+                        </div>
+                        <div class="small text-muted">
+                            <code dir="ltr">@row.Event.Code</code>
+                            · @T("to:", "إلى:") @(isRtl ? row.Event.RecipientsAr : row.Event.RecipientsEn)
+                        </div>
+                        @if (row.Event.IsStatutory)
+                        {
+                            <div class="small text-muted fst-italic">@(isRtl ? row.Event.FloorAr : row.Event.FloorEn)</div>
+                        }
+                    </th>
+
+                    @foreach (var cell in row.Cells)
+                    {
+                        <td class="text-center">
+                            <form method="post" asp-action="Notifications" class="d-inline">
+                                <input type="hidden" name="code" value="@row.Event.Code" />
+                                <input type="hidden" name="channel" value="@cell.Channel" />
+                                <input type="hidden" name="timing" value="@cell.Timing" />
+
+                                @if (cell.IsEnabled && cell.CanSwitchOff)
+                                {
+                                    <button type="submit" name="enable" value="false" class="btn btn-sm btn-success"
+                                            title="@T($"On — switch off {row.Event.TitleEn} on {Channel(cell.Channel)}", $"مُشغَّل — أوقف «{row.Event.TitleAr}» على قناة {Channel(cell.Channel)}")">
+                                        <i class="bi bi-check-lg" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@T($"Switch off {row.Event.TitleEn} on {Channel(cell.Channel)}", $"إيقاف «{row.Event.TitleAr}» على قناة {Channel(cell.Channel)}")</span>
+                                    </button>
+                                }
+                                else if (cell.IsEnabled)
+                                {
+                                    <button type="button" class="btn btn-sm btn-success disabled" aria-disabled="true"
+                                            title="@(isRtl ? row.Event.FloorAr : row.Event.FloorEn)">
+                                        <i class="bi bi-lock-fill" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@T($"{row.Event.TitleEn} on {Channel(cell.Channel)} is statutory and cannot be switched off", $"«{row.Event.TitleAr}» على قناة {Channel(cell.Channel)} إشعار نظامي لا يمكن إيقافه")</span>
+                                    </button>
+                                }
+                                else if (!cell.CanSwitchOn)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary disabled" aria-disabled="true"
+                                            title="@T("Switched off here earlier. Restoring it needs a fix in the notification configuration service — see the help panel.", "أُوقف من هنا سابقاً. وإعادته تحتاج إصلاحاً في خدمة إعداد الإشعارات — انظر لوحة المساعدة.")">
+                                        <i class="bi bi-slash-circle" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@T($"{row.Event.TitleEn} is switched off on {Channel(cell.Channel)} and cannot be restored from this screen", $"«{row.Event.TitleAr}» متوقف على قناة {Channel(cell.Channel)} ولا يمكن إعادته من هذه الشاشة")</span>
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button type="submit" name="enable" value="true" class="btn btn-sm btn-outline-secondary"
+                                            title="@T($"Off — switch on {row.Event.TitleEn} on {Channel(cell.Channel)}", $"متوقف — شغّل «{row.Event.TitleAr}» على قناة {Channel(cell.Channel)}")">
+                                        <i class="bi bi-dash-lg" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@T($"Switch on {row.Event.TitleEn} on {Channel(cell.Channel)}", $"تشغيل «{row.Event.TitleAr}» على قناة {Channel(cell.Channel)}")</span>
+                                    </button>
+                                }
+                            </form>
+
+                            @if (cell.IsEnabled)
+                            {
+                                <form method="post" asp-action="Notifications" class="d-inline">
+                                    <input type="hidden" name="code" value="@row.Event.Code" />
+                                    <input type="hidden" name="channel" value="@cell.Channel" />
+                                    <input type="hidden" name="enable" value="true" />
+                                    <button type="submit" name="timing"
+                                            value="@(cell.Timing == NotificationTiming.Digest ? NotificationTiming.Immediate : NotificationTiming.Digest)"
+                                            class="btn btn-sm btn-link p-0 small text-decoration-none"
+                                            title="@T($"Change to {Timing(cell.Timing == NotificationTiming.Digest ? NotificationTiming.Immediate : NotificationTiming.Digest)}", $"غيّره إلى {Timing(cell.Timing == NotificationTiming.Digest ? NotificationTiming.Immediate : NotificationTiming.Digest)}")">
+                                        @Timing(cell.Timing)
+                                    </button>
+                                </form>
+                            }
+                            else if (cell.IsProductDefault)
+                            {
+                                <div class="small text-muted">@T("product default", "افتراض المنتج")</div>
+                            }
+
+                            @if (cell.IsEnabled && !cell.CanDeliver)
+                            {
+                                <div class="small text-warning-emphasis">@T("nothing is sent", "لا شيء يُرسل")</div>
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}
+
+@if (Model.Groups.Count == 0)
+{
+    <div class="sms-card"><div class="p-3 text-muted">
+        @T("The event catalogue is empty, which should not be possible — it is compiled into the product, not stored. Report this.",
+           "قائمة الأحداث فارغة، وهذا لا ينبغي أن يحدث — فهي مُضمَّنة في المنتج لا مخزَّنة. أبلغ عن هذا.")
+    </div></div>
+}

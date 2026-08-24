@@ -82,7 +82,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DefineBuilding(RoomCatalogViewModel form)
         {
             try { Require(form.BuildingNameAr, "Name (Arabic)"); Require(form.BuildingNameEn, "Name (English)"); await _rooms.DefineBuildingAsync(form.BuildingNameAr!, form.BuildingNameEn!); TempData["Flash"] = T("Building created.", "تم إنشاء المبنى."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -98,7 +98,7 @@ namespace Sms.Web.Controllers
                 await _rooms.DefineFloorAsync(form.FloorBuildingId.Value, form.FloorNameAr!, form.FloorNameEn!, form.FloorOrder ?? 1);
                 TempData["Flash"] = T("Floor created.", "تم إنشاء الطابق.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -115,7 +115,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Room created.", "تم إنشاء القاعة.");
                 return RedirectToAction(nameof(Details), new { id = r.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -143,7 +143,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Building updated.", "تم تحديث المبنى.");
                 return RedirectToAction(nameof(Index));
             }
-            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", form); }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic)); return View("Edit", form); }
         }
 
         [HttpPost("building/{id:int}/delete")]
@@ -152,7 +152,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteBuilding(int id)
         {
             try { await _rooms.DeactivateBuildingAsync(id); TempData["Flash"] = T("Building removed (deactivated).", "تم حذف المبنى (إلغاء تفعيل)."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -179,7 +179,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Floor updated.", "تم تحديث الطابق.");
                 return RedirectToAction(nameof(Index));
             }
-            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", await FillEditListsAsync(form)); }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic)); return View("Edit", await FillEditListsAsync(form)); }
         }
 
         [HttpPost("floor/{id:int}/delete")]
@@ -188,7 +188,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteFloor(int id)
         {
             try { await _rooms.DeactivateFloorAsync(id); TempData["Flash"] = T("Floor removed (deactivated).", "تم حذف الطابق (إلغاء تفعيل)."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -220,7 +220,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Room updated.", "تم تحديث القاعة.");
                 return RedirectToAction(nameof(Details), new { id });
             }
-            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, ex.Message); return View("Edit", await FillEditListsAsync(form)); }
+            catch (InvalidOperationException ex) { ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic)); return View("Edit", await FillEditListsAsync(form)); }
         }
 
         [HttpPost("{id:int}/delete")]
@@ -229,7 +229,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> DeleteRoom(int id)
         {
             try { await _rooms.DeactivateRoomAsync(id); TempData["Flash"] = T("Room removed (deactivated; bookings/history kept).", "تم حذف القاعة (إلغاء تفعيل مع حفظ الحجوزات والسجل)."); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
 
@@ -278,7 +278,7 @@ namespace Sms.Web.Controllers
                 await _rooms.AddFeatureAsync(id, featureLookupId.Value);
                 TempData["Flash"] = T("Feature added.", "تمت إضافة التجهيز.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -294,7 +294,7 @@ namespace Sms.Web.Controllers
                 await _rooms.SetUnavailableAsync(id, reason, startDate.Value, endDate.Value, notes);
                 TempData["Flash"] = T("Unavailability window recorded (BR-ROM-004).", "تم تسجيل فترة عدم التوفر (BR-ROM-004).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 
@@ -311,7 +311,7 @@ namespace Sms.Web.Controllers
                 var b = await _rooms.RequestBookingAsync(id, yearId, purpose!.Trim(), DateTime.SpecifyKind(start.Value, DateTimeKind.Utc), DateTime.SpecifyKind(end.Value, DateTimeKind.Utc), _currentUser.UserId);
                 TempData["Flash"] = T($"Booking {b.Status}.", $"الحجز: {b.Status}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Details), new { id });
         }
 

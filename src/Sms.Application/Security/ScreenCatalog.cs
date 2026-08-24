@@ -79,6 +79,9 @@ namespace Sms.Application.Security
             /// <summary>Module 23. School transport: the fleet, the routes, who rides, and today's trips.</summary>
             public const string Transport = "TRN";
 
+            /// <summary>Module 25. Behaviour: the code, what was recorded against it, and the cases that follow.</summary>
+            public const string Discipline = "DIS";
+
             /// <summary>Module 36. The screens that decide what every other screen may be reached by.</summary>
             public const string SystemAdministration = "SYS";
 
@@ -96,6 +99,15 @@ namespace Sms.Application.Security
             public const string Nationalities = "Nationalities";
             public const string Features = "Features";
             public const string ContentPack = "ContentPack";
+
+            /// <summary>doc/Modules/01 §8.3 — the settings hub embeds doc 08's series registry.</summary>
+            public const string Numbering = "Numbering";
+
+            /// <summary>doc/Modules/01 §8.3 + doc 10 §5 — the document-type catalogue every module attaches against.</summary>
+            public const string Documents = "Documents";
+
+            /// <summary>doc/Modules/01 §8.3 ("Notifications defaults" tab) + doc 09 §3/§4 — the event × channel subscription matrix, BR-SET-008 and BR-NOT-003.</summary>
+            public const string Notifications = "Notifications";
         }
 
         public static class Schools
@@ -269,6 +281,24 @@ namespace Sms.Application.Security
             public const string Pos = "Pos";
         }
 
+        public static class Discipline
+        {
+            /// <summary>The year's behaviour code: violations, merits, consequences and the ladder (BR-DCP-001).</summary>
+            public const string Code = "Code";
+
+            /// <summary>Recording what happened — an incident against the code, or a merit (BR-DCP-002).</summary>
+            public const string Incidents = "Incidents";
+
+            /// <summary>The WF-11 case: investigation, statements, decision, action, appeal, closure (BR-DCP-003).</summary>
+            public const string Cases = "Cases";
+
+            /// <summary>Consequences in force — detentions, suspensions, contracts coming due (BR-DCP-004).</summary>
+            public const string Actions = "Actions";
+
+            /// <summary>Where behaviour concentrates, and who it keeps happening to (BR-DCP-007).</summary>
+            public const string Analytics = "Analytics";
+        }
+
         public static class Transport
         {
             /// <summary>The buses and their expiry-tracked documents (BR-TRN-001).</summary>
@@ -325,6 +355,9 @@ namespace Sms.Application.Security
             // wizard and the settings hub beside it, and the pack was read-only here only because
             // nothing could yet write one.
             S(Modules.Setup, Setup.ContentPack, "Content pack", "حزمة المحتوى", ActionVerb.View, ActionVerb.Configure),
+            S(Modules.Setup, Setup.Numbering, "Numbering series", "سلاسل الترقيم", ActionVerb.View, ActionVerb.Configure),
+            S(Modules.Setup, Setup.Documents, "Document types", "أنواع المستندات", ActionVerb.View, ActionVerb.Configure),
+            S(Modules.Setup, Setup.Notifications, "Notification defaults", "الإشعارات الافتراضية", ActionVerb.View, ActionVerb.Configure),
 
             // ---- School
             S(Modules.Schools, Schools.Profile, "School profile", "ملف المدرسة", ActionVerb.View, ActionVerb.Edit),
@@ -467,6 +500,27 @@ namespace Sms.Application.Security
                 ActionVerb.View, ActionVerb.Post, ActionVerb.Edit, ActionVerb.Approve),
             S(Modules.Transport, Transport.Safety, "Safety register", "سجل السلامة",
                 ActionVerb.View, ActionVerb.Approve),
+
+            // ---- Discipline
+            //
+            // The split here is the module's own separation of powers (BR-DCP-002/003/006): recording
+            // is open to any teacher, deciding is not, and the person who decided a case may not be
+            // the person who reviews its appeal. Create on Incidents is therefore a wide grant and
+            // Approve on Cases is a narrow one, which only works if they are separate screens.
+            //
+            // Configure writes a new version of the code, Approve publishes it to families: writing
+            // the school's behaviour rules and putting them in front of parents are different acts,
+            // and the second is the Principal's.
+            S(Modules.Discipline, Discipline.Code, "Behaviour code", "لائحة السلوك",
+                ActionVerb.View, ActionVerb.Configure, ActionVerb.Approve),
+            S(Modules.Discipline, Discipline.Incidents, "Record behaviour", "تسجيل السلوك",
+                ActionVerb.View, ActionVerb.Create),
+            S(Modules.Discipline, Discipline.Cases, "Discipline cases", "قضايا السلوك",
+                ActionVerb.View, ActionVerb.Edit, ActionVerb.Approve),
+            S(Modules.Discipline, Discipline.Actions, "Action tracker", "متابعة الإجراءات",
+                ActionVerb.View, ActionVerb.Edit),
+            S(Modules.Discipline, Discipline.Analytics, "Behaviour analytics", "تحليلات السلوك",
+                ActionVerb.View),
 
             // ---- System administration
             //

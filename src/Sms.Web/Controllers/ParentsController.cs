@@ -109,7 +109,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync();
                 return View(form);
             }
@@ -177,7 +177,7 @@ namespace Sms.Web.Controllers
                 await _parents.UpdateParentAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage);
                 TempData["Flash"] = T("Parent file updated.", "تم تحديث ملف ولي الأمر.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "identity" });
         }
 
@@ -277,7 +277,7 @@ namespace Sms.Web.Controllers
                 await _parents.SetResidenceAsync(id, residenceAreaId, neighbourhoodId);
                 TempData["Flash"] = T("Residence updated.", "تم تحديث السكن.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             // Back where the editing started: the picker lives on four other screens, and being
             // returned to the parent file from a half-finished admission form is its own small loss.
@@ -296,7 +296,7 @@ namespace Sms.Web.Controllers
                 await _parents.DeleteParentAsync(id);
                 TempData["Flash"] = T($"Parent {p.ParentFileNo} deleted.", $"تم حذف ولي الأمر {p.ParentFileNo}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { q, filter });
         }
 

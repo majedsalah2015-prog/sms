@@ -1,0 +1,102 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model WorkflowCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Workflow catalogue", "فهرس المسارات");
+    ViewData["Breadcrumb"] = T("Approvals / Catalogue", "الموافقات / الفهرس");
+    var help = new HelpPanelViewModel
+    {
+        Id = "wf-catalog-help", Title = T("Workflow catalogue — help", "فهرس المسارات — مساعدة"),
+        Intro = T("The state machines this school has, and who signs at each level. This screen reads; it does not edit — a live chain is changed by publishing a new version of it, never by amending the one that requests are already running on (BR-WF-008).", "آلات الحالة التي تملكها هذه المدرسة، ومن يوقّع عند كل مستوى. هذه الشاشة تقرأ ولا تعدّل — فالسلسلة الجارية تُغيَّر بنشر نسخة جديدة منها، لا بتعديل النسخة التي تسير عليها طلبات قائمة (BR-WF-008)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Levels are read downward", "المستويات تُقرأ نزولاً"), T("Each line is one approval: the state it acts from, who may act, and where the request lands next. A line landing on Approved is the one that completes the chain and applies its effect (BR-WF-009).", "كل سطر اعتماد واحد: الحالة التي يتصرّف منها، ومن يملك التصرّف، وأين يحطّ الطلب بعده. والسطر الذي ينتهي إلى «معتمد» هو الذي يكمل السلسلة ويطبّق أثرها (BR-WF-009).")),
+            new HelpPanelViewModel.Item(T("A band means the value decides", "النطاق يعني أن القيمة تقرّر"), T("Where a level shows a band, the request's own value picks the line: a discount at or under the band ends there, one above it moves up to the next signature (BR-WF-005).", "حيث يظهر نطاق عند مستوى، تختار قيمة الطلب نفسها السطر: فالخصم عند النطاق أو دونه ينتهي هناك، وما فوقه يصعد إلى التوقيع التالي (BR-WF-005).")),
+            new HelpPanelViewModel.Item(T("The gate is the second lock", "الصلاحية قفل ثانٍ"), T("Where a level names a screen permission, holding the role is not enough: the approver's data scopes must also cover the record (BR-WF-004). Levels with no gate are held by role alone, because the module that owns them has no screen yet.", "حيث يذكر المستوى صلاحية شاشة، لا يكفي حمل الدور: بل يجب أن يغطّي نطاق بيانات المعتمِد السجلَّ أيضاً (BR-WF-004). أما المستويات بلا صلاحية فيحكمها الدور وحده، لأن الوحدة المالكة لها بلا شاشة بعد.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("doc 05 §5's catalogue as this school holds it — the chain each request walks, and the signature each level needs.",
+               "فهرس الوثيقة 05 (البند 5) كما تحمله هذه المدرسة — السلسلة التي يسلكها كل طلب، والتوقيع الذي يحتاجه كل مستوى.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_ApprovalsNav" />
+
+@if (Model.Items.Count == 0)
+{
+    <div class="sms-card">
+        <div class="p-4 text-center">
+            <p class="h5 mb-2">@T("No workflow is defined for this school.", "لا يوجد مسار معرَّف لهذه المدرسة.")</p>
+            <p class="text-muted mb-0">@T("Until one exists, no module can route anything for approval — the engine refuses to start an instance for a code it cannot find.", "ما دام لا يوجد واحد، فلا وحدة تستطيع توجيه شيء للاعتماد — إذ يرفض المحرّك بدء أي طلب برمز لا يجده.")</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@ViewData["Title"]</caption>
+            <thead><tr>
+                <th scope="col">@T("Code", "الرمز")</th>
+                <th scope="col">@T("Workflow", "المسار")</th>
+                <th scope="col">@T("Record", "السجل")</th>
+                <th scope="col">@T("Approval chain", "سلسلة الاعتماد")</th>
+                <th scope="col">@T("Open", "مفتوح")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in Model.Items)
+            {
+                <tr>
+                    <td>
+                        <code>@row.Code</code>
+                        <div class="small text-muted">@T("v", "نسخة ")@(row.Version)</div>
+                    </td>
+                    <td>
+                        @row.Name
+                        @if (!row.IsActive)
+                        {
+                            <span class="badge text-bg-secondary ms-1">@T("superseded", "مستبدَل")</span>
+                        }
+                        <div class="small text-muted">@string.Format(T("{0} states", "{0} حالات"), row.StateCount)</div>
+                    </td>
+                    <td><code>@row.EntityTypeName</code></td>
+                    <td>
+                        @if (row.Levels.Count == 0)
+                        {
+                            <span class="text-muted">@T("no approval step", "لا مرحلة اعتماد")</span>
+                        }
+                        else
+                        {
+                            <ol class="mb-0 ps-3 small">
+                                @foreach (var level in row.Levels)
+                                {
+                                    <li>
+                                        <strong>@(level.RoleName ?? T("role missing", "الدور غير موجود"))</strong>
+                                        <span class="text-muted">@level.FromStateName → @level.ToStateName</span>
+                                        <span class="badge text-bg-light border ms-1">@level.Band</span>
+                                        @if (level.Gate != null)
+                                        {
+                                            <div class="text-muted"><i class="bi bi-shield-lock me-1" aria-hidden="true"></i><code>@level.Gate</code></div>
+                                        }
+                                    </li>
+                                }
+                            </ol>
+                        }
+                    </td>
+                    <td>@(row.OpenInstances == 0 ? T("—", "—") : row.OpenInstances.ToString(CultureInfo.InvariantCulture))</td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}

@@ -1,0 +1,161 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model BehaviorAnalyticsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Behaviour analytics", "تحليلات السلوك");
+    ViewData["Breadcrumb"] = T("Behaviour / Analytics", "السلوك / التحليلات");
+    var help = new HelpPanelViewModel
+    {
+        Id = "dis-analytics-help", Title = T("Behaviour analytics — help", "تحليلات السلوك — مساعدة"),
+        Intro = T("Where behaviour concentrates — by grade, by kind, by hour of the day. These are counts of what was recorded, which is not the same as what happened: a grade that looks calm may simply have teachers who record less.", "أين يتركّز السلوك — بحسب الصف والنوع وساعة اليوم. وهذه أعداد ما سُجِّل، وليست ما حدث: فالصف الذي يبدو هادئاً قد يكون معلّموه أقلّ تسجيلاً لا أكثر انضباطاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Merits come first", "التميّز أولاً"), T("The merit leaderboard is placed above the repeat list deliberately. A behaviour system that shows a school only its worst children teaches the school to look for them, and the module doc asks for positive-first display.", "لوحة التميّز موضوعة فوق قائمة التكرار قصداً. فنظام السلوك الذي لا يُري المدرسة إلا أسوأ أبنائها يعلّمها أن تبحث عنهم، ووثيقة الوحدة تطلب تقديم الإيجابي.")),
+            new HelpPanelViewModel.Item(T("The repeat list is restricted", "قائمة التكرار مقيَّدة"), T("This list names children by their record and is exactly the kind of thing BR-DCP-008 restricts. It is a prompt to look at a child's situation — a welfare question — not a ranking to circulate.", "تسمّي هذه القائمة أطفالاً بسجلّهم، وهي بالضبط ما يقيّده BR-DCP-008. وهي دعوة للنظر في حال طفل — سؤال رعاية — لا ترتيب يُتداوَل.")),
+            new HelpPanelViewModel.Item(T("Time of day", "ساعة اليوم"), T("Incidents clustering in one hour usually says something about supervision at that hour rather than about the children in it — break, transitions between lessons, the end of the day.", "تجمّع المخالفات في ساعة واحدة يقول عادةً شيئاً عن الإشراف في تلك الساعة لا عن الأطفال فيها — الفسحة، والانتقال بين الحصص، ونهاية اليوم.")),
+        },
+    };
+
+    var cellLookup = Model.Cells.ToDictionary(c => (c.GradeId, c.ViolationTypeId), c => c.Count);
+    var maxHour = Model.ByHour.Count == 0 ? 1 : Model.ByHour.Values.Max();
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Counts of what was recorded this year. Read them as a question to ask, not as an answer.",
+               "أعداد ما سُجِّل هذا العام. اقرأها كسؤال يُطرَح لا كإجابة.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_DisciplineNav" />
+
+<h2 class="sms-section-title"><i class="bi bi-star me-1" aria-hidden="true"></i>@T("Merit leaders", "المتميّزون")</h2>
+<div class="sms-card mb-4"><div class="table-responsive"><table class="table sms-table mb-0">
+    <caption class="visually-hidden">@T("Merit leaders", "المتميّزون")</caption>
+    <thead><tr>
+        <th scope="col">@T("Student", "الطالب")</th>
+        <th scope="col" class="text-center">@T("Awards", "المنح")</th>
+        <th scope="col" class="text-center">@T("Points", "النقاط")</th>
+    </tr></thead>
+    <tbody>
+    @foreach (var row in Model.MeritLeaders)
+    {
+        <tr>
+            <td>@(isRtl ? row.Student.NameAr : row.Student.NameEn) <span class="text-muted small">@row.Student.StudentNo</span></td>
+            <td class="text-center">@row.Awards</td>
+            <td class="text-center fw-semibold text-success">@row.Points</td>
+        </tr>
+    }
+    @if (Model.MeritLeaders.Count == 0)
+    {
+        <tr><td colspan="3" class="text-muted text-center py-4">@T("No merits recorded this year yet.", "لم يُسجَّل تميّز هذا العام بعد.")</td></tr>
+    }
+    </tbody>
+</table></div></div>
+
+<h2 class="sms-section-title">@T("Violations by grade", "المخالفات بحسب الصف")</h2>
+@if (Model.Violations.Count == 0 || Model.Grades.Count == 0)
+{
+    <div class="sms-card p-4 text-center text-muted mb-4">@T("Nothing has been recorded against the code this year.", "لم يُسجَّل شيء بالاستناد إلى اللائحة هذا العام.")</div>
+}
+else
+{
+    <div class="sms-card mb-4"><div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Violations by grade", "المخالفات بحسب الصف")</caption>
+        <thead><tr>
+            <th scope="col">@T("Violation", "المخالفة")</th>
+            @foreach (var g in Model.Grades)
+            {
+                <th scope="col" class="text-center">@(isRtl ? g.NameAr : g.NameEn)</th>
+            }
+            <th scope="col" class="text-center">@T("Total", "المجموع")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var v in Model.Violations)
+        {
+            var total = 0;
+            <tr>
+                <th scope="row" class="fw-normal">
+                    <span class="badge @DisciplineLabels.SeverityClass(v.Severity)">@v.Severity</span>
+                    @(isRtl ? v.NameAr : v.NameEn)
+                </th>
+                @foreach (var g in Model.Grades)
+                {
+                    var count = cellLookup.TryGetValue((g.GradeId, v.ViolationTypeId), out var n) ? n : 0;
+                    total += count;
+                    // Intensity as an inline background so the heat reads without a chart library;
+                    // the number stays visible because colour alone is not an accessible signal.
+                    var intensity = Model.MaxCell == 0 ? 0 : (double)count / Model.MaxCell;
+                    <td class="text-center" style="@(count > 0 ? $"background-color: rgba(220,53,69,{(0.08 + (intensity * 0.5)).ToString("0.00", CultureInfo.InvariantCulture)})" : "")">
+                        @(count == 0 ? "" : count.ToString(CultureInfo.InvariantCulture))
+                    </td>
+                }
+                <td class="text-center fw-semibold">@total</td>
+            </tr>
+        }
+        </tbody>
+    </table></div></div>
+}
+
+<div class="row g-4">
+    <div class="col-12 col-lg-7">
+        <h2 class="sms-section-title">@T("Repeat list", "قائمة التكرار") <span class="badge text-bg-danger">@T("restricted", "مقيَّدة")</span></h2>
+        <div class="sms-card"><div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@T("Students with repeated incidents", "الطلاب ذوو المخالفات المتكرّرة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Student", "الطالب")</th>
+                <th scope="col" class="text-center">@T("Incidents", "المخالفات")</th>
+                <th scope="col" class="text-center">@T("Points", "النقاط")</th>
+                <th scope="col" class="text-center">@T("Highest level", "أعلى مستوى")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in Model.RepeatOffenders)
+            {
+                <tr>
+                    <td>@(isRtl ? row.Student.NameAr : row.Student.NameEn) <span class="text-muted small">@row.Student.StudentNo</span></td>
+                    <td class="text-center">@row.Incidents</td>
+                    <td class="text-center">@row.ViolationPoints</td>
+                    <td class="text-center"><span class="badge @DisciplineLabels.SeverityClass(row.HighestSeverity)">@DisciplineLabels.Severity(row.HighestSeverity, isRtl)</span></td>
+                </tr>
+            }
+            @if (Model.RepeatOffenders.Count == 0)
+            {
+                <tr><td colspan="4" class="text-muted text-center py-4">@T("No student has reached the repeat threshold this year.", "لم يبلغ أي طالب حدّ التكرار هذا العام.")</td></tr>
+            }
+            </tbody>
+        </table></div></div>
+    </div>
+
+    <div class="col-12 col-lg-5">
+        <h2 class="sms-section-title">@T("By hour of the day", "بحسب ساعة اليوم")</h2>
+        <div class="sms-card p-3">
+            @if (Model.ByHour.Count == 0)
+            {
+                <p class="text-muted mb-0">@T("Nothing recorded yet.", "لم يُسجَّل شيء بعد.")</p>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                    @foreach (var (hour, count) in Model.ByHour.OrderBy(x => x.Key))
+                    {
+                        var width = (int)Math.Round(100.0 * count / maxHour);
+                        <li class="d-flex align-items-center gap-2 mb-1">
+                            <span class="text-muted small" style="width:3.5rem">@hour.ToString("00", CultureInfo.InvariantCulture):00</span>
+                            <span class="progress flex-fill" style="height:.75rem" role="img"
+                                  aria-label="@T($"{count} incidents", $"{count} مخالفة")">
+                                <span class="progress-bar bg-danger" style="width:@width%"></span>
+                            </span>
+                            <span class="small" style="width:2rem">@count</span>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+</div>

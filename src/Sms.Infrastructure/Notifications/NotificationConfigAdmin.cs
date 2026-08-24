@@ -64,8 +64,15 @@ namespace Sms.Infrastructure.Notifications
             bool isEnabled,
             CancellationToken cancellationToken = default)
         {
-            var rule = await _db.SubscriptionRules.SingleOrDefaultAsync(
-                r => r.EventCode == eventCode && r.Channel == channel, cancellationToken);
+            // Past the soft-active filter, with the school predicate back on by hand.
+            // The rule's IsActive flag *is* the school's on/off switch, so a disabled
+            // rule is exactly the one this method is most often asked to touch — and
+            // reading through the filter made it invisible, so re-enabling it inserted
+            // a second row and died on the unique index over (school, event, channel).
+            // A DbUpdateException, at that: not an InvalidOperationException, so no
+            // controller's catch would have translated it either.
+            var rule = await _db.SubscriptionRules.IgnoreQueryFilters().SingleOrDefaultAsync(
+                r => r.SchoolId == _db.CurrentSchoolId && r.EventCode == eventCode && r.Channel == channel, cancellationToken);
 
             if (rule == null)
             {

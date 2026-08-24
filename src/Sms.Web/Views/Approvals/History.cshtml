@@ -1,0 +1,93 @@
+@using System.Globalization
+@using Sms.Web.Models
+@model WorkflowHistoryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = string.Format(T("Request #{0}", "الطلب رقم {0}"), Model.InstanceId);
+    ViewData["Breadcrumb"] = T("Approvals / History", "الموافقات / المسار");
+    var help = new HelpPanelViewModel
+    {
+        Id = "wf-history-help", Title = T("Request history — help", "مسار الطلب — مساعدة"),
+        Intro = T("Every step this request has taken, in order: who acted, when, and why. The same facts are written to the tamper-evident audit store at the moment they happen (BR-WF-002); this panel is the readable copy.", "كل خطوة سلكها هذا الطلب بالترتيب: من تصرّف ومتى ولماذا. والوقائع نفسها تُكتب في سجل التدقيق المحصَّن لحظة وقوعها (BR-WF-002)؛ وهذه اللوحة نسختها المقروءة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Nothing here was edited", "لا شيء هنا عُدِّل"), T("A step is written once. A correction is another step, not a rewrite of an earlier one — which is what makes the trail worth reading years later.", "الخطوة تُكتب مرة واحدة. والتصويب خطوة أخرى لا إعادة كتابة لخطوة سابقة — وهذا ما يجعل المسار جديراً بالقراءة بعد سنين.")),
+            new HelpPanelViewModel.Item(T("The routing value", "قيمة التوجيه"), T("Where a workflow routes by value — a discount percentage, an amount — the value is fixed when the request starts and cannot drift afterwards (BR-WF-005), so the chain a request walked cannot be changed under it.", "حيث يوجَّه المسار بالقيمة — نسبة خصم أو مبلغ — تُثبَّت القيمة عند بدء الطلب ولا تتغيّر بعده (BR-WF-005)، فلا تُبدَّل السلسلة التي سلكها الطلب من تحته.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@Model.WorkflowName · <code>@Model.WorkflowCode</code> · @Model.EntityLabel</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_ApprovalsNav" />
+
+<div class="sms-card mb-3">
+    <div class="p-3">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">@T("Current state", "الحالة الحالية")</dt>
+            <dd class="col-sm-9">
+                <span class="badge @(Model.IsClosed ? "text-bg-secondary" : "text-bg-light border")">@Model.StateName</span>
+                @if (Model.IsClosed)
+                {
+                    <span class="small text-muted ms-1">@T("closed", "مغلق")</span>
+                }
+            </dd>
+
+            <dt class="col-sm-3">@T("Submitted by", "قدّمه")</dt>
+            <dd class="col-sm-9">@(Model.SubmittedBy ?? T("not submitted yet", "لم يُقدَّم بعد"))</dd>
+
+            @if (Model.RoutingValue is decimal routing)
+            {
+                <dt class="col-sm-3">@T("Routing value", "قيمة التوجيه")</dt>
+                <dd class="col-sm-9 text-end-ltr">@routing.ToString("0.##", CultureInfo.InvariantCulture)</dd>
+            }
+        </dl>
+    </div>
+</div>
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("Step trail", "سجل الخطوات")</caption>
+        <thead><tr>
+            <th scope="col">@T("When", "متى")</th>
+            <th scope="col">@T("Action", "الإجراء")</th>
+            <th scope="col">@T("From", "من")</th>
+            <th scope="col">@T("To", "إلى")</th>
+            <th scope="col">@T("By", "بواسطة")</th>
+            <th scope="col">@T("Reason", "السبب")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Steps.Count == 0)
+        {
+            <tr><td colspan="6" class="text-muted p-3">@T("The request has not moved yet — it is sitting at its first state.", "لم يتحرّك الطلب بعد — ما زال عند حالته الأولى.")</td></tr>
+        }
+        else
+        {
+            @foreach (var step in Model.Steps)
+            {
+                <tr>
+                    <td>@step.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                    <td><span class="badge @ApprovalLabels.ActionBadge(step.Action)">@ApprovalLabels.Action(step.Action, isRtl)</span></td>
+                    <td>@step.FromStateName</td>
+                    <td>@step.ToStateName</td>
+                    <td>
+                        @(step.Actor ?? T("—", "—"))
+                        @if (step.IsDelegated)
+                        {
+                            <div class="small text-muted">@T("under delegation", "بالتفويض")</div>
+                        }
+                    </td>
+                    <td>@(string.IsNullOrWhiteSpace(step.Reason) ? T("—", "—") : step.Reason)</td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>

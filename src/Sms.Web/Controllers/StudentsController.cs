@@ -158,7 +158,7 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 var model = await BuildFormAsync(null);
                 Copy(form, model);
                 return View(model);
@@ -203,7 +203,7 @@ namespace Sms.Web.Controllers
                     form.Gender, form.DateOfBirth.Value, form.NationalityLookupId.Value, form.PrimaryIdTypeLookupId, string.IsNullOrWhiteSpace(form.PrimaryIdNo) ? null : form.PrimaryIdNo.Trim(), form.PrimaryIdExpiry);
                 TempData["Flash"] = T("Student file updated.", "تم تحديث ملف الطالب.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
         }
 
@@ -226,7 +226,7 @@ namespace Sms.Web.Controllers
                     HttpContext.RequestAborted);
                 TempData["Flash"] = T("Social profile updated.", "تم تحديث البيانات الاجتماعية.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return RedirectToAction(nameof(File), new { id, tab = "social" });
         }
@@ -273,7 +273,7 @@ namespace Sms.Web.Controllers
             // Also an InvalidOperationException, and it carries a reason rather than a sentence —
             // the wording is chosen here, in the reader's language, never thrown from the service.
             catch (PhotoRejectedException ex) { TempData["Error"] = Labels.PhotoRejection(ex.Rejection, IsArabic); }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
         }
@@ -319,7 +319,7 @@ namespace Sms.Web.Controllers
                 await _students.ChangeStatusAsync(id, target);
                 TempData["Flash"] = T($"Status changed to {target}.", $"تغيرت الحالة إلى {target}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "status" });
         }
 
@@ -334,7 +334,7 @@ namespace Sms.Web.Controllers
                 await _students.LinkGuardianAsync(id, parentId.Value, relationshipId.Value, isPrimary, isFinancial, isPickup, isPortal, DateTime.SpecifyKind(effectiveFrom ?? _clock.UtcNow.Date, DateTimeKind.Utc));
                 TempData["Flash"] = T("Guardian linked.", "تم ربط ولي الأمر.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "guardians" });
         }
 
@@ -348,7 +348,7 @@ namespace Sms.Web.Controllers
                 await _students.UnlinkGuardianAsync(linkId, DateTime.SpecifyKind(effectiveTo ?? _clock.UtcNow.Date, DateTimeKind.Utc));
                 TempData["Flash"] = T("Guardian link ended (history kept).", "تم إنهاء ربط ولي الأمر (مع حفظ السجل).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "guardians" });
         }
 
@@ -363,7 +363,7 @@ namespace Sms.Web.Controllers
                 await _students.AddEmergencyContactAsync(id, nameAr.Trim(), nameEn.Trim(), phone.Trim(), isPickup, relationshipId);
                 TempData["Flash"] = T("Emergency contact added.", "تمت إضافة جهة اتصال الطوارئ.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "emergency" });
         }
 
@@ -378,7 +378,7 @@ namespace Sms.Web.Controllers
                 await _students.EnrollAsync(id, gradeYearProfileId.Value, enrollmentDate ?? _clock.UtcNow.Date, sourceType);
                 TempData["Flash"] = T("Enrollment recorded.", "تم تسجيل القيد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "academic" });
         }
 
@@ -394,7 +394,7 @@ namespace Sms.Web.Controllers
                 await _students.DeleteStudentAsync(id);
                 TempData["Flash"] = T($"Student {s.StudentNo} deleted.", $"تم حذف الطالب {s.StudentNo}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { q, status, grade });
         }
 

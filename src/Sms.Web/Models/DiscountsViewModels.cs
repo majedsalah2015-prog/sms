@@ -128,6 +128,14 @@ namespace Sms.Web.Models
 
         public string? Q { get; set; }
 
+        /// <summary>
+        /// How many grants the filter matched in the database. The page shows at most
+        /// one page of them, and saying so matters here: an operator who searched a
+        /// student's number and sees three rows needs to know whether that is all of
+        /// them or the first slice.
+        /// </summary>
+        public int MatchCount { get; set; }
+
         public IReadOnlyList<StudentOption> StudentOptions { get; set; } = Array.Empty<StudentOption>();
 
         public IReadOnlyList<DiscountType> AutomaticTypes => Types.Where(t => t.EligibilityMode == DiscountEligibilityMode.Automatic && t.IsActive).ToList();

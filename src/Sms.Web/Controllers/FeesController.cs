@@ -127,7 +127,7 @@ namespace Sms.Web.Controllers
                 await _fees.DefineCategoryAsync(nameAr.Trim(), nameEn.Trim(), ParseRate(vatRate), isMandatory, isRefundable, isServiceLinked, Blank(glExportCode));
                 TempData["Flash"] = T("Category added.", "أُضيفت الفئة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Categories));
         }
 
@@ -142,7 +142,7 @@ namespace Sms.Web.Controllers
                 await _fees.UpdateCategoryAsync(id, nameAr.Trim(), nameEn.Trim(), ParseRate(vatRate), isMandatory, isRefundable, isServiceLinked, Blank(glExportCode));
                 TempData["Flash"] = T("Category updated — existing charges keep their VAT snapshot (BR-GLB-061).", "حُدّثت الفئة — تحتفظ الفواتير السابقة بنسبة الضريبة المسجّلة عليها (BR-GLB-061).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Categories));
         }
 
@@ -156,7 +156,7 @@ namespace Sms.Web.Controllers
                 await _fees.DeactivateCategoryAsync(id);
                 TempData["Flash"] = T("Category deactivated.", "أُلغي تفعيل الفئة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Categories));
         }
 
@@ -197,7 +197,7 @@ namespace Sms.Web.Controllers
                 await _fees.DefineStructureLineAsync(profileId, categoryId, amount);
                 TempData["Flash"] = T("Draft line added — approve it before charging (BR-FEE-002).", "أُضيف سطر مسودة — اعتمده قبل الفوترة (BR-FEE-002).");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -213,7 +213,7 @@ namespace Sms.Web.Controllers
                 await _fees.UpdateStructureLineAsync(id, amount);
                 TempData["Flash"] = T("Amount updated.", "حُدّث المبلغ.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -227,7 +227,7 @@ namespace Sms.Web.Controllers
                 await _fees.ApproveStructureLineAsync(id);
                 TempData["Flash"] = T("Line approved — it is now immutable and chargeable.", "اعتُمد السطر — أصبح ثابتاً وقابلاً للفوترة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -241,7 +241,7 @@ namespace Sms.Web.Controllers
                 await _fees.DeleteStructureLineAsync(id);
                 TempData["Flash"] = T("Draft line removed.", "حُذف سطر المسودة.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -257,7 +257,7 @@ namespace Sms.Web.Controllers
                 foreach (var id in drafts) { await _fees.ApproveStructureLineAsync(id); n++; }
                 TempData["Flash"] = T($"{n} line(s) approved.", $"اعتُمد {n} سطر/أسطر.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -274,7 +274,7 @@ namespace Sms.Web.Controllers
                     ? T("Nothing copied — no approved source lines, or every grade × category already has a line.", "لم يُنسخ شيء — لا أسطر معتمدة في المصدر أو كل الأزواج موجودة.")
                     : T($"{n} draft line(s) created at {(uplift >= 0 ? "+" : "")}{uplift:0.##}% — review and approve.", $"أُنشئ {n} سطر مسودة بنسبة {(uplift >= 0 ? "+" : "")}{uplift:0.##}% — راجع واعتمد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
@@ -317,7 +317,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T($"Charge {charge.ChargeNo} posted — gross {charge.GrossAmount:N2} (VAT {charge.VatAmount:N2}).", $"رُحّلت الفاتورة {charge.ChargeNo} — الإجمالي {charge.GrossAmount:N2} (الضريبة {charge.VatAmount:N2}).");
                 return RedirectToAction(nameof(Charge), new { id = charge.Id });
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(NewCharge), new { studentId, year });
         }
 
@@ -372,7 +372,7 @@ namespace Sms.Web.Controllers
                 await _fees.VoidChargeAsync(id);
                 TempData["Flash"] = T($"Charge {no} voided — it no longer counts toward any balance.", $"حُذفت الفاتورة {no} (ملغاة) — لم تعد تُحتسب في أي رصيد.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
         }
 
@@ -389,7 +389,7 @@ namespace Sms.Web.Controllers
                 var note = await _fees.IssueCreditNoteAsync(id, amount, reason.Trim());
                 TempData["Flash"] = T($"Credit note {note.CreditNoteNo} issued for {note.Amount:N2}.", $"صدر الإشعار الدائن {note.CreditNoteNo} بمبلغ {note.Amount:N2}.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = ex.Message; }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Charge), new { id });
         }
 

@@ -22,7 +22,7 @@
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("One permanent record and EMP number per person — rehires reuse it (BR-EMP-001).", "سجل واحد دائم ورقم EMP لكل شخص — إعادة التعيين تعيد استخدامه (BR-EMP-001).")</p></div>
     <partial name="_HelpModal" model="help" /></div>
 <partial name="_StaffNav" />
-<form method="post" asp-action="Register">
+<form method="post" asp-action="Register" enctype="multipart/form-data">
     <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
     <p class="form-text">@T("Fields marked * are required.", "الحقول المعلّمة بـ * إلزامية.")</p>
     <div class="row g-3">
@@ -52,7 +52,28 @@
                 <div class="form-text mt-2">@T("No org units yet? Build the tree under Org chart first.", "لا وحدات بعد؟ أنشئ الهيكل من «الهيكل التنظيمي» أولاً.")</div>
             </div>
         </div>
-        <div class="col-xl-4"><div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a><div class="form-text mt-3">@T("Contracts, qualifications and teacher designation are added from the Employee file after registration.", "تُضاف العقود والمؤهلات وتعيين المعلم من ملف الموظف بعد التسجيل.")</div></div></div>
+        <div class="col-xl-4">
+            @* The photograph is taken while the new employee is still at the HR desk, so it belongs
+               on this form rather than only on the file screen afterwards — whoever has to come back
+               for it usually does not. It posts with the rest of the form and is attached the moment
+               the record exists (doc/Modules/12 §8.1–8.2). *@
+            <div class="sms-card p-4 mb-3">
+                <h2 class="h6 mb-3">@T("Photograph", "الصورة الشخصية")</h2>
+                <div class="sms-photo-panel text-center" data-photo-preview>
+                    <div class="sms-photo-frame mx-auto mb-2">
+                        <img data-photo-preview-image alt="@T("Chosen photo", "الصورة المختارة")" hidden />
+                        <span class="sms-photo-empty" data-photo-preview-placeholder aria-hidden="true"><i class="bi bi-person"></i></span>
+                    </div>
+                    <label class="visually-hidden" asp-for="Photo">@T("Photo file", "ملف الصورة")</label>
+                    <input asp-for="Photo" type="file" accept="image/jpeg,image/png" class="form-control form-control-sm" data-photo-preview-input />
+                    <div class="form-text">@T("JPEG or PNG, up to 2 MB. Optional — it can also be added from the employee file later.", "JPEG أو PNG، حتى 2 ميغابايت. اختيارية — ويمكن إضافتها لاحقاً من ملف الموظف.")</div>
+                    @* A browser never re-sends a file after a failed post, so the box above comes
+                       back empty even though a photograph was chosen. Saying so beats letting the
+                       registrar submit twice and wonder where it went. *@
+                    @if (!ViewData.ModelState.IsValid) { <div class="form-text fw-semibold">@T("Choose the photo again — a browser does not resend it after an error.", "اختر الصورة مرة أخرى — فالمتصفح لا يعيد إرسالها بعد الخطأ.")</div> }
+                </div>
+            </div>
+            <div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a><div class="form-text mt-3">@T("Contracts, qualifications and teacher designation are added from the Employee file after registration.", "تُضاف العقود والمؤهلات وتعيين المعلم من ملف الموظف بعد التسجيل.")</div></div></div>
     </div>
 </form>
 <partial name="_QuickAddLookup" />

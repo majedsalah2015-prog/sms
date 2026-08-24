@@ -203,6 +203,73 @@
         'لغات': 'Languages', 'اللغات': 'Languages', 'فنون': 'Arts', 'الفنون': 'Arts',
         'رياضة': 'Sports', 'الرياضة': 'Sports', 'موسيقى': 'Music', 'الموسيقى': 'Music',
 
+        // ---- what a school charges for: fee categories, discounts, the money words.
+        // Same closed-vocabulary bet again, and the payoff is larger here than on the
+        // ladder: a fee category's English name is what a parent reads on an invoice
+        // and what the GL export groups by, so "Alrsom Aldrasyh" would be wrong in two
+        // places at once. Longest phrases first — the matcher takes the longest hit.
+        'الرسوم الدراسية': 'Tuition Fees', 'رسوم دراسية': 'Tuition Fees', 'الرسوم الدراسيه': 'Tuition Fees',
+        'رسوم التسجيل': 'Registration Fees', 'رسوم تسجيل': 'Registration Fees',
+        'رسوم النقل': 'Transport Fees', 'رسوم المواصلات': 'Transport Fees',
+        'الزي المدرسي': 'Uniform', 'زي مدرسي': 'Uniform', 'الزي الموحد': 'Uniform',
+        'الكتب المدرسية': 'Textbooks', 'كتب مدرسية': 'Textbooks',
+        'القرطاسية': 'Stationery', 'قرطاسية': 'Stationery',
+        'الأنشطة اللاصفية': 'Extracurricular Activities', 'الانشطة اللاصفية': 'Extracurricular Activities',
+        'الرحلات المدرسية': 'School Trips', 'رحلات مدرسية': 'School Trips',
+        'التأمين الصحي': 'Health Insurance', 'التامين الصحي': 'Health Insurance',
+        'رسوم الامتحانات': 'Examination Fees', 'رسوم الاختبارات': 'Examination Fees',
+        'رسوم الشهادات': 'Certificate Fees', 'بدل فاقد': 'Replacement Charge',
+        'غرامة تأخير': 'Late Fee', 'غرامة التأخير': 'Late Fee', 'غرامة ارتداد': 'Bounce Fee',
+        'وجبة مدرسية': 'School Meal', 'الوجبات المدرسية': 'School Meals',
+
+        // what a school gives back: discount types and scholarship programmes. The
+        // English name here lands on the discount register and the owner's revenue
+        // report, so the same argument applies — translate, never transliterate.
+        'خصم الإخوة': 'Sibling Discount', 'خصم الاخوة': 'Sibling Discount', 'خصم الأخوة': 'Sibling Discount',
+        'خصم أبناء الموظفين': 'Staff Children Discount', 'خصم ابناء الموظفين': 'Staff Children Discount',
+        'خصم الموظفين': 'Staff Discount', 'خصم المعلمين': 'Teachers Discount',
+        'منحة التفوق': 'Merit Scholarship', 'منحة تفوق': 'Merit Scholarship', 'منحة التفوق الدراسي': 'Academic Merit Scholarship',
+        'منحة الأيتام': 'Orphans Scholarship', 'منحة الايتام': 'Orphans Scholarship',
+        'منحة الحالات الاجتماعية': 'Hardship Scholarship', 'الحالة الاجتماعية': 'Hardship',
+        'خصم الدفع المبكر': 'Early Payment Discount', 'الدفع المبكر': 'Early Payment',
+        'خصم الدفعة الواحدة': 'Lump Sum Discount', 'حفظة القرآن': 'Quran Memorisation',
+        'ذوي الاحتياجات الخاصة': 'Special Needs', 'الاحتياجات الخاصة': 'Special Needs',
+
+        'إخوة': 'Siblings', 'الإخوة': 'Siblings', 'اخوة': 'Siblings', 'الاخوة': 'Siblings',
+        'أيتام': 'Orphans', 'الأيتام': 'Orphans', 'ايتام': 'Orphans', 'الايتام': 'Orphans',
+        'يتيم': 'Orphan', 'اليتيم': 'Orphan', 'تفوق': 'Merit', 'التفوق': 'Merit',
+        'موظفين': 'Staff', 'الموظفين': 'Staff', 'موظف': 'Staff', 'الموظف': 'Staff',
+        'أبناء': 'Children', 'الأبناء': 'Children', 'ابناء': 'Children', 'الابناء': 'Children',
+        'اجتماعية': 'Social', 'الاجتماعية': 'Social', 'اجتماعي': 'Social', 'الاجتماعي': 'Social',
+        'مبكر': 'Early', 'المبكر': 'Early', 'كامل': 'Full', 'الكامل': 'Full', 'جزئي': 'Partial', 'الجزئي': 'Partial',
+        'برنامج': 'Programme', 'البرنامج': 'Programme', 'كفالة': 'Sponsorship', 'الكفالة': 'Sponsorship',
+        'راعي': 'Sponsor', 'الراعي': 'Sponsor', 'داعم': 'Sponsor', 'الداعم': 'Sponsor',
+
+        'رسوم': 'Fees', 'الرسوم': 'Fees', 'رسم': 'Fee', 'الرسم': 'Fee',
+        'قسط': 'Instalment', 'القسط': 'Instalment', 'أقساط': 'Instalments', 'الأقساط': 'Instalments',
+        'تسجيل': 'Registration', 'التسجيل': 'Registration', 'قبول': 'Admission', 'القبول': 'Admission',
+        'نقل': 'Transport', 'النقل': 'Transport', 'مواصلات': 'Transport', 'المواصلات': 'Transport',
+        'سكن': 'Boarding', 'السكن': 'Boarding', 'إقامة': 'Boarding', 'الإقامة': 'Boarding',
+        'كتب': 'Books', 'الكتب': 'Books', 'زي': 'Uniform', 'الزي': 'Uniform',
+        'أنشطة': 'Activities', 'الأنشطة': 'Activities', 'انشطة': 'Activities', 'الانشطة': 'Activities',
+        'رحلة': 'Trip', 'الرحلة': 'Trip', 'رحلات': 'Trips', 'الرحلات': 'Trips',
+        'تأمين': 'Insurance', 'التأمين': 'Insurance', 'تامين': 'Insurance', 'التامين': 'Insurance',
+        'امتحان': 'Examination', 'الامتحان': 'Examination', 'امتحانات': 'Examinations', 'الامتحانات': 'Examinations',
+        'اختبار': 'Examination', 'الاختبار': 'Examination', 'اختبارات': 'Examinations', 'الاختبارات': 'Examinations',
+        'شهادة': 'Certificate', 'الشهادة': 'Certificate', 'شهادات': 'Certificates', 'الشهادات': 'Certificates',
+        'وجبة': 'Meal', 'الوجبة': 'Meal', 'وجبات': 'Meals', 'الوجبات': 'Meals',
+        'غرامة': 'Fine', 'الغرامة': 'Fine', 'خصم': 'Discount', 'الخصم': 'Discount',
+        'منحة': 'Scholarship', 'المنحة': 'Scholarship', 'منح': 'Scholarships', 'المنح': 'Scholarships',
+        'إعفاء': 'Waiver', 'الإعفاء': 'Waiver', 'اعفاء': 'Waiver', 'الاعفاء': 'Waiver',
+        'تبرع': 'Donation', 'التبرع': 'Donation', 'تأمينات': 'Deposits', 'التأمينات': 'Deposits',
+        'صيانة': 'Maintenance', 'الصيانة': 'Maintenance', 'خدمات': 'Services', 'الخدمات': 'Services',
+        'إضافي': 'Additional', 'الإضافي': 'Additional', 'اضافي': 'Additional', 'الاضافي': 'Additional',
+        'اختياري': 'Optional', 'الاختياري': 'Optional', 'إلزامي': 'Mandatory', 'الإلزامي': 'Mandatory', 'الزامي': 'Mandatory',
+        'سنوي': 'Annual', 'السنوي': 'Annual', 'سنوية': 'Annual', 'السنوية': 'Annual',
+        'شهري': 'Monthly', 'الشهري': 'Monthly', 'شهرية': 'Monthly', 'الشهرية': 'Monthly',
+        'فصلي': 'Termly', 'الفصلي': 'Termly', 'فصلية': 'Termly', 'الفصلية': 'Termly',
+        'مدرسي': 'School', 'المدرسي': 'School', 'مدرسية': 'School', 'المدرسية': 'School',
+
         // where and which one — the adjectives that finish a building's name
         'رئيسي': 'Main', 'الرئيسي': 'Main', 'رئيسية': 'Main', 'الرئيسية': 'Main',
         'أرضي': 'Ground', 'الأرضي': 'Ground', 'ارضي': 'Ground', 'الارضي': 'Ground',
