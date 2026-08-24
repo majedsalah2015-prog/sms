@@ -14,7 +14,8 @@
         Intro = T("One amount per grade-year × category. A line starts Draft, becomes Approved (immutable) and only then can be charged (BR-FEE-002).", "مبلغ واحد لكل صف-عام × فئة. يبدأ السطر مسودة ثم يُعتمد (ثابت) وعندها فقط يُفوتر (BR-FEE-002)."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("Grid", "الشبكة"), T("Rows are the year's grade profiles, columns the active categories. Type an amount in an empty cell and press ↵ to add a Draft line; draft cells can be edited (reason required, T1), approved ✓ or removed 🗑.", "الصفوف ملفات الصفوف للعام والأعمدة الفئات الفعّالة. اكتب مبلغاً في خلية فارغة واضغط ↵ لإضافة سطر مسودة؛ خلايا المسودة تُعدَّل (بسبب، T1) أو تُعتمد ✓ أو تُحذف 🗑.")),
+            new HelpPanelViewModel.Item(T("Grid", "الشبكة"), T("Rows are the year's grade profiles, columns the active categories. Type the amounts along a grade's row, then Save beside its total (↵ in any cell does the same); a draft cell can also be approved ✓ or removed 🗑 on its own.", "الصفوف ملفات الصفوف للعام والأعمدة الفئات الفعّالة. اكتب المبالغ على امتداد سطر الصف ثم احفظ بجوار المجموع (أو اضغط ↵ في أي خلية)؛ ويمكن اعتماد ✓ خلية المسودة أو حذفها 🗑 وحدها.")),
+            new HelpPanelViewModel.Item(T("Save / Clear a row", "حفظ / تصفير سطر"), T("Save writes the whole row at once: an empty cell with an amount becomes a Draft line, a changed draft amount is updated against the reason typed beside it (T1), a blank cell changes nothing, and an approved price is left alone. Clear removes the row's draft lines only — an approved price leaves the list by withdrawal, with a reason (BR-GLB-005).", "يكتب الحفظ السطر كاملاً: الخلية الفارغة ذات المبلغ تصبح سطر مسودة، ومبلغ المسودة المتغيّر يُحدَّث بالسبب المكتوب بجواره (T1)، والخلية الفارغة لا تغيّر شيئاً، والسعر المعتمد يبقى كما هو. أما التصفير فيحذف مسودات السطر فقط — إذ لا يخرج السعر المعتمد إلا بالسحب مع ذكر السبب (BR-GLB-005).")),
             new HelpPanelViewModel.Item(T("Copy from last year", "نسخ من العام السابق"), T("Copies every approved line of the source year into this year's matching grades (by grade level) as Draft, with an optional % uplift. Existing pairs are skipped.", "ينسخ كل الأسطر المعتمدة من العام المصدر إلى صفوف هذا العام المطابقة كمسودات مع نسبة رفع اختيارية. الأزواج الموجودة تُتخطى.")),
             new HelpPanelViewModel.Item(T("Approve all", "اعتماد الكل"), T("Approves every Draft line of the year in one go — use after review.", "يعتمد كل مسودات العام دفعة واحدة — بعد المراجعة.")),
         },
@@ -54,6 +55,10 @@ else
             @foreach (var p in Model.Profiles)
             {
                 var rowTotal = Model.Categories.Sum(c => Model.Lines.TryGetValue((p.Profile.Id, c.Id), out var l) ? l.Amount : 0m);
+                @* Every editable cell in the row posts to one form, which lives beside the total.
+                   A grade is priced across all its categories in a single sitting, and one save
+                   per cell meant a page reload between each figure. *@
+                var rid = $"fsrow{p.Profile.Id}";
                 <tr>
                     <th scope="row"><span class="fw-semibold">@(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</span><br /><span class="small text-muted">@(isRtl ? p.Stage.Name.NameAr : p.Stage.Name.NameEn)</span></th>
                     <td class="small text-muted">@p.Enrolled</td>
@@ -88,11 +93,9 @@ else
                             }
                             else
                             {
-                                var fid = $"ln{line.Id}";
                                 <div class="d-flex gap-1 justify-content-center align-items-center">
-                                    <input form="@fid" name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
-                                    <input form="@fid" name="reason" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" aria-label="@T($"Reason — {p.Grade.Name.NameEn} × {c.NameEn}", $"السبب — {p.Grade.Name.NameAr} × {c.NameAr}")" />
-                                    <form id="@fid" method="post" asp-action="EditLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save amount", "حفظ المبلغ")" aria-label="@T("Save amount", "حفظ المبلغ")"><i class="bi bi-pencil" aria-hidden="true"></i></button></form>
+                                    <input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
+                                    <input form="@rid" name="reason_@c.Id" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" aria-label="@T($"Reason — {p.Grade.Name.NameEn} × {c.NameEn}", $"السبب — {p.Grade.Name.NameAr} × {c.NameAr}")" />
                                     <form method="post" asp-action="ApproveLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")" aria-label="@T("Approve", "اعتماد")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
                                     <form method="post" asp-action="DeleteLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove draft", "حذف المسودة")" aria-label="@T("Remove draft", "حذف المسودة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form>
                                 </div>
@@ -101,11 +104,26 @@ else
                         }
                         else
                         {
-                            <form method="post" asp-action="CreateLine" asp-route-year="@yid" class="d-flex justify-content-center"><input type="hidden" name="profileId" value="@p.Profile.Id" /><input type="hidden" name="categoryId" value="@c.Id" /><input name="amount" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and press Enter", "اكتب مبلغاً واضغط Enter")" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" /><button type="submit" class="visually-hidden">@T("Save amount", "حفظ المبلغ")</button></form>
+                            <div class="d-flex justify-content-center"><input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and save the row", "اكتب مبلغاً واحفظ السطر")" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" /></div>
                         }
                         </td>
                     }
-                    <td class="text-end fw-semibold">@rowTotal.ToString("N2")</td>
+                    <td class="text-end fw-semibold">
+                        <div>@rowTotal.ToString("N2")</div>
+                        <div class="d-flex gap-1 justify-content-end mt-1">
+                            @* The save form owns every amount and reason field in the row (they carry
+                               form="@rid"), so ↵ in any cell submits the whole line. Clearing is a
+                               second form because it is a different act on the same row — drafts only,
+                               since an approved price leaves the list by withdrawal alone (BR-GLB-005). *@
+                            <form id="@rid" method="post" asp-action="SaveRow" asp-route-profileId="@p.Profile.Id" asp-route-year="@yid" class="d-inline">
+                                <button class="btn btn-sm btn-primary" type="submit" title="@T("Save this row", "حفظ هذا السطر")" aria-label="@T($"Save row — {p.Grade.Name.NameEn}", $"حفظ سطر — {p.Grade.Name.NameAr}")"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                            </form>
+                            <form method="post" asp-action="ResetRow" asp-route-profileId="@p.Profile.Id" asp-route-year="@yid" class="d-inline"
+                                  onsubmit="return confirm('@T("Clear every draft amount in this row? Approved prices stay.", "تصفير كل مبالغ المسودة في هذا السطر؟ تبقى الأسعار المعتمدة.")');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Clear this row's drafts", "تصفير مسودات هذا السطر")" aria-label="@T($"Clear row — {p.Grade.Name.NameEn}", $"تصفير سطر — {p.Grade.Name.NameAr}")"><i class="bi bi-eraser me-1" aria-hidden="true"></i>@T("Clear", "تصفير")</button>
+                            </form>
+                        </div>
+                    </td>
                 </tr>
             }
             </tbody>

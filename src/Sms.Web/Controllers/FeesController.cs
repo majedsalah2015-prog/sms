@@ -44,8 +44,9 @@ namespace Sms.Web.Controllers
         private readonly IAuditContext _audit;
         private readonly IWorkingYearContext _workingYear;
         private readonly IClock _clock;
+        private readonly IPermissionService _permissions;
 
-        public FeesController(IFeeAdmin fees, IStatementService statements, ISystemSetupAdmin setup, AppDbContext db, IAuditContext audit, IWorkingYearContext workingYear, IClock clock)
+        public FeesController(IFeeAdmin fees, IStatementService statements, ISystemSetupAdmin setup, AppDbContext db, IAuditContext audit, IWorkingYearContext workingYear, IClock clock, IPermissionService permissions)
         {
             _fees = fees;
             _statements = statements;
@@ -54,6 +55,7 @@ namespace Sms.Web.Controllers
             _audit = audit;
             _workingYear = workingYear;
             _clock = clock;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -186,36 +188,149 @@ namespace Sms.Web.Controllers
             return View(m);
         }
 
-        [HttpPost("structure/lines/new")]
+        /// <summary>
+        /// doc/Modules/19 §8.2. The grid was a post per cell, so pricing one grade across ten
+        /// categories was ten submits and ten page reloads, and a row abandoned halfway stayed
+        /// halfway. This saves the whole grade row in one act: a cell that was empty and now
+        /// carries an amount becomes a Draft line, a Draft line whose figure changed is updated
+        /// against that cell's own reason (T1 on <c>FeeStructureLine.Amount</c>), a cell left
+        /// blank asks for nothing, and Approved or Withdrawn cells are passed over — BR-FEE-002
+        /// makes an approved price immutable and its only exit is Withdraw, with a reason
+        /// (BR-GLB-005).
+        /// <para>
+        /// Guarded on Edit, with Create tested at runtime for the cells that would add a line:
+        /// one button is not one act, and a user who may revise prices but not introduce new
+        /// ones keeps that boundary here as much as in a per-cell grid. Whatever could not be
+        /// saved is counted back to the user rather than dropped in silence.
+        /// </para>
+        /// </summary>
+        [HttpPost("structure/rows/{profileId:int}/save")]
         [ValidateAntiForgeryToken]
-        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Create)]
-        public async Task<IActionResult> CreateLine(int profileId, int categoryId, decimal amount, int? year)
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Edit)]
+        public async Task<IActionResult> SaveRow(int profileId, int? year)
         {
             try
             {
-                if (amount < 0) throw new InvalidOperationException(T("Amount cannot be negative.", "لا يمكن أن يكون المبلغ سالباً."));
-                await _fees.DefineStructureLineAsync(profileId, categoryId, amount);
-                TempData["Flash"] = T("Draft line added — approve it before charging (BR-FEE-002).", "أُضيف سطر مسودة — اعتمده قبل الفوترة (BR-FEE-002).");
+                if (!await RowBelongsToSchoolAsync(profileId)) return NotFound();
+
+                var categories = await _db.FeeCategories.AsNoTracking().ToListAsync();
+                var lines = await _db.FeeStructureLines.AsNoTracking().Where(l => l.GradeYearProfileId == profileId).ToListAsync();
+                var canCreate = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Create, HttpContext.RequestAborted);
+
+                int added = 0, updated = 0, blocked = 0;
+                var rejected = new List<string>();
+                var unexplained = new List<string>();
+
+                foreach (var c in categories)
+                {
+                    var raw = Request.Form[$"amount_{c.Id}"].ToString().Trim();
+                    if (raw.Length == 0) continue;
+
+                    var name = IsArabic ? c.NameAr : c.NameEn;
+
+                    // Invariant on purpose: the cell is a number input, whose value the browser
+                    // posts in that format whatever language the page is being read in.
+                    if (!decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out var amount) || amount < 0)
+                    {
+                        rejected.Add(name);
+                        continue;
+                    }
+
+                    var line = lines.FirstOrDefault(l => l.FeeCategoryId == c.Id);
+                    if (line == null)
+                    {
+                        if (!canCreate) { blocked++; continue; }
+                        _audit.Reason = null;
+                        await _fees.DefineStructureLineAsync(profileId, c.Id, amount);
+                        added++;
+                        continue;
+                    }
+
+                    if (line.Status != FeeStructureLineStatus.Draft || line.Amount == amount) continue;
+
+                    var reason = Request.Form[$"reason_{c.Id}"].ToString().Trim();
+                    if (reason.Length == 0) { unexplained.Add(name); continue; }
+                    _audit.Reason = reason;
+                    await _fees.UpdateStructureLineAsync(line.Id, amount);
+                    updated++;
+                }
+
+                TempData["Flash"] = added + updated == 0
+                    ? T("Nothing changed in this row.", "لا تغيير في هذا الصف.")
+                    : T($"Row saved — {added} added, {updated} updated. A new line is Draft; approve it before charging (BR-FEE-002).", $"حُفظ الصف — أُضيف {added} وحُدّث {updated}. السطر الجديد مسودة؛ اعتمده قبل الفوترة (BR-FEE-002).");
+
+                var sep = T(", ", "، ");
+                var refusals = new List<string>();
+                if (rejected.Count > 0)
+                {
+                    refusals.Add(T($"{rejected.Count} cell(s) not saved — an amount must be a number of zero or more: {string.Join(sep, rejected)}.", $"لم تُحفظ {rejected.Count} خلية — المبلغ رقم أكبر من أو يساوي صفراً: {string.Join(sep, rejected)}."));
+                }
+
+                if (unexplained.Count > 0)
+                {
+                    refusals.Add(T($"A reason is required to change a fee amount (T1), so {unexplained.Count} cell(s) were left as they were: {string.Join(sep, unexplained)}.", $"تغيير مبلغ الرسم يتطلب سبباً (T1)، فبقيت {unexplained.Count} خلية كما هي: {string.Join(sep, unexplained)}."));
+                }
+
+                if (blocked > 0)
+                {
+                    refusals.Add(T($"{blocked} new price(s) were not added — you may revise this grade's prices but not introduce new ones.", $"لم تُضف {blocked} خلية جديدة — لديك صلاحية تعديل أسعار هذا الصف دون إنشاء أسعار جديدة."));
+                }
+
+                if (refusals.Count > 0) TempData["Error"] = string.Join(" · ", refusals);
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
 
-        [HttpPost("structure/lines/{id:int}/edit")]
+        /// <summary>
+        /// doc/Modules/19 §8.2 — empties a grade's row in one act, which is what a row copied
+        /// from the wrong year or priced against the wrong template needs. Draft lines only: an
+        /// approved price is not scratch data but a figure the school has committed to
+        /// (BR-FEE-002), and it leaves the price list only by withdrawal with a reason on the
+        /// record (BR-GLB-005). Anything kept for that reason is reported rather than silently
+        /// skipped — a row that looks unchanged is exactly how a clearing gets believed to have
+        /// happened when it did not.
+        /// </summary>
+        [HttpPost("structure/rows/{profileId:int}/reset")]
         [ValidateAntiForgeryToken]
-        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Edit)]
-        public async Task<IActionResult> EditLine(int id, decimal amount, string? reason, int? year)
+        [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Structure, ActionVerb.Deactivate)]
+        public async Task<IActionResult> ResetRow(int profileId, int? year)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(reason)) throw new InvalidOperationException(T("A reason is required to change a fee amount (T1).", "تغيير مبلغ الرسم يتطلب سبباً (T1)."));
-                _audit.Reason = reason.Trim();
-                await _fees.UpdateStructureLineAsync(id, amount);
-                TempData["Flash"] = T("Amount updated.", "حُدّث المبلغ.");
+                if (!await RowBelongsToSchoolAsync(profileId)) return NotFound();
+
+                var lines = await _db.FeeStructureLines.AsNoTracking().Where(l => l.GradeYearProfileId == profileId).ToListAsync();
+                var kept = lines.Count(l => l.Status != FeeStructureLineStatus.Draft);
+                var cleared = 0;
+                foreach (var id in lines.Where(l => l.Status == FeeStructureLineStatus.Draft).Select(l => l.Id).ToList())
+                {
+                    await _fees.DeleteStructureLineAsync(id);
+                    cleared++;
+                }
+
+                TempData["Flash"] = cleared == 0
+                    ? T("Nothing to clear — this row has no draft lines.", "لا شيء للتصفير — لا مسودات في هذا الصف.")
+                    : T($"{cleared} draft line(s) cleared.", $"صُفِّر {cleared} سطر مسودة.");
+
+                if (kept > 0)
+                {
+                    TempData["Error"] = T($"{kept} approved or withdrawn price(s) stay — an approved price leaves the list only by withdrawal, with a reason (BR-GLB-005).", $"بقي {kept} سعر معتمد أو مسحوب — لا يخرج السعر المعتمد من القائمة إلا بالسحب مع ذكر السبب (BR-GLB-005).");
+                }
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Structure), new { year });
         }
+
+        /// <summary>
+        /// The row a POST names is a route value, so it is checked against the tenant before
+        /// anything is written. GradeYearProfile is year-scoped as well as school-scoped, which
+        /// is why the filters come off and the school is stated explicitly.
+        /// </summary>
+        private async Task<bool> RowBelongsToSchoolAsync(int profileId) =>
+            await _db.GradeYearProfiles.IgnoreQueryFilters().AsNoTracking()
+                .AnyAsync(p => p.Id == profileId && p.SchoolId == _db.CurrentSchoolId);
 
         [HttpPost("structure/lines/{id:int}/approve")]
         [ValidateAntiForgeryToken]
