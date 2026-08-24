@@ -443,11 +443,15 @@ namespace Sms.Infrastructure.Tests
             var fresh = await CreateEnrollment(db);
             await admin.AssignMembershipAsync(a.Id, seated, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
 
-            var moved = await admin.ApplyDistributionAsync(
+            var outcome = await admin.ApplyDistributionAsync(
                 new Dictionary<int, int> { [seated] = b.Id, [fresh] = a.Id },
                 "balancing", new DateTime(2026, 10, 1));
 
-            Assert.Equal(2, moved);
+            // Counted apart: a first seat and a transfer are different events on a
+            // child's record, and only the second carries a reason.
+            Assert.Equal(1, outcome.Seated);
+            Assert.Equal(1, outcome.Transferred);
+            Assert.Equal(2, outcome.Total);
             var seatedNow = db.SectionMemberships.Single(m => m.EnrollmentId == seated && m.EffectiveToUtc == null);
             Assert.Equal(b.Id, seatedNow.SectionId);
             Assert.Equal("balancing", seatedNow.TransferReasonCode);
@@ -537,10 +541,10 @@ namespace Sms.Infrastructure.Tests
             var seated = await CreateEnrollment(db);
             await admin.AssignMembershipAsync(a.Id, seated, new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc));
 
-            var moved = await admin.ApplyDistributionAsync(
+            var outcome = await admin.ApplyDistributionAsync(
                 new Dictionary<int, int> { [seated] = a.Id }, "balancing", new DateTime(2026, 10, 1));
 
-            Assert.Equal(0, moved);
+            Assert.Equal(0, outcome.Total);
             Assert.Single(db.SectionMemberships.Where(m => m.EnrollmentId == seated));
         }
 
@@ -573,8 +577,10 @@ namespace Sms.Infrastructure.Tests
             using var db = CreateContext();
             var admin = new SectionAdmin(db);
 
-            Assert.Equal(0, await admin.ApplyDistributionAsync(
-                new Dictionary<int, int>(), "balancing", new DateTime(2026, 10, 1)));
+            var outcome = await admin.ApplyDistributionAsync(
+                new Dictionary<int, int>(), "balancing", new DateTime(2026, 10, 1));
+
+            Assert.Equal(0, outcome.Total);
         }
 
         // --- BR-SCN-007 merge / close ----------------------------------------

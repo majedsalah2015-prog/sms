@@ -7,6 +7,18 @@ using Sms.Domain.Sections;
 
 namespace Sms.Application.Sections
 {
+    /// <summary>
+    /// What a board layout actually did. The two halves are counted separately
+    /// because they are different events on a child's record: a first seat is not a
+    /// transfer and carries no reason code (BR-SCN-005's reason answers "why was this
+    /// child moved", and there is no answer to give when they were not). A screen
+    /// that reported one number would have to describe both as the same thing.
+    /// </summary>
+    public sealed record PlacementOutcome(int Seated, int Transferred)
+    {
+        public int Total => Seated + Transferred;
+    }
+
     /// <summary>doc/Modules/06 §8 "Section list"/"Assignment board"/"Transfer dialog" screens backing (screens deferred, the operations are core).</summary>
     public interface ISectionAdmin
     {
@@ -82,13 +94,13 @@ namespace Sms.Application.Sections
         /// <para>
         /// Throws <see cref="Common.Exceptions.SectionFullException"/>,
         /// <see cref="Common.Exceptions.SectionGenderMismatchException"/> or
-        /// <see cref="Common.Exceptions.SectionGradeMismatchException"/>; returns the
-        /// number of students actually moved (an entry that names the section a
-        /// student already sits in is not a move and writes nothing).
+        /// <see cref="Common.Exceptions.SectionGradeMismatchException"/>; returns what
+        /// was written, split into first seats and transfers (an entry that names the
+        /// section a student already sits in is neither, and writes nothing).
         /// </para>
         /// </summary>
         /// <param name="placements">enrollment id → target section id.</param>
-        Task<int> ApplyDistributionAsync(
+        Task<PlacementOutcome> ApplyDistributionAsync(
             IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
             CancellationToken cancellationToken = default);
 

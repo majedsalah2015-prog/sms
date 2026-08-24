@@ -417,13 +417,27 @@ namespace Sms.Web.Controllers
                     return RedirectToAction(nameof(Board), new { year, grade });
                 }
 
-                var moved = await _sections.ApplyDistributionAsync(
+                var outcome = await _sections.ApplyDistributionAsync(
                     parsed, reasonCode!, effectiveDate ?? _clock.UtcNow.Date, Ct);
 
-                TempData["Flash"] = moved == 0
-                    ? T("Nothing to apply — no student changed section.", "لا شيء لتطبيقه — لم تتغير شعبة أي طالب.")
-                    : T($"{moved} student(s) placed; every move is effective-dated and reason-coded (BR-SCN-005).",
-                        $"تم إسناد {moved} طالباً؛ كل نقل مؤرَّخ ومُعلَّل (BR-SCN-005).");
+                // The two halves are reported separately because they are different
+                // events on a child's record. Saying "reason-coded" over a batch of
+                // first seats would describe a reason code that was deliberately not
+                // written — BR-SCN-005's reason answers "why was this child moved",
+                // and there is nothing to answer when they were not.
+                TempData["Flash"] = outcome.Total switch
+                {
+                    0 => T("Nothing to apply — no student changed section.", "لا شيء لتطبيقه — لم تتغير شعبة أي طالب."),
+                    _ when outcome.Transferred == 0 => T(
+                        $"{outcome.Seated} student(s) seated. A first section is not a transfer, so nothing was recorded as one.",
+                        $"أُسند {outcome.Seated} طالباً. والشعبة الأولى ليست نقلاً، فلم يُسجَّل شيء على أنه نقل."),
+                    _ when outcome.Seated == 0 => T(
+                        $"{outcome.Transferred} student(s) transferred — effective-dated and reason-coded (BR-SCN-005).",
+                        $"نُقل {outcome.Transferred} طالباً — كل نقل مؤرَّخ ومُعلَّل (BR-SCN-005)."),
+                    _ => T(
+                        $"{outcome.Seated} student(s) seated and {outcome.Transferred} transferred; the transfers are effective-dated and reason-coded (BR-SCN-005).",
+                        $"أُسند {outcome.Seated} طالباً ونُقل {outcome.Transferred}؛ والنقلات مؤرَّخة ومُعلَّلة (BR-SCN-005)."),
+                };
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 

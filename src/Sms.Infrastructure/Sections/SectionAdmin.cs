@@ -279,18 +279,18 @@ namespace Sms.Infrastructure.Sections
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        public async Task<int> ApplyDistributionAsync(
+        public async Task<PlacementOutcome> ApplyDistributionAsync(
             IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
             CancellationToken cancellationToken = default)
         {
             if (placements.Count == 0)
             {
-                return 0;
+                return new PlacementOutcome(0, 0);
             }
 
-            var moved = await StagePlacementsAsync(placements, transferReasonCode, effectiveDate, cancellationToken);
+            var outcome = await StagePlacementsAsync(placements, transferReasonCode, effectiveDate, cancellationToken);
             await _db.SaveChangesAsync(cancellationToken);
-            return moved;
+            return outcome;
         }
 
         public async Task<int> MergeAndCloseSectionAsync(
@@ -334,7 +334,7 @@ namespace Sms.Infrastructure.Sections
         /// has more to do in the same transaction (closing the section the students
         /// came out of) commits all of it or none.
         /// </summary>
-        private async Task<int> StagePlacementsAsync(
+        private async Task<PlacementOutcome> StagePlacementsAsync(
             IReadOnlyDictionary<int, int> placements, string transferReasonCode, DateTime effectiveDate,
             CancellationToken cancellationToken)
         {
@@ -399,7 +399,8 @@ namespace Sms.Infrastructure.Sections
                 }
             }
 
-            var moved = 0;
+            var seated = 0;
+            var transferred = 0;
             foreach (var (enrollmentId, sectionId) in placements.OrderBy(p => p.Key))
             {
                 currentBy.TryGetValue(enrollmentId, out var existing);
@@ -424,10 +425,18 @@ namespace Sms.Infrastructure.Sections
                     // answer to give when they were not.
                     TransferReasonCode = existing == null ? null : transferReasonCode,
                 });
-                moved++;
+
+                if (existing == null)
+                {
+                    seated++;
+                }
+                else
+                {
+                    transferred++;
+                }
             }
 
-            return moved;
+            return new PlacementOutcome(seated, transferred);
         }
 
         /// <summary>
