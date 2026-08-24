@@ -1,3 +1,4 @@
+using System;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -175,6 +176,42 @@ namespace Sms.Web
         public IConfiguration Configuration { get; }
 
         /// <summary>
+        /// The one connection string the whole product runs on — the school schema,
+        /// Hangfire's job storage, and every embedded ERP module's context.
+        /// <para>
+        /// Read through here rather than inline so a missing value fails with a
+        /// sentence somebody can act on. Passing null into
+        /// <c>UseSqlServerStorage</c> throws <c>ArgumentNullException
+        /// (nameOrConnectionString)</c> from inside Hangfire during
+        /// <c>ConfigureServices</c>, which reaches an operator as a bare
+        /// <b>HTTP 500.30 — ASP.NET Core app failed to start</b>: a page that names
+        /// neither the setting nor the file it should have been in. The first
+        /// diagnosis anyone attempts from that page is a code fault, which is the
+        /// one thing it never is.
+        /// </para>
+        /// </summary>
+        private string SmsConnectionString
+        {
+            get
+            {
+                var connectionString = Configuration.GetConnectionString("Sms");
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                    return connectionString;
+                }
+
+                throw new InvalidOperationException(
+                    "No 'Sms' connection string is configured, so nothing can start. " +
+                    $"The environment is '{Environment.EnvironmentName}', so the value is read from " +
+                    $"appsettings.{Environment.EnvironmentName}.json, then appsettings.json, then the " +
+                    "environment variable ConnectionStrings__Sms — which overrides both and is the way to " +
+                    "point a run at a different server without editing a file. Content root: " +
+                    $"'{Environment.ContentRootPath}' (the appsettings files are read from there, not from " +
+                    "the working directory).");
+            }
+        }
+
+        /// <summary>
         /// Needed by the embedded ERP's file store, which resolves a relative upload root against the
         /// content root rather than the process's working directory — those differ between running
         /// from an IDE, from the CLI, and as a service.
@@ -246,7 +283,7 @@ namespace Sms.Web
 
             // E-003 authorization core: deny-by-default policy engine (doc 06).
             services.AddDbContext<AppDbContext>(options =>
-                options.UseSqlServer(Configuration.GetConnectionString("Sms")));
+                options.UseSqlServer(SmsConnectionString));
             services.AddScoped<IPermissionService, PermissionService>();
 
             // Module 36's role designer — the screen that changes what every other screen may be
@@ -351,7 +388,7 @@ namespace Sms.Web
                 .SetDataCompatibilityLevel(CompatibilityLevel.Version_170)
                 .UseSimpleAssemblyNameTypeSerializer()
                 .UseRecommendedSerializerSettings()
-                .UseSqlServerStorage(Configuration.GetConnectionString("Sms")));
+                .UseSqlServerStorage(SmsConnectionString));
             services.AddHangfireServer();
 
             // E-102: School module (doc/Modules/02, BR-SCH-001..008) + Academic
@@ -735,7 +772,7 @@ namespace Sms.Web
         /// </summary>
         private void AddEmbeddedAccounting(IServiceCollection services)
         {
-            var connectionString = Configuration.GetConnectionString("Sms");
+            var connectionString = SmsConnectionString;
 
             // One connection per request, shared by every ERP module's DbContext.
             // MARS is required because two contexts then read on one physical
