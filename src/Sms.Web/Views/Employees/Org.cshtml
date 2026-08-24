@@ -3,6 +3,12 @@
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
+    // A CSS length is not written in the reader's language. Formatted with the ambient culture,
+    // ar-SA renders 2.5 as "2٫5" — U+066B, not a period — and the browser drops the whole
+    // declaration, so a child unit lost its indent and sat flatter than its own children while
+    // depths that happen to land on a whole number kept theirs. The tree read as scrambled in
+    // Arabic and correct in English. Any number going into an attribute value is invariant.
+    string Indent(int depth) => (1 + depth * 1.5).ToString(CultureInfo.InvariantCulture);
     ViewData["Title"] = T("Org chart", "الهيكل التنظيمي");
     ViewData["Breadcrumb"] = T("Employees / Org chart", "الموظفون / الهيكل التنظيمي");
     var help = new HelpPanelViewModel
@@ -32,7 +38,7 @@
                     var fid = $"ou{n.Unit.Id}";
                     var deletable = n.ChildCount == 0 && n.HeadCount == 0;
                     <tr>
-                        <td style="padding-@(isRtl ? "right" : "left"):@(1 + n.Depth * 1.5)rem"><div class="d-flex gap-1"><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@n.Unit.NameAr" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (Arabic)", $"الوحدة {n.Unit.NameAr} — الاسم (عربي)")" /><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@n.Unit.NameEn" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (English)", $"الوحدة {n.Unit.NameAr} — الاسم (إنجليزي)")" /></div></td>
+                        <td style="padding-@(isRtl ? "right" : "left"):@(Indent(n.Depth))rem"><div class="d-flex gap-1"><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@n.Unit.NameAr" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (Arabic)", $"الوحدة {n.Unit.NameAr} — الاسم (عربي)")" /><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@n.Unit.NameEn" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (English)", $"الوحدة {n.Unit.NameAr} — الاسم (إنجليزي)")" /></div></td>
                         <td><select form="@fid" name="parentId" class="form-select form-select-sm" style="width:12rem" aria-label="@T($"Unit {n.Unit.NameEn} — parent unit", $"الوحدة {n.Unit.NameAr} — الوحدة الأم")"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All.Where(u => u.Id != n.Unit.Id)) { <option value="@u.Id" selected="@(u.Id == n.Unit.ParentOrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></td>
                         <td>@n.HeadCount</td>
                         <td class="small">@string.Join(" · ", n.Current.Take(6).Select(c => $"{(isRtl ? $"{c.Employee.FirstNameAr} {c.Employee.FamilyNameAr}" : $"{c.Employee.FirstNameEn} {c.Employee.FamilyNameEn}")}{(c.Position == null ? "" : $" ({c.Position})")}"))@(n.Current.Count > 6 ? $" +{n.Current.Count - 6}" : "")</td>

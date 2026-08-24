@@ -141,6 +141,7 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, WorkflowCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, NotificationDefaultsSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
+            services.AddScoped<ISeedContributor, StaffDemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
             services.AddScoped<ISeedContributor, CafeteriaDemoSeedContributor>();
 

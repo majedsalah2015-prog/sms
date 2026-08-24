@@ -210,6 +210,47 @@ namespace Sms.Web.Models
                 ? "لا تُتاح هذه الحركة من حالة السعر الحالية: المسودة تُعتمد، والمعتمد يُسحب، ولا طريق عائد إلى المسودة (BR-FEE-002)."
                 : "That move is not available from the price's current state: a draft is approved, an approved price is withdrawn, and there is no way back to draft (BR-FEE-002).",
 
+            // ---------------------------------------------------------------- M12 employees · M13 teachers
+            //
+            // Every refusal these two modules' screens can produce. They were reachable and
+            // untranslated: the employee file, the contract manager and the assignment matrix each
+            // answered an Arabic administrator in English the moment they did something the rules
+            // forbid — which, on a screen whose whole job is to enforce those rules, is not a rare
+            // path. None of the engine sentences name an id here either; "employee 7" told the
+            // reader nothing they could act on.
+
+            InvalidEmployeeStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة الموظف الحالية: النشط يُوقَف أو تُنهى خدمته، والموقوف يعود نشطاً أو تُنهى خدمته، ولا عودة بعد انتهاء الخدمة (BR-EMP-001)."
+                : "That move is not available from the employee's current status: an active employee is suspended or offboarded, a suspended one returns to active or is offboarded, and there is no way back once service has ended (BR-EMP-001).",
+
+            OverlappingContractException => arabic
+                ? "للموظف عقد آخر يغطي جزءاً من هذه الفترة — أنهِ العقد القائم أو غيّر التواريخ، فعقود الموظف الواحد لا تتداخل (BR-EMP-003)."
+                : "The employee already has a contract covering part of this period — end the existing one or change the dates; one employee's contracts do not overlap (BR-EMP-003).",
+
+            InvalidContractStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة العقد الحالية: المسودة تُفعَّل، والساري يُنهى، ولا طريق عائد إلى المسودة (BR-EMP-003)."
+                : "That move is not available from the contract's current state: a draft is activated, an active contract is terminated, and there is no way back to draft (BR-EMP-003).",
+
+            ContractNotEditableException => arabic
+                ? "العقد لم يعد مسودة، والعقد بعد تفعيله وثيقة لا استمارة — أنهِه واكتب عقداً جديداً بدل تعديل شروطه (BR-EMP-003)."
+                : "The contract is no longer a draft, and an activated contract is a document rather than a form — terminate it and write a new one instead of editing its terms (BR-EMP-003).",
+
+            OrgUnitInUseException => arabic
+                ? "الوحدة التنظيمية ما زالت مرتبطة بغيرها — انقل الوحدات التابعة لها وأعد إسناد من شغلوا مناصب فيها أولاً، فسجل المناصب لا يُحذف معها (BR-EMP-002)."
+                : "The org unit is still referenced — move its child units and reassign anyone who has held a position in it first; the position history is not deleted along with it (BR-EMP-002).",
+
+            EmployeeNotEligibleForTeachingException => arabic
+                ? "لا عقد سارياً لهذا الموظف اليوم، ومن لا عقد له لا يحمل صفة معلم ولا إسناداً تدريسياً — فعّل عقده أولاً (BR-TCH-001)."
+                : "This employee has no contract in force today, and without one they can hold neither a teaching designation nor a teaching assignment — activate a contract first (BR-TCH-001).",
+
+            DuplicatePrimaryTeacherException => arabic
+                ? "لهذه المادة في هذه الشعبة معلم أساسي بالفعل — أنهِ إسناده، أو أضف الجديد معلماً مشاركاً (BR-TCH-005)."
+                : "This subject already has a primary teacher in this section — end that assignment, or add the new teacher as a co-teacher instead (BR-TCH-005).",
+
+            LoadExceededException => arabic
+                ? "هذا الإسناد يتجاوز الحد الأسبوعي لنصاب المعلم — أنقص نصابه أو أسند الحصة لغيره؛ والتجاوز ممكن لكنه قرار صريح يُسجَّل (BR-TCH-004)."
+                : "This assignment would take the teacher past their weekly maximum — reduce their load or give the class to someone else; exceeding it is possible, but it is an explicit choice and it is logged (BR-TCH-004).",
+
             _ => exception.Message,
         };
 
