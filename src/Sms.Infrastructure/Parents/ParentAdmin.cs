@@ -23,14 +23,29 @@ namespace Sms.Infrastructure.Parents
 
         public async Task<Parent> UpdateParentAsync(
             int parentId, string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
-            string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default)
+            string? occupationEmployer = null, string preferredLanguage = "ar",
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
+            ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            CancellationToken cancellationToken = default)
         {
             var parent = await _db.Parents.SingleAsync(p => p.Id == parentId, cancellationToken);
             parent.NameAr = nameAr; parent.NameEn = nameEn; parent.PrimaryMobile = primaryMobile; parent.Email = email;
             parent.Address = address; parent.OccupationEmployer = occupationEmployer; parent.PreferredLanguage = preferredLanguage;
+            parent.PrimaryIdTypeLookupId = primaryIdTypeLookupId;
+            parent.PrimaryIdNo = Trimmed(primaryIdNo);
+            parent.LifeStatus = lifeStatus;
+
+            // The note explains "Other" and nothing else. Keeping it after a status
+            // change to Deceased would leave a sentence on the record describing a
+            // category the person is no longer filed under.
+            parent.LifeStatusNote = lifeStatus == ParentLifeStatus.Other ? Trimmed(lifeStatusNote) : null;
+
             await _db.SaveChangesAsync(cancellationToken);
             return parent;
         }
+
+        /// <summary>Empty and whitespace both mean "not recorded" — and only null keeps the filtered ID index out of the way.</summary>
+        private static string? Trimmed(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
         public async Task SetResidenceAsync(int parentId, int? residenceAreaId, int? neighbourhoodId, CancellationToken cancellationToken = default)
         {
@@ -59,7 +74,10 @@ namespace Sms.Infrastructure.Parents
 
         public async Task<Parent> RegisterParentAsync(
             string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
-            string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default)
+            string? occupationEmployer = null, string preferredLanguage = "ar",
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
+            ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            CancellationToken cancellationToken = default)
         {
             var fileNo = await _numberIssuer.IssueAsync("PAR", cancellationToken);
 
@@ -73,6 +91,10 @@ namespace Sms.Infrastructure.Parents
                 Address = address,
                 OccupationEmployer = occupationEmployer,
                 PreferredLanguage = preferredLanguage,
+                PrimaryIdTypeLookupId = primaryIdTypeLookupId,
+                PrimaryIdNo = Trimmed(primaryIdNo),
+                LifeStatus = lifeStatus,
+                LifeStatusNote = lifeStatus == ParentLifeStatus.Other ? Trimmed(lifeStatusNote) : null,
             };
             _db.Parents.Add(parent);
 

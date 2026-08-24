@@ -1,3 +1,4 @@
+using Sms.Domain.Parents;
 using Sms.Domain.Students;
 
 namespace Sms.Web.Models

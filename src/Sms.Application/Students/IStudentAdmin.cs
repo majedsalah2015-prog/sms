@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Sms.Domain.Common;
+using Sms.Domain.Parents;
 using Sms.Domain.Students;
 
 namespace Sms.Application.Students

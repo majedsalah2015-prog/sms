@@ -85,6 +85,7 @@ namespace Sms.Web.Controllers
         public async Task<IActionResult> Register() => View(new ParentFormViewModel
         {
             Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
+            IdTypes = await IdTypesAsync(),
         });
 
         [HttpPost("new")]
@@ -98,7 +99,20 @@ namespace Sms.Web.Controllers
                 var mobile = form.PrimaryMobile!.Trim();
                 var dup = await _db.Parents.AsNoTracking().FirstOrDefaultAsync(p => p.PrimaryMobile == mobile);
                 if (dup != null) throw new InvalidOperationException(T($"A parent with this mobile already exists ({dup.ParentFileNo}) — open that file instead (BR-PAR-002).", $"يوجد ولي أمر بهذا الجوال ({dup.ParentFileNo}) — افتح ملفه بدلاً من الإنشاء (BR-PAR-002)."));
-                var p = await _parents.RegisterParentAsync(form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage);
+
+                // BR-PAR-002 matches on the ID number before anything weaker, so now that
+                // the register holds one it is checked ahead of the phone — two people
+                // share a household phone far more often than they share an ID.
+                var idNo = Blank(form.PrimaryIdNo);
+                if (idNo != null)
+                {
+                    var byId = await _db.Parents.AsNoTracking().FirstOrDefaultAsync(p => p.PrimaryIdNo == idNo);
+                    if (byId != null) throw new InvalidOperationException(T($"A parent with this ID number already exists ({byId.ParentFileNo}) — open that file and link the child to it (BR-PAR-002).", $"يوجد ولي أمر بهذا رقم الهوية ({byId.ParentFileNo}) — افتح ملفه واربط الطالب به (BR-PAR-002)."));
+                }
+
+                var p = await _parents.RegisterParentAsync(
+                    form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage,
+                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote);
                 if (form.ResidenceAreaId != null)
                 {
                     await _parents.SetResidenceAsync(p.Id, form.ResidenceAreaId, form.NeighbourhoodId);
@@ -111,6 +125,7 @@ namespace Sms.Web.Controllers
             {
                 ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync();
+                form.IdTypes = await IdTypesAsync();
                 return View(form);
             }
         }
@@ -158,7 +173,7 @@ namespace Sms.Web.Controllers
                 ResidencePath = (await ResidencePathAsync(p)).Path,
                 Children = links.Where(l => l.EffectiveToUtc == null).Select(C).ToList(),
                 PastChildren = links.Where(l => l.EffectiveToUtc != null).Select(C).ToList(),
-                PossibleDuplicates = dups, PortalUserName = portal,
+                PossibleDuplicates = dups, PortalUserName = portal, IdTypes = await IdTypesAsync(),
                 Audit = audit.Select(a => (a.Action.ToString(), a.FieldName, a.OldValue, a.NewValue, a.OccurredAtUtc, a.ActorUserId, a.Reason)).ToList(),
             });
         }
@@ -174,7 +189,15 @@ namespace Sms.Web.Controllers
                 var mobile = form.PrimaryMobile!.Trim();
                 if (await _db.Parents.AsNoTracking().AnyAsync(x => x.Id != id && x.PrimaryMobile == mobile)) throw new InvalidOperationException(T("Another parent already uses this mobile (BR-PAR-002).", "ولي أمر آخر يستخدم هذا الجوال (BR-PAR-002)."));
                 _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
-                await _parents.UpdateParentAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage);
+                var idNo = Blank(form.PrimaryIdNo);
+                if (idNo != null && await _db.Parents.AsNoTracking().AnyAsync(x => x.Id != id && x.PrimaryIdNo == idNo))
+                {
+                    throw new InvalidOperationException(T("Another parent already carries this ID number (BR-PAR-002).", "ولي أمر آخر يحمل رقم الهوية هذا (BR-PAR-002)."));
+                }
+
+                await _parents.UpdateParentAsync(
+                    id, form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage,
+                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote);
                 TempData["Flash"] = T("Parent file updated.", "تم تحديث ملف ولي الأمر.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
@@ -326,6 +349,11 @@ namespace Sms.Web.Controllers
         {
             if (string.IsNullOrWhiteSpace(v)) throw new InvalidOperationException(T($"{f} is required.", $"الحقل {f} مطلوب."));
         }
+
+        private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+        /// <summary>The picker offers what a school can still choose, so the list keeps the soft-active filter.</summary>
+        private Task<IReadOnlyList<(int Id, string Ar, string En)>> IdTypesAsync() => LookupAsync("IdType");
 
         private async Task<IReadOnlyList<(int Id, string Ar, string En)>> LookupAsync(string category)
         {

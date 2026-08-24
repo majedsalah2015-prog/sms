@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Domain.Parents
 @model ParentFormViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -37,6 +38,42 @@
                     <div class="col-md-3"><label class="form-label small" asp-for="OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input asp-for="OccupationEmployer" class="form-control form-control-sm" /></div>
                     <div class="col-md-2"><label class="form-label small" asp-for="PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select asp-for="PreferredLanguage" class="form-select form-select-sm"><option value="ar">العربية</option><option value="en">English</option></select></div>
                     <div class="col-12"><label class="form-label small" asp-for="Address">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" placeholder="@T("street, building, landmark", "الشارع والعمارة وعلامة مميزة")" /></div>
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="PrimaryIdTypeLookupId">@T("ID type", "نوع الهوية")</label>
+                        <select asp-for="PrimaryIdTypeLookupId" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            @foreach (var t in Model.IdTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="PrimaryIdNo">@T("ID number", "رقم الهوية")</label>
+                        <input asp-for="PrimaryIdNo" class="form-control form-control-sm" dir="ltr" inputmode="numeric" maxlength="30" />
+                        <div class="form-text">@T("Checked against the register before the file is created — two people share a household phone far more often than an ID (BR-PAR-002).", "يُفحص أمام السجل قبل إنشاء الملف — فمشاركة جوال البيت أشيع كثيراً من مشاركة رقم الهوية (BR-PAR-002).")</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="LifeStatus">@T("Status", "الحالة")</label>
+                        <select asp-for="LifeStatus" class="form-select form-select-sm" id="LifeStatus">
+                            @foreach (ParentLifeStatus s in Enum.GetValues(typeof(ParentLifeStatus)))
+                            {
+                                <option value="@s">@SocialProfileLabels.ParentStatus(s, isRtl)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3" id="life-status-note-wrap">
+                        <label class="form-label small" asp-for="LifeStatusNote">@T("Note", "بيان الحالة")</label>
+                        <input asp-for="LifeStatusNote" class="form-control form-control-sm" maxlength="200" placeholder="@T("what \"other\" means here", "ما المقصود بـ«غير ذلك»")" />
+                    </div>
+                    <div class="col-12">
+                        <div class="form-text">
+                            @T("Martyr and missing are recorded separately from deceased on purpose: they carry different entitlements — fee exemptions, ministry reporting, benevolent-fund eligibility — and collapsing them would put those out of reach of anyone reading the file later.",
+                               "يُسجَّل الشهيد والمفقود منفصلَين عن المتوفى عن قصد: فلكلٍّ منهما استحقاقات مختلفة — إعفاءات من الرسوم، وتبليغ وزاري، وأهلية لصناديق الإحسان — ودمجها يضعها بعيداً عن متناول من يقرأ الملف لاحقاً.")
+                        </div>
+                    </div>
                 </div>
 
                 @* Where the family lives belongs to the family, so it is recorded once here rather
@@ -113,6 +150,17 @@
             .then(function (r) { return r.json(); })
             .then(function (rows) { fill(hood, rows, labels.none); });
     });
+
+    // The note only means anything for "Other". Hidden rather than removed, so a
+    // form posted with scripting off still carries whatever was typed and the admin
+    // still drops it — the rule lives on the server either way.
+    var status = document.getElementById("LifeStatus");
+    var noteWrap = document.getElementById("life-status-note-wrap");
+    if (status && noteWrap) {
+        var syncNote = function () { noteWrap.style.display = status.value === "Other" ? "" : "none"; };
+        status.addEventListener("change", syncNote);
+        syncNote();
+    }
 })();
 </script>
 }

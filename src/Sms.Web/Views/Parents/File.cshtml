@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Domain.Parents
 @model ParentFileViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -53,6 +54,28 @@
                     <div class="col-md-3"><label class="form-label small" for="par-OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input name="OccupationEmployer" id="par-OccupationEmployer" class="form-control form-control-sm" value="@p.OccupationEmployer" /></div>
                     <div class="col-md-2"><label class="form-label small" for="par-PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select name="PreferredLanguage" id="par-PreferredLanguage" class="form-select form-select-sm"><option value="ar" selected="@(p.PreferredLanguage == "ar")">العربية</option><option value="en" selected="@(p.PreferredLanguage == "en")">English</option></select></div>
                     <div class="col-md-8"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@p.Address" /></div>
+
+                    <div class="col-md-3"><label class="form-label small" for="par-IdType">@T("ID type", "نوع الهوية")</label>
+                        <select name="PrimaryIdTypeLookupId" id="par-IdType" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            @foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(p.PrimaryIdTypeLookupId == t.Id)">@(isRtl ? t.Ar : t.En)</option> }
+                        </select>
+                    </div>
+                    <div class="col-md-3"><label class="form-label small" for="par-IdNo">@T("ID number", "رقم الهوية")</label>
+                        <input name="PrimaryIdNo" id="par-IdNo" class="form-control form-control-sm" dir="ltr" maxlength="30" value="@p.PrimaryIdNo" />
+                        <div class="form-text">@T("Identity field — changing it needs the reason below (BR-PAR-009).", "حقل هوية — تغييره يحتاج السبب أدناه (BR-PAR-009).")</div>
+                    </div>
+                    <div class="col-md-3"><label class="form-label small" for="par-LifeStatus">@T("Status", "الحالة")</label>
+                        <select name="LifeStatus" id="par-LifeStatus" class="form-select form-select-sm">
+                            @foreach (ParentLifeStatus s in Enum.GetValues(typeof(ParentLifeStatus)))
+                            {
+                                <option value="@s" selected="@(p.LifeStatus == s)">@SocialProfileLabels.ParentStatus(s, isRtl)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3" id="par-note-wrap"><label class="form-label small" for="par-LifeStatusNote">@T("Note", "بيان الحالة")</label>
+                        <input name="LifeStatusNote" id="par-LifeStatusNote" class="form-control form-control-sm" maxlength="200" value="@p.LifeStatusNote" />
+                    </div>
                     @* The hierarchy is edited on its own page — three dependent pickers do not belong
                        inside a form whose Save means something else. *@
                     <div class="col-md-4"><label class="form-label small" for="par-residence">@T("Residence", "السكن")</label>

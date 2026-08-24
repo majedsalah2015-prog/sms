@@ -195,6 +195,20 @@ namespace Sms.Web.Models
 
         public string? PrimaryMobile { get; set; }
 
+        /// <summary>References the "IdType" lookup category, same catalogue the student and employee registers use.</summary>
+        public int? PrimaryIdTypeLookupId { get; set; }
+
+        /// <summary>BR-PAR-002's strongest deduplication signal, which the parent register had no field for.</summary>
+        public string? PrimaryIdNo { get; set; }
+
+        /// <summary>حالة ولي الأمر — defaults to Alive so the common case costs no clicks.</summary>
+        public ParentLifeStatus LifeStatus { get; set; } = ParentLifeStatus.Alive;
+
+        /// <summary>Only meaningful for <see cref="ParentLifeStatus.Other"/>; the admin drops it otherwise.</summary>
+        public string? LifeStatusNote { get; set; }
+
+        public IReadOnlyList<(int Id, string Ar, string En)> IdTypes { get; set; } = Array.Empty<(int, string, string)>();
+
         public string? Email { get; set; }
 
         public string? Address { get; set; }
@@ -224,6 +238,9 @@ namespace Sms.Web.Models
         public IReadOnlyList<ChildRow> Children { get; set; } = Array.Empty<ChildRow>();
 
         public IReadOnlyList<ChildRow> PastChildren { get; set; } = Array.Empty<ChildRow>();
+
+        /// <summary>The "IdType" lookup, for the identity tab's picker.</summary>
+        public IReadOnlyList<(int Id, string Ar, string En)> IdTypes { get; set; } = Array.Empty<(int, string, string)>();
 
         public IReadOnlyList<Parent> PossibleDuplicates { get; set; } = Array.Empty<Parent>();
 

@@ -1,5 +1,6 @@
 using System;
 using Sms.Domain.Audit;
+using Sms.Domain.Parents;
 using Sms.Domain.Common;
 
 namespace Sms.Domain.Students

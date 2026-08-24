@@ -28,6 +28,29 @@ namespace Sms.Domain.Parents
         [RequiresAuditReason]
         public string NameEn { get; set; } = string.Empty;
 
+        /// <summary>References core.LookupValue, category "IdType" (seeded by E-010) — the same catalogue Student and Employee draw from.</summary>
+        public int? PrimaryIdTypeLookupId { get; set; }
+
+        /// <summary>
+        /// BR-PAR-002 matches "exact on ID numbers" before anything fuzzier, and
+        /// until now the parent register held no ID number at all — so the strongest
+        /// signal deduplication has was missing from the entity it deduplicates.
+        /// An identity field, so T1 with a reason (BR-PAR-009).
+        /// </summary>
+        [RequiresAuditReason]
+        public string? PrimaryIdNo { get; set; }
+
+        /// <summary>
+        /// doc/Modules/11 §7's "status". Not audit-reason-gated: it is a fact being
+        /// recorded rather than a decision being made, and demanding a justification
+        /// for entering that a parent has died would be its own kind of wrong. The
+        /// change is still captured field-level, because the class is T1.
+        /// </summary>
+        public ParentLifeStatus LifeStatus { get; set; } = ParentLifeStatus.Alive;
+
+        /// <summary>What <see cref="ParentLifeStatus.Other"/> means for this person; ignored for every other status.</summary>
+        public string? LifeStatusNote { get; set; }
+
         /// <summary>BR-PAR-007: mandatory, verified on portal activation (verification not modeled in this slice).</summary>
         public string PrimaryMobile { get; set; } = string.Empty;
 

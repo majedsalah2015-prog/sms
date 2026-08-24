@@ -13,10 +13,17 @@ namespace Sms.Application.Parents
     /// </summary>
     public interface IParentAdmin
     {
-        /// <summary>Edits identity/contact fields (T1 audited).</summary>
+        /// <summary>
+        /// Edits identity/contact fields (T1 audited). Changing <paramref name="primaryIdNo"/>
+        /// needs <c>IAuditContext.Reason</c> set first — it is an identity field
+        /// (BR-PAR-009) and the register deduplicates on it (BR-PAR-002).
+        /// </summary>
         Task<Parent> UpdateParentAsync(
             int parentId, string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
-            string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default);
+            string? occupationEmployer = null, string preferredLanguage = "ar",
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
+            ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Sets where the family lives: the locality, and the quarter inside it where the locality has
@@ -27,7 +34,10 @@ namespace Sms.Application.Parents
 
         Task<Parent> RegisterParentAsync(
             string nameAr, string nameEn, string primaryMobile, string? email = null, string? address = null,
-            string? occupationEmployer = null, string preferredLanguage = "ar", CancellationToken cancellationToken = default);
+            string? occupationEmployer = null, string preferredLanguage = "ar",
+            int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
+            ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Hard-deletes a parent file. Refused (InvalidOperationException) while the parent is still an

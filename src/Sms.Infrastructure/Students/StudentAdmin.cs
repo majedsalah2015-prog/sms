@@ -7,6 +7,7 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Numbering;
 using Sms.Application.Students;
 using Sms.Domain.Common;
+using Sms.Domain.Parents;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 
