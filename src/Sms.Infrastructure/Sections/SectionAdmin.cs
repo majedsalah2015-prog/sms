@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,71 @@ namespace Sms.Infrastructure.Sections
         public SectionAdmin(AppDbContext db)
         {
             _db = db;
+        }
+
+        public async Task<IReadOnlyList<Section>> DefineSectionsAsync(
+            int gradeYearProfileId, int count, int capacity, GenderPolicy genderPolicy,
+            CancellationToken cancellationToken = default)
+        {
+            if (count <= 0)
+            {
+                return Array.Empty<Section>();
+            }
+
+            var profile = await _db.GradeYearProfiles.SingleAsync(p => p.Id == gradeYearProfileId, cancellationToken);
+
+            // Checked once for the batch rather than per section: capacity and gender
+            // are the same for all of them, so a count that breaks the plan on the
+            // third must refuse all four instead of leaving two behind.
+            if (!SectionCapacityGuard.WithinGradePlan(capacity, profile.TargetSectionSize))
+            {
+                throw new SectionCapacityPlanExceededException(capacity, profile.TargetSectionSize);
+            }
+
+            if (!GenderPolicyNarrowing.IsValidNarrowing(profile.GenderPolicy, genderPolicy))
+            {
+                throw new InvalidSectionGenderPolicyException(profile.GenderPolicy, genderPolicy);
+            }
+
+            // IgnoreQueryFilters on the grade: a profile whose grade the school retired
+            // still has sections to add to mid-year, and the name pattern is read off
+            // the grade's own short name.
+            var grade = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(g => g.Id == profile.GradeLevelId, cancellationToken);
+
+            // Every section in the grade, closed ones included: their names are still
+            // taken, which is exactly what the sequence has to continue past.
+            var existing = (await _db.Sections.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId && s.GradeYearProfileId == gradeYearProfileId)
+                .OrderBy(s => s.Id)
+                .Select(s => new { s.NameAr, s.NameEn })
+                .ToListAsync(cancellationToken))
+                .Select(s => new SectionNameSequence.ExistingName(s.NameAr, s.NameEn))
+                .ToList();
+
+            var proposed = SectionNameSequence.Next(grade.Name.NameAr, grade.Name.NameEn, existing, count);
+            var taken = existing.Select(e => e.NameEn).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var name in proposed.Where(n => taken.Contains(n.NameEn)))
+            {
+                // The sequence continues past the highest, so this should be
+                // unreachable — but a name collision is the one failure that would
+                // otherwise surface as a unique-index crash halfway through the batch.
+                throw new DuplicateSectionNameException(name.NameEn);
+            }
+
+            var sections = proposed.Select(name => new Section
+            {
+                AcademicYearId = profile.AcademicYearId,
+                GradeYearProfileId = gradeYearProfileId,
+                NameAr = name.NameAr,
+                NameEn = name.NameEn,
+                Capacity = capacity,
+                GenderPolicy = genderPolicy,
+            }).ToList();
+
+            _db.Sections.AddRange(sections);
+            await _db.SaveChangesAsync(cancellationToken);
+            return sections;
         }
 
         public async Task<Section> DefineSectionAsync(

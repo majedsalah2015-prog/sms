@@ -327,5 +327,66 @@ namespace Sms.Infrastructure.Tests
             await admin.DeleteSectionAsync(empty.Id);
             Assert.Empty(db.Sections.Where(s => s.Id == empty.Id));
         }
+
+        /// <summary>
+        /// BR-SCN-001: a grade is planned as a number of sections, so opening them is
+        /// one operation named from the grade's own pattern rather than four trips
+        /// through a form — which is how "1-A", "1-b" and "1 - C" end up in one grade.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-001")]
+        public async Task Opening_several_sections_names_them_from_the_grades_own_pattern()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+
+            var created = await admin.DefineSectionsAsync(_profileId, 3, 3, GenderPolicy.Mixed);
+
+            Assert.Equal(new[] { "ثالث-أ", "ثالث-ب", "ثالث-ج" }, created.Select(s => s.NameAr).ToArray());
+            Assert.Equal(new[] { "Grade 3-A", "Grade 3-B", "Grade 3-C" }, created.Select(s => s.NameEn).ToArray());
+            Assert.All(created, s => Assert.Equal(3, s.Capacity));
+            Assert.Equal(3, db.Sections.Count(s => s.GradeYearProfileId == _profileId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-001")]
+        public async Task A_second_batch_continues_past_what_the_grade_already_holds()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            await admin.DefineSectionsAsync(_profileId, 2, 3, GenderPolicy.Mixed);
+
+            var more = await admin.DefineSectionsAsync(_profileId, 2, 3, GenderPolicy.Mixed);
+
+            Assert.Equal(new[] { "Grade 3-C", "Grade 3-D" }, more.Select(s => s.NameEn).ToArray());
+        }
+
+        /// <summary>
+        /// The whole batch is checked before any of it is written: a capacity that
+        /// breaks the grade's plan must refuse all four rather than leave two behind
+        /// for somebody to find and clean up.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCN-002")]
+        public async Task A_batch_that_breaks_the_grade_plan_writes_none_of_it()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+
+            await Assert.ThrowsAsync<SectionCapacityPlanExceededException>(
+                () => admin.DefineSectionsAsync(_profileId, 4, capacity: 99, GenderPolicy.Mixed));
+
+            Assert.Empty(db.Sections.Where(s => s.GradeYearProfileId == _profileId));
+        }
+
+        [Fact]
+        public async Task Opening_none_writes_nothing_and_does_not_throw()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+
+            Assert.Empty(await admin.DefineSectionsAsync(_profileId, 0, 3, GenderPolicy.Mixed));
+            Assert.Empty(db.Sections.Where(s => s.GradeYearProfileId == _profileId));
+        }
     }
 }

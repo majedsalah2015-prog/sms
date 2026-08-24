@@ -39,6 +39,9 @@ namespace Sms.Application.Sections
 
         private static readonly string[] LatinLetters = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" };
 
+        /// <summary>What a school puts between the grade and the section in a name.</summary>
+        private static readonly char[] Separators = { '-', '/', '_', ' ' };
+
         /// <summary>How a grade labels its sections, read from the names it already has.</summary>
         public enum Style
         {
@@ -72,16 +75,20 @@ namespace Sms.Application.Sections
         /// The next <paramref name="count"/> names for a grade, continuing past
         /// whatever it already holds.
         /// <para>
-        /// <paramref name="gradePrefixAr"/> and <paramref name="gradePrefixEn"/> are
-        /// what the name is built on — the grade's own short name. Passing them empty
-        /// yields the bare suffix, which is what a school naming sections "أ" rather
-        /// than "خامس-أ" wants.
+        /// <b>The prefix comes from the grade's own sections where it has any.</b>
+        /// BR-SCN-001 calls the naming "a school pattern", and the prefix is half of
+        /// that pattern: a grade whose sections read "1-A" and "1-B" is a grade that
+        /// calls itself "1", whatever its full name in the ladder is. Only an empty
+        /// grade falls back to <paramref name="gradeFallbackAr"/> /
+        /// <paramref name="gradeFallbackEn"/> — and passing those empty yields bare
+        /// suffixes, which is what a school naming sections "أ" rather than "خامس-أ"
+        /// wants.
         /// </para>
         /// </summary>
         public static IReadOnlyList<ProposedName> Next(
-            string gradePrefixAr,
-            string gradePrefixEn,
-            IReadOnlyCollection<string> existingEnglishNames,
+            string gradeFallbackAr,
+            string gradeFallbackEn,
+            IReadOnlyCollection<ExistingName> existing,
             int count,
             Style? style = null)
         {
@@ -90,8 +97,13 @@ namespace Sms.Application.Sections
                 return Array.Empty<ProposedName>();
             }
 
-            var chosen = style ?? DetectStyle(existingEnglishNames);
-            var startIndex = NextIndex(existingEnglishNames, chosen);
+            var englishNames = existing.Select(e => e.NameEn).ToList();
+            var chosen = style ?? DetectStyle(englishNames);
+            var startIndex = NextIndex(englishNames, chosen);
+
+            var last = existing.LastOrDefault();
+            var ar0 = last == null ? new Shape(gradeFallbackAr, DefaultSeparator) : ShapeOf(last.NameAr, gradeFallbackAr);
+            var en0 = last == null ? new Shape(gradeFallbackEn, DefaultSeparator) : ShapeOf(last.NameEn, gradeFallbackEn);
 
             var names = new List<ProposedName>(count);
             for (var i = 0; i < count; i++)
@@ -101,10 +113,46 @@ namespace Sms.Application.Sections
                     ? SuffixPair(index)
                     : (ArabicLetters[index], LatinLetters[index]);
 
-                names.Add(new ProposedName(Join(gradePrefixAr, ar), Join(gradePrefixEn, en)));
+                names.Add(new ProposedName(ar0.Join(ar), en0.Join(en)));
             }
 
             return names;
+        }
+
+        /// <summary>A section the grade already has, in both languages.</summary>
+        public sealed record ExistingName(string NameAr, string NameEn);
+
+        private const string DefaultSeparator = "-";
+
+        /// <summary>
+        /// How this grade writes a section name: what comes before the suffix, and what
+        /// joins the two. Both are copied rather than re-derived — a school writing
+        /// "أول أ" with a space means the space, and proposing "أول-ب" next to it would
+        /// be the tool breaking the convention it exists to follow.
+        /// </summary>
+        private sealed record Shape(string Prefix, string Separator)
+        {
+            public string Join(string suffix)
+                => string.IsNullOrWhiteSpace(Prefix) ? suffix : $"{Prefix}{Separator}{suffix}";
+        }
+
+        /// <summary>
+        /// Reads the shape off an existing name — "الصف الأول-ب" gives ("الصف الأول", "-"),
+        /// "أول أ" gives ("أول", " "), and a bare "ب" gives the fallback with the default
+        /// separator, because a name with no prefix says nothing about how one would join.
+        /// </summary>
+        private static Shape ShapeOf(string? name, string fallbackPrefix)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return new Shape(fallbackPrefix, DefaultSeparator);
+            }
+
+            var trimmed = name.Trim();
+            var cut = trimmed.LastIndexOfAny(Separators);
+            return cut <= 0
+                ? new Shape(string.Empty, DefaultSeparator)
+                : new Shape(trimmed[..cut].TrimEnd(), trimmed[cut].ToString());
         }
 
         /// <summary>
@@ -146,7 +194,7 @@ namespace Sms.Application.Sections
             }
 
             var trimmed = name.Trim();
-            var cut = trimmed.LastIndexOfAny(new[] { '-', '/', '_', ' ' });
+            var cut = trimmed.LastIndexOfAny(Separators);
             return cut < 0 ? trimmed : trimmed[(cut + 1)..].Trim();
         }
 
@@ -156,7 +204,5 @@ namespace Sms.Application.Sections
             return (number, number);
         }
 
-        private static string Join(string prefix, string suffix)
-            => string.IsNullOrWhiteSpace(prefix) ? suffix : $"{prefix.Trim()}-{suffix}";
     }
 }

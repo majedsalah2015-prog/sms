@@ -74,7 +74,103 @@
                     <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create section", "إنشاء شعبة")</button>
                     <div class="form-text">@T("Sections × size can't exceed the grade-year plan (BR-SCN-001); gender may only narrow the grade's policy (BR-SCN-002).", "الشعب × الحجم لا تتجاوز خطة الصف السنوية (BR-SCN-001)؛ الجنس يضيّق سياسة الصف فقط (BR-SCN-002).")</div>
                 </form>
+
+                <hr class="my-3" />
+
+                @* A grade is planned as a number of sections, not as one section
+                   repeated. Naming them by hand is the step that leaves "1-A", "1-b"
+                   and "1 - C" in one grade by the third year. *@
+                <h2 class="h6">@T("Open several at once", "فتح عدة شعب دفعة واحدة")</h2>
+                <form method="post" asp-action="DefineMany" asp-route-year="@yid" id="bulk-form">
+                    <div class="mb-2">
+                        <label class="form-label small mb-1" for="bulk-grade">@T("Grade", "الصف") <span class="text-danger" aria-hidden="true">*</span></label>
+                        <select name="gradeYearProfileId" id="bulk-grade" class="form-select form-select-sm" required aria-required="true">
+                            <option value="">@T("— grade —", "— الصف —")</option>
+                            @foreach (var p in Model.Profiles) { <option value="@p.ProfileId" data-planned="@p.TargetSections" data-size="@p.TargetSize">@(isRtl ? p.GradeAr : p.GradeEn) (@p.TargetSections × @p.TargetSize)</option> }
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-4">
+                            <label class="form-label small mb-1" for="bulk-count">@T("How many", "العدد")</label>
+                            <input name="count" id="bulk-count" class="form-control form-control-sm" type="number" min="1" max="12" value="2" />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small mb-1" for="bulk-capacity">@T("Capacity", "السعة")</label>
+                            <input name="capacity" id="bulk-capacity" class="form-control form-control-sm" type="number" min="1" value="25" />
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small mb-1" for="bulk-gender">@T("Gender", "الجنس")</label>
+                            <select name="genderPolicy" id="bulk-gender" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select>
+                        </div>
+                    </div>
+
+                    @* Named before they are written, not after: a batch that picks its
+                       own names silently is one an operator undoes section by section. *@
+                    <div class="small mb-2" id="bulk-preview" aria-live="polite"></div>
+
+                    <button class="btn btn-sm btn-outline-primary w-100" type="submit">@T("Open sections", "فتح الشعب")</button>
+                    <div class="form-text">@T("Names continue the grade's own pattern — letters where it uses letters, numbers where it numbers — and never reuse a name a closed section still holds (BR-SCN-001).", "تواصل المسميات نمط الصف نفسه — حروفاً حيث يستخدم الحروف، وأرقاماً حيث يرقّم — ولا تعيد استخدام اسم ما زالت تحمله شعبة مغلقة (BR-SCN-001).")</div>
+                </form>
             }
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+// The preview is the point of the batch form: names are shown before anything is
+// written, so a wrong pattern is caught here rather than undone section by section
+// afterwards. Without script the form still works — the server names them the same
+// way and the flash message lists what it opened.
+(function () {
+    var grade = document.getElementById('bulk-grade');
+    var count = document.getElementById('bulk-count');
+    var preview = document.getElementById('bulk-preview');
+    if (!grade || !count || !preview) { return; }
+
+    var labels = @Html.Raw(Json.Serialize(new {
+        willOpen = T("Will open:", "سيفتح:"),
+        pickGrade = T("Choose a grade to see the names.", "اختر صفاً لعرض المسميات."),
+        overPlan = T("The grade plans {0} section(s); this would take it past that.", "الصف مخطَّط له {0} شعبة؛ وهذا يتجاوزها."),
+    }));
+
+    // Two in-flight previews can resolve out of order — picking a grade fires one
+    // immediately and typing a count fires another — and the loser landing last
+    // would leave the wrong names on screen. Only the newest request may paint.
+    var timer = null;
+    var sequence = 0;
+    function refresh() {
+        var mine = ++sequence;
+        if (!grade.value) { preview.textContent = labels.pickGrade; return; }
+        var n = parseInt(count.value, 10);
+        if (!(n >= 1 && n <= 12)) { preview.textContent = ''; return; }
+
+        fetch('@Url.Content("~/sections/bulk/preview")?gradeYearProfileId=' + grade.value + '&count=' + n)
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) {
+                if (mine !== sequence) { return; }
+                var isRtl = document.documentElement.getAttribute('dir') === 'rtl';
+                var names = rows.map(function (x) { return isRtl ? x.ar : x.en; }).join('، ');
+                preview.textContent = names ? labels.willOpen + ' ' + names : '';
+
+                // The plan is the school's own number; exceeding it is the engine's
+                // refusal, so say it here rather than let the operator find out on submit.
+                var option = grade.options[grade.selectedIndex];
+                var planned = parseInt(option.getAttribute('data-planned'), 10);
+                if (planned > 0 && rows.length > 0) {
+                    var existing = @Html.Raw(Json.Serialize(Model.Rows.GroupBy(r => r.Profile.Id).ToDictionary(g => g.Key.ToString(), g => g.Count())));
+                    var have = existing[grade.value] || 0;
+                    if (have + rows.length > planned) {
+                        preview.textContent += ' — ' + labels.overPlan.replace('{0}', planned);
+                    }
+                }
+            });
+    }
+
+    function debounced() { clearTimeout(timer); timer = setTimeout(refresh, 150); }
+    grade.addEventListener('change', refresh);
+    count.addEventListener('input', debounced);
+    refresh();
+})();
+</script>
+}

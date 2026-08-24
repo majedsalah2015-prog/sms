@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -44,6 +45,15 @@ namespace Sms.Web.Controllers
             _workingYear = workingYear;
             _clock = clock;
         }
+
+        /// <summary>
+        /// A grade with more than a dozen sections is a data-entry mistake, not a
+        /// school — and the letter sequence itself runs out at ten. The cap keeps a
+        /// mistyped count from opening two hundred rows nobody asked for.
+        /// </summary>
+        private const int MaxSectionsPerBatch = 12;
+
+        private CancellationToken Ct => HttpContext.RequestAborted;
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
 
@@ -97,6 +107,70 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index), new { year });
+        }
+
+        /// <summary>
+        /// Opens a grade's sections in one go, named from its own convention
+        /// (BR-SCN-001). A grade is planned as a number of sections — four sections of
+        /// twenty-five — and typing four names by hand is the step that produces
+        /// "1-A", "1-b" and "1 - C" in the same grade by the third year.
+        /// </summary>
+        [HttpPost("bulk")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.Create)]
+        public async Task<IActionResult> DefineMany(int? gradeYearProfileId, int count, int? capacity, GenderPolicy genderPolicy, int? year)
+        {
+            try
+            {
+                if (gradeYearProfileId == null) throw new InvalidOperationException(T("Choose a grade.", "اختر صفاً."));
+                if (count is < 1 or > MaxSectionsPerBatch)
+                {
+                    throw new InvalidOperationException(string.Format(
+                        T("Choose between 1 and {0} sections.", "اختر عدداً بين 1 و{0} شعبة."), MaxSectionsPerBatch));
+                }
+
+                var created = await _sections.DefineSectionsAsync(gradeYearProfileId.Value, count, capacity ?? 25, genderPolicy, Ct);
+                TempData["Flash"] = string.Format(
+                    T("{0} section(s) opened: {1}.", "فُتحت {0} شعبة: {1}."),
+                    created.Count,
+                    string.Join("، ", created.Select(s => IsArabic ? s.NameAr : s.NameEn)));
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(Index), new { year });
+        }
+
+        /// <summary>
+        /// The proposed names, for the screen to show before anything is written. A
+        /// batch that silently picks names is one an operator has to undo section by
+        /// section when it picks the wrong ones.
+        /// </summary>
+        [HttpGet("bulk/preview")]
+        [RequirePermission(ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Sections_, ActionVerb.View)]
+        public async Task<IActionResult> PreviewNames(int gradeYearProfileId, int count)
+        {
+            if (count is < 1 or > MaxSectionsPerBatch)
+            {
+                return Json(Array.Empty<object>());
+            }
+
+            var profile = await _db.GradeYearProfiles.AsNoTracking().SingleOrDefaultAsync(p => p.Id == gradeYearProfileId, Ct);
+            if (profile == null)
+            {
+                return NotFound();
+            }
+
+            var grade = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking()
+                .SingleAsync(g => g.Id == profile.GradeLevelId, Ct);
+            var existing = (await _db.Sections.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId && s.GradeYearProfileId == gradeYearProfileId)
+                .OrderBy(s => s.Id)
+                .Select(s => new { s.NameAr, s.NameEn })
+                .ToListAsync(Ct))
+                .Select(s => new SectionNameSequence.ExistingName(s.NameAr, s.NameEn))
+                .ToList();
+
+            var names = SectionNameSequence.Next(grade.Name.NameAr, grade.Name.NameEn, existing, count);
+            return Json(names.Select(n => new { ar = n.NameAr, en = n.NameEn }));
         }
 
         [HttpGet("{id:int}")]

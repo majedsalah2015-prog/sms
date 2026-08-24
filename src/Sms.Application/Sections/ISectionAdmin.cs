@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Sms.Domain.Grades;
@@ -13,6 +14,23 @@ namespace Sms.Application.Sections
         Task<Section> DefineSectionAsync(
             int gradeYearProfileId, string nameAr, string nameEn, int capacity, GenderPolicy genderPolicy,
             int? defaultClassroomId = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Opens several sections at once, named by <see cref="SectionNameSequence"/>
+        /// from the grade's own convention (BR-SCN-001). A grade is planned as a number
+        /// of sections, not as one section repeated — typing four names by hand is the
+        /// step where a school ends up with "1-A", "1-b" and "1 - C" in the same grade.
+        /// <para>
+        /// Every proposed name and the shared capacity and gender policy are checked
+        /// against the whole batch before anything is written, so a count that would
+        /// break the grade's plan on the third section refuses all four rather than
+        /// leaving two behind. The same exceptions as
+        /// <see cref="DefineSectionAsync"/>.
+        /// </para>
+        /// </summary>
+        Task<IReadOnlyList<Section>> DefineSectionsAsync(
+            int gradeYearProfileId, int count, int capacity, GenderPolicy genderPolicy,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Edits a section's names/capacity/gender/room under the same rules as
