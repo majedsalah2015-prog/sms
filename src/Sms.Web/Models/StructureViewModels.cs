@@ -33,7 +33,14 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<PeriodCount> Counters { get; set; } = Array.Empty<PeriodCount>();
 
+        /// <summary>Every event of the year, cancelled ones included — the manager lists what was called off (BR-GLB-006).</summary>
         public IReadOnlyList<CalendarEvent> Events { get; set; } = Array.Empty<CalendarEvent>();
+
+        /// <summary>The event the ?edit= id names, when the entry card is amending one instead of adding one.</summary>
+        public CalendarEvent? EditEvent { get; set; }
+
+        /// <summary>Today by the application clock — what the list compares against to know an event has already started (BR-CAL-004).</summary>
+        public DateTime TodayUtc { get; set; }
 
         public IReadOnlyList<CalendarVersion> Versions { get; set; } = Array.Empty<CalendarVersion>();
 
@@ -64,6 +71,9 @@ namespace Sms.Web.Models
     public sealed class CalendarEventFormViewModel
     {
         public int AcademicYearId { get; set; }
+
+        /// <summary>Set when the card is amending an event rather than adding one; null is "add".</summary>
+        public int? Id { get; set; }
 
         public string? NameAr { get; set; }
 
@@ -117,6 +127,18 @@ namespace Sms.Web.Models
             => month >= 1 && month <= 12
                 ? (isRtl ? HijriMonthsAr[month - 1] : HijriMonthsEn[month - 1])
                 : month.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// Who a day or event applies to (BR-CAL-002). The events list printed the enum name, so
+        /// an Arabic reader was told a school trip's audience was "StudentsOnly".
+        /// </summary>
+        public static string Audience(CalendarAudience audience, bool isRtl) => audience switch
+        {
+            CalendarAudience.All => isRtl ? "الجميع" : "All",
+            CalendarAudience.StudentsOnly => isRtl ? "الطلاب فقط" : "Students only",
+            CalendarAudience.StaffOnly => isRtl ? "الموظفون فقط" : "Staff only",
+            _ => audience.ToString(),
+        };
     }
 
     // ---------------------------------------------------------------- Grades (doc/Modules/05 §8)

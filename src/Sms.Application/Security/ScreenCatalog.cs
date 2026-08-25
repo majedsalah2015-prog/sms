@@ -374,7 +374,10 @@ namespace Sms.Application.Security
             S(Modules.AcademicYears, AcademicYears.Years, "Academic years", "الأعوام الدراسية", CrudApprove),
 
             // ---- Calendar
-            S(Modules.Calendar, Calendar.Calendar_, "Academic calendar", "التقويم الدراسي", ActionVerb.View, ActionVerb.Edit, ActionVerb.Approve),
+            // Deactivate is cancelling an event (BR-GLB-005 — no delete verb), and it is separate
+            // from Edit on purpose: correcting the date of a school trip and calling the trip off
+            // are not the same authority over a calendar parents have already been shown.
+            S(Modules.Calendar, Calendar.Calendar_, "Academic calendar", "التقويم الدراسي", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
 
             // ---- Grades
             S(Modules.Grades, Grades.Grades_, "Grade levels", "الصفوف", Crud),

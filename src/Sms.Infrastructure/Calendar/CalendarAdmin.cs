@@ -79,6 +79,54 @@ namespace Sms.Infrastructure.Calendar
             return calendarEvent;
         }
 
+        public async Task<CalendarEvent> UpdateEventAsync(
+            int calendarEventId, string nameAr, string nameEn, CalendarEventCategory category, DateTime startDate, DateTime endDate,
+            CalendarAudience audience = CalendarAudience.All, bool isPortalVisible = true, CancellationToken cancellationToken = default)
+        {
+            var calendarEvent = await _db.CalendarEvents.SingleAsync(e => e.Id == calendarEventId, cancellationToken);
+
+            // Both ends of BR-CAL-004. The stored date matters as much as the new one: an event
+            // that has already run is history, and renaming it is how the record of what the
+            // school actually did gets rewritten after the fact.
+            if (CalendarChangeGuard.IsPastDate(calendarEvent.StartDate, _clock.UtcNow))
+            {
+                throw new CalendarPastDateEditException(calendarEvent.StartDate);
+            }
+
+            if (CalendarChangeGuard.IsPastDate(startDate, _clock.UtcNow))
+            {
+                throw new CalendarPastDateEditException(startDate);
+            }
+
+            await EnsureWithinYearAsync(calendarEvent.AcademicYearId, startDate, endDate, cancellationToken);
+
+            calendarEvent.NameAr = nameAr;
+            calendarEvent.NameEn = nameEn;
+            calendarEvent.Category = category;
+            calendarEvent.StartDate = startDate.Date;
+            calendarEvent.EndDate = endDate.Date;
+            calendarEvent.Audience = audience;
+            calendarEvent.IsPortalVisible = isPortalVisible;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return calendarEvent;
+        }
+
+        public async Task<CalendarEvent> SetEventActiveAsync(int calendarEventId, bool isActive, CancellationToken cancellationToken = default)
+        {
+            var calendarEvent = await _db.CalendarEvents.SingleAsync(e => e.Id == calendarEventId, cancellationToken);
+
+            if (CalendarChangeGuard.IsPastDate(calendarEvent.StartDate, _clock.UtcNow))
+            {
+                throw new CalendarPastDateEditException(calendarEvent.StartDate);
+            }
+
+            calendarEvent.IsActive = isActive;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return calendarEvent;
+        }
+
         public async Task<CalendarVersion> PublishAsync(int academicYearId, int publishedByUserId, CancellationToken cancellationToken = default)
         {
             var lastVersionNumber = await _db.CalendarVersions

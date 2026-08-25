@@ -152,6 +152,125 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal("National Day", db.CalendarEvents.Single(e => e.Id == evt.Id).NameEn);
         }
 
+        [Fact]
+        [BusinessRule("BR-CAL-002")]
+        public async Task An_event_can_be_amended_in_place()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 5), new DateTime(2026, 10, 5));
+
+            await admin.UpdateEventAsync(
+                evt.Id, "رحلة مدرسية", "School trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 12), new DateTime(2026, 10, 13), CalendarAudience.StudentsOnly, isPortalVisible: false);
+
+            var stored = db.CalendarEvents.Single(e => e.Id == evt.Id);
+            Assert.Equal("School trip", stored.NameEn);
+            Assert.Equal(new DateTime(2026, 10, 12), stored.StartDate);
+            Assert.Equal(new DateTime(2026, 10, 13), stored.EndDate);
+            Assert.Equal(CalendarAudience.StudentsOnly, stored.Audience);
+            Assert.False(stored.IsPortalVisible);
+            Assert.Single(db.CalendarEvents.Where(e => e.AcademicYearId == _yearId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-051")]
+        public async Task An_event_cannot_be_amended_onto_a_date_outside_the_year()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 5), new DateTime(2026, 10, 5));
+
+            await Assert.ThrowsAsync<CalendarDateOutsideYearException>(() =>
+                admin.UpdateEventAsync(evt.Id, "رحلة", "Trip", CalendarEventCategory.SchoolEvent, new DateTime(2027, 8, 1), new DateTime(2027, 8, 1)));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-004")]
+        public async Task An_event_that_has_already_started_cannot_be_amended()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 9, 10), new DateTime(2026, 9, 10));
+
+            // The clock moves past the event: it is now a record of something that happened.
+            _clock.UtcNow = new DateTime(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc);
+
+            await Assert.ThrowsAsync<CalendarPastDateEditException>(() =>
+                admin.UpdateEventAsync(evt.Id, "رحلة", "Trip", CalendarEventCategory.SchoolEvent, new DateTime(2026, 10, 1), new DateTime(2026, 10, 1)));
+        }
+
+        // --- BR-GLB-005 cancellation ---------------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task Cancelling_an_event_deactivates_it_rather_than_removing_the_row()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 5), new DateTime(2026, 10, 5));
+
+            await admin.SetEventActiveAsync(evt.Id, isActive: false);
+
+            var stored = Assert.Single(db.CalendarEvents.Where(e => e.AcademicYearId == _yearId));
+            Assert.False(stored.IsActive);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-006")]
+        public async Task A_cancelled_event_can_be_reinstated()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 5), new DateTime(2026, 10, 5));
+            await admin.SetEventActiveAsync(evt.Id, isActive: false);
+
+            await admin.SetEventActiveAsync(evt.Id, isActive: true);
+
+            Assert.True(db.CalendarEvents.Single(e => e.Id == evt.Id).IsActive);
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-004")]
+        public async Task An_event_that_has_already_started_cannot_be_cancelled()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 9, 10), new DateTime(2026, 9, 10));
+
+            _clock.UtcNow = new DateTime(2026, 9, 20, 8, 0, 0, DateTimeKind.Utc);
+
+            await Assert.ThrowsAsync<CalendarPastDateEditException>(() => admin.SetEventActiveAsync(evt.Id, isActive: false));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task A_calendar_event_cannot_be_hard_deleted()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var evt = await admin.DefineEventAsync(
+                _yearId, "رحلة", "Trip", CalendarEventCategory.SchoolEvent,
+                new DateTime(2026, 10, 5), new DateTime(2026, 10, 5));
+
+            using var second = CreateContext();
+            second.CalendarEvents.Remove(second.CalendarEvents.Single(e => e.Id == evt.Id));
+
+            await Assert.ThrowsAsync<HardDeleteForbiddenException>(() => second.SaveChangesAsync());
+        }
+
         // --- BR-CAL-007 publication versioning -----------------------------------
 
         [Fact]

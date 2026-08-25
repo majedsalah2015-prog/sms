@@ -35,6 +35,7 @@
             new HelpPanelViewModel.Item(T("Day types are not colours", "أنواع الأيام ليست ألواناً"), T("Working, Weekend, Holiday, Partial and Exam period each mean something to the modules that read them: a partial day still counts for attendance but on a shortened schedule, and an exam-period day is instructional even when normal lessons are not running.", "«عمل» و«عطلة أسبوعية» و«إجازة» و«يوم جزئي» و«فترة اختبارات» لكل منها معنى عند الوحدات التي تقرؤها: فاليوم الجزئي يُحتسب للحضور لكن بجدول مختصر، ويوم فترة الاختبارات يوم دراسي وإن لم تُعقد فيه الحصص المعتادة.")),
             new HelpPanelViewModel.Item(T("Publishing is what makes it real", "النشر هو ما يجعله واقعاً"), T("Edits are drafts until you publish, and publishing snapshots a new numbered version (BR-CAL-007). The button is disabled when there is nothing unpublished. Old versions stay readable, which is how you answer what the calendar said before a mid-year change.", "التعديلات مسوّدات حتى تنشر، والنشر يحفظ إصداراً مرقّماً جديداً (BR-CAL-007). والزر معطَّل حين لا يوجد غير منشور. وتبقى الإصدارات القديمة مقروءة، وبها تُجيب عمّا كان يقوله التقويم قبل تغيير في منتصف العام.")),
             new HelpPanelViewModel.Item(T("The Hijri overlay is display only", "العرض الهجري للعرض فقط"), T("Toggling it adds Hijri dates beside the Gregorian grid; it never changes what is stored or which day a record belongs to. The Arabic interface does not turn the overlay on by itself.", "تبديله يضيف التواريخ الهجرية بجانب الشبكة الميلادية؛ ولا يغيّر أبداً ما هو مخزَّن ولا اليوم الذي ينتمي إليه سجل. والواجهة العربية لا تشغّل العرض من تلقائها.")),
+            new HelpPanelViewModel.Item(T("Events are edited and cancelled, never deleted", "الأحداث تُعدَّل وتُلغى ولا تُحذف"), T("The pencil on a row loads the event back into the entry card; the red button cancels it, which takes it off the board and off the portal but leaves it on the record with an audit entry (BR-GLB-005/006). A cancelled event can be reinstated. Once an event's start date has passed, both are refused — the calendar is then a record of what happened (BR-CAL-004).", "قلم التعديل في الصف يعيد الحدث إلى بطاقة الإدخال؛ والزر الأحمر يلغيه فيختفي من اللوحة ومن البوابة ويبقى في السجل مع قيد تدقيق (BR-GLB-005/006). ويمكن إعادة تفعيل الحدث الملغى. وبعد أن يمر تاريخ بداية الحدث يُرفض الاثنان — فالتقويم حينها سجلٌّ لما جرى (BR-CAL-004).")),
             new HelpPanelViewModel.Item(T("Instructional days is the number to watch", "عدد الأيام الدراسية هو الرقم الذي تراقبه"), T("The count in the header is what the ministry minimum is checked against and what attendance percentages divide by. If it looks wrong, the cause is almost always a stretch of days painted with the wrong type rather than a miscount.", "العدد في الترويسة هو ما يُقاس عليه الحد الأدنى الوزاري وما تُقسم عليه نسب الحضور. فإن بدا خاطئاً فالسبب في الغالب مجموعة أيام عُيِّنت بنوع خاطئ لا خطأ في العدّ.")),
         },
     };
@@ -96,9 +97,41 @@
             <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Events", "الأحداث")</h2><span class="small text-muted">@Model.Events.Count</span></div>
             <div class="table-responsive"><table class="table table-sm sms-table mb-0">
                 <caption class="visually-hidden">@T("Events", "الأحداث")</caption>
-                <thead><tr><th scope="col">@T("Event", "الحدث")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Audience", "الجمهور")</th><th scope="col">@T("Portal", "البوابة")</th></tr></thead>
-                <tbody>@foreach (var e in Model.Events) { <tr><td>@(isRtl ? e.NameAr : e.NameEn)</td><td>@CatName(e.Category)</td><td>@e.StartDate.ToString("yyyy-MM-dd")</td><td>@e.EndDate.ToString("yyyy-MM-dd")</td><td>@e.Audience</td><td>@(e.IsPortalVisible ? "✓" : "—")</td></tr> }
-                @if (Model.Events.Count == 0) { <tr><td colspan="6" class="text-muted text-center py-3">@T("No events yet.", "لا أحداث بعد.")</td></tr> }</tbody>
+                <thead><tr><th scope="col">@T("Event", "الحدث")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Audience", "الجمهور")</th><th scope="col">@T("Portal", "البوابة")</th><th scope="col" class="text-end">@T("Actions", "إجراءات")</th></tr></thead>
+                <tbody>
+                @foreach (var e in Model.Events)
+                {
+                    @* An event that has already started is history: BR-CAL-004 refuses to amend or
+                       cancel it, so the row says so rather than offering a button that will refuse. *@
+                    var started = e.StartDate.Date < Model.TodayUtc;
+                    <tr class="@(e.IsActive ? "" : "text-muted")">
+                        <td>@(isRtl ? e.NameAr : e.NameEn) @if (!e.IsActive) { <span class="badge bg-secondary">@T("Cancelled", "ملغى")</span> }</td>
+                        <td>@CatName(e.Category)</td>
+                        <td><bdi>@e.StartDate.ToString("yyyy-MM-dd")</bdi></td>
+                        <td><bdi>@e.EndDate.ToString("yyyy-MM-dd")</bdi></td>
+                        <td>@CalendarLabels.Audience(e.Audience, isRtl)</td>
+                        <td>@(e.IsPortalVisible ? "✓" : "—")</td>
+                        <td class="text-end text-nowrap">
+                            @if (started)
+                            {
+                                <span class="small">@T("Started — locked (BR-CAL-004)", "بدأ — مقفل (BR-CAL-004)")</span>
+                            }
+                            else
+                            {
+                                if (e.IsActive)
+                                {
+                                    <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-year="@Model.Year.Id" asp-route-hijri="@Model.HijriOverlay" asp-route-edit="@e.Id" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                }
+                                <form method="post" asp-action="EventActive" asp-route-id="@e.Id" class="d-inline" onsubmit="return confirm('@(e.IsActive ? T("Cancel this event? It stays on the record.", "إلغاء هذا الحدث؟ يبقى في السجل.") : T("Reinstate this event?", "إعادة تفعيل هذا الحدث؟"))');">
+                                    <input type="hidden" name="academicYearId" value="@Model.Year.Id" />
+                                    <input type="hidden" name="isActive" value="@(e.IsActive ? "false" : "true")" />
+                                    <button class="btn btn-sm @(e.IsActive ? "btn-outline-danger" : "btn-outline-success")" type="submit" title="@(e.IsActive ? T("Cancel event", "إلغاء الحدث") : T("Reinstate event", "إعادة تفعيل الحدث"))" aria-label="@(e.IsActive ? T("Cancel event", "إلغاء الحدث") : T("Reinstate event", "إعادة تفعيل الحدث"))"><i class="bi @(e.IsActive ? "bi-x-circle" : "bi-arrow-counterclockwise")" aria-hidden="true"></i></button>
+                                </form>
+                            }
+                        </td>
+                    </tr>
+                }
+                @if (Model.Events.Count == 0) { <tr><td colspan="7" class="text-muted text-center py-3">@T("No events yet.", "لا أحداث بعد.")</td></tr> }</tbody>
             </table></div>
         </div>
     </div>
@@ -110,23 +143,35 @@
                 <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small" for="paint-from">@T("From", "من")</label><input name="Date" id="paint-from" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div>
                     <div class="col-6"><label class="form-label small" for="paint-to">@T("To (optional)", "إلى (اختياري)")</label><input name="EndDate" id="paint-to" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div></div>
                 <div class="mb-2"><label class="form-label small" for="paint-daytype">@T("Day type", "نوع اليوم")</label><select name="DayType" id="paint-daytype" class="form-select form-select-sm">@foreach (DayType t in Enum.GetValues(typeof(DayType))) { <option value="@t" selected="@(t == DayType.Holiday)">@TypeName(t)</option> }</select></div>
-                <div class="mb-2"><label class="form-label small" for="paint-audience">@T("Audience", "الجمهور")</label><select name="Audience" id="paint-audience" class="form-select form-select-sm"><option value="All">@T("All", "الجميع")</option><option value="StudentsOnly">@T("Students only", "الطلاب فقط")</option><option value="StaffOnly">@T("Staff only", "الموظفون فقط")</option></select></div>
+                <div class="mb-2"><label class="form-label small" for="paint-audience">@T("Audience", "الجمهور")</label><select name="Audience" id="paint-audience" class="form-select form-select-sm">@foreach (CalendarAudience a in Enum.GetValues(typeof(CalendarAudience))) { <option value="@a">@CalendarLabels.Audience(a, isRtl)</option> }</select></div>
                 <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="IsProvisional" value="true" id="prov" /><label class="form-check-label small" for="prov">@T("Provisional (Hijri, pending confirmation)", "مبدئي (هجري، بانتظار التأكيد)")</label></div>
                 <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-brush me-1" aria-hidden="true"></i>@T("Paint", "تعيين")</button>
                 <div class="form-text">@T("Past dates are locked (BR-CAL-003). Click a day in the grid to pick it.", "التواريخ الماضية مقفلة (BR-CAL-003). انقر يوماً في الشبكة لاختياره.")</div>
             </form>
         </div>
-        <div class="sms-card p-3 mb-3">
-            <h2 class="h6">@T("Add event", "إضافة حدث")</h2>
+        @*
+            One card for both jobs. With ?edit=<id> it is the same fields carrying the event's
+            current values, which is how the events list's pencil reaches a form — the alternative
+            was a second near-identical card that would drift from this one by the third change.
+        *@
+        @{ var ev = Model.EditEvent; }
+        <div class="sms-card p-3 mb-3" id="event-form">
+            <h2 class="h6">@(ev == null ? T("Add event", "إضافة حدث") : T("Edit event", "تعديل حدث"))</h2>
+            @if (ev != null)
+            {
+                <div class="small text-muted mb-2"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@(isRtl ? ev.NameAr : ev.NameEn) · <a asp-action="Index" asp-route-year="@Model.Year.Id" asp-route-hijri="@Model.HijriOverlay">@T("cancel editing", "إلغاء التعديل")</a></div>
+            }
             <form method="post" asp-action="Event">
                 <input type="hidden" name="AcademicYearId" value="@Model.Year.Id" />
-                <div class="mb-2"><input name="NameAr" id="event-name-ar" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" aria-label="@T("Event Arabic name", "اسم الحدث بالعربية")" /></div>
-                <div class="mb-2"><input name="NameEn" id="event-name-en" class="form-control form-control-sm" dir="ltr" placeholder="English name" aria-label="@T("Event English name", "اسم الحدث بالإنجليزية")" /></div>
-                <div class="mb-2"><select name="Category" id="event-category" class="form-select form-select-sm" aria-label="@T("Event category", "فئة الحدث")">@foreach (CalendarEventCategory c in Enum.GetValues(typeof(CalendarEventCategory))) { <option value="@c">@CatName(c)</option> }</select></div>
-                <div class="row g-2 mb-2"><div class="col-6"><input name="StartDate" id="event-start" type="date" class="form-control form-control-sm" aria-label="@T("Event start date", "تاريخ بداية الحدث")" /></div><div class="col-6"><input name="EndDate" id="event-end" type="date" class="form-control form-control-sm" aria-label="@T("Event end date", "تاريخ نهاية الحدث")" /></div></div>
-                <div class="form-check"><input class="form-check-input" type="checkbox" name="IsPortalVisible" value="true" id="pv" checked /><label class="form-check-label small" for="pv">@T("Visible on portal", "ظاهر في البوابة")</label></div>
+                @if (ev != null) { <input type="hidden" name="Id" value="@ev.Id" /> }
+                <div class="mb-2"><input name="NameAr" id="event-name-ar" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" value="@(ev?.NameAr)" aria-label="@T("Event Arabic name", "اسم الحدث بالعربية")" /></div>
+                <div class="mb-2"><input name="NameEn" id="event-name-en" class="form-control form-control-sm" dir="ltr" placeholder="English name" value="@(ev?.NameEn)" aria-label="@T("Event English name", "اسم الحدث بالإنجليزية")" /></div>
+                <div class="mb-2"><select name="Category" id="event-category" class="form-select form-select-sm" aria-label="@T("Event category", "فئة الحدث")">@foreach (CalendarEventCategory c in Enum.GetValues(typeof(CalendarEventCategory))) { <option value="@c" selected="@(ev != null && ev.Category == c)">@CatName(c)</option> }</select></div>
+                <div class="mb-2"><select name="Audience" id="event-audience" class="form-select form-select-sm" aria-label="@T("Audience", "الجمهور")">@foreach (CalendarAudience a in Enum.GetValues(typeof(CalendarAudience))) { <option value="@a" selected="@(ev != null && ev.Audience == a)">@CalendarLabels.Audience(a, isRtl)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-6"><input name="StartDate" id="event-start" type="date" class="form-control form-control-sm" value="@(ev?.StartDate.ToString("yyyy-MM-dd"))" aria-label="@T("Event start date", "تاريخ بداية الحدث")" /></div><div class="col-6"><input name="EndDate" id="event-end" type="date" class="form-control form-control-sm" value="@(ev?.EndDate.ToString("yyyy-MM-dd"))" aria-label="@T("Event end date", "تاريخ نهاية الحدث")" /></div></div>
+                <div class="form-check"><input class="form-check-input" type="checkbox" name="IsPortalVisible" value="true" id="pv" checked="@(ev == null || ev.IsPortalVisible)" /><label class="form-check-label small" for="pv">@T("Visible on portal", "ظاهر في البوابة")</label></div>
                 <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="MarkAsHoliday" value="true" id="mh" /><label class="form-check-label small" for="mh">@T("Also paint the range as holiday", "تعيين المدى كإجازة أيضاً")</label></div>
-                <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>@T("Add event", "إضافة حدث")</button>
+                <button class="btn btn-sm btn-outline-primary w-100" type="submit"><i class="bi @(ev == null ? "bi-calendar-plus" : "bi-check2") me-1" aria-hidden="true"></i>@(ev == null ? T("Add event", "إضافة حدث") : T("Save changes", "حفظ التعديل"))</button>
             </form>
         </div>
         <div class="sms-card p-3 mb-3">

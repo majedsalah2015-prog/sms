@@ -3,15 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260825_CalendarEventCancellation")]
+    partial class CalendarEventCancellation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -8733,6 +8735,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<int>("CreatedByUserId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("EducationLookupId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
@@ -9701,6 +9706,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<int?>("LogoAttachmentId")
+                        .HasColumnType("int");
+
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
 
@@ -9726,6 +9734,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<int?>("SchoolGroupId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SealAttachmentId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("SetupCompletedAtUtc")
@@ -11651,9 +11662,6 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("nvarchar(60)");
 
-                    b.Property<short?>("FatherStatus")
-                        .HasColumnType("smallint");
-
                     b.Property<short?>("FinancialStatus")
                         .HasColumnType("smallint");
 
@@ -11683,33 +11691,15 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime?>("ModifiedAtUtc")
                         .HasColumnType("datetime2");
 
                     b.Property<int?>("ModifiedByUserId")
                         .HasColumnType("int");
-
-                    b.Property<int?>("MotherEducationLookupId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("MotherMobile")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("MotherName")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("MotherNationalId")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("MotherOccupation")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<short?>("MotherStatus")
-                        .HasColumnType("smallint");
 
                     b.Property<int>("NationalityLookupId")
                         .HasColumnType("int");
@@ -11742,6 +11732,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasColumnType("smallint");
 
                     b.Property<int>("SchoolId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SiblingCount")
                         .HasColumnType("int");
 
                     b.Property<short>("Status")

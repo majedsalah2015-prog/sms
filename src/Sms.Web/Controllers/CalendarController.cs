@@ -37,14 +37,16 @@ namespace Sms.Web.Controllers
         private readonly AppDbContext _db;
         private readonly IWorkingYearContext _workingYear;
         private readonly ICurrentUser _currentUser;
+        private readonly IClock _clock;
 
-        public CalendarController(ICalendarAdmin calendar, ISystemSetupAdmin setup, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser currentUser)
+        public CalendarController(ICalendarAdmin calendar, ISystemSetupAdmin setup, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser currentUser, IClock clock)
         {
             _calendar = calendar;
             _setup = setup;
             _db = db;
             _workingYear = workingYear;
             _currentUser = currentUser;
+            _clock = clock;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -53,7 +55,7 @@ namespace Sms.Web.Controllers
 
         [HttpGet("")]
         [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.View)]
-        public async Task<IActionResult> Index(int? year = null, bool? hijri = null)
+        public async Task<IActionResult> Index(int? year = null, bool? hijri = null, int? edit = null)
         {
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
             var selected = years.FirstOrDefault(y => y.Id == (year ?? _workingYear.AcademicYearId))
@@ -65,7 +67,7 @@ namespace Sms.Web.Controllers
                 return RedirectToAction("Index", "AcademicYears");
             }
 
-            var model = await BuildBoardAsync(selected, years, hijri);
+            var model = await BuildBoardAsync(selected, years, hijri, edit);
             return View(model);
         }
 
@@ -122,7 +124,20 @@ namespace Sms.Web.Controllers
                 }
 
                 var end = form.EndDate ?? form.StartDate.Value;
-                await _calendar.DefineEventAsync(form.AcademicYearId, form.NameAr.Trim(), form.NameEn.Trim(), form.Category, form.StartDate.Value, end, form.Audience, form.IsPortalVisible);
+                if (form.Id is int editedId)
+                {
+                    if (!await EventBelongsToYearAsync(editedId, form.AcademicYearId))
+                    {
+                        return NotFound();
+                    }
+
+                    await _calendar.UpdateEventAsync(editedId, form.NameAr.Trim(), form.NameEn.Trim(), form.Category, form.StartDate.Value, end, form.Audience, form.IsPortalVisible);
+                }
+                else
+                {
+                    await _calendar.DefineEventAsync(form.AcademicYearId, form.NameAr.Trim(), form.NameEn.Trim(), form.Category, form.StartDate.Value, end, form.Audience, form.IsPortalVisible);
+                }
+
                 if (form.MarkAsHoliday)
                 {
                     for (var d = form.StartDate.Value.Date; d <= end.Date; d = d.AddDays(1))
@@ -140,6 +155,44 @@ namespace Sms.Web.Controllers
 
             return RedirectToAction(nameof(Index), new { year = form.AcademicYearId });
         }
+
+        /// <summary>
+        /// Cancels an event and reinstates one — BR-GLB-005's answer to "delete this". The row
+        /// stays, stops painting the board and stops reaching the portal, and the T2 audit records
+        /// who called it off (BR-CAL-008). BR-CAL-004 refuses it once the event has started.
+        /// </summary>
+        [HttpPost("event/{id:int}/active")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.Deactivate)]
+        public async Task<IActionResult> EventActive(int id, int academicYearId, bool isActive)
+        {
+            if (!await EventBelongsToYearAsync(id, academicYearId))
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                await _calendar.SetEventActiveAsync(id, isActive);
+                TempData["Flash"] = isActive
+                    ? T("Event reinstated.", "تمت إعادة تفعيل الحدث.")
+                    : T("Event cancelled — it stays on the record and leaves the board.", "أُلغي الحدث — يبقى في السجل ويختفي من اللوحة.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Index), new { year = academicYearId });
+        }
+
+        /// <summary>
+        /// The tenant filter already scopes the set to this school; this asks the other half —
+        /// that the id in the URL belongs to the year the form was posted from, so an id typed
+        /// into the address bar cannot edit some other year's event through this screen.
+        /// </summary>
+        private Task<bool> EventBelongsToYearAsync(int calendarEventId, int academicYearId)
+            => _db.CalendarEvents.AnyAsync(e => e.Id == calendarEventId && e.AcademicYearId == academicYearId);
 
         [HttpPost("publish")]
         [ValidateAntiForgeryToken]
@@ -159,7 +212,7 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { year = academicYearId });
         }
 
-        private async Task<CalendarBoardViewModel> BuildBoardAsync(AcademicYear year, IReadOnlyList<AcademicYear> years, bool? hijriToggle)
+        private async Task<CalendarBoardViewModel> BuildBoardAsync(AcademicYear year, IReadOnlyList<AcademicYear> years, bool? hijriToggle, int? editEventId)
         {
             var workingDaysSetting = await _setup.GetSettingAsync(SettingKeys.WorkingDays, year.Id) ?? "Sunday,Monday,Tuesday,Wednesday,Thursday";
             var weekend = new HashSet<DayOfWeek>(WorkingWeek.WeekendDays(workingDaysSetting));
@@ -170,7 +223,10 @@ namespace Sms.Web.Controllers
             var days = await _db.CalendarDays.AsNoTracking().Where(d => d.AcademicYearId == year.Id).ToListAsync();
             var overrides = days.ToDictionary(d => d.Date.Date, d => d.DayType);
             var overrideRows = days.ToDictionary(d => d.Date.Date);
+            // Every event for the manager's list — cancelled ones included, which is the point of
+            // BR-GLB-006 — and only the live ones for the grid, which paints what is still on.
             var events = await _db.CalendarEvents.AsNoTracking().Where(e => e.AcademicYearId == year.Id).OrderBy(e => e.StartDate).ToListAsync();
+            var liveEvents = events.Where(e => e.IsActive).ToList();
             var versions = await _db.CalendarVersions.AsNoTracking().Where(v => v.AcademicYearId == year.Id).OrderByDescending(v => v.VersionNumber).ToListAsync();
             var semesters = await _db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == year.Id).OrderBy(s => s.SequenceNumber).ToListAsync();
             var terms = await _db.Terms.AsNoTracking().Where(t => t.AcademicYearId == year.Id).OrderBy(t => t.SemesterId).ThenBy(t => t.SequenceNumber).ToListAsync();
@@ -185,7 +241,7 @@ namespace Sms.Web.Controllers
                 return new CalendarBoardViewModel.DayCell(
                     d, Resolve(d), row != null, row?.IsProvisional ?? false,
                     hijri ? HijriCalendarConverter.ToHijri(d).Day.ToString(CultureInfo.InvariantCulture) : null,
-                    events.Where(e => d >= e.StartDate.Date && d <= e.EndDate.Date).ToList(), inYear);
+                    liveEvents.Where(e => d >= e.StartDate.Date && d <= e.EndDate.Date).ToList(), inYear);
             }
 
             // The grid is Gregorian and its month titles say so; the overlay names the Hijri month
@@ -268,6 +324,8 @@ namespace Sms.Web.Controllers
                 WeekOrder = weekOrder,
                 Counters = counters,
                 Events = events,
+                EditEvent = editEventId == null ? null : events.FirstOrDefault(e => e.Id == editEventId.Value),
+                TodayUtc = _clock.UtcNow.Date,
                 Versions = versions,
                 HijriOverlay = hijri,
                 HasUnpublishedEdits = hasUnpublished,
