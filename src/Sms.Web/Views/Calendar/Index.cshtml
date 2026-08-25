@@ -6,7 +6,19 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Academic calendar", "التقويم الدراسي");
     ViewData["Breadcrumb"] = T("Academic Calendar / ", "التقويم الدراسي / ") + (isRtl ? Model.Year.LabelAr : Model.Year.LabelEn);
-    var ci = isRtl ? CultureInfo.GetCultureInfo("ar-SA") : CultureInfo.InvariantCulture;
+    // CurrentCulture, not GetCultureInfo("ar-SA"): ar-SA's default calendar is Umm al-Qura, so
+    // formatting a Gregorian date on the raw culture names the Hijri month — a grid of September's
+    // days sat under the title ربيع الأول ١٤٤٧. Startup pins the request culture's calendar to
+    // Gregorian for that exact reason (ADR-4: Hijri is an overlay the school switches on, never a
+    // side effect of the language), and GetCultureInfo returns the cached, unpinned instance,
+    // walking straight around the fix. The guard re-pins it here so the title cannot depend on
+    // middleware order.
+    var ci = CultureInfo.CurrentCulture;
+    if (ci.DateTimeFormat.Calendar is not GregorianCalendar)
+    {
+        ci = (CultureInfo)ci.Clone();
+        ci.DateTimeFormat.Calendar = new GregorianCalendar();
+    }
     string DayName(DayOfWeek d) => ci.DateTimeFormat.GetAbbreviatedDayName(d);
     string MonthName(int y, int m) => new DateTime(y, m, 1).ToString("MMMM yyyy", ci);
     string Cls(DayType t) => t switch { DayType.Working => "is-working", DayType.Weekend => "is-weekend", DayType.Holiday => "is-holiday", DayType.Partial => "is-partial", DayType.ExamPeriodWorking => "is-exam", _ => "" };
@@ -53,9 +65,11 @@
                 @foreach (var m in Model.Months)
                 {
                     <div class="sms-cal-month">
-                        <div class="sms-cal-month__title">@MonthName(m.Year, m.Month)</div>
+                        <div class="sms-cal-month__title">@MonthName(m.Year, m.Month)
+                            @if (m.HijriLabel != null) { <span class="sms-cal-month__hijri"><bdi>@m.HijriLabel</bdi></span> }
+                        </div>
                         <table class="sms-cal-grid">
-                            <caption class="visually-hidden">@MonthName(m.Year, m.Month)</caption>
+                            <caption class="visually-hidden">@MonthName(m.Year, m.Month)@(m.HijriLabel != null ? " · " + m.HijriLabel : "")</caption>
                             <thead><tr>@foreach (var d in Model.WeekOrder) { <th scope="col">@DayName(d)</th> }</tr></thead>
                             <tbody>
                             @foreach (var w in m.Weeks)

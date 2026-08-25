@@ -13,7 +13,13 @@ namespace Sms.Web.Models
     {
         public sealed record DayCell(DateTime Date, DayType Type, bool IsOverride, bool IsProvisional, string? HijriDay, IReadOnlyList<CalendarEvent> Events, bool InYear);
 
-        public sealed record MonthGrid(int Year, int Month, IReadOnlyList<DayCell?[]> Weeks);
+        /// <summary>
+        /// One Gregorian month of the board. <c>HijriLabel</c> names the Hijri month or
+        /// two that month falls across, and is filled only while the overlay is on — the
+        /// grid itself stays Gregorian (ADR-4 / docs/UI/02: Gregorian dates with a Hijri
+        /// sub-display, never a calendar swapped in behind the reader).
+        /// </summary>
+        public sealed record MonthGrid(int Year, int Month, IReadOnlyList<DayCell?[]> Weeks, string? HijriLabel);
 
         public sealed record PeriodCount(string Label, int WorkingDays, int TotalDays);
 
@@ -75,6 +81,42 @@ namespace Sms.Web.Models
 
         /// <summary>Also paint the range as Holiday days (national/religious events usually are).</summary>
         public bool MarkAsHoliday { get; set; }
+    }
+
+    /// <summary>
+    /// Text the calendar board's Hijri overlay prints (doc/Modules/04 §8.1, BR-CAL-005).
+    /// <para>
+    /// The month names are written out rather than read off a
+    /// <see cref="System.Globalization.CultureInfo"/>. The only culture that would name a
+    /// Hijri month is <c>ar-SA</c>, whose default calendar is Umm al-Qura — and asking it
+    /// to format a date is how the board's month titles came to read ربيع الأول ١٤٤٧ over a
+    /// grid of September's days. Startup pins the request culture's calendar to Gregorian
+    /// for exactly that reason (ADR-4), so the Hijri names have to come from somewhere
+    /// else; StatisticsLabels made the same call for the Gregorian months.
+    /// </para>
+    /// </summary>
+    public static class CalendarLabels
+    {
+        private static readonly string[] HijriMonthsEn =
+        {
+            "Muharram", "Safar", "Rabi' al-Awwal", "Rabi' al-Thani", "Jumada al-Ula", "Jumada al-Akhirah",
+            "Rajab", "Sha'ban", "Ramadan", "Shawwal", "Dhu al-Qi'dah", "Dhu al-Hijjah",
+        };
+
+        private static readonly string[] HijriMonthsAr =
+        {
+            "محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة",
+            "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة",
+        };
+
+        /// <summary>
+        /// Hijri month name, 1–12. Out-of-range months render as their number rather than
+        /// throwing — a month title is not worth a 500.
+        /// </summary>
+        public static string HijriMonth(int month, bool isRtl)
+            => month >= 1 && month <= 12
+                ? (isRtl ? HijriMonthsAr[month - 1] : HijriMonthsEn[month - 1])
+                : month.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     // ---------------------------------------------------------------- Grades (doc/Modules/05 §8)

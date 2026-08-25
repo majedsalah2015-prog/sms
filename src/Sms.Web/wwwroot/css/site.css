@@ -287,6 +287,8 @@ input[type=number].form-control { min-width: 4.5rem; }
 /* ---- Calendar board (doc/Modules/04 §8.1) ---- */
 .sms-cal-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
 .sms-cal-month__title { font-weight: 600; font-size: .9rem; margin-bottom: .35rem; }
+/* Hijri stays a sub-display under the Gregorian month name (ADR-4), never a replacement for it. */
+.sms-cal-month__hijri { display: block; font-weight: 400; font-size: .72rem; color: var(--sms-muted); }
 .sms-cal-grid { width: 100%; border-collapse: separate; border-spacing: 2px; table-layout: fixed; }
 .sms-cal-grid th { font-size: .65rem; color: var(--sms-muted); font-weight: 500; text-align: center; }
 .sms-cal-day { position: relative; height: 30px; text-align: center; font-size: .78rem; border-radius: 4px; cursor: pointer; background: var(--sms-body-bg); border: 1px solid transparent; }

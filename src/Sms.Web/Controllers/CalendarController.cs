@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Calendar;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Localization;
 using Sms.Application.Setup;
 using Sms.Domain.Calendar;
 using Sms.Domain.Schools;
@@ -174,7 +175,6 @@ namespace Sms.Web.Controllers
             var semesters = await _db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == year.Id).OrderBy(s => s.SequenceNumber).ToListAsync();
             var terms = await _db.Terms.AsNoTracking().Where(t => t.AcademicYearId == year.Id).OrderBy(t => t.SemesterId).ThenBy(t => t.SequenceNumber).ToListAsync();
 
-            var hijriCal = new HijriCalendar();
             var weekOrder = Enumerable.Range(0, 7).Select(i => (DayOfWeek)(((int)firstDay + i) % 7)).ToList();
 
             DayType Resolve(DateTime d) => CalendarDayResolver.Resolve(d, weekend, overrides);
@@ -184,8 +184,34 @@ namespace Sms.Web.Controllers
                 overrideRows.TryGetValue(d.Date, out var row);
                 return new CalendarBoardViewModel.DayCell(
                     d, Resolve(d), row != null, row?.IsProvisional ?? false,
-                    hijri ? hijriCal.GetDayOfMonth(d).ToString(CultureInfo.InvariantCulture) : null,
+                    hijri ? HijriCalendarConverter.ToHijri(d).Day.ToString(CultureInfo.InvariantCulture) : null,
                     events.Where(e => d >= e.StartDate.Date && d <= e.EndDate.Date).ToList(), inYear);
+            }
+
+            // The grid is Gregorian and its month titles say so; the overlay names the Hijri month
+            // the same days fall in, so the per-day Hijri numbers have a month to belong to
+            // (doc/Modules/04 §8.1, ADR-4). A Gregorian month always spans two Hijri ones or sits
+            // inside one, and around Dhu al-Hijjah it spans two Hijri years as well.
+            string? HijriMonthLabel(DateTime first, DateTime last)
+            {
+                if (!hijri)
+                {
+                    return null;
+                }
+
+                var from = HijriCalendarConverter.ToHijri(first);
+                var to = HijriCalendarConverter.ToHijri(last);
+                var fromName = CalendarLabels.HijriMonth(from.Month, IsArabic);
+                var toName = CalendarLabels.HijriMonth(to.Month, IsArabic);
+                var fromYear = from.Year.ToString(CultureInfo.InvariantCulture);
+                var toYear = to.Year.ToString(CultureInfo.InvariantCulture);
+
+                if (from.Year != to.Year)
+                {
+                    return $"{fromName} {fromYear} – {toName} {toYear}";
+                }
+
+                return from.Month == to.Month ? $"{fromName} {fromYear}" : $"{fromName} – {toName} {fromYear}";
             }
 
             var months = new List<CalendarBoardViewModel.MonthGrid>();
@@ -213,7 +239,8 @@ namespace Sms.Web.Controllers
                     weeks.Add(week);
                 }
 
-                months.Add(new CalendarBoardViewModel.MonthGrid(m.Year, m.Month, weeks));
+                months.Add(new CalendarBoardViewModel.MonthGrid(
+                    m.Year, m.Month, weeks, HijriMonthLabel(first, new DateTime(m.Year, m.Month, daysInMonth))));
             }
 
             var counters = new List<CalendarBoardViewModel.PeriodCount>();
