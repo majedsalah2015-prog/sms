@@ -251,6 +251,12 @@ namespace Sms.Web.Models
                 ? "هذا الإسناد يتجاوز الحد الأسبوعي لنصاب المعلم — أنقص نصابه أو أسند الحصة لغيره؛ والتجاوز ممكن لكنه قرار صريح يُسجَّل (BR-TCH-004)."
                 : "This assignment would take the teacher past their weekly maximum — reduce their load or give the class to someone else; exceeding it is possible, but it is an explicit choice and it is logged (BR-TCH-004).",
 
+            // ---------------------------------------------------------------- M20 installment plans
+
+            TemplateCategoryNotMandatoryException => arabic
+                ? "إسناد صف كامل يجدول الرسوم الإلزامية فقط، وهذا القالب مقصور على فئة رسوم غير إلزامية فلن يجدول شيئاً — اختر قالباً عاماً أو قالباً على فئة إلزامية (BR-INS-002)."
+                : "A grade-wide assignment schedules mandatory fees only, and this template is scoped to a non-mandatory fee category, so it would schedule nothing — choose a general template or one scoped to a mandatory category (BR-INS-002).",
+
             _ => exception.Message,
         };
 

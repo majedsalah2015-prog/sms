@@ -18,6 +18,7 @@ using Sms.Domain.Calendar;
 using Sms.Domain.Fees;
 using Sms.Domain.Installments;
 using Sms.Domain.Payments;
+using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Installments
@@ -190,9 +191,7 @@ namespace Sms.Infrastructure.Installments
                 .ToList();
         }
 
-        public async Task<PlanAssignment> AssignPlanAsync(
-            int studentId, int payerId, int planTemplateId, ISet<DayOfWeek> weekendDays,
-            bool isException = false, string? exceptionReason = null, CancellationToken cancellationToken = default)
+        private async Task<PlanTemplate> LoadApprovedTemplateAsync(int planTemplateId, CancellationToken cancellationToken)
         {
             var template = await _db.PlanTemplates.Include(t => t.Installments).SingleAsync(t => t.Id == planTemplateId, cancellationToken);
             if (template.Status != PlanTemplateStatus.Approved)
@@ -200,15 +199,71 @@ namespace Sms.Infrastructure.Installments
                 throw new PlanTemplateNotApprovedException(planTemplateId);
             }
 
+            return template;
+        }
+
+        /// <summary>BR-INS-002: where the template's splits land in this year, each shifted off a non-working day.</summary>
+        private async Task<IReadOnlyList<DateTime>> DueDatesAsync(PlanTemplate template, int yearId, ISet<DayOfWeek> weekendDays, CancellationToken cancellationToken)
+        {
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == yearId, cancellationToken);
+            var isWorkingDay = await BuildWorkingDayPredicateAsync(yearId, weekendDays, cancellationToken);
+            return template.Installments.OrderBy(i => i.SequenceNumber)
+                .Select(s => s.DueDate ?? year.StartDate.AddDays(s.OffsetDaysFromYearStart!.Value))
+                .Select(d => DueDateShifter.ShiftToWorkingDay(d, isWorkingDay))
+                .ToList();
+        }
+
+        private Task<bool> HasPlanAsync(int studentId, int yearId, int? feeCategoryId, CancellationToken cancellationToken)
+            => _db.PlanAssignments.AnyAsync(
+                a => a.StudentId == studentId && a.AcademicYearId == yearId && a.FeeCategoryId == feeCategoryId, cancellationToken);
+
+        /// <summary>
+        /// Builds the schedule graph. Nothing here reads the database, so a batch may keep one
+        /// template and one set of due dates across a whole grade without re-deriving them per
+        /// student — and the template stays a detached read even after <c>ChangeTracker.Clear()</c>,
+        /// because only its id is written onto the assignment.
+        /// </summary>
+        private static PlanAssignment BuildAssignment(
+            PlanTemplate template, IReadOnlyList<DateTime> dueDates, int yearId, int studentId, int payerId,
+            IReadOnlyList<InstallmentScheduleBuilder.ChargePortion> portions, bool isException, string? exceptionReason)
+        {
+            var splits = template.Installments.OrderBy(i => i.SequenceNumber).ToList();
+            var total = portions.Sum(p => p.Amount);
+            var scheduled = InstallmentScheduleBuilder.Build(total, splits.Select(s => s.SplitPercent).ToList(), dueDates);
+            var lines = InstallmentScheduleBuilder.MapChargesToInstallments(portions, scheduled.Select(s => s.Amount).ToList());
+
+            var assignment = new PlanAssignment
+            {
+                AcademicYearId = yearId, StudentId = studentId, PayerId = payerId, PlanTemplateId = template.Id,
+                FeeCategoryId = template.FeeCategoryId, IsException = isException, ExceptionReason = exceptionReason,
+            };
+            foreach (var s in scheduled)
+            {
+                var installment = new Installment { SequenceNumber = s.SequenceNumber, DueDate = s.DueDate, Amount = s.Amount };
+                foreach (var line in lines.Where(l => l.InstallmentIndex == s.SequenceNumber - 1))
+                {
+                    installment.ChargeLines.Add(new InstallmentChargeLine { ChargeId = line.ChargeId, Amount = line.Amount });
+                }
+
+                assignment.Installments.Add(installment);
+            }
+
+            return assignment;
+        }
+
+        public async Task<PlanAssignment> AssignPlanAsync(
+            int studentId, int payerId, int planTemplateId, ISet<DayOfWeek> weekendDays,
+            bool isException = false, string? exceptionReason = null, CancellationToken cancellationToken = default)
+        {
+            var template = await LoadApprovedTemplateAsync(planTemplateId, cancellationToken);
+
             if (isException && string.IsNullOrWhiteSpace(exceptionReason))
             {
                 throw new ExceptionAssignmentReasonRequiredException();
             }
 
             var yearId = _workingYear.AcademicYearId;
-            var exists = await _db.PlanAssignments.AnyAsync(
-                a => a.StudentId == studentId && a.AcademicYearId == yearId && a.FeeCategoryId == template.FeeCategoryId, cancellationToken);
-            if (exists)
+            if (await HasPlanAsync(studentId, yearId, template.FeeCategoryId, cancellationToken))
             {
                 throw new PlanAssignmentExistsException(studentId);
             }
@@ -224,39 +279,140 @@ namespace Sms.Infrastructure.Installments
                 throw new NoChargesToScheduleException(studentId);
             }
 
-            var year = await _db.AcademicYears.SingleAsync(y => y.Id == yearId, cancellationToken);
-            var isWorkingDay = await BuildWorkingDayPredicateAsync(yearId, weekendDays, cancellationToken);
-            var splits = template.Installments.OrderBy(i => i.SequenceNumber).ToList();
-            var dueDates = splits
-                .Select(s => s.DueDate ?? year.StartDate.AddDays(s.OffsetDaysFromYearStart!.Value))
-                .Select(d => DueDateShifter.ShiftToWorkingDay(d, isWorkingDay))
-                .ToList();
-
-            var total = portions.Sum(p => p.Amount);
-            var scheduled = InstallmentScheduleBuilder.Build(total, splits.Select(s => s.SplitPercent).ToList(), dueDates);
-            var lines = InstallmentScheduleBuilder.MapChargesToInstallments(portions, scheduled.Select(s => s.Amount).ToList());
-
-            var assignment = new PlanAssignment
-            {
-                AcademicYearId = yearId, StudentId = studentId, PayerId = payerId, PlanTemplateId = planTemplateId,
-                FeeCategoryId = template.FeeCategoryId, IsException = isException, ExceptionReason = exceptionReason,
-            };
-            foreach (var s in scheduled)
-            {
-                var installment = new Installment { SequenceNumber = s.SequenceNumber, DueDate = s.DueDate, Amount = s.Amount };
-                foreach (var line in lines.Where(l => l.InstallmentIndex == s.SequenceNumber - 1))
-                {
-                    installment.ChargeLines.Add(new InstallmentChargeLine { ChargeId = line.ChargeId, Amount = line.Amount });
-                }
-
-                assignment.Installments.Add(installment);
-            }
+            var dueDates = await DueDatesAsync(template, yearId, weekendDays, cancellationToken);
+            var assignment = BuildAssignment(template, dueDates, yearId, studentId, payerId, portions, isException, exceptionReason);
 
             _db.PlanAssignments.Add(assignment);
             await _db.SaveChangesAsync(cancellationToken);
 
             await LogRevisionAsync(assignment.Id, ScheduleRevisionCause.Generated, null, "[]", cancellationToken);
             return assignment;
+        }
+
+        // ------------------------------------------------------------------ doc §8.2 grade-wide defaults
+
+        public Task<GradeAssignmentRun> PreviewGradeAssignmentAsync(
+            int gradeLevelId, int planTemplateId, CancellationToken cancellationToken = default)
+            => RunGradeAsync(gradeLevelId, planTemplateId, null, cancellationToken);
+
+        public Task<GradeAssignmentRun> AssignPlanToGradeAsync(
+            int gradeLevelId, int planTemplateId, ISet<DayOfWeek> weekendDays, CancellationToken cancellationToken = default)
+            => RunGradeAsync(gradeLevelId, planTemplateId, weekendDays, cancellationToken);
+
+        /// <summary>
+        /// One evaluation behind both the preview and the run, so what the officer was shown is
+        /// what happens. <paramref name="weekendDays"/> null is the preview: it writes nothing,
+        /// and the due-date shift it would need is never computed.
+        /// </summary>
+        private async Task<GradeAssignmentRun> RunGradeAsync(
+            int gradeLevelId, int planTemplateId, ISet<DayOfWeek>? weekendDays, CancellationToken cancellationToken)
+        {
+            var template = await LoadApprovedTemplateAsync(planTemplateId, cancellationToken);
+            var mandatoryCategoryIds = await MandatoryCategoryIdsAsync(cancellationToken);
+            if (template.FeeCategoryId is int scoped && !mandatoryCategoryIds.Contains(scoped))
+            {
+                throw new TemplateCategoryNotMandatoryException(planTemplateId);
+            }
+
+            var yearId = _workingYear.AcademicYearId;
+            var profileIds = await _db.GradeYearProfiles
+                .Where(p => p.AcademicYearId == yearId && p.GradeLevelId == gradeLevelId)
+                .Select(p => p.Id).ToListAsync(cancellationToken);
+            var enrolledIds = await _db.Enrollments
+                .Where(e => e.AcademicYearId == yearId && e.Status == EnrollmentStatus.Active && profileIds.Contains(e.GradeYearProfileId))
+                .Select(e => e.StudentId).Distinct().ToListAsync(cancellationToken);
+
+            // Register order, so the same run reads the same way twice and the officer can follow it down
+            // the list. Read through the soft-active filter deliberately: a deactivated student record
+            // with an enrolment still marked Active is a data fault, and the safe reading of it is not to
+            // raise a payment schedule against them.
+            var studentIds = await _db.Students
+                .Where(s => enrolledIds.Contains(s.Id)).OrderBy(s => s.StudentNo)
+                .Select(s => s.Id).ToListAsync(cancellationToken);
+
+            var dueDates = weekendDays == null ? null : await DueDatesAsync(template, yearId, weekendDays, cancellationToken);
+
+            var lines = new List<GradeAssignmentLine>();
+            foreach (var studentId in studentIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                lines.Add(await EvaluateStudentAsync(studentId, template, yearId, mandatoryCategoryIds, dueDates, cancellationToken));
+
+                // One student = one committed unit, and the tracker is dropped between them: a grade is
+                // 25–40 students today but a whole-school run is the obvious next ask, and a batch that
+                // keeps every saved graph re-walks all of it on the next DetectChanges. Everything below
+                // re-reads what it needs; `template` and `dueDates` are detached reads by design.
+                if (dueDates != null)
+                {
+                    _db.ChangeTracker.Clear();
+                }
+            }
+
+            return new GradeAssignmentRun(gradeLevelId, planTemplateId, lines);
+        }
+
+        /// <summary>
+        /// The mandatory fee categories of this school, read <b>past</b> the soft-active filter.
+        /// A category that has been retired mid-year still owns the charges it already posted, and
+        /// reading the list through the filter would drop those charges out of the schedule
+        /// silently — a schedule that is short by a whole fee, with nothing on screen to say so.
+        /// </summary>
+        private async Task<List<int>> MandatoryCategoryIdsAsync(CancellationToken cancellationToken)
+            => await _db.FeeCategories.IgnoreQueryFilters().AsNoTracking()
+                .Where(c => c.SchoolId == _db.CurrentSchoolId && c.IsMandatory)
+                .Select(c => c.Id).ToListAsync(cancellationToken);
+
+        private async Task<GradeAssignmentLine> EvaluateStudentAsync(
+            int studentId, PlanTemplate template, int yearId, List<int> mandatoryCategoryIds,
+            IReadOnlyList<DateTime>? dueDates, CancellationToken cancellationToken)
+        {
+            var existingId = await _db.PlanAssignments
+                .Where(a => a.StudentId == studentId && a.AcademicYearId == yearId && a.FeeCategoryId == template.FeeCategoryId)
+                .Select(a => (int?)a.Id).FirstOrDefaultAsync(cancellationToken);
+            if (existingId != null)
+            {
+                return new GradeAssignmentLine(studentId, null, GradeAssignmentOutcome.AlreadyPlanned, 0m, existingId);
+            }
+
+            var charges = await _db.Charges
+                .Where(c => c.StudentId == studentId && c.AcademicYearId == yearId && c.Status == ChargeStatus.Posted)
+                .Where(c => template.FeeCategoryId == null || c.FeeCategoryId == template.FeeCategoryId)
+                .Where(c => mandatoryCategoryIds.Contains(c.FeeCategoryId))
+                .Select(c => new { c.Id, c.PayerId })
+                .ToListAsync(cancellationToken);
+
+            var payerIds = charges.Select(c => c.PayerId).Distinct().ToList();
+            if (payerIds.Count == 0)
+            {
+                return new GradeAssignmentLine(studentId, null, GradeAssignmentOutcome.NoMandatoryCharges, 0m, null);
+            }
+
+            if (payerIds.Count > 1)
+            {
+                return new GradeAssignmentLine(studentId, null, GradeAssignmentOutcome.PayerSplit, 0m, null);
+            }
+
+            var payerId = payerIds[0];
+            var portions = await LoadNetChargePortionsAsync(charges.Select(c => c.Id).ToList(), cancellationToken);
+            if (portions.Count == 0)
+            {
+                // Charges exist but credit notes and discounts have taken all of them off. There is
+                // still nothing to split, and saying "no mandatory charges" is the truth the officer
+                // needs — the fees screen is where the credit notes are.
+                return new GradeAssignmentLine(studentId, null, GradeAssignmentOutcome.NoMandatoryCharges, 0m, null);
+            }
+
+            var total = portions.Sum(p => p.Amount);
+            if (dueDates == null)
+            {
+                return new GradeAssignmentLine(studentId, payerId, GradeAssignmentOutcome.Ready, total, null);
+            }
+
+            var assignment = BuildAssignment(template, dueDates, yearId, studentId, payerId, portions, isException: false, exceptionReason: null);
+            _db.PlanAssignments.Add(assignment);
+            await _db.SaveChangesAsync(cancellationToken);
+            await LogRevisionAsync(assignment.Id, ScheduleRevisionCause.Generated, null, "[]", cancellationToken);
+            return new GradeAssignmentLine(studentId, payerId, GradeAssignmentOutcome.Assigned, total, assignment.Id);
         }
 
         // ------------------------------------------------------------------ derived schedule

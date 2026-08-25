@@ -17,6 +17,56 @@ namespace Sms.Application.Installments
         int InstallmentId, int SequenceNumber, DateTime DueDate, decimal Amount, decimal Paid, InstallmentStatus Status, bool IsPdcCovered);
 
     /// <summary>
+    /// BR-INS-002 grade-wide run: what happened, or would happen, to one student.
+    /// Every value is reachable — a grade is never uniform, and the officer needs
+    /// to see who was left behind and why rather than a bare success count.
+    /// </summary>
+    public enum GradeAssignmentOutcome
+    {
+        /// <summary>Preview only: this student would get a schedule.</summary>
+        Ready = 1,
+
+        /// <summary>A schedule was generated.</summary>
+        Assigned = 2,
+
+        /// <summary>Already carries a plan for this year and category group — left alone, never rewritten.</summary>
+        AlreadyPlanned = 3,
+
+        /// <summary>No posted mandatory charges, or none left once credit notes and discounts are taken off.</summary>
+        NoMandatoryCharges = 4,
+
+        /// <summary>
+        /// The student's mandatory charges are billed to more than one payer (BR-FEE-004
+        /// sponsor billing does exactly this). A schedule is addressed to one payer, so
+        /// picking one here would silently leave the other's charges unscheduled — this
+        /// student is left for the single-student console.
+        /// </summary>
+        PayerSplit = 5,
+    }
+
+    /// <summary>One student's line in a grade-wide run. Ids only: the caller already knows how to name a student.</summary>
+    public sealed record GradeAssignmentLine(
+        int StudentId, int? PayerId, GradeAssignmentOutcome Outcome, decimal MandatoryTotal, int? PlanAssignmentId);
+
+    /// <summary>BR-INS-002 grade-wide run, previewed or committed.</summary>
+    public sealed record GradeAssignmentRun(int GradeLevelId, int PlanTemplateId, IReadOnlyList<GradeAssignmentLine> Lines)
+    {
+        public int Count(GradeAssignmentOutcome outcome)
+        {
+            var n = 0;
+            foreach (var line in Lines)
+            {
+                if (line.Outcome == outcome)
+                {
+                    n++;
+                }
+            }
+
+            return n;
+        }
+    }
+
+    /// <summary>
     /// doc/Modules/20 §8 Template designer / Assignment console / Family
     /// schedule view / Reschedule wizard / Dunning console screens backing
     /// (screens deferred, the operations are core). Late-fee computation
@@ -71,6 +121,37 @@ namespace Sms.Application.Installments
         Task<PlanAssignment> AssignPlanAsync(
             int studentId, int payerId, int planTemplateId, ISet<DayOfWeek> weekendDays,
             bool isException = false, string? exceptionReason = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// doc §8.2 "defaults per grade" / BR-INS-002: what a grade-wide run would do,
+        /// student by student, without writing anything. Same evaluation
+        /// <see cref="AssignPlanToGradeAsync"/> performs, so the preview and the run cannot
+        /// disagree.
+        /// <para>
+        /// Throws <see cref="Common.Exceptions.PlanTemplateNotApprovedException"/>, and
+        /// <see cref="Common.Exceptions.TemplateCategoryNotMandatoryException"/> when the
+        /// template is scoped to a fee category that is not mandatory.
+        /// </para>
+        /// </summary>
+        Task<GradeAssignmentRun> PreviewGradeAssignmentAsync(
+            int gradeLevelId, int planTemplateId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// doc §8.2 / BR-INS-002: generates a schedule for every actively-enrolled student of
+        /// one grade level in the working year, over that student's posted <b>mandatory</b>
+        /// charges only (net of credit notes and discounts) — the fees the school bills every
+        /// child of the grade, as opposed to the optional services a family adds one at a time.
+        /// <para>
+        /// Each student is one committed unit: a student the run cannot schedule is reported on
+        /// their own line and never stops the rest of the grade. Assignments are ordinary
+        /// defaults, not exceptions (BR-INS-002 makes the per-family exception the deliberate
+        /// gesture, and a grade-wide default is the opposite of one). Students who already carry
+        /// a plan for this year and category group are left untouched.
+        /// </para>
+        /// <para>Throws the same two refusals as <see cref="PreviewGradeAssignmentAsync"/>.</para>
+        /// </summary>
+        Task<GradeAssignmentRun> AssignPlanToGradeAsync(
+            int gradeLevelId, int planTemplateId, ISet<DayOfWeek> weekendDays, CancellationToken cancellationToken = default);
 
         /// <summary>BR-INS-007: statuses derived as of now from Module 21 allocations.</summary>
         Task<IReadOnlyList<InstallmentView>> GetScheduleAsync(int planAssignmentId, CancellationToken cancellationToken = default);

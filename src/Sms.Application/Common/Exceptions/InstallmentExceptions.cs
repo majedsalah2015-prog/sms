@@ -102,6 +102,20 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>
+    /// BR-INS-002: a grade-wide run schedules mandatory fees only, so a template
+    /// scoped to a non-mandatory category can never schedule anything through it.
+    /// Refused up front rather than reported as "no charges" once per student —
+    /// thirty identical skips do not tell the officer their template was wrong.
+    /// </summary>
+    public class TemplateCategoryNotMandatoryException : InvalidOperationException
+    {
+        public TemplateCategoryNotMandatoryException(int planTemplateId)
+            : base($"Plan template {planTemplateId} is scoped to a non-mandatory fee category and cannot drive a mandatory-fees-only grade assignment (BR-INS-002).")
+        {
+        }
+    }
+
+    /// <summary>
     /// BR-INS-001: only a draft template may be rewritten. An approved one may already
     /// have produced schedules, and a schedule is a copy of the shape taken at
     /// assignment — editing the template would leave new families on one shape and

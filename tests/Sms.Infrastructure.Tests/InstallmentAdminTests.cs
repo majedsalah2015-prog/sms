@@ -66,6 +66,8 @@ namespace Sms.Infrastructure.Tests
         private int _payerId;
         private int _categoryId;
         private int _transportCategoryId;
+        private int _gradeId;
+        private int _profileId;
 
         public InstallmentAdminTests()
         {
@@ -132,6 +134,8 @@ namespace Sms.Infrastructure.Tests
             _payerId = payer.Id;
             _categoryId = tuition.Id;
             _transportCategoryId = transport.Id;
+            _gradeId = grade.Id;
+            _profileId = profile.Id;
         }
 
         public void Dispose() => _connection.Dispose();
@@ -150,6 +154,60 @@ namespace Sms.Infrastructure.Tests
 
         private Task<Charge> PostCharge(AppDbContext db, decimal amount, int? categoryId = null)
             => CreateFeeAdmin(db).PostManualChargeAsync(_studentId, _payerId, categoryId ?? _categoryId, amount);
+
+        private Task<Charge> PostChargeFor(AppDbContext db, int studentId, int payerId, decimal amount, int? categoryId = null)
+            => CreateFeeAdmin(db).PostManualChargeAsync(studentId, payerId, categoryId ?? _categoryId, amount);
+
+        /// <summary>
+        /// Another child of the grade, with their own family and payer. A grade-wide run against a
+        /// cohort of one proves nothing about the loop it is.
+        /// </summary>
+        private (int StudentId, int PayerId) EnrollStudent(string studentNo, int? profileId = null)
+        {
+            using var db = CreateContext();
+            var student = new Student
+            {
+                StudentNo = studentNo,
+                FirstNameAr = studentNo, FatherNameAr = "Father", GrandfatherNameAr = "Grandfather", FamilyNameAr = "Family",
+                FirstNameEn = studentNo, FatherNameEn = "Father", GrandfatherNameEn = "Grandfather", FamilyNameEn = "Family",
+                Gender = Gender.Male, DateOfBirth = new DateTime(2018, 1, 1), NationalityLookupId = 1,
+            };
+            db.Students.Add(student);
+            var parent = new Parent { ParentFileNo = $"PAR-{studentNo}", NameAr = studentNo, NameEn = studentNo, PrimaryMobile = "0500000001" };
+            db.Parents.Add(parent);
+            db.SaveChanges();
+
+            db.Payers.Add(new Payer { Type = PayerType.Parent, ParentId = parent.Id });
+            db.Enrollments.Add(new Enrollment
+            {
+                AcademicYearId = _yearId, StudentId = student.Id, GradeYearProfileId = profileId ?? _profileId,
+                EnrollmentDate = new DateTime(2026, 9, 1), SourceType = EnrollmentSourceType.Admission,
+            });
+            db.SaveChanges();
+
+            var payerId = db.Payers.Single(p => p.ParentId == parent.Id).Id;
+            return (student.Id, payerId);
+        }
+
+        /// <summary>A second grade running the same year, to prove a grade-wide run stops at its own grade.</summary>
+        private (int GradeId, int ProfileId) AddGrade(string code, int sequence)
+        {
+            using var db = CreateContext();
+            var stageId = db.Stages.First().Id;
+            var grade = new GradeLevel { StageId = stageId, Code = code, Name = new LocalizedName(code, code), SequenceOrder = sequence };
+            db.GradeLevels.Add(grade);
+            db.SaveChanges();
+            var profile = new GradeYearProfile
+            {
+                GradeLevelId = grade.Id, AcademicYearId = _yearId, GenderPolicy = GenderPolicy.Mixed, TargetSections = 1, TargetSectionSize = 25,
+            };
+            db.GradeYearProfiles.Add(profile);
+            db.SaveChanges();
+            return (grade.Id, profile.Id);
+        }
+
+        private static GradeAssignmentLine LineFor(GradeAssignmentRun run, int studentId)
+            => run.Lines.Single(l => l.StudentId == studentId);
 
         private static IReadOnlyList<TemplateSplit> Quarterly() => new[]
         {
@@ -686,6 +744,220 @@ namespace Sms.Infrastructure.Tests
 
             var note = db.CreditNotes.Single(n => n.IsWriteOff);
             Assert.Equal(first.Amount - half, note.Amount);
+        }
+
+        // --- BR-INS-002 / doc §8.2 grade-wide defaults, mandatory fees only ---------------------
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_grade_wide_run_schedules_every_enrolled_student_over_mandatory_fees_only()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var second = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);                                   // tuition — mandatory
+            await PostCharge(db, 300m, _transportCategoryId);              // transport — optional, must not be scheduled
+            await PostChargeFor(db, second.StudentId, second.PayerId, 800m);
+            var template = await ApprovedTemplateAsync(admin);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            Assert.Equal(2, run.Count(GradeAssignmentOutcome.Assigned));
+            var first = LineFor(run, _studentId);
+            Assert.Equal(GradeAssignmentOutcome.Assigned, first.Outcome);
+            Assert.Equal(1000m, first.MandatoryTotal);
+            Assert.Equal(_payerId, first.PayerId);
+
+            // The optional transport charge is left off the schedule, not folded into it.
+            var schedule = await admin.GetScheduleAsync(first.PlanAssignmentId!.Value);
+            Assert.Equal(1000m, schedule.Sum(i => i.Amount));
+            Assert.All(schedule, i => Assert.Equal(250m, i.Amount));
+            Assert.Equal(800m, (await admin.GetScheduleAsync(LineFor(run, second.StudentId).PlanAssignmentId!.Value)).Sum(i => i.Amount));
+
+            // BR-INS-002 makes the per-family exception the deliberate gesture; a grade default is its opposite.
+            Assert.All(db.PlanAssignments.ToList(), a => Assert.False(a.IsException));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_grade_wide_run_leaves_a_student_who_already_has_a_plan_untouched()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var second = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);
+            await PostChargeFor(db, second.StudentId, second.PayerId, 800m);
+            var template = await ApprovedTemplateAsync(admin);
+            var existing = await admin.AssignPlanAsync(_studentId, _payerId, template.Id, KsaWeekend);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            var line = LineFor(run, _studentId);
+            Assert.Equal(GradeAssignmentOutcome.AlreadyPlanned, line.Outcome);
+            Assert.Equal(existing.Id, line.PlanAssignmentId);
+            Assert.Equal(GradeAssignmentOutcome.Assigned, LineFor(run, second.StudentId).Outcome);
+            Assert.Single(db.PlanAssignments.Where(a => a.StudentId == _studentId).ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_student_with_no_mandatory_charges_is_reported_rather_than_dropped()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var second = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);
+            await PostChargeFor(db, second.StudentId, second.PayerId, 300m, _transportCategoryId);
+            var template = await ApprovedTemplateAsync(admin);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            var line = LineFor(run, second.StudentId);
+            Assert.Equal(GradeAssignmentOutcome.NoMandatoryCharges, line.Outcome);
+            Assert.Null(line.PlanAssignmentId);
+            Assert.Empty(db.PlanAssignments.Where(a => a.StudentId == second.StudentId).ToList());
+
+            // One student's missing fees never stops the rest of the grade.
+            Assert.Equal(GradeAssignmentOutcome.Assigned, LineFor(run, _studentId).Outcome);
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_grade_wide_run_stops_at_its_own_grade()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var other = AddGrade("G4", 4);
+            var elsewhere = EnrollStudent("STU-TEST-3", other.ProfileId);
+            await PostCharge(db, 1000m);
+            await PostChargeFor(db, elsewhere.StudentId, elsewhere.PayerId, 900m);
+            var template = await ApprovedTemplateAsync(admin);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            Assert.Equal(new[] { _studentId }, run.Lines.Select(l => l.StudentId));
+            Assert.Empty(db.PlanAssignments.Where(a => a.StudentId == elsewhere.StudentId).ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task Mandatory_charges_split_across_two_payers_are_left_for_the_single_student_console()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var otherFamily = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);
+            // BR-FEE-004 sponsor billing does exactly this: one child, two payers. A schedule is
+            // addressed to one of them, so picking either here would leave the other unscheduled.
+            await PostChargeFor(db, _studentId, otherFamily.PayerId, 400m);
+            var template = await ApprovedTemplateAsync(admin);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            var line = LineFor(run, _studentId);
+            Assert.Equal(GradeAssignmentOutcome.PayerSplit, line.Outcome);
+            Assert.Empty(db.PlanAssignments.Where(a => a.StudentId == _studentId).ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_mandatory_category_retired_mid_year_still_reaches_the_schedule()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+
+            // The category is soft-active master data; the charge it already posted is not. Reading
+            // the mandatory list through the query filter would drop this charge silently, and the
+            // grade would be scheduled short by a whole fee with nothing on screen to say so.
+            var category = db.FeeCategories.Single(c => c.Id == _categoryId);
+            category.IsActive = false;
+            db.SaveChanges();
+
+            var template = await ApprovedTemplateAsync(admin);
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            var line = LineFor(run, _studentId);
+            Assert.Equal(GradeAssignmentOutcome.Assigned, line.Outcome);
+            Assert.Equal(1000m, line.MandatoryTotal);
+            Assert.Equal(1000m, (await admin.GetScheduleAsync(line.PlanAssignmentId!.Value)).Sum(i => i.Amount));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task The_preview_writes_nothing_and_says_what_the_run_will_do()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var second = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);
+            await PostChargeFor(db, second.StudentId, second.PayerId, 300m, _transportCategoryId);
+            var template = await ApprovedTemplateAsync(admin);
+
+            var preview = await admin.PreviewGradeAssignmentAsync(_gradeId, template.Id);
+
+            Assert.Equal(1, preview.Count(GradeAssignmentOutcome.Ready));
+            Assert.Equal(1000m, LineFor(preview, _studentId).MandatoryTotal);
+            Assert.Equal(GradeAssignmentOutcome.NoMandatoryCharges, LineFor(preview, second.StudentId).Outcome);
+            Assert.Empty(db.PlanAssignments.ToList());
+            Assert.Empty(db.Installments.ToList());
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            // Same evaluation behind both, so the preview cannot promise what the run will not do.
+            Assert.Equal(preview.Lines.Select(l => l.StudentId), run.Lines.Select(l => l.StudentId));
+            Assert.Equal(preview.Lines.Select(l => l.MandatoryTotal), run.Lines.Select(l => l.MandatoryTotal));
+            Assert.Equal(1, run.Count(GradeAssignmentOutcome.Assigned));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_template_scoped_to_an_optional_category_is_refused_before_the_run_starts()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 300m, _transportCategoryId);
+            var template = await ApprovedTemplateAsync(admin, categoryId: _transportCategoryId);
+
+            // Refused once, up front — not reported as "no mandatory charges" thirty times over.
+            await Assert.ThrowsAsync<TemplateCategoryNotMandatoryException>(
+                () => admin.PreviewGradeAssignmentAsync(_gradeId, template.Id));
+            await Assert.ThrowsAsync<TemplateCategoryNotMandatoryException>(
+                () => admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend));
+            Assert.Empty(db.PlanAssignments.ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-001")]
+        public async Task A_grade_wide_run_refuses_an_unapproved_template()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var template = await admin.DefineTemplateAsync(_yearId, "Plan", "Plan", Quarterly());
+
+            await Assert.ThrowsAsync<PlanTemplateNotApprovedException>(
+                () => admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend));
+            Assert.Empty(db.PlanAssignments.ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_grade_wide_run_ignores_a_withdrawn_enrolment()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var gone = EnrollStudent("STU-TEST-2");
+            await PostCharge(db, 1000m);
+            await PostChargeFor(db, gone.StudentId, gone.PayerId, 800m);
+            var enrolment = db.Enrollments.Single(e => e.StudentId == gone.StudentId);
+            enrolment.Status = EnrollmentStatus.Withdrawn;
+            db.SaveChanges();
+            var template = await ApprovedTemplateAsync(admin);
+
+            var run = await admin.AssignPlanToGradeAsync(_gradeId, template.Id, KsaWeekend);
+
+            Assert.Equal(new[] { _studentId }, run.Lines.Select(l => l.StudentId));
         }
 
         [Fact]

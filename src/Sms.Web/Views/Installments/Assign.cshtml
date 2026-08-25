@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Application.Installments
 @model AssignViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -15,6 +16,7 @@
             new HelpPanelViewModel.Item(T("Payer, not parent", "الدافع لا ولي الأمر"), T("The schedule is addressed to the payer: every dunning message and statement goes to them. Guardians marked financially responsible are listed first.", "الجدول موجَّه للدافع: كل رسالة مطالبة وكل كشف حساب يذهب إليه. أولياء الأمور المسؤولون مالياً مُدرَجون أولاً.")),
             new HelpPanelViewModel.Item(T("Exception assignment", "إسناد استثنائي"), T("Use it when the plan departs from the template's own rules; a reason is mandatory and is kept on the assignment.", "استخدمه حين تخرج الخطة عن قواعد القالب؛ السبب إلزامي ويُحفظ على الإسناد.")),
             new HelpPanelViewModel.Item(T("No charges yet?", "لا رسوم بعد؟"), T("Post the student's fees first — there is nothing to split until charges exist.", "رحّل رسوم الطالب أولاً — لا شيء يُقسَّم قبل وجود رسوم.")),
+            new HelpPanelViewModel.Item(T("A whole grade at once", "صف كامل دفعة واحدة"), T("The grade-wide card schedules mandatory fees only — the fees every child of the grade is billed. Optional services stay out of it, and a student who already has a plan is never rewritten. Preview first: the run generates one schedule per student.", "بطاقة إسناد الصف تجدول الرسوم الإلزامية فقط — الرسوم التي تُحمَّل على كل طالب في الصف. الخدمات الاختيارية خارجها، والطالب الذي له خطة لا تُعاد كتابتها. عايِن أولاً: التشغيل يولّد جدولاً لكل طالب.")),
         },
     };
 }
@@ -23,17 +25,100 @@
 <partial name="_InstallmentsNav" />
 
 
-<form method="get" class="d-flex flex-wrap gap-2 align-items-end mb-3">
-    <div>
-        <label for="year-pick" class="form-label small text-muted mb-0">@T("Academic year", "العام الدراسي")</label>
-        <select id="year-pick" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
-            @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
-        </select>
+@{
+    // The selected student is loaded past the filter, so they may not be in the picker's own list.
+    // Carry them as an extra option: a filter change must never silently drop the open panel.
+    var selectedOutsideFilter = Model.Selected != null && !Model.Students.Any(s => s.Student.Id == Model.Selected.Id);
+}
+
+<form method="get" class="sms-card p-3 mb-3">
+    @* Narrowing the student list must not throw away a grade-wide preview the officer is reading. *@
+    <input type="hidden" name="bulkGradeId" value="@Model.BulkGradeId" />
+    <input type="hidden" name="bulkTemplateId" value="@Model.BulkTemplateId" />
+    <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div>
+            <label for="year-pick" class="form-label small text-muted mb-0">@T("Academic year", "العام الدراسي")</label>
+            <select id="year-pick" name="year" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </div>
+        <div>
+            <label for="grade-pick" class="form-label small text-muted mb-0">@T("Grade", "الصف")</label>
+            <select id="grade-pick" name="gradeId" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+                <option value="">@T("All grades", "كل الصفوف")</option>
+                @foreach (var g in Model.Grades)
+                {
+                    <option value="@g.Id" selected="@(Model.GradeId == g.Id)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label for="q" class="form-label small text-muted mb-0">@T("Student", "الطالب")</label>
+            <input type="search" id="q" name="q" value="@Model.Q" class="form-control form-control-sm" style="min-width:12rem"
+                   placeholder="@T("Student no / name…", "رقم الطالب / الاسم…")" aria-label="@T("Filter by student", "فلترة بالطالب")" />
+        </div>
+        <div>
+            <label for="payerQ" class="form-label small text-muted mb-0">@T("Payer", "الدافع")</label>
+            <input type="search" id="payerQ" name="payerQ" value="@Model.PayerQ" class="form-control form-control-sm" style="min-width:12rem"
+                   placeholder="@T("Parent / file no / mobile…", "ولي أمر / رقم ملف / جوال…")" aria-label="@T("Filter by payer", "فلترة بالدافع")" />
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-funnel" aria-hidden="true"></i> @T("Filter", "فلترة")</button>
+            @if (Model.HasFilter)
+            {
+                <a class="btn btn-sm btn-link" asp-action="Assign" asp-route-year="@yid" asp-route-studentId="@Model.Selected?.Id">@T("Clear", "مسح")</a>
+            }
+        </div>
     </div>
-    <div>
-        <label for="student-pick" class="form-label small text-muted mb-0">@T("Student", "الطالب")</label>
-        <select id="student-pick" name="studentId" class="form-select form-select-sm" style="min-width:18rem" onchange="this.form.submit()">
+
+    @if (Model.PayerMatches.Count > 0)
+    {
+        <div class="small text-muted mt-2">
+            @T("Families matched:", "الأُسر المطابقة:")
+            @foreach (var p in Model.PayerMatches.Take(6))
+            {
+                <span class="badge text-bg-light border me-1">
+                    @p.Label(isRtl)
+                    <span class="text-muted">(@p.ChildCount)</span>
+                    @if (p.Payer == null)
+                    {
+                        <i class="bi bi-exclamation-triangle text-warning ms-1" title="@T("No payer record yet", "لا سجل دافع بعد")" aria-hidden="true"></i>
+                    }
+                </span>
+            }
+            @if (Model.PayerMatches.Count > 6) { <span>+@(Model.PayerMatches.Count - 6)</span> }
+        </div>
+    }
+    else if (Model.PayerQ != null)
+    {
+        <div class="small text-danger mt-2">@T("No family matched that search.", "لا أسرة مطابقة لهذا البحث.")</div>
+    }
+
+    <div class="mt-2">
+        <label for="student-pick" class="form-label small text-muted mb-0">
+            @T("Students", "الطلاب")
+            <span class="ms-1">
+                @if (Model.MatchCount == 0)
+                {
+                    @T("— none match", "— لا نتائج")
+                }
+                else if (Model.Truncated)
+                {
+                    @($"— {Model.MatchCount} " + T("match, showing the first", "مطابق، يُعرض أول") + $" {Model.Students.Count}")
+                }
+                else
+                {
+                    @($"— {Model.MatchCount}")
+                }
+            </span>
+        </label>
+        <select id="student-pick" name="studentId" class="form-select form-select-sm" style="max-width:32rem" onchange="this.form.submit()">
             <option value="">@T("— choose a student —", "— اختر طالباً —")</option>
+            @if (selectedOutsideFilter && Model.Selected != null)
+            {
+                var outside = Model.Selected;
+                <option value="@outside.Id" selected>@outside.StudentNo · @FinanceLabels.StudentName(outside, isRtl) @T("(outside the current filter)", "(خارج الفلتر الحالي)")</option>
+            }
             @foreach (var s in Model.Students)
             {
                 var name = FinanceLabels.StudentName(s.Student, isRtl);
@@ -41,8 +126,172 @@
                 <option value="@s.Student.Id" selected="@(Model.Selected?.Id == s.Student.Id)">@s.Student.StudentNo · @name@grade</option>
             }
         </select>
+        @if (Model.Truncated)
+        {
+            <div class="form-text">@T("Narrow the filter to reach the rest of the register.", "ضيّق الفلتر للوصول إلى بقية السجل.")</div>
+        }
     </div>
 </form>
+
+@* doc/Modules/20 §8.2 "defaults per grade" (BR-INS-002). One template over a whole grade, mandatory
+   fees only — the fees the school bills every child of the grade, as opposed to the optional
+   services a family adds one at a time. Nothing runs without a preview first: this button writes a
+   schedule per student, and thirty of them are not something to undo row by row. *@
+@if (Model.Year != null)
+{
+    <div class="sms-card p-3 mb-3">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <h2 class="h6 mb-0">@T("Assign a plan to a whole grade", "إسناد خطة لصف كامل")</h2>
+            <span class="badge text-bg-info">@T("Mandatory fees only", "الرسوم الإلزامية فقط")</span>
+        </div>
+        <p class="text-muted small mb-3">
+            @T("Every actively-enrolled student of the grade gets a schedule over their posted mandatory charges, net of credit notes and discounts. Optional services — transport, books, activities — are left out; schedule those from the student's own panel.",
+               "كل طالب مقيَّد فعلياً في الصف يحصل على جدول من رسومه الإلزامية المرحّلة، بعد خصم الإشعارات الدائنة والحسومات. الخدمات الاختيارية — نقل، كتب، أنشطة — خارج هذا الإسناد؛ جدولها من لوحة الطالب نفسه.")
+        </p>
+
+        @if (!Model.BulkAvailable)
+        {
+            <div class="alert alert-warning mb-0">
+                @T("Grade-wide assignment writes into the working year, so it is only offered while that is the year selected above.",
+                   "إسناد الصف يكتب في عام العمل، فلا يُتاح إلا حين يكون هو العام المحدَّد أعلاه.")
+            </div>
+        }
+        else if (Model.Grades.Count == 0)
+        {
+            <div class="alert alert-warning mb-0">@T("No grade is running with enrolled students this year.", "لا صف قائم بطلاب مقيَّدين هذا العام.")</div>
+        }
+        else if (Model.ApprovedTemplates.Count == 0)
+        {
+            <div class="alert alert-warning mb-0">@T("No approved template for this year. Approve one in the Template designer first.", "لا قالب معتمد لهذا العام. اعتمد قالباً في مصمّم القوالب أولاً.")</div>
+        }
+        else
+        {
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-end">
+                @* The filter above is the officer's working list; previewing must not reset it. *@
+                <input type="hidden" name="year" value="@yid" />
+                <input type="hidden" name="studentId" value="@Model.Selected?.Id" />
+                <input type="hidden" name="q" value="@Model.Q" />
+                <input type="hidden" name="payerQ" value="@Model.PayerQ" />
+                <input type="hidden" name="gradeId" value="@Model.GradeId" />
+                <div>
+                    <label for="bulkGradeId" class="form-label small text-muted mb-0">@T("Grade", "الصف")</label>
+                    <select id="bulkGradeId" name="bulkGradeId" class="form-select form-select-sm" style="width:auto" required>
+                        <option value="">@T("— choose a grade —", "— اختر صفاً —")</option>
+                        @foreach (var g in Model.Grades)
+                        {
+                            <option value="@g.Id" selected="@(Model.BulkGradeId == g.Id)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="bulkTemplateId" class="form-label small text-muted mb-0">@T("Template", "القالب")</label>
+                    <select id="bulkTemplateId" name="bulkTemplateId" class="form-select form-select-sm" style="width:auto" required>
+                        <option value="">@T("— choose a template —", "— اختر قالباً —")</option>
+                        @foreach (var t in Model.ApprovedTemplates)
+                        {
+                            <option value="@t.Id" selected="@(Model.BulkTemplateId == t.Id)">@(isRtl ? t.NameAr : t.NameEn)</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">
+                        <i class="bi bi-list-check" aria-hidden="true"></i> @T("Preview the grade", "معاينة الصف")
+                    </button>
+                </div>
+            </form>
+
+            @if (Model.BulkError != null)
+            {
+                <div class="alert alert-danger mt-3 mb-0">@Model.BulkError</div>
+            }
+            else if (Model.HasBulkPreview)
+            {
+                var ready = Model.BulkCount(GradeAssignmentOutcome.Ready);
+                <hr />
+                @if (Model.BulkRows.Count == 0)
+                {
+                    <div class="alert alert-warning mb-0">@T("No student is actively enrolled in that grade this year.", "لا طالب مقيَّد فعلياً في هذا الصف هذا العام.")</div>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                        <span class="badge text-bg-primary">@T("Will be scheduled:", "سيُسنَد:") @ready</span>
+                        @foreach (var outcome in new[] { GradeAssignmentOutcome.AlreadyPlanned, GradeAssignmentOutcome.NoMandatoryCharges, GradeAssignmentOutcome.PayerSplit })
+                        {
+                            var n = Model.BulkCount(outcome);
+                            if (n > 0)
+                            {
+                                <span class="badge @InstallmentLabels.GradeOutcomeBadge(outcome)">@InstallmentLabels.GradeOutcome(outcome, isRtl): @n</span>
+                            }
+                        }
+                        @if (ready > 0)
+                        {
+                            <span class="ms-auto small text-muted">@T("Total to schedule:", "الإجمالي المراد جدولته:") <span class="fw-semibold">@Model.BulkReadyTotal.ToString("N2")</span></span>
+                        }
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <thead>
+                                <tr>
+                                    <th scope="col">@T("Student", "الطالب")</th>
+                                    <th scope="col">@T("Payer", "الدافع")</th>
+                                    <th scope="col" class="text-end">@T("Mandatory total", "إجمالي الإلزامي")</th>
+                                    <th scope="col">@T("Outcome", "النتيجة")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var r in Model.BulkRows)
+                                {
+                                    var hint = InstallmentLabels.GradeOutcomeHint(r.Line.Outcome, isRtl);
+                                    <tr>
+                                        <td>
+                                            <span class="text-muted small">@r.Student.StudentNo</span>
+                                            <span class="ms-1">@FinanceLabels.StudentName(r.Student, isRtl)</span>
+                                        </td>
+                                        <td>@(r.Payer == null ? "—" : FinanceLabels.ParentName(r.Payer, isRtl))</td>
+                                        <td class="text-end">@(r.Line.MandatoryTotal > 0m ? r.Line.MandatoryTotal.ToString("N2") : "—")</td>
+                                        <td>
+                                            <span class="badge @InstallmentLabels.GradeOutcomeBadge(r.Line.Outcome)">@InstallmentLabels.GradeOutcome(r.Line.Outcome, isRtl)</span>
+                                            @if (r.Line.Outcome == GradeAssignmentOutcome.AlreadyPlanned && r.Line.PlanAssignmentId is int existingId)
+                                            {
+                                                <a class="btn btn-sm btn-link p-0 ms-1" asp-action="Schedule" asp-route-id="@existingId">@T("Open", "فتح")</a>
+                                            }
+                                            @if (hint.Length > 0)
+                                            {
+                                                <div class="form-text mt-0">@hint</div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if (ready == 0)
+                    {
+                        <div class="alert alert-secondary mb-0">@T("Nothing left to schedule in this grade with this template.", "لا شيء متبقٍّ للجدولة في هذا الصف بهذا القالب.")</div>
+                    }
+                    else
+                    {
+                        <form method="post" asp-action="AssignGrade"
+                              onsubmit="return confirm('@T($"Generate {ready} schedule(s) for this grade from its mandatory fees?", $"توليد {ready} جدولاً لهذا الصف من رسومه الإلزامية؟")');">
+                            <input type="hidden" name="bulkGradeId" value="@Model.BulkGradeId" />
+                            <input type="hidden" name="bulkTemplateId" value="@Model.BulkTemplateId" />
+                            <input type="hidden" name="year" value="@yid" />
+                            <input type="hidden" name="q" value="@Model.Q" />
+                            <input type="hidden" name="payerQ" value="@Model.PayerQ" />
+                            <input type="hidden" name="gradeId" value="@Model.GradeId" />
+                            <button class="btn btn-primary btn-sm" type="submit">
+                                <i class="bi bi-calendar-plus" aria-hidden="true"></i> @T($"Generate {ready} schedule(s)", $"توليد {ready} جدولاً")
+                            </button>
+                        </form>
+                    }
+                }
+            }
+        }
+    </div>
+}
 
 @if (Model.Selected == null)
 {
@@ -66,6 +315,9 @@ else
                 {
                     <form method="post" asp-action="AssignPlan" asp-route-year="@yid">
                         <input type="hidden" name="studentId" value="@Model.Selected.Id" />
+                        <input type="hidden" name="q" value="@Model.Q" />
+                        <input type="hidden" name="payerQ" value="@Model.PayerQ" />
+                        <input type="hidden" name="gradeId" value="@Model.GradeId" />
                         <div class="mb-2">
                             <label class="form-label small" for="payerId">@T("Payer", "الدافع")</label>
                             <select class="form-select form-select-sm" id="payerId" name="payerId" required>
@@ -73,9 +325,13 @@ else
                                 {
                                     var pname = FinanceLabels.ParentName(p.Parent, isRtl);
                                     var tag = p.IsFinanciallyResponsible ? T(" (financially responsible)", " (مسؤول مالياً)") : "";
-                                    <option value="@p.Payer!.Id">@pname@tag</option>
+                                    <option value="@p.Payer!.Id" selected="@(Model.PreferredPayerId == p.Payer.Id)">@pname@tag</option>
                                 }
                             </select>
+                            @if (Model.PreferredPayerId != null)
+                            {
+                                <div class="form-text">@T("Preselected from the payer filter.", "مُختار مسبقاً من فلتر الدافع.")</div>
+                            }
                             @if (!Model.Payers.Any(p => p.Payer != null))
                             {
                                 <div class="form-text text-danger">@T("No payer record exists for this family yet — create one from the Fees screen.", "لا سجل دافع لهذه الأسرة بعد — أنشئه من شاشة الرسوم.")</div>
@@ -88,11 +344,15 @@ else
                             </select>
                         </div>
                         <div class="form-check mb-2">
-                            <input class="form-check-input" type="checkbox" value="true" id="isException" name="isException" onchange="document.getElementById('excWrap').hidden = !this.checked" />
+                            <input class="form-check-input" type="checkbox" value="true" id="isException" name="isException" onchange="document.getElementById('excWrap').hidden = !this.checked; document.getElementById('exceptionReason').required = this.checked;" />
                             <label class="form-check-label small" for="isException">@T("Exception assignment", "إسناد استثنائي")</label>
                         </div>
                         <div class="mb-3" id="excWrap" hidden>
                             <label class="form-label small" for="exceptionReason">@T("Reason (required for an exception)", "السبب (إلزامي للاستثناء)")</label>
+                            @* The label said "required" and nothing enforced it; the engine's refusal is the real
+                               guard (BR-INS-002), this only stops the officer making the round trip to hear it.
+                               required is toggled with the checkbox, never left on a hidden field — the browser
+                               refuses to submit a form whose invalid control cannot be focused, silently. *@
                             <input class="form-control form-control-sm" id="exceptionReason" name="exceptionReason" />
                         </div>
                         <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-calendar-plus" aria-hidden="true"></i> @T("Generate schedule", "توليد الجدول")</button>

@@ -335,11 +335,20 @@ namespace Sms.Web.Controllers
 
         // ================================================================== 8.2 Assignment console
 
+        /// <summary>
+        /// The picker cap. A flat list of every enrolment was never a usable picker — the filter
+        /// exists so the officer narrows before choosing, and the cap is now stated on screen
+        /// rather than swallowing the tail of the register silently.
+        /// </summary>
+        private const int StudentPickerCap = 200;
+
         [HttpGet("assign")]
         [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Assignment, ActionVerb.View)]
-        public async Task<IActionResult> Assign(int? year = null, int? studentId = null)
+        public async Task<IActionResult> Assign(
+            int? year = null, int? studentId = null, string? q = null, string? payerQ = null, int? gradeId = null,
+            int? bulkGradeId = null, int? bulkTemplateId = null)
         {
-            var m = new AssignViewModel();
+            var m = new AssignViewModel { Q = Blank(q), PayerQ = Blank(payerQ), GradeId = gradeId, BulkGradeId = bulkGradeId, BulkTemplateId = bulkTemplateId };
             await FillPageAsync(m, year);
             if (m.Year == null)
             {
@@ -351,14 +360,10 @@ namespace Sms.Web.Controllers
                 .Where(t => t.AcademicYearId == yid && t.Status == PlanTemplateStatus.Approved)
                 .OrderBy(t => t.NameEn).ToListAsync();
 
-            var enrolledIds = await _db.Enrollments.AsNoTracking()
-                .Where(e => e.AcademicYearId == yid && e.Status == EnrollmentStatus.Active)
-                .Select(e => e.StudentId).Distinct().ToListAsync();
-            var students = await _db.Students.AsNoTracking()
-                .Where(s => enrolledIds.Contains(s.Id)).OrderBy(s => s.StudentNo).Take(500).ToListAsync();
             var grades = await _db.GradeLevels.AsNoTracking().ToListAsync();
             var enrollments = await _db.Enrollments.AsNoTracking()
                 .Where(e => e.AcademicYearId == yid && e.Status == EnrollmentStatus.Active).ToListAsync();
+            var enrolledIds = enrollments.Select(e => e.StudentId).Distinct().ToList();
 
             // An enrolment names a GradeYearProfile, not a grade — the profile is the grade *as run in
             // this year*, with its own curriculum and age rules. The picker wants the grade's name, so
@@ -366,16 +371,92 @@ namespace Sms.Web.Controllers
             var profiles = await _db.GradeYearProfiles.AsNoTracking()
                 .Where(p => p.AcademicYearId == yid).ToListAsync();
 
+            // Offer only the grades this year actually runs, and only those with an enrolment behind
+            // them — a filter that can return nothing is a filter that wastes the officer's time.
+            var runningGradeIds = profiles.Where(p => enrollments.Any(e => e.GradeYearProfileId == p.Id))
+                .Select(p => p.GradeLevelId).Distinct().ToHashSet();
+            m.Grades = grades.Where(g => runningGradeIds.Contains(g.Id))
+                .OrderBy(g => g.SequenceOrder).ToList();
+
+            var candidates = _db.Students.AsNoTracking().Where(s => enrolledIds.Contains(s.Id));
+
+            if (m.Q is string text)
+            {
+                // A student's identity name is four parts in each language (BR-STU-001) and the
+                // picker prints three of them, so a search over first and family names alone tells
+                // the clerk "no results" for the father's name they can read on screen. Every part
+                // is searched, in both languages, alongside the student number.
+                //
+                // Each word narrows further rather than starting over: "محمد أحمد" means the محمد
+                // whose father is أحمد, not every محمد in the school and every child of an أحمد.
+                foreach (var word in text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var w = word;
+                    candidates = candidates.Where(s =>
+                        s.StudentNo.Contains(w)
+                        || s.FirstNameAr.Contains(w) || s.FatherNameAr.Contains(w)
+                        || s.GrandfatherNameAr.Contains(w) || s.FamilyNameAr.Contains(w)
+                        || s.FirstNameEn.Contains(w) || s.FatherNameEn.Contains(w)
+                        || s.GrandfatherNameEn.Contains(w) || s.FamilyNameEn.Contains(w));
+                }
+            }
+
+            if (gradeId is int gid)
+            {
+                var profileIds = profiles.Where(p => p.GradeLevelId == gid).Select(p => p.Id).ToHashSet();
+                var inGrade = enrollments.Where(e => profileIds.Contains(e.GradeYearProfileId)).Select(e => e.StudentId).Distinct().ToList();
+                candidates = candidates.Where(s => inGrade.Contains(s.Id));
+            }
+
+            // The payer filter answers the collection officer's real question — "which of this family's
+            // children still needs a plan?" — so it narrows the student list to that family's children
+            // and carries the payer forward into the assign form. It matches on the guardian, not on the
+            // fin.Payer row: that row only exists once money has moved, so keying the filter on it would
+            // hide precisely the families that still need a plan. IgnoreQueryFilters with an explicit
+            // SchoolId mirrors FinanceQueries.SearchPayersAsync — a family must stay findable after a
+            // guardian record is deactivated, which is exactly when someone comes looking for it.
+            if (m.PayerQ is string payerText)
+            {
+                var matchedParents = await _db.Parents.IgnoreQueryFilters().AsNoTracking()
+                    .Where(p => p.SchoolId == _db.CurrentSchoolId
+                        && (p.NameAr.Contains(payerText) || p.NameEn.Contains(payerText)
+                            || p.ParentFileNo.Contains(payerText) || p.PrimaryMobile.Contains(payerText)))
+                    .OrderBy(p => p.ParentFileNo).Take(25).ToListAsync();
+                var matchedParentIds = matchedParents.Select(p => p.Id).ToList();
+
+                var familyLinks = await _db.StudentGuardianLinks.AsNoTracking()
+                    .Where(l => matchedParentIds.Contains(l.ParentId) && l.EffectiveToUtc == null)
+                    .Select(l => new { l.ParentId, l.StudentId }).ToListAsync();
+                var familyPayers = await _db.Payers.AsNoTracking()
+                    .Where(p => p.ParentId != null && matchedParentIds.Contains(p.ParentId.Value)).ToListAsync();
+
+                m.PayerMatches = matchedParents.Select(p => new AssignViewModel.FamilyMatch(
+                    p,
+                    familyPayers.FirstOrDefault(x => x.ParentId == p.Id),
+                    familyLinks.Count(l => l.ParentId == p.Id))).ToList();
+
+                var familyStudentIds = familyLinks.Select(l => l.StudentId).Distinct().ToList();
+                candidates = candidates.Where(s => familyStudentIds.Contains(s.Id));
+            }
+
+            var matched = await candidates.OrderBy(s => s.StudentNo).ToListAsync();
+            m.MatchCount = matched.Count;
+            var students = matched.Take(StudentPickerCap).ToList();
+
             m.Students = students.Select(s =>
             {
                 var profileId = enrollments.FirstOrDefault(e => e.StudentId == s.Id)?.GradeYearProfileId;
-                var gradeId = profiles.FirstOrDefault(p => p.Id == profileId)?.GradeLevelId;
-                return new AssignViewModel.StudentOption(s, grades.FirstOrDefault(g => g.Id == gradeId));
+                var studentGradeId = profiles.FirstOrDefault(p => p.Id == profileId)?.GradeLevelId;
+                return new AssignViewModel.StudentOption(s, grades.FirstOrDefault(g => g.Id == studentGradeId));
             }).ToList();
 
             if (studentId is int sid)
             {
-                m.Selected = students.FirstOrDefault(s => s.Id == sid);
+                // Loaded past the filter, not through it: the filter governs the picker, while an
+                // explicitly chosen student must keep their panel open even after the officer narrows
+                // the list to something that no longer contains them.
+                m.Selected = students.FirstOrDefault(s => s.Id == sid)
+                    ?? (enrolledIds.Contains(sid) ? await _db.Students.AsNoTracking().SingleOrDefaultAsync(s => s.Id == sid) : null);
                 if (m.Selected != null)
                 {
                     // Only guardians the family marked financially responsible are offered first — assigning a
@@ -393,6 +474,15 @@ namespace Sms.Web.Controllers
                         .OrderByDescending(o => o.IsFinanciallyResponsible)
                         .ToList();
 
+                    // Searching for a family and then billing a different guardian of the same student is
+                    // exactly the mistake this console exists to prevent, so the filtered payer wins the
+                    // preselection — but only when they really are a payer for this student.
+                    if (m.PayerMatches.Count > 0)
+                    {
+                        var filtered = m.PayerMatches.Where(c => c.Payer != null).Select(c => c.Payer!.Id).ToHashSet();
+                        m.PreferredPayerId = m.Payers.FirstOrDefault(o => o.Payer != null && filtered.Contains(o.Payer.Id))?.Payer?.Id;
+                    }
+
                     var existing = await _db.PlanAssignments.AsNoTracking()
                         .Where(a => a.StudentId == sid && a.AcademicYearId == yid).ToListAsync();
                     var templateIds = existing.Select(a => a.PlanTemplateId).ToList();
@@ -404,13 +494,107 @@ namespace Sms.Web.Controllers
                 }
             }
 
+            // doc §8.2 "defaults per grade". The engine writes into the working year regardless of
+            // what the filter above is showing, so the card is only offered while the two agree —
+            // a mistake here is one gesture and thirty schedules in the wrong year.
+            m.BulkAvailable = yid == _workingYear.AcademicYearId;
+            if (m.BulkAvailable && bulkGradeId is int bulkGrade && bulkTemplateId is int bulkTemplate)
+            {
+                try
+                {
+                    var run = await _installments.PreviewGradeAssignmentAsync(bulkGrade, bulkTemplate, HttpContext.RequestAborted);
+                    m.BulkRows = await GradeRunRowsAsync(run);
+                    m.HasBulkPreview = true;
+                }
+                catch (Exception ex) when (ex is PlanTemplateNotApprovedException or TemplateCategoryNotMandatoryException)
+                {
+                    m.BulkError = UserMessage.For(ex, IsArabic);
+                }
+            }
+
             return View(m);
+        }
+
+        /// <summary>
+        /// doc §8.2 "defaults per grade" / BR-INS-002 — one approved template across a whole grade
+        /// in one gesture, over each student's <b>mandatory</b> charges only.
+        /// <para>
+        /// It redirects back into the same preview it was launched from rather than to a result
+        /// page of its own: after the run that preview is the result, student by student, and it
+        /// stays refreshable. The counts go in the flash because a row that reads "already has a
+        /// plan" afterwards cannot say whether this run is what gave it one.
+        /// </para>
+        /// </summary>
+        [HttpPost("assign/grade")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Assignment, ActionVerb.Create)]
+        public async Task<IActionResult> AssignGrade(
+            int bulkGradeId, int bulkTemplateId, int? year, string? q = null, string? payerQ = null, int? gradeId = null)
+        {
+            var back = new { year, q, payerQ, gradeId, bulkGradeId, bulkTemplateId };
+            try
+            {
+                var run = await _installments.AssignPlanToGradeAsync(
+                    bulkGradeId, bulkTemplateId, await WeekendDaysAsync(), HttpContext.RequestAborted);
+
+                var assigned = run.Count(GradeAssignmentOutcome.Assigned);
+                var skipped = run.Lines.Count - assigned;
+                TempData["Flash"] = run.Lines.Count == 0
+                    ? T("No student is actively enrolled in that grade this year.", "لا طالب مقيَّد فعلياً في هذا الصف هذا العام.")
+                    : skipped == 0
+                        ? T($"Grade-wide assignment: {assigned} scheduled.", $"إسناد الصف: {assigned} مُجدوَل.")
+                        : T($"Grade-wide assignment: {assigned} scheduled, {skipped} skipped — the reasons are on each row.",
+                            $"إسناد الصف: {assigned} مُجدوَل، {skipped} مُتخطّى — السبب مبيَّن على كل سطر.");
+                return RedirectToAction(nameof(Assign), back);
+            }
+            catch (Exception ex) when (ex is PlanTemplateNotApprovedException or TemplateCategoryNotMandatoryException or ArgumentException)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+                return RedirectToAction(nameof(Assign), back);
+            }
+        }
+
+        /// <summary>
+        /// Names a grade-wide run for the screen: the student, and the payer the schedule would be
+        /// addressed to. The payer is not decoration — every dunning message and every statement
+        /// goes to that person, and a grade-wide run is exactly where nobody checks them one by one.
+        /// </summary>
+        private async Task<IReadOnlyList<AssignViewModel.GradeRunRow>> GradeRunRowsAsync(GradeAssignmentRun run)
+        {
+            var studentIds = run.Lines.Select(l => l.StudentId).ToList();
+
+            // Past the filter, as every other by-id student lookup on this controller is: the ids come
+            // from the run, and a row the soft-active filter hides would turn into "Sequence contains no
+            // matching element" rather than a name. The school is named explicitly because
+            // IgnoreQueryFilters drops the tenant filter with it.
+            var students = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId && studentIds.Contains(s.Id)).ToListAsync();
+
+            var payerIds = run.Lines.Where(l => l.PayerId != null).Select(l => l.PayerId!.Value).Distinct().ToList();
+            var payers = await _db.Payers.AsNoTracking().Where(p => payerIds.Contains(p.Id)).ToListAsync();
+            var parentIds = payers.Where(p => p.ParentId != null).Select(p => p.ParentId!.Value).ToList();
+
+            // Past the filter, with the school named explicitly: a guardian who has been deactivated
+            // still owns the charges billed to them, and blanking their name here would hide who is
+            // about to be dunned — mirrors FinanceQueries.SearchPayersAsync.
+            var parents = await _db.Parents.IgnoreQueryFilters().AsNoTracking()
+                .Where(p => p.SchoolId == _db.CurrentSchoolId && parentIds.Contains(p.Id)).ToListAsync();
+
+            return run.Lines.Select(l =>
+                {
+                    var parentId = l.PayerId == null ? null : payers.FirstOrDefault(p => p.Id == l.PayerId.Value)?.ParentId;
+                    return new AssignViewModel.GradeRunRow(
+                        students.First(s => s.Id == l.StudentId),
+                        l,
+                        parentId == null ? null : parents.FirstOrDefault(p => p.Id == parentId.Value));
+                })
+                .ToList();
         }
 
         [HttpPost("assign")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Installments, ScreenCatalog.Installments.Assignment, ActionVerb.Create)]
-        public async Task<IActionResult> AssignPlan(int studentId, int payerId, int planTemplateId, bool isException, string? exceptionReason, int? year)
+        public async Task<IActionResult> AssignPlan(int studentId, int payerId, int planTemplateId, bool isException, string? exceptionReason, int? year, string? q = null, string? payerQ = null, int? gradeId = null)
         {
             try
             {
@@ -420,10 +604,15 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Schedule generated.", "تم توليد الجدول.");
                 return RedirectToAction(nameof(Schedule), new { id = assignment.Id });
             }
-            catch (Exception ex) when (ex is PlanTemplateNotApprovedException or NoChargesToScheduleException or PlanAssignmentExistsException or ArgumentException)
+            // ExceptionAssignmentReasonRequiredException was missing from this list, and the screen
+            // offers exactly the gesture that raises it — tick "Exception assignment", leave the
+            // reason blank. That returned HTTP 500 rather than the rule (BR-INS-002, doc §9).
+            catch (Exception ex) when (ex is PlanTemplateNotApprovedException or NoChargesToScheduleException
+                or PlanAssignmentExistsException or ExceptionAssignmentReasonRequiredException or ArgumentException)
             {
+                // A refusal returns the officer to the list they were working, not to an unfiltered register.
                 TempData["Error"] = UserMessage.For(ex, IsArabic);
-                return RedirectToAction(nameof(Assign), new { year, studentId });
+                return RedirectToAction(nameof(Assign), new { year, studentId, q, payerQ, gradeId });
             }
         }
 
