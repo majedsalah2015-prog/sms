@@ -69,8 +69,8 @@
             </div>
         </div>
         <p class="mb-0 small">
-            @T("This password is not stored anywhere it can be read back from, and this is the only time it is shown. The holder must change it at their first sign-in.",
-               "لا تُحفظ كلمة المرور هذه في أي مكان يمكن قراءتها منه، وهذه هي المرة الوحيدة التي تُعرض فيها. وعلى صاحبها تغييرها عند أول دخول.")
+            @T("This password is not stored anywhere it can be read back from, and this is the only time it is shown. The holder must change it at their next sign-in.",
+               "لا تُحفظ كلمة المرور هذه في أي مكان يمكن قراءتها منه، وهذه هي المرة الوحيدة التي تُعرض فيها. وعلى صاحبها تغييرها عند دخوله التالي.")
         </p>
     </div>
 }
@@ -90,6 +90,10 @@
             <th scope="col">@T("Type", "النوع")</th>
             <th scope="col">@T("Roles", "الأدوار")</th>
             <th scope="col">@T("Assign", "إسناد")</th>
+            @if (Model.CanResetPassword)
+            {
+                <th scope="col">@T("Password", "كلمة المرور")</th>
+            }
         </tr>
         </thead>
         <tbody>
@@ -139,6 +143,27 @@
                         <button type="submit" class="btn btn-sm btn-outline-primary">@T("Assign", "إسناد")</button>
                     </form>
                 </td>
+                @if (Model.CanResetPassword)
+                {
+                    <td>
+                        @* Offered only where it would work: a deactivated account has no sign-in for
+                           a new password to be used at, and the port refuses it (BR-SEC-005). *@
+                        @if (user.IsActive)
+                        {
+                            <form method="post" asp-action="ResetPassword" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search"
+                                  class="d-inline"
+                                  onsubmit="return confirm('@T($"Issue a new one-time password for {user.UserName}? The current one stops working immediately.", $"إصدار كلمة مرور جديدة لمرة واحدة لـ {user.UserName}؟ الحالية تتوقف فوراً.")');">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-key" aria-hidden="true"></i> @T("Reset", "إعادة تعيين")
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">—</span>
+                        }
+                    </td>
+                }
             </tr>
         }
         </tbody>

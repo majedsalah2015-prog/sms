@@ -403,6 +403,42 @@ namespace Sms.Infrastructure.Tests
         }
 
         [Fact]
+        [BusinessRule("BR-SEC-005")]
+        public async Task Resetting_issues_a_new_password_and_retires_the_old_one()
+        {
+            var employeeId = AddEmployee("1042");
+            ProvisionedAccount provisioned;
+            using (var db = CreateContext())
+            {
+                provisioned = await CreateService(db).ProvisionAsync(
+                    new NewUserAccount(ProvisionableAccountType.Staff, employeeId, "emp-1042"));
+            }
+
+            // The first password is used once — signing in clears MustChangePassword only after a
+            // change, so the reset has to put it back for the flag to mean anything.
+            using (var db = CreateContext())
+            {
+                var account = await db.UserAccounts.SingleAsync(a => a.Id == provisioned.UserAccountId);
+                account.MustChangePassword = false;
+                await db.SaveChangesAsync();
+            }
+
+            string issued;
+            using (var db = CreateContext())
+            {
+                issued = await CreateService(db).ResetPasswordAsync(provisioned.UserAccountId);
+            }
+
+            Assert.NotEqual(provisioned.TemporaryPassword, issued);
+
+            using var check = CreateContext();
+            var reset = await check.UserAccounts.SingleAsync(a => a.Id == provisioned.UserAccountId);
+            Assert.True(reset.MustChangePassword);
+            Assert.True(_hasher.Verify(reset.PasswordHash!, issued));
+            Assert.False(_hasher.Verify(reset.PasswordHash!, provisioned.TemporaryPassword));
+        }
+
+        [Fact]
         [BusinessRule("BR-SEC-002")]
         public async Task Unlocking_clears_the_lockout_without_touching_the_password()
         {

@@ -197,6 +197,11 @@ namespace Sms.Web.Controllers
                     ScreenCatalog.SystemAdministration.Users,
                     ActionVerb.Create,
                     HttpContext.RequestAborted),
+                CanResetPassword = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.SystemAdministration,
+                    ScreenCatalog.SystemAdministration.Users,
+                    ActionVerb.Edit,
+                    HttpContext.RequestAborted),
             });
         }
 
@@ -288,6 +293,41 @@ namespace Sms.Web.Controllers
                 ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 return View(nameof(NewUser), await BuildNewUserAsync(form));
             }
+        }
+
+        /// <summary>
+        /// BR-SEC-005's other half: the password an administrator issues when somebody cannot get
+        /// in. It is minted here, shown once on the list, and forces a change at the next sign-in —
+        /// there is no screen anywhere that can show it a second time, and no field an administrator
+        /// can type one into.
+        /// <para>
+        /// <c>Edit</c> rather than <c>Create</c>: handing a colleague a new password is an everyday
+        /// act of a front office, and deciding who has an account is not.
+        /// </para>
+        /// </summary>
+        [HttpPost("users/{userAccountId:int}/reset-password")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.Users, ActionVerb.Edit)]
+        public async Task<IActionResult> ResetPassword(int userAccountId, string? q)
+        {
+            try
+            {
+                var password = await _accounts.ResetPasswordAsync(userAccountId, HttpContext.RequestAborted);
+                var account = await _accounts.GetAsync(userAccountId, HttpContext.RequestAborted);
+
+                TempData["ProvisionedUserId"] = userAccountId;
+                TempData["ProvisionedUserName"] = account?.Account.UserName ?? string.Empty;
+                TempData["ProvisionedPassword"] = password;
+                TempData["Message"] = T(
+                    "A new one-time password was issued. The holder must change it at their next sign-in.",
+                    "صدرت كلمة مرور جديدة لمرة واحدة. وعلى صاحبها تغييرها عند دخوله التالي.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Users), new { q });
         }
 
         private async Task<NewUserViewModel> BuildNewUserAsync(NewUserViewModel form)

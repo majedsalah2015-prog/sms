@@ -553,11 +553,13 @@ namespace Sms.Application.Security
                 ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Configure),
             S(Modules.SystemAdministration, SystemAdministration.UserRoles, "User role assignments", "إسناد الأدوار للمستخدمين",
                 ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
-            // Create only, for now: provisioning an account is built, and the directory with its
-            // lifecycle actions (deactivate, reset, unlock) is not — so View would be a grant that
-            // opens nothing. The account lifecycle screen adds its own verbs when it is built.
+            // Create provisions an account; Edit issues it a new one-time password. No View yet:
+            // the directory with the rest of the lifecycle (deactivate, unlock, end sessions) has
+            // no screen, so View would be a grant that opens nothing. The two verbs are separate
+            // because a receptionist who resets forgotten passwords all morning is not thereby
+            // someone who may decide who exists in the system.
             S(Modules.SystemAdministration, SystemAdministration.Users, "User accounts", "حسابات المستخدمين",
-                ActionVerb.Create),
+                ActionVerb.Create, ActionVerb.Edit),
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),

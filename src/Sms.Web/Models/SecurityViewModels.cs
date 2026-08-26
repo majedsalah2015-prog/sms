@@ -28,6 +28,9 @@ namespace Sms.Web.Models
 
         /// <summary>Whether this user may open the provisioning form — the button is hidden otherwise (BR-SEC-010).</summary>
         public bool CanProvision { get; set; }
+
+        /// <summary>Whether this user may issue a new one-time password. A separate right, so a front office can do it without being able to create accounts.</summary>
+        public bool CanResetPassword { get; set; }
     }
 
     /// <summary>
