@@ -333,6 +333,14 @@ namespace Sms.Application.Security
 
             /// <summary>Who holds which role.</summary>
             public const string UserRoles = "UserRoles";
+
+            /// <summary>
+            /// The accounts themselves (doc 06 §8, Module 36 §8.1). Separate from
+            /// <see cref="UserRoles"/> because they are separate authorities: handing an existing
+            /// person a role is an everyday act of administration, while creating the login that
+            /// carries it decides who exists in this system at all.
+            /// </summary>
+            public const string Users = "Users";
         }
 
         public static class Portal
@@ -545,6 +553,11 @@ namespace Sms.Application.Security
                 ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Configure),
             S(Modules.SystemAdministration, SystemAdministration.UserRoles, "User role assignments", "إسناد الأدوار للمستخدمين",
                 ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+            // Create only, for now: provisioning an account is built, and the directory with its
+            // lifecycle actions (deactivate, reset, unlock) is not — so View would be a grant that
+            // opens nothing. The account lifecycle screen adds its own verbs when it is built.
+            S(Modules.SystemAdministration, SystemAdministration.Users, "User accounts", "حسابات المستخدمين",
+                ActionVerb.Create),
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),

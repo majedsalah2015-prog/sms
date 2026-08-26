@@ -180,6 +180,28 @@ namespace Sms.Web.Models
                 ? "هذه الصلاحية ليست في فهرس الشاشات، فلا شاشة تتحقق منها — لا فائدة من منحها."
                 : "That permission is not in the screen catalogue, so no screen will ever check it.",
 
+            // ---------------------------------------------------------------- M36 user accounts
+
+            InvalidUserNameException => arabic
+                ? $"اسم المستخدم غير صالح: من {Sms.Application.Security.UserNameRules.MinLength} إلى {Sms.Application.Security.UserNameRules.MaxLength} حرفاً، أحرف إنجليزية صغيرة وأرقام و . _ - @ فقط، ويبدأ بحرف أو رقم."
+                : $"That user name will not work: {Sms.Application.Security.UserNameRules.MinLength}–{Sms.Application.Security.UserNameRules.MaxLength} characters, lower-case letters, digits and . _ - @ only, starting with a letter or a digit.",
+
+            DuplicateUserNameException => arabic
+                ? "اسم المستخدم محجوز — والحساب المعطَّل يحجز اسمه أيضاً، لأن الاسم يبقى لصاحبه. اختر غيره."
+                : "That user name is taken — a deactivated account keeps its name too, because the name still belongs to whoever held it. Choose another.",
+
+            PersonAlreadyHasAccountException => arabic
+                ? "لهذا الشخص حساب بالفعل — ولكل شخص حساب واحد (BR-GLB-002). ابحث عن حسابه في قائمة الحسابات بدل إنشاء ثانٍ."
+                : "This person already has an account — one person holds one account (BR-GLB-002). Find theirs on the accounts list instead of creating a second.",
+
+            SelfAccountDeactivationException => arabic
+                ? "لا يمكنك تعطيل الحساب الذي تعمل به الآن — اطلب من زميل يحمل الصلاحية أن يفعل ذلك."
+                : "You cannot deactivate the account you are signed in with — ask a colleague who holds the permission to do it.",
+
+            InactiveAccountException => arabic
+                ? "الحساب معطَّل، فلا يوجد دخول تُستخدم فيه كلمة مرور جديدة — أعِد تفعيله أولاً."
+                : "The account is deactivated, so there is no sign-in for a new password to be used at — reactivate it first.",
+
             // ---------------------------------------------------------------- doc 05 workflow engine
 
             WorkflowSelfApprovalException => arabic

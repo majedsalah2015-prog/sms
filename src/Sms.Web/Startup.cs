@@ -291,6 +291,11 @@ namespace Sms.Web
             // seeder provisions and PermissionService evaluates.
             services.AddScoped<ISecurityAdmin, SecurityAdmin>();
 
+            // The accounts the roles above are handed to (doc 06 §8, Module 36 §8.1). Provisioning
+            // mints the one-time password itself rather than accepting one, which is why it needs
+            // the authentication service beside the context.
+            services.AddScoped<IUserAccountAdmin, UserAccountAdmin>();
+
             // Reads the same grants the screen filter reads, so the menu and the screens agree about
             // what this user can open. Scoped: it caches its answer for the request.
             services.AddScoped<Sms.Web.Navigation.ModuleVisibility>();

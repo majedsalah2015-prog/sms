@@ -1,0 +1,181 @@
+@using System.Globalization
+@using Sms.Application.Security
+@model Sms.Web.Models.NewUserViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("New user account", "حساب مستخدم جديد");
+    ViewData["Breadcrumb"] = T("System administration / User accounts / New", "إدارة النظام / حسابات المستخدمين / جديد");
+
+    string TypeName(ProvisionableAccountType type) => type switch
+    {
+        ProvisionableAccountType.Staff => T("Staff", "موظف"),
+        ProvisionableAccountType.Parent => T("Parent", "ولي أمر"),
+        ProvisionableAccountType.Student => T("Student", "طالب"),
+        _ => type.ToString(),
+    };
+
+    // True whether the register is full and everyone already holds a login, or the register is
+    // empty — the way out is the same, and a sentence that assumed the first reading would be a lie
+    // on a school's first afternoon.
+    var emptyMessage = Model.AccountType switch
+    {
+        ProvisionableAccountType.Staff => T("No employee is without an account. Add the employee to the staff register first, then come back here.", "لا يوجد موظف بلا حساب. أضف الموظف إلى سجل الموظفين أولاً ثم عد إلى هنا."),
+        ProvisionableAccountType.Parent => T("No parent on file is without an account. Register the parent first, then come back here.", "لا يوجد ولي أمر بلا حساب. سجّل ولي الأمر في سجل أولياء الأمور أولاً ثم عد إلى هنا."),
+        _ => T("No student on the roll is without an account. Admit the student first, then come back here.", "لا يوجد طالب بلا حساب. سجّل الطالب في سجل الطلاب أولاً ثم عد إلى هنا."),
+    };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "new-user-help",
+        Title = T("New user account — help", "حساب مستخدم جديد — مساعدة"),
+        Intro = T("Creating the login a person signs in with (doc 06 §2, §8). One person holds one account, so this screen starts from the person and not from a blank name field.", "إنشاء الحساب الذي يدخل به الشخص إلى النظام (الوثيقة 06 §2 و§8). ولكل شخص حساب واحد، لذا تبدأ هذه الشاشة من الشخص لا من حقل اسم فارغ."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Only people without an account appear", "لا يظهر إلا من لا حساب له"), T("The list is everyone of this kind who does not already hold a login (BR-GLB-002). Somebody missing from it either already has an account — search for them on the previous screen — or is not on the register yet.", "القائمة هي كل من كان من هذا النوع ولا يملك حساباً (BR-GLB-002). ومن لا تجده فيها إما أن له حساباً بالفعل — فابحث عنه في الشاشة السابقة — أو أنه ليس في السجل بعد.")),
+            new HelpPanelViewModel.Item(T("The user name is proposed, not imposed", "اسم المستخدم مقترح لا مفروض"), T("It is built from the person's own reference number — emp-1042, stu-2311 — because two brothers share far more of a name than they share of a student number. Leave it as it is, or type the name your school already uses.", "يُبنى من الرقم المرجعي للشخص نفسه — emp-1042 وstu-2311 — لأن الأخوين يشتركان في الاسم أكثر بكثير مما يشتركان في رقم القيد. اتركه كما هو أو اكتب الاسم الذي تستخدمه مدرستك.")),
+            new HelpPanelViewModel.Item(T("The password is shown once", "كلمة المرور تُعرض مرة واحدة"), T("The system mints a one-time password, shows it on the next screen, and keeps no readable copy (BR-SEC-005). Hand it over before you navigate away; if it is lost, issue a new one rather than looking for it.", "ينشئ النظام كلمة مرور لمرة واحدة، ويعرضها في الشاشة التالية، ولا يحتفظ بنسخة مقروءة منها (BR-SEC-005). سلّمها قبل مغادرة الصفحة؛ وإن ضاعت فأصدر غيرها ولا تبحث عنها.")),
+            new HelpPanelViewModel.Item(T("A new account reaches nothing yet", "الحساب الجديد لا يصل إلى شيء بعد"), T("It can sign in and find every screen answering 404 until a role is assigned to it. Give it one on the assignment screen straight after creating it — that is the step people forget, and it looks exactly like a broken account.", "يستطيع الدخول ويجد كل شاشة تردّ 404 حتى يُسنَد إليه دور. فامنحه دوراً في شاشة الإسناد فور إنشائه — فهذه هي الخطوة التي تُنسى، وتبدو تماماً كحساب معطوب.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("An account belongs to a person on the register — pick them, confirm the user name, and the system issues a one-time password.",
+               "الحساب يخص شخصاً في السجل — اختره، وأكّد اسم المستخدم، ويُصدر النظام كلمة مرور لمرة واحدة.")
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Users">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left")" aria-hidden="true"></i> @T("Back to accounts", "العودة إلى الحسابات")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+
+<div class="sms-card p-4 mb-3">
+    <form method="get" asp-action="NewUser" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small" for="accountType">@T("Account type", "نوع الحساب")</label>
+            <select id="accountType" name="accountType" class="form-select form-select-sm" onchange="this.form.submit()">
+                @foreach (ProvisionableAccountType type in Enum.GetValues(typeof(ProvisionableAccountType)))
+                {
+                    <option value="@type" selected="@(type == Model.AccountType)">@TypeName(type)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-5">
+            <label class="form-label small" for="personSearch">@T("Find the person", "ابحث عن الشخص")</label>
+            <input id="personSearch" name="personSearch" value="@Model.PersonSearch" class="form-control form-control-sm"
+                   placeholder="@T("name or reference number", "الاسم أو الرقم المرجعي")" />
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-outline-secondary btn-sm w-100">@T("Search", "بحث")</button>
+        </div>
+    </form>
+</div>
+
+@if (Model.People.Count == 0)
+{
+    <div class="sms-card p-4">
+        <p class="mb-1 fw-semibold">@T("Nobody here needs an account", "لا أحد هنا بحاجة إلى حساب")</p>
+        <p class="text-muted mb-0">
+            @(string.IsNullOrWhiteSpace(Model.PersonSearch)
+                ? emptyMessage
+                : T("Nobody without an account matches that search. Clear it to see the whole list.", "لا أحد بلا حساب يطابق هذا البحث. امسحه لرؤية القائمة كاملة."))
+        </p>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="CreateUser">
+        <input type="hidden" name="AccountType" value="@Model.AccountType" />
+        <input type="hidden" name="PersonSearch" value="@Model.PersonSearch" />
+        <div class="row g-3">
+            <div class="col-xl-8">
+                <div class="sms-card">
+                    <div class="table-responsive"><table class="table sms-table mb-0">
+                        <caption class="visually-hidden">@T("People without an account", "أشخاص بلا حساب")</caption>
+                        <thead>
+                        <tr>
+                            <th scope="col" style="width:3rem"><span class="visually-hidden">@T("Choose", "اختيار")</span></th>
+                            <th scope="col">@T("Name", "الاسم")</th>
+                            <th scope="col">@T("Reference", "الرقم المرجعي")</th>
+                            <th scope="col">@T("Proposed user name", "اسم المستخدم المقترح")</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        @foreach (var person in Model.People)
+                        {
+                            var inputId = $"person-{person.PersonId}";
+                            <tr>
+                                <td>
+                                    <input class="form-check-input js-person" type="radio" name="PersonId" id="@inputId"
+                                           value="@person.PersonId" data-username="@person.SuggestedUserName"
+                                           checked="@(Model.PersonId == person.PersonId)" />
+                                </td>
+                                <td class="fw-semibold"><label for="@inputId" class="mb-0">@(isRtl ? person.NameAr : person.NameEn)</label></td>
+                                <td class="small" dir="ltr">@person.Reference</td>
+                                <td class="small text-muted" dir="ltr">@person.SuggestedUserName</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table></div>
+                </div>
+                @if (Model.PickerIsCapped)
+                {
+                    <p class="form-text">
+                        @T("Only the first 50 are listed. Search by name or reference number to reach anyone else.",
+                           "لا تُعرض إلا أول خمسين. ابحث بالاسم أو الرقم المرجعي للوصول إلى غيرهم.")
+                    </p>
+                }
+            </div>
+            <div class="col-xl-4">
+                <div class="sms-card p-4">
+                    <h2 class="h6">@T("The account", "الحساب")</h2>
+                    <div class="mb-3">
+                        <label class="form-label small" for="UserName">@T("User name", "اسم المستخدم")</label>
+                        <input id="UserName" name="UserName" value="@Model.UserName" class="form-control form-control-sm" dir="ltr"
+                               maxlength="@UserNameRules.MaxLength" autocomplete="off" />
+                        <div class="form-text">
+                            @T("Lower case, no spaces: letters, digits and . _ - @ only. Left blank, the proposed name is used.",
+                               "حروف صغيرة بلا مسافات: أحرف وأرقام و . _ - @ فقط. وإن تُرك فارغاً استُخدم الاسم المقترح.")
+                        </div>
+                    </div>
+                    <p class="text-muted small">
+                        @T("A one-time password is issued when the account is created and shown to you once. The holder must change it at their first sign-in (BR-SEC-005).",
+                           "تُصدر كلمة مرور لمرة واحدة عند إنشاء الحساب وتُعرض عليك مرة واحدة. وعلى صاحبها تغييرها عند أول دخول (BR-SEC-005).")
+                    </p>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-person-plus" aria-hidden="true"></i> @T("Create the account", "إنشاء الحساب")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+}
+
+@section Scripts {
+<script>
+(function () {
+    // Convenience only: the proposal is applied server-side when the field is left blank, so the
+    // screen still works with this script absent.
+    var name = document.getElementById('UserName');
+    if (!name) { return; }
+    Array.prototype.forEach.call(document.querySelectorAll('.js-person'), function (radio) {
+        radio.addEventListener('change', function () {
+            if (!name.value || name.dataset.proposed === '1') {
+                name.value = radio.dataset.username || '';
+                name.dataset.proposed = '1';
+            }
+        });
+    });
+    name.addEventListener('input', function () { name.dataset.proposed = ''; });
+})();
+</script>
+}

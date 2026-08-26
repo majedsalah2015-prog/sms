@@ -76,5 +76,19 @@ namespace Sms.Web.Models
             Sms.Domain.Security.ActionVerb.Configure => "ضبط",
             _ => v.ToString(),
         };
+
+        /// <summary>
+        /// Which kind of person a login belongs to (doc 06 §2). The account list printed the enum
+        /// name itself, so an Arabic screen said "Staff" — and the distinction the column exists to
+        /// draw, between a staff login and a portal one, is the one BR-SEC-010 routes on.
+        /// </summary>
+        public static string AccountType(Sms.Domain.Security.AccountType t, bool arabic) => t switch
+        {
+            Sms.Domain.Security.AccountType.Staff => arabic ? "موظف" : "Staff",
+            Sms.Domain.Security.AccountType.Parent => arabic ? "ولي أمر" : "Parent",
+            Sms.Domain.Security.AccountType.Student => arabic ? "طالب" : "Student",
+            Sms.Domain.Security.AccountType.System => arabic ? "حساب نظام" : "System",
+            _ => t.ToString(),
+        };
     }
 }

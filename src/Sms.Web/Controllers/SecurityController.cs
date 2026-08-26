@@ -28,12 +28,19 @@ namespace Sms.Web.Controllers
     {
         private static bool IsArabic => System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
 
+        private static string T(string en, string ar) => IsArabic ? ar : en;
+
         private readonly ISecurityAdmin _security;
+        private readonly IUserAccountAdmin _accounts;
+        private readonly IPermissionService _permissions;
         private readonly IAuditContext _audit;
 
-        public SecurityController(ISecurityAdmin security, IAuditContext audit)
+        public SecurityController(
+            ISecurityAdmin security, IUserAccountAdmin accounts, IPermissionService permissions, IAuditContext audit)
         {
             _security = security;
+            _accounts = accounts;
+            _permissions = permissions;
             _audit = audit;
         }
 
@@ -166,7 +173,140 @@ namespace Sms.Web.Controllers
         {
             var users = await _security.ListUserRolesAsync(q, HttpContext.RequestAborted);
             var roles = await _security.ListRolesAsync(false, HttpContext.RequestAborted);
-            return View(new UserRoleListViewModel { Users = users, Roles = roles, Search = q });
+
+            // Shown once, immediately after provisioning, and never again: the password is not stored
+            // anywhere it could be read back from (BR-SEC-005). It rides the redirect in TempData —
+            // an encrypted, HttpOnly cookie consumed on this read — rather than in the URL, and the
+            // redirect is what stops a refresh from re-posting the form.
+            ProvisionedAccount? provisioned = null;
+            if (TempData["ProvisionedUserName"] is string name
+                && TempData["ProvisionedPassword"] is string password
+                && TempData["ProvisionedUserId"] is int id)
+            {
+                provisioned = new ProvisionedAccount(id, name, password);
+            }
+
+            return View(new UserRoleListViewModel
+            {
+                Users = users,
+                Roles = roles,
+                Search = q,
+                JustProvisioned = provisioned,
+                CanProvision = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.SystemAdministration,
+                    ScreenCatalog.SystemAdministration.Users,
+                    ActionVerb.Create,
+                    HttpContext.RequestAborted),
+            });
+        }
+
+        // ------------------------------------------------------------------ provisioning
+
+        /// <summary>
+        /// doc 06 §8's "users list &amp; lifecycle", the create half of it. An account exists only
+        /// against a person (BR-GLB-002), so the form picks one from the people who have none rather
+        /// than offering an empty name field — there is no free-standing login in this product.
+        /// <para>
+        /// <b>Not built here:</b> the directory itself with its lifecycle actions — deactivate,
+        /// reactivate, reset a password, clear a lockout, end a session, the dormant queue. The port
+        /// behind this screen (<see cref="IUserAccountAdmin"/>) implements all of them; what is
+        /// missing is their screen, and <c>SYS/Users</c> catalogues only <c>Create</c> until it
+        /// exists.
+        /// </para>
+        /// </summary>
+        [HttpGet("users/new")]
+        [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.Users, ActionVerb.Create)]
+        public async Task<IActionResult> NewUser(
+            ProvisionableAccountType accountType = ProvisionableAccountType.Staff,
+            string? personSearch = null,
+            int? personId = null)
+            => View(await BuildNewUserAsync(new NewUserViewModel
+            {
+                AccountType = accountType,
+                PersonSearch = personSearch,
+                PersonId = personId,
+            }));
+
+        [HttpPost("users/new")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.Users, ActionVerb.Create)]
+        public async Task<IActionResult> CreateUser(NewUserViewModel form)
+        {
+            if (!Enum.IsDefined(typeof(ProvisionableAccountType), form.AccountType))
+            {
+                form.AccountType = ProvisionableAccountType.Staff;
+            }
+
+            if (form.PersonId is not { } personId)
+            {
+                ModelState.AddModelError(
+                    nameof(form.PersonId),
+                    T("Choose the person this account belongs to.", "اختر الشخص الذي يعود إليه هذا الحساب."));
+                return View(nameof(NewUser), await BuildNewUserAsync(form));
+            }
+
+            // A blank name is not an error: the screen proposes one from the person's own reference
+            // number, and a clerk who does not want to argue with it should be able to leave it be.
+            var userName = form.UserName;
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                // The same list the person was chosen from, so the proposal is the one the screen
+                // showed. It is empty when the person's reference number yields nothing typeable —
+                // UserNameRules.Propose says so rather than offering a bare prefix everyone collides
+                // on — and then the screen asks for a name instead of inventing one.
+                userName = (await _accounts.ListProvisionableAsync(
+                        form.AccountType, form.PersonSearch, HttpContext.RequestAborted))
+                    .FirstOrDefault(p => p.PersonId == personId)?.SuggestedUserName;
+            }
+
+            if (string.IsNullOrWhiteSpace(userName))
+            {
+                ModelState.AddModelError(
+                    nameof(form.UserName),
+                    T("This person has no reference number to build a user name from — type one.",
+                      "لا يوجد رقم مرجعي لهذا الشخص يُبنى منه اسم مستخدم — اكتب اسماً."));
+                return View(nameof(NewUser), await BuildNewUserAsync(form));
+            }
+
+            try
+            {
+                var provisioned = await _accounts.ProvisionAsync(
+                    new NewUserAccount(form.AccountType, personId, userName),
+                    HttpContext.RequestAborted);
+
+                TempData["ProvisionedUserId"] = provisioned.UserAccountId;
+                TempData["ProvisionedUserName"] = provisioned.UserName;
+                TempData["ProvisionedPassword"] = provisioned.TemporaryPassword;
+                TempData["Message"] = T(
+                    $"Account {provisioned.UserName} created. Give it a role below — an account with no role reaches nothing.",
+                    $"أُنشئ الحساب {provisioned.UserName}. امنحه دوراً أدناه — فالحساب بلا دور لا يصل إلى شيء.");
+
+                return RedirectToAction(nameof(Users), new { q = provisioned.UserName });
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
+            {
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
+                return View(nameof(NewUser), await BuildNewUserAsync(form));
+            }
+        }
+
+        private async Task<NewUserViewModel> BuildNewUserAsync(NewUserViewModel form)
+        {
+            // A hand-made request can carry an account type the enum does not define, and the port
+            // would answer that with an English ArgumentOutOfRangeException. The screen only ever
+            // offers three, so anything else is read as the default rather than surfaced as a fault.
+            if (!Enum.IsDefined(typeof(ProvisionableAccountType), form.AccountType))
+            {
+                form.AccountType = ProvisionableAccountType.Staff;
+            }
+
+            form.People = await _accounts.ListProvisionableAsync(
+                form.AccountType, form.PersonSearch, HttpContext.RequestAborted);
+
+            // The port caps the picker rather than returning a register of two thousand students, so
+            // a full page is a page that may be hiding somebody. Say so instead of implying it is all.
+            form.PickerIsCapped = form.People.Count >= 50;
+            return form;
         }
 
         [HttpPost("users/{userAccountId:int}/roles")]
