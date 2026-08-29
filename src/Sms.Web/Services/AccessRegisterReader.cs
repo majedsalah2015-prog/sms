@@ -99,6 +99,11 @@ namespace Sms.Web.Services
             if (UseBridge) { return AccessBridgeClient.ListTables(filePath); }
 
             using var connection = Open(filePath);
+            return ListTables(connection);
+        }
+
+        private static List<string> ListTables(OdbcConnection connection)
+        {
             var schema = connection.GetSchema("Tables");
             return schema.Rows.Cast<DataRow>()
                 .Where(r => string.Equals(Convert.ToString(r["TABLE_TYPE"]), "TABLE", StringComparison.OrdinalIgnoreCase))
@@ -106,6 +111,43 @@ namespace Sms.Web.Services
                 .Where(n => n.Length > 0 && !n.StartsWith("MSys", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Every table with the number of rows in it, for a picker that has to say which ones hold
+        /// anything. A register of this kind carries 160 tables of which four matter, and the name
+        /// alone does not distinguish the students table that was emptied by a year-end rollover
+        /// from the one that holds the school — which is a difference the operator otherwise
+        /// discovers only by choosing wrong.
+        /// <para>
+        /// <c>COUNT(*)</c> transfers no rows, so the whole file answers in around a second where
+        /// reading each table would take minutes. A table whose count fails comes back with a null
+        /// count rather than being left out: an unknown size must not shorten the list.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<(string Name, int? Rows)> ListTableSizes(string filePath)
+        {
+            if (UseBridge) { return AccessBridgeClient.ListTableSizes(filePath); }
+
+            using var connection = Open(filePath);
+            var sizes = new List<(string, int?)>();
+            foreach (var name in ListTables(connection))
+            {
+                int? rows;
+                try
+                {
+                    using var command = new OdbcCommand($"SELECT COUNT(*) FROM [{Sanitize(name)}]", connection);
+                    rows = Convert.ToInt32(command.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+                }
+                catch (Exception)
+                {
+                    rows = null;
+                }
+
+                sizes.Add((name, rows));
+            }
+
+            return sizes;
         }
 
         /// <summary>Column names of one table, in the order Access holds them.</summary>

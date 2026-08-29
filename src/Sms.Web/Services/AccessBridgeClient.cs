@@ -43,6 +43,48 @@ namespace Sms.Web.Services
             return Strings(answer, "tables");
         }
 
+        /// <summary>
+        /// Table names with row counts, degrading to names alone against a bridge that predates the
+        /// verb. The executable is built and deployed separately from the application — it is 32-bit
+        /// where the application is not, which is the whole reason it exists — so the two versions
+        /// can and will drift on a school's server. A stale one must cost the counts, never the
+        /// import: without this the screen would answer "Unknown verb: sizes" and list no tables at
+        /// all. Anything else the bridge says is a real failure and still propagates.
+        /// </summary>
+        public static IReadOnlyList<(string Name, int? Rows)> ListTableSizes(string filePath)
+        {
+            JsonElement answer;
+            try
+            {
+                answer = Run("sizes", filePath, null);
+            }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("Unknown verb", StringComparison.OrdinalIgnoreCase))
+            {
+                return ListTables(filePath).Select(name => (name, (int?)null)).ToList();
+            }
+
+            var sizes = new List<(string, int?)>();
+            if (!answer.TryGetProperty("sizes", out var array) || array.ValueKind != JsonValueKind.Array)
+            {
+                return sizes;
+            }
+
+            foreach (var element in array.EnumerateArray())
+            {
+                var name = element.TryGetProperty("name", out var n) ? n.GetString() : null;
+                if (string.IsNullOrEmpty(name)) { continue; }
+
+                // A count the bridge could not take arrives as null and stays null here: the table
+                // is still offered, just without a size beside it.
+                int? rows = element.TryGetProperty("rows", out var r) && r.ValueKind == JsonValueKind.Number
+                    ? r.GetInt32()
+                    : null;
+                sizes.Add((name!, rows));
+            }
+
+            return sizes;
+        }
+
         public static IReadOnlyList<string> ListColumns(string filePath, string table)
         {
             var answer = Run("columns", filePath, table);

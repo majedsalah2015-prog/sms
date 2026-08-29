@@ -21,6 +21,13 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<string> Tables { get; set; } = Array.Empty<string>();
 
+        /// <summary>
+        /// How many rows each table holds, shown beside its name in the pickers. Missing for a table
+        /// whose count could not be taken, which is why it is a lookup rather than a parallel list:
+        /// a name with no size is a name shown without one, never a name left out.
+        /// </summary>
+        public IReadOnlyDictionary<string, int> TableRowCounts { get; set; } = new Dictionary<string, int>();
+
         public string? Table { get; set; }
 
         public IReadOnlyList<string> Columns { get; set; } = Array.Empty<string>();

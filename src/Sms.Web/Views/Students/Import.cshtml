@@ -25,6 +25,31 @@
         },
     };
 
+    // The name with its row count beside it. A register of this kind carries 160 tables of which
+    // four matter, and the count is what separates the students table that holds the school from
+    // the one a year-end rollover emptied — the difference an operator otherwise finds only by
+    // choosing wrong. A table whose count could not be taken keeps its name and shows no number.
+    // Arabic counts by bracket rather than by "one versus many": two is a dual, three to ten take
+    // the plural, and eleven upward take the accusative singular — so "8 صفاً" is wrong where
+    // "8 صفوف" is right. And zero is spelled as a word in both languages, because an empty table is
+    // the one thing this list exists to make obvious, and "فارغ" carries further than a digit.
+    string Sized(string table)
+    {
+        if (!Model.TableRowCounts.TryGetValue(table, out var rows)) { return table; }
+
+        var n = rows.ToString("N0", CultureInfo.InvariantCulture);
+        var counted = rows switch
+        {
+            0 => T("empty", "فارغ"),
+            1 => T("1 row", "صف واحد"),
+            2 => T("2 rows", "صفان"),
+            <= 10 => T($"{n} rows", $"{n} صفوف"),
+            _ => T($"{n} rows", $"{n} صفاً"),
+        };
+
+        return $"{table} · {counted}";
+    }
+
     string Guardian(StudentImportViewModel.GuardianCandidate? g)
     {
         if (g == null) { return "—"; }
@@ -77,7 +102,7 @@
                         <option value="">@T("— choose —", "— اختر —")</option>
                         @foreach (var t in Model.Tables)
                         {
-                            <option value="@t" selected="@(t == Model.Table)">@t</option>
+                            <option value="@t" selected="@(t == Model.Table)">@Sized(t)</option>
                         }
                     </select>
                 </div>
@@ -186,7 +211,7 @@
                             <option value="">@T("— the column holds text —", "— العمود يحمل نصاً —")</option>
                             @foreach (var t in Model.Tables)
                             {
-                                <option value="@t" selected="@(t == Model.OccupationCodeTable)">@t</option>
+                                <option value="@t" selected="@(t == Model.OccupationCodeTable)">@Sized(t)</option>
                             }
                         </select>
                     </div>
@@ -196,7 +221,7 @@
                             <option value="">@T("— the column holds text —", "— العمود يحمل نصاً —")</option>
                             @foreach (var t in Model.Tables)
                             {
-                                <option value="@t" selected="@(t == Model.EducationCodeTable)">@t</option>
+                                <option value="@t" selected="@(t == Model.EducationCodeTable)">@Sized(t)</option>
                             }
                         </select>
                     </div>

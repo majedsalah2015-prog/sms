@@ -139,7 +139,7 @@ namespace Sms.Web.Controllers
 
                 m.Token = token;
                 m.OriginalFileName = Path.GetFileName(register.FileName);
-                m.Tables = AccessRegisterReader.ListTables(path);
+                LoadTables(m, path);
                 if (m.Tables.Count == 0)
                 {
                     TempData["Error"] = T("That file has no tables to read.", "لا توجد جداول قابلة للقراءة في هذا الملف.");
@@ -160,7 +160,7 @@ namespace Sms.Web.Controllers
             try
             {
                 var path = PathOf(form.Token);
-                form.Tables = AccessRegisterReader.ListTables(path);
+                LoadTables(form, path);
                 if (string.IsNullOrWhiteSpace(form.Table))
                 {
                     // Pressing "Read the table" on the empty choice returned the page unchanged and
@@ -506,6 +506,30 @@ namespace Sms.Web.Controllers
                     : AccessRegisterReader.ReadCodeMap(path, table!);
 
             return new CodeMaps(Read(path, form.OccupationCodeTable), Read(path, form.EducationCodeTable), educationLevels);
+        }
+
+        /// <summary>
+        /// Fills the table pickers: the names, and the row count to show beside each one. A register
+        /// of this kind holds 160 tables of which four matter, and a name alone cannot tell an
+        /// operator that <c>student_table</c> is the empty one — so the count is read here rather
+        /// than left to be discovered by choosing wrong. It costs about a second for the whole file,
+        /// because <c>COUNT(*)</c> transfers nothing.
+        /// </summary>
+        private static void LoadTables(StudentImportViewModel m, string path)
+        {
+            var sizes = AccessRegisterReader.ListTableSizes(path);
+            m.Tables = sizes.Select(s => s.Name).ToList();
+
+            // Indexer rather than ToDictionary: Access will not hold two tables whose names differ
+            // only by case, but this reads whatever file was handed to it, and a duplicate key must
+            // not be a 500 on somebody's register.
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, rows) in sizes)
+            {
+                if (rows is int count) { counts[name] = count; }
+            }
+
+            m.TableRowCounts = counts;
         }
 
         private static string PathOf(string? token)

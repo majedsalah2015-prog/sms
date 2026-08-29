@@ -15,10 +15,11 @@ namespace Sms.AccessBridge
     /// answer as JSON, because the driver that can open the file is 32-bit and the web app is not.
     /// See the project file for why that is the arrangement.
     /// <para>
-    /// Three verbs, matching what the import screen asks in its three steps:
+    /// Four verbs, matching what the import screen asks across its three steps:
     /// </para>
     /// <code>
     /// Sms.AccessBridge tables  &lt;file&gt;
+    /// Sms.AccessBridge sizes   &lt;file&gt;
     /// Sms.AccessBridge columns &lt;file&gt; &lt;table&gt;
     /// Sms.AccessBridge rows    &lt;file&gt; &lt;table&gt;
     /// </code>
@@ -62,6 +63,7 @@ namespace Sms.AccessBridge
                 return args[0].ToLowerInvariant() switch
                 {
                     "tables" => Tables(file),
+                    "sizes" => Sizes(file),
                     "columns" => args.Length >= 3 ? Columns(file, args[2]) : Fail("columns needs a table name.", false),
                     "rows" => args.Length >= 3 ? Rows(file, args[2]) : Fail("rows needs a table name.", false),
                     _ => Fail($"Unknown verb: {args[0]}", missingDriver: false),
@@ -80,15 +82,53 @@ namespace Sms.AccessBridge
         private static int Tables(string file)
         {
             using var connection = Open(file);
+            return Ok(new Dictionary<string, object> { ["tables"] = Names(connection) });
+        }
+
+        /// <summary>
+        /// Every table with the number of rows in it, so the picker can say which ones hold
+        /// anything. Worth its own verb: a register of 162 tables answers all 162 counts in under a
+        /// second because <c>COUNT(*)</c> transfers no rows, whereas discovering the same thing by
+        /// reading each table is minutes.
+        /// <para>
+        /// A table whose count fails reports <c>null</c> rather than being dropped: an unknown size
+        /// is a table the operator may still need to choose, and silently shortening the list would
+        /// hide it.
+        /// </para>
+        /// </summary>
+        private static int Sizes(string file)
+        {
+            using var connection = Open(file);
+            var sizes = new List<Dictionary<string, object?>>();
+            foreach (var name in Names(connection))
+            {
+                int? rows;
+                try
+                {
+                    using var command = new OdbcCommand($"SELECT COUNT(*) FROM [{Sanitize(name)}]", connection);
+                    rows = Convert.ToInt32(command.ExecuteScalar(), CultureInfo.InvariantCulture);
+                }
+                catch (Exception)
+                {
+                    rows = null;
+                }
+
+                sizes.Add(new Dictionary<string, object?> { ["name"] = name, ["rows"] = rows });
+            }
+
+            return Ok(new Dictionary<string, object> { ["sizes"] = sizes });
+        }
+
+        /// <summary>The user tables, in a stable order. Access's own MSys* bookkeeping is not one of them.</summary>
+        private static List<string> Names(OdbcConnection connection)
+        {
             var schema = connection.GetSchema("Tables");
-            var tables = schema.Rows.Cast<DataRow>()
+            return schema.Rows.Cast<DataRow>()
                 .Where(r => string.Equals(Convert.ToString(r["TABLE_TYPE"], CultureInfo.InvariantCulture), "TABLE", StringComparison.OrdinalIgnoreCase))
                 .Select(r => Convert.ToString(r["TABLE_NAME"], CultureInfo.InvariantCulture) ?? string.Empty)
                 .Where(n => n.Length > 0 && !n.StartsWith("MSys", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToList();
-
-            return Ok(new Dictionary<string, object> { ["tables"] = tables });
         }
 
         private static int Columns(string file, string table)
