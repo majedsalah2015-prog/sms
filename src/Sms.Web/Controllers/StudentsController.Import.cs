@@ -161,14 +161,45 @@ namespace Sms.Web.Controllers
             {
                 var path = PathOf(form.Token);
                 form.Tables = AccessRegisterReader.ListTables(path);
-                if (!string.IsNullOrWhiteSpace(form.Table))
+                if (string.IsNullOrWhiteSpace(form.Table))
+                {
+                    // Pressing "Read the table" on the empty choice returned the page unchanged and
+                    // said nothing, which reads as a dead button rather than as a question not yet
+                    // answered.
+                    TempData["Error"] = T("Choose the table to read first.", "اختر أولاً الجدول المراد قراءته.");
+                }
+                else
                 {
                     form.Columns = AccessRegisterReader.ListColumns(path, form.Table!);
-                    GuessMapping(form);
+
+                    // Guess only what has not been answered. Re-guessing unconditionally meant a
+                    // field the operator had just set back to "— none —" came straight back mapped,
+                    // so a wrong guess could be re-pointed but never cleared; and a mapping made
+                    // against the previous table survived the switch naming columns the new one does
+                    // not have, which shows as a mapping the screen cannot display and a preview in
+                    // which every row is "name incomplete".
+                    if (!KeepMappingsThatStillExist(form) || !form.MappingChosen)
+                    {
+                        GuessMapping(form);
+                    }
 
                     var maps = LoadCodeMaps(path, form, await LookupAsync("EducationLevel"));
                     var rows = AccessRegisterReader.ReadRows(path, form.Table!);
                     form.TotalRows = rows.Count;
+
+                    // An empty table is an answer, and until now it was the one answer this screen
+                    // could not give: no rows meant no preview, and no preview meant the whole third
+                    // step vanished, so the operator saw the mapping they had just filled in come
+                    // back unchanged and concluded the button was broken. It happens for a real
+                    // reason — one register of this shape carried an empty `student_table` beside a
+                    // `del_st` holding 103 withdrawn children — so the fix is to say which table was
+                    // read and that it was empty, not to guess at another one.
+                    if (rows.Count == 0)
+                    {
+                        TempData["Error"] = T(
+                            $"The table \"{form.Table}\" has no rows, so there is nothing to preview. Choose the table that actually holds the children — an old register often keeps the current students in one table and the withdrawn ones in another.",
+                            $"الجدول «{form.Table}» لا يحتوي على أي صف، فلا شيء يُعايَن. اختر الجدول الذي يحمل الطلاب فعلاً — فالسجل القديم كثيراً ما يحفظ الطلاب الحاليين في جدول والمنسحبين في جدول آخر.");
+                    }
 
                     var preview = new List<StudentImportViewModel.PreviewRow>();
                     var ready = 0;
@@ -497,6 +528,44 @@ namespace Sms.Web.Controllers
             var text = (value ?? string.Empty).Trim();
             if (text.Length == 0) { return null; }
             return text.Length <= limit ? text : text.Substring(0, limit);
+        }
+
+        /// <summary>
+        /// Clears every mapping naming a column the chosen table does not have, and says whether any
+        /// mapping survived. A mapping is only meaningful against the table it was made for, and the
+        /// table can be changed after the mapping is filled in — a stale name then binds to nothing,
+        /// which is invisible on screen (the picker simply shows "— none —" while the model still
+        /// holds the old column) and shows up only as a preview where every row is "name incomplete".
+        /// <para>
+        /// Found by reflection over the view model's own <c>*Column</c> properties rather than listed
+        /// here: the list would be a second copy of the mapping, and the copy that gets forgotten
+        /// when a twenty-third column is added is this one — silently, because a field missing from
+        /// it simply never clears. The two <c>*CodeTable</c> properties are deliberately not matched:
+        /// they name tables, and a table is not invalidated by a change of table.
+        /// </para>
+        /// </summary>
+        private static bool KeepMappingsThatStillExist(StudentImportViewModel form)
+        {
+            var columns = new HashSet<string>(form.Columns, StringComparer.OrdinalIgnoreCase);
+            var mapped = false;
+
+            foreach (var property in typeof(StudentImportViewModel).GetProperties())
+            {
+                if (property.PropertyType != typeof(string)
+                    || !property.Name.EndsWith("Column", StringComparison.Ordinal)
+                    || !property.CanWrite)
+                {
+                    continue;
+                }
+
+                var value = (string?)property.GetValue(form);
+                if (value == null) { continue; }
+
+                if (columns.Contains(value)) { mapped = true; }
+                else { property.SetValue(form, null); }
+            }
+
+            return mapped;
         }
 
         /// <summary>

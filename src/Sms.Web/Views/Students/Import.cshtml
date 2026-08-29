@@ -88,7 +88,10 @@
 
             @if (haveColumns)
             {
-                <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها.")</p>
+                <!-- Says the mapping below was answered, not merely guessed — so a field set back
+                     to "none" stays there instead of being re-guessed on the next post. -->
+                <input type="hidden" name="MappingChosen" value="true" />
+                <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong. A field left at “none” is simply not imported.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها. والحقل المتروك على «بلا» لا يُستورَد ببساطة.")</p>
 
                 var studentFields = new (string Prop, string En, string Ar, string? Value)[]
                     {

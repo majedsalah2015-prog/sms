@@ -25,6 +25,20 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<string> Columns { get; set; } = Array.Empty<string>();
 
+        /// <summary>
+        /// True once the mapping below has been shown to the operator, so what comes back is their
+        /// answer rather than an unanswered form.
+        /// <para>
+        /// It exists so that "— none —" means none. The screen guesses the mapping from the column
+        /// names, and the guess re-ran on every post, which re-filled any field the operator had
+        /// just emptied: a wrong guess could be pointed somewhere else but never cleared. On a
+        /// register whose <c>owner_*</c> columns are a guardian for some schools and a bus driver
+        /// for others, that is the difference between an import that can be corrected and one that
+        /// cannot.
+        /// </para>
+        /// </summary>
+        public bool MappingChosen { get; set; }
+
         // ---- the student's own fields. Everything else in the old register stays in the old register.
 
         public string? FirstNameColumn { get; set; }
