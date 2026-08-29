@@ -148,6 +148,9 @@ namespace Sms.Web.Models
         public sealed record Row(DiscountType Type, FeeCategory? Category, int GrantCount);
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
+
+        /// <summary>The row the grid is editing in place, if any — the ?edit= on the URL.</summary>
+        public int? EditId { get; set; }
     }
 
     // ---- Scholarship board ----

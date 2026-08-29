@@ -1,0 +1,138 @@
+@using System.Globalization
+@using Sms.Application.Payroll
+@model PayrollPrintViewModel<PayrollRegister>
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var r = Model.Content;
+    var period = PayrollLabels.Period(r.PeriodYear, r.PeriodMonth, isRtl);
+    ViewData["Title"] = T($"Payroll register — {period}", $"مسير الرواتب — {period}");
+    ViewData["Breadcrumb"] = T("Staff / Payroll / Register", "شؤون الموظفين / الرواتب / المسير");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "register-help",
+        Title = T("The register — help", "المسير — مساعدة"),
+        Intro = T("Every employee paid this month on one sheet, with the column totals a school signs at the bottom. This is the document the payroll file is built around.", "كل موظف مصروف له هذا الشهر في ورقة واحدة، مع إجماليات الأعمدة التي توقّع المدرسة أسفلها. وهو المستند الذي يُبنى عليه ملف الرواتب."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("It follows the payroll's state", "يتبع حالة المسير"),
+                T("A register printed from a draft shows figures that can still change; the status is stamped in the header so a printed copy always says which it was.", "المسير المطبوع من مسودة يعرض أرقاماً قابلة للتغيير، والحالة مختومة في الترويسة لتقول النسخة المطبوعة دائماً أيّهما كانت.")),
+            new HelpPanelViewModel.Item(
+                T("Advances are their own column", "أقساط السلف عمود مستقل"),
+                T("Advance instalments are shown apart from the hand-entered deductions, because a school asks what it recovered from staff loans as a question of its own.", "تُعرض أقساط السلف منفصلة عن الاستقطاعات اليدوية، لأن المدرسة تسأل عمّا استردّته من سلف موظفيها سؤالاً مستقلاً.")),
+            new HelpPanelViewModel.Item(
+                T("CSV opens in Excel", "ملف CSV يُفتح في إكسل"),
+                T("The CSV carries a byte-order mark so Arabic names arrive readable rather than as mojibake. Amounts are in Western digits in both languages, as they are on screen.", "يحمل ملف CSV علامة ترتيب البايت لتصل الأسماء العربية مقروءة لا مشوّهة. والمبالغ بالأرقام اللاتينية في اللغتين كما هي على الشاشة.")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@T("Monthly payroll register", "مسير الرواتب الشهري")</h1>
+        <p class="text-muted mb-0">@period &middot; <code>@r.RunNo</code></p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Run" asp-route-id="@r.RunId">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to payroll", "عودة إلى المسير")
+        </a>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="RegisterCsv" asp-route-id="@r.RunId">
+            <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>@T("CSV", "CSV")
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="sms-card">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@(isRtl ? Model.SchoolNameAr : Model.SchoolNameEn)</h2>
+        <p class="h6 mb-1">@T("Monthly payroll register", "مسير الرواتب الشهري")</p>
+        <p class="text-muted small mb-0">
+            @period &middot; <code>@r.RunNo</code> &middot;
+            <span class="badge @PayrollLabels.RunStatusBadge(r.Status)">@PayrollLabels.RunStatus(r.Status, isRtl)</span>
+            &middot; @T("payment date", "تاريخ الصرف"): @r.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        </p>
+    </header>
+
+    @if (r.Lines.Count == 0)
+    {
+        <p class="text-muted mb-0">@T("This payroll has no employees on it.", "لا يوجد موظفون في هذا المسير.")</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table sms-table table-sm align-middle">
+                <caption class="visually-hidden">@T("Every employee paid this month, with pay components and net", "كل موظف مصروف له هذا الشهر مع مكوّنات الراتب والصافي")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">@T("Employee no", "الرقم الوظيفي")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col" class="text-end">@T("Basic", "الأساسي")</th>
+                        <th scope="col" class="text-end">@T("Allowances", "البدلات")</th>
+                        <th scope="col" class="text-end">@T("Additions", "الإضافات")</th>
+                        <th scope="col" class="text-end">@T("Deductions", "الاستقطاعات")</th>
+                        <th scope="col" class="text-end">@T("Advance", "قسط السلفة")</th>
+                        <th scope="col" class="text-end">@T("Gross", "الإجمالي")</th>
+                        <th scope="col" class="text-end">@T("Net", "الصافي")</th>
+                        <th scope="col" class="d-print-table-cell">@T("Signature", "التوقيع")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var n = 0; }
+                    @foreach (var line in r.Lines)
+                    {
+                        n++;
+                        <tr>
+                            <td>@n</td>
+                            <td class="text-nowrap"><code>@line.Employee.EmployeeNo</code></td>
+                            <td>@(isRtl ? line.Employee.NameAr : line.Employee.NameEn)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.BasicSalary)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.Allowances)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.AdditionsTotal)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.DeductionsTotal)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.AdvanceDeduction)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.GrossPay)</td>
+                            <td class="text-end fw-bold" dir="ltr">@PayrollLabels.Money(line.NetPay)</td>
+                            <td style="min-width:6rem"></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="3">@T("Total", "الإجمالي")</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalBasic)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalAllowances)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalAdditions)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalDeductions)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalAdvanceDeduction)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalGross)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalNet)</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="row mt-5 text-center small">
+            <div class="col">
+                <div class="border-top pt-2 mx-4">@T("Prepared by", "أعدّه")</div>
+            </div>
+            <div class="col">
+                <div class="border-top pt-2 mx-4">@T("Reviewed by", "راجعه")</div>
+            </div>
+            <div class="col">
+                <div class="border-top pt-2 mx-4">@T("Approved by", "اعتمده")</div>
+            </div>
+        </div>
+    }
+
+    <p class="text-muted small mt-4 mb-0">
+        @T("Printed", "طُبع"): @Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC
+    </p>
+</div>

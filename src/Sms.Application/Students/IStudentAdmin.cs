@@ -2,7 +2,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Sms.Domain.Common;
-using Sms.Domain.Parents;
 using Sms.Domain.Students;
 
 namespace Sms.Application.Students
@@ -23,9 +22,16 @@ namespace Sms.Application.Students
             CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// The mother's particulars and the family's social profile — a separate
-        /// operation from <see cref="UpdateStudentAsync"/>, not extra parameters on
-        /// it.
+        /// The family's social profile — a separate operation from
+        /// <see cref="UpdateStudentAsync"/>, not extra parameters on it.
+        /// <para>
+        /// The parents used to lead this list — the mother's own particulars, and both
+        /// parents' life status. All of it is guardian data now (owner request,
+        /// 2026-08-24): a <c>Parent</c> row linked by <see cref="LinkGuardianAsync"/>
+        /// with relationship "Father" or "Mother", carrying the name, ID number, mobile,
+        /// occupation, qualification and <c>LifeStatus</c> on one row per person instead
+        /// of one copy per child.
+        /// </para>
         /// <para>
         /// They are filled at a different time by a different person: identity comes
         /// off the birth certificate at registration, this section off documents that
@@ -43,10 +49,9 @@ namespace Sms.Application.Students
         /// </summary>
         Task<Student> UpdateSocialProfileAsync(
             int studentId,
-            string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
-            ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
+            Religion? religion,
             ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
-            string? placeOfBirth, int? familySize, int? birthOrder,
+            string? placeOfBirth, int? familySize, int? birthOrder, int? siblingCount, string? mobile,
             CancellationToken cancellationToken = default);
 
         /// <summary>Corrects identity/ID fields; identity edits are T1 with a mandatory audit reason (BR-STU-002).</summary>

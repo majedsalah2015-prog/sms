@@ -82,6 +82,28 @@ namespace Sms.Infrastructure.Schools
             await _db.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task SetBrandingAsync(int schoolId, SchoolBrandingAsset asset, int? attachmentId, CancellationToken cancellationToken = default)
+        {
+            var school = await _db.Schools.SingleAsync(s => s.Id == schoolId, cancellationToken);
+
+            switch (asset)
+            {
+                case SchoolBrandingAsset.Logo:
+                    school.LogoAttachmentId = attachmentId;
+                    break;
+                case SchoolBrandingAsset.Seal:
+                    school.SealAttachmentId = attachmentId;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(asset), asset, null);
+            }
+
+            // No reason is set or required: the branding pointers carry no [RequiresAuditReason],
+            // so the T1 tag on School records which slot changed without demanding the sentence
+            // BR-SCH-002 asks of a name or a licence number.
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<Signatory> DefineSignatoryAsync(
             string documentClassCode,
             string nameAr,

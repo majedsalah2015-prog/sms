@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sms.Application.GlExport;
 using Sms.Application.Payments;
 using Sms.Application.ReadModels;
 using Sms.Application.Statements;
@@ -93,15 +94,58 @@ namespace Sms.Web.Models
             _ => b.ToString(),
         };
 
+        /// <summary>
+        /// The ledger's five account classifications, for the chart-of-accounts
+        /// picker. <c>Unspecified</c> is rendered as an em dash rather than the
+        /// word: the ledger declining to classify an account is not a fact worth
+        /// putting a label on, and the account is offered either way.
+        /// </summary>
+        public static string AccountNature(GlAccountNature n, bool ar) => n switch
+        {
+            GlAccountNature.Asset => ar ? "أصول" : "Asset",
+            GlAccountNature.Liability => ar ? "التزامات" : "Liability",
+            GlAccountNature.Equity => ar ? "حقوق ملكية" : "Equity",
+            GlAccountNature.Revenue => ar ? "إيرادات" : "Revenue",
+            GlAccountNature.Expense => ar ? "مصروفات" : "Expense",
+            _ => "—",
+        };
+
         public static string StudentName(Student s, bool ar) => ar ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
 
         public static string ParentName(Parent? p, bool ar) => p == null ? "—" : (ar ? p.NameAr : p.NameEn);
     }
 
+    /// <summary>
+    /// A child as it appears on a payer's card: the student, what this payer is to them, and
+    /// whether the school bills this payer for them. BR-PAR-005 assigns financial responsibility
+    /// per child, so the answer differs sibling to sibling and a bare name cannot carry it.
+    /// An empty relationship means no live guardian link — a former guardian the old charges
+    /// still name (see <see cref="PayerResponsibilityEvaluator"/>).
+    /// </summary>
+    public sealed record PayerChild(Student Student, string RelationshipAr, string RelationshipEn, bool IsFinanciallyResponsible)
+    {
+        public string Relationship(bool ar) => ar ? RelationshipAr : RelationshipEn;
+
+        public bool IsCurrentGuardian => !string.IsNullOrWhiteSpace(RelationshipAr) || !string.IsNullOrWhiteSpace(RelationshipEn);
+    }
+
     /// <summary>A payer as the screens show it: the Payer row + its parent + the children it pays for.</summary>
-    public sealed record PayerCard(Payer Payer, Parent? Parent, IReadOnlyList<Student> Children)
+    public sealed record PayerCard(Payer Payer, Parent? Parent, IReadOnlyList<PayerChild> Children)
     {
         public string Label(bool ar) => Parent == null ? $"#{Payer.Id}" : $"{FinanceLabels.ParentName(Parent, ar)} · {Parent.ParentFileNo}";
+
+        /// <summary>The children as plain students, for the screens that only name them.</summary>
+        public IReadOnlyList<Student> Students => Children.Select(c => c.Student).ToList();
+
+        /// <summary>
+        /// BR-FEE-004: the school bills this payer for none of the children on the card. Set from
+        /// <see cref="PayerResponsibilityEvaluator.IsResponsibleForNothing"/> when the card is built
+        /// with its children; left false on the list screens that carry no children and take no money.
+        /// </summary>
+        public bool IsResponsibleForNothing { get; init; }
+
+        /// <summary>True when responsibility is split across this card — BR-PAR-005's divorced-parents case.</summary>
+        public bool HasSplitResponsibility => Children.Any(c => c.IsFinanciallyResponsible) && Children.Any(c => !c.IsFinanciallyResponsible);
     }
 
     /// <summary>One posted charge with everything subtracted from it (BR-FEE-008 single math, BR-DIS-010 separated).</summary>
@@ -131,6 +175,27 @@ namespace Sms.Web.Models
         public decimal? DefaultVatRate { get; set; }
 
         public int? EditId { get; set; }
+
+        /// <summary>
+        /// The attached ledger's postable accounts, so the GL export code is
+        /// chosen from the real chart rather than typed from memory
+        /// (docs/Integration/00 — the free-text account code is named there as the
+        /// interface's one remaining gap). Empty when no ledger is attached, which
+        /// is a supported way to run: the field stays free text.
+        /// </summary>
+        public IReadOnlyList<GlAccountOption> GlAccounts { get; set; } = Array.Empty<GlAccountOption>();
+
+        /// <summary>True when a ledger answered — the screen may offer a chart to pick from.</summary>
+        public bool HasLedger => GlAccounts.Count > 0;
+
+        /// <summary>
+        /// The chart entry a stored code names, or <c>null</c> when the chart does
+        /// not have it. Null with <see cref="HasLedger"/> true is worth showing the
+        /// operator: it is either a code kept for an accountant's own ledger, or the
+        /// transposed digit this picker exists to prevent.
+        /// </summary>
+        public GlAccountOption? FindAccount(string? code) =>
+            string.IsNullOrWhiteSpace(code) ? null : GlAccounts.FirstOrDefault(a => a.Code == code.Trim());
     }
 
     // ---- 19 §8.2 Fee structure workbench ----
@@ -239,11 +304,29 @@ namespace Sms.Web.Models
 
     // ---- 19 §8.7 Student/payer position ----
 
+    /// <summary>
+    /// A guardian this school has never billed. There is no <c>Payer</c> row behind them — one is
+    /// created by the first charge (BR-FEE-004) — so they carry no statement, no aging and no
+    /// balance. They are listed anyway because the alternative is what this screen used to do:
+    /// answer "no matching payers" for a guardian who is plainly on file, which reads as the
+    /// person not existing rather than as their account not having been opened.
+    /// </summary>
+    public sealed record UnbilledGuardian(Parent Parent, IReadOnlyList<Student> Children);
+
     public sealed class PayerPositionViewModel
     {
         public IReadOnlyList<PayerCard> Payers { get; set; } = Array.Empty<PayerCard>();
 
         public PayerCard? Selected { get; set; }
+
+        /// <summary>Guardians matching the search who have never been billed — offered under the payers, not mixed into them.</summary>
+        public IReadOnlyList<UnbilledGuardian> Unbilled { get; set; } = Array.Empty<UnbilledGuardian>();
+
+        /// <summary>The unbilled guardian being read, when the reader picked one of them instead of a payer.</summary>
+        public UnbilledGuardian? SelectedUnbilled { get; set; }
+
+        /// <summary>How many guardians on file have never been billed at all — the number that explains a short payer list.</summary>
+        public int UnbilledTotal { get; set; }
 
         public string? Q { get; set; }
 

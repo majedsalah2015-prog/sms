@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Grades;
 using Sms.Domain.Common;
 using Sms.Domain.Grades;
@@ -91,7 +92,7 @@ namespace Sms.Infrastructure.Grades
             var grades = await _db.GradeLevels.CountAsync(g => g.StageId == stageId, cancellationToken);
             if (grades > 0)
             {
-                throw new GradeStructureInUseException($"stage still has {grades} active grade level(s)");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("active grade level(s)", "صف دراسي فعّال", grades)));
             }
 
             stage.IsActive = false;
@@ -134,19 +135,19 @@ namespace Sms.Infrastructure.Grades
             var enrollments = await _db.Enrollments.CountAsync(e => profileIds.Contains(e.GradeYearProfileId), cancellationToken);
             if (enrollments > 0)
             {
-                throw new GradeStructureInUseException($"{enrollments} enrollment(s) exist for this grade");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("enrollment(s) in this grade", "قيد في هذا الصف", enrollments)));
             }
 
             var sections = await _db.Sections.CountAsync(s => profileIds.Contains(s.GradeYearProfileId), cancellationToken);
             if (sections > 0)
             {
-                throw new GradeStructureInUseException($"{sections} section(s) exist for this grade");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("section(s) in this grade", "شعبة في هذا الصف", sections)));
             }
 
             var feeders = await _db.GradeLevels.Where(g => g.PromotionTargetGradeLevelId == gradeLevelId).Select(g => g.Code).ToListAsync(cancellationToken);
             if (feeders.Count > 0)
             {
-                throw new GradeStructureInUseException($"grade(s) {string.Join(", ", feeders)} promote into it — change their promotion path first (BR-GRD-002)");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("grade(s) that promote into it — change their promotion path first (BR-GRD-002)", "صف يُرفَّع طلابه إليه — غيّر مسار الترفيع فيه أولاً (BR-GRD-002)", feeders.Count)));
             }
 
             foreach (var p in await _db.GradeYearProfiles.Where(p => profileIds.Contains(p.Id)).ToListAsync(cancellationToken))
@@ -164,13 +165,13 @@ namespace Sms.Infrastructure.Grades
             var enrollments = await _db.Enrollments.CountAsync(e => e.GradeYearProfileId == gradeYearProfileId, cancellationToken);
             if (enrollments > 0)
             {
-                throw new GradeStructureInUseException($"{enrollments} enrollment(s) exist for this grade-year profile");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("enrollment(s) in this grade for this year", "قيد في هذا الصف لهذا العام", enrollments)));
             }
 
             var sections = await _db.Sections.CountAsync(s => s.GradeYearProfileId == gradeYearProfileId, cancellationToken);
             if (sections > 0)
             {
-                throw new GradeStructureInUseException($"{sections} section(s) exist for this grade-year profile");
+                throw new GradeStructureInUseException(UsageReport.From(new UsageReference("section(s) in this grade for this year", "شعبة في هذا الصف لهذا العام", sections)));
             }
 
             profile.IsActive = false;

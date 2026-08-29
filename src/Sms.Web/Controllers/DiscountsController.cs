@@ -289,11 +289,14 @@ namespace Sms.Web.Controllers
 
         [HttpGet("types")]
         [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.View)]
-        public async Task<IActionResult> Types(int? year = null)
+        public async Task<IActionResult> Types(int? year = null, int? edit = null)
         {
-            var m = new TypeCatalogViewModel();
+            var m = new TypeCatalogViewModel { EditId = edit };
             await FillPageAsync(m, year);
-            var all = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking().Where(t => t.SchoolId == _db.CurrentSchoolId).OrderByDescending(t => t.IsActive).ThenBy(t => t.NameEn).ToListAsync();
+            // The rules come with the row: the edit form has to show the ladder the type was
+            // saved with, and a second round-trip per row to fetch them would be a query per type.
+            var all = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking().Include(t => t.EligibilityRules)
+                .Where(t => t.SchoolId == _db.CurrentSchoolId).OrderByDescending(t => t.IsActive).ThenBy(t => t.NameEn).ToListAsync();
             var grantCounts = await _db.DiscountGrants.AsNoTracking().GroupBy(g => g.DiscountTypeId).Select(g => new { g.Key, N = g.Count() }).ToListAsync();
             m.Rows = all.Select(t => new TypeCatalogViewModel.Row(t, m.Categories.FirstOrDefault(c => c.Id == t.FeeCategoryId), grantCounts.FirstOrDefault(x => x.Key == t.Id)?.N ?? 0)).ToList();
             return View(m);
@@ -311,18 +314,84 @@ namespace Sms.Web.Controllers
             try
             {
                 if (string.IsNullOrWhiteSpace(nameAr) || string.IsNullOrWhiteSpace(nameEn)) throw new InvalidOperationException(T("Both names are required.", "الاسمان مطلوبان."));
-                var rules = new List<EligibilityRuleInput>();
-                if (ladder2 is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder2.Value, 2));
-                if (ladder3 is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder3.Value, 3));
-                if (ladder4Plus is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder4Plus.Value, 4));
-                if (staffPercent is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.Staff, staffPercent.Value));
-
                 await _discounts.DefineTypeAsync(nameAr.Trim(), nameEn.Trim(), basis, eligibilityMode, feeCategoryId, stage, capAmountPerStudent,
-                    isStackable, maxCombinedPercent <= 0 ? 100m : maxCombinedPercent, renewalMode, requiresHardshipDocumentation, rules);
+                    isStackable, maxCombinedPercent <= 0 ? 100m : maxCombinedPercent, renewalMode, requiresHardshipDocumentation, LadderRules(ladder2, ladder3, ladder4Plus, staffPercent));
                 TempData["Flash"] = T("Discount type added.", "أُضيف نوع الخصم.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Types));
+        }
+
+        /// <summary>
+        /// doc/Modules/22 §8.2. Corrects a type in place. The catalog could only append, so a
+        /// misspelled name or a stacking cap entered wrong could never be fixed — only shadowed
+        /// by a second type, leaving the school's own list carrying both.
+        /// </summary>
+        [HttpPost("types/{id:int}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.Edit)]
+        public async Task<IActionResult> EditType(
+            int id, string nameAr, string nameEn, DiscountBasis basis, DiscountEligibilityMode eligibilityMode,
+            int? feeCategoryId, DiscountComputationStage stage, decimal? capAmountPerStudent,
+            bool isStackable, decimal maxCombinedPercent, DiscountRenewalMode renewalMode, bool requiresHardshipDocumentation,
+            decimal? ladder2, decimal? ladder3, decimal? ladder4Plus, decimal? staffPercent)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(nameAr) || string.IsNullOrWhiteSpace(nameEn)) throw new InvalidOperationException(T("Both names are required.", "الاسمان مطلوبان."));
+                await _discounts.UpdateTypeAsync(id, nameAr.Trim(), nameEn.Trim(), basis, eligibilityMode, feeCategoryId, stage, capAmountPerStudent,
+                    isStackable, maxCombinedPercent <= 0 ? 100m : maxCombinedPercent, renewalMode, requiresHardshipDocumentation, LadderRules(ladder2, ladder3, ladder4Plus, staffPercent));
+                TempData["Flash"] = T("Discount type updated.", "حُدِّث نوع الخصم.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(Types));
+        }
+
+        /// <summary>
+        /// BR-GLB-005: retires a type. Grants already carrying it keep it — the type simply stops
+        /// being offered to new ones, which is why this is reversible and not a delete.
+        /// </summary>
+        [HttpPost("types/{id:int}/deactivate")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.Deactivate)]
+        public async Task<IActionResult> DeactivateType(int id)
+        {
+            try
+            {
+                await _discounts.SetTypeActiveAsync(id, false);
+                TempData["Flash"] = T("Discount type retired — existing grants keep it (BR-GLB-005: never deleted).", "أُوقف نوع الخصم — والمنح القائمة تحتفظ به (BR-GLB-005: لا حذف).");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(Types));
+        }
+
+        /// <summary>doc/Modules/22 §8.2: puts a retired type back in the grant desk's picker.</summary>
+        [HttpPost("types/{id:int}/activate")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Discounts, ScreenCatalog.Discounts.Types, ActionVerb.Edit)]
+        public async Task<IActionResult> ActivateType(int id)
+        {
+            try
+            {
+                await _discounts.SetTypeActiveAsync(id, true);
+                TempData["Flash"] = T("Discount type reactivated.", "أُعيد تفعيل نوع الخصم.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(Types));
+        }
+
+        /// <summary>
+        /// BR-DIS-002's ladder, read off the form. Shared by create and edit so the two can never
+        /// disagree about what "4th child and up" means.
+        /// </summary>
+        private static List<EligibilityRuleInput> LadderRules(decimal? ladder2, decimal? ladder3, decimal? ladder4Plus, decimal? staffPercent)
+        {
+            var rules = new List<EligibilityRuleInput>();
+            if (ladder2 is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder2.Value, 2));
+            if (ladder3 is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder3.Value, 3));
+            if (ladder4Plus is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, ladder4Plus.Value, 4));
+            if (staffPercent is > 0) rules.Add(new EligibilityRuleInput(EligibilityRuleKind.Staff, staffPercent.Value));
+            return rules;
         }
 
         // ================================================================== 8.3 Scholarship board

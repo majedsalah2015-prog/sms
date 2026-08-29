@@ -1,0 +1,66 @@
+@using System.Globalization
+@using Sms.Application.Dashboards
+@model DonutChartViewModel
+@*
+    A donut and the legend that carries its numbers.
+
+    The legend is not optional decoration: it is what makes the chart readable
+    without colour vision (WCAG 1.4.1), and it is where the actual figures live.
+    The wedges are the shape of the split; the list beside them is the data.
+*@
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+
+    // Seven, matching the ramp in site.css. An eighth category reuses the first
+    // colour rather than falling off the end — the legend still tells them apart,
+    // and a repeated wedge is a smaller problem than an invisible one.
+    const int PaletteSize = 7;
+
+    var slices = ChartGeometry.Donut(
+        Model.Slices.Select(s => s.Value).ToList(),
+        centreX: 100m, centreY: 100m, outerRadius: 88m, innerRadius: 56m);
+
+    var titleId = "donut-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+}
+
+@if (slices.Count == 0)
+{
+    <p class="text-muted small mb-0">@Model.EmptyText</p>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-3">
+        <svg class="sms-donut" viewBox="0 0 200 200" role="img" aria-labelledby="@titleId">
+            <title id="@titleId">@Model.Title</title>
+            @foreach (var slice in slices)
+            {
+                var colour = "var(--sms-chart-" + ((slice.Index % PaletteSize) + 1) + ")";
+                <path class="sms-donut__slice" d="@slice.Path" fill="@colour" fill-rule="evenodd"></path>
+            }
+            @*
+                The hole says how many categories, not the total: the total is the
+                first line of the legend already, and a money figure at this size
+                truncates on a phone.
+            *@
+            <text class="sms-donut__hole-value" x="100" y="98" text-anchor="middle">@slices.Count.ToString(CultureInfo.InvariantCulture)</text>
+            <text class="sms-donut__hole-label" x="100" y="116" text-anchor="middle">@(slices.Count == 1 ? T("category", "فئة") : T("categories", "فئات"))</text>
+        </svg>
+
+        <ul class="sms-legend flex-grow-1">
+            @foreach (var slice in slices)
+            {
+                var source = Model.Slices[slice.Index];
+                var colour = "var(--sms-chart-" + ((slice.Index % PaletteSize) + 1) + ")";
+                <li>
+                    <span class="sms-legend__swatch" style="background:@colour" aria-hidden="true"></span>
+                    <span>@StatisticsLabels.Name(source, isRtl)</span>
+                    <span class="sms-legend__value">
+                        <bdi dir="ltr">@StatisticsLabels.Value(slice.Value, Model.IsMoney)</bdi>
+                        · <bdi dir="ltr">@slice.Percent.ToString("0.#", CultureInfo.InvariantCulture)%</bdi>
+                    </span>
+                </li>
+            }
+        </ul>
+    </div>
+}

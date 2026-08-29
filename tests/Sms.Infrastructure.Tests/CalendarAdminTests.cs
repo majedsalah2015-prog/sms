@@ -112,6 +112,142 @@ namespace Sms.Infrastructure.Tests
                 admin.DefineDayAsync(_yearId, new DateTime(2027, 8, 1), DayType.Holiday));
         }
 
+        // --- BR-CAL-001 range painting -------------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-CAL-001")]
+        public async Task Painting_a_range_writes_every_day_in_it()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+
+            var painted = await admin.DefineDaysAsync(
+                _yearId, new DateTime(2026, 9, 10), new DateTime(2026, 9, 14), DayType.Holiday);
+
+            Assert.Equal(5, painted);
+            var stored = db.CalendarDays.Where(d => d.Date >= new DateTime(2026, 9, 10) && d.Date <= new DateTime(2026, 9, 14)).ToList();
+            Assert.Equal(5, stored.Count);
+            Assert.All(stored, d => Assert.Equal(DayType.Holiday, d.DayType));
+            Assert.All(stored, d => Assert.Equal(CalendarDaySource.Manual, d.Source));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-001")]
+        public async Task Painting_a_range_upserts_the_days_already_defined_in_it()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            await admin.DefineDayAsync(_yearId, new DateTime(2026, 9, 12), DayType.Working);
+
+            await admin.DefineDaysAsync(_yearId, new DateTime(2026, 9, 10), new DateTime(2026, 9, 14), DayType.Holiday);
+
+            var stored = Assert.Single(db.CalendarDays.Where(d => d.Date == new DateTime(2026, 9, 12)));
+            Assert.Equal(DayType.Holiday, stored.DayType);
+            Assert.Equal(5, db.CalendarDays.Count(d => d.AcademicYearId == _yearId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-001")]
+        public async Task A_reversed_range_paints_the_same_days()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+
+            var painted = await admin.DefineDaysAsync(
+                _yearId, new DateTime(2026, 9, 14), new DateTime(2026, 9, 10), DayType.Holiday);
+
+            Assert.Equal(5, painted);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-051")]
+        public async Task A_range_running_past_the_year_end_is_refused_whole()
+        {
+            // The board painted day by day and saved per row, so a range whose tail fell outside
+            // the year left its head written and reported an error — half an amendment, and the
+            // published calendar disagreeing with what the registrar thought they had done.
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+
+            await Assert.ThrowsAsync<CalendarDateOutsideYearException>(() =>
+                admin.DefineDaysAsync(_yearId, new DateTime(2027, 6, 28), new DateTime(2027, 7, 3), DayType.Holiday));
+
+            Assert.Empty(db.CalendarDays.Where(d => d.AcademicYearId == _yearId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-004")]
+        public async Task A_range_starting_in_the_past_is_refused_whole()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+
+            await Assert.ThrowsAsync<CalendarPastDateEditException>(() =>
+                admin.DefineDaysAsync(_yearId, new DateTime(2026, 8, 10), new DateTime(2026, 9, 5), DayType.Holiday));
+
+            Assert.Empty(db.CalendarDays.Where(d => d.AcademicYearId == _yearId));
+        }
+
+        // --- BR-CAL-005 provisional confirmation ---------------------------------
+
+        [Fact]
+        [BusinessRule("BR-CAL-005")]
+        public async Task A_provisional_day_can_be_confirmed()
+        {
+            // "Flagged until confirmed" had no confirm: the flag went on and stayed on.
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var date = new DateTime(2027, 3, 20);
+            await admin.DefineDayAsync(_yearId, date, DayType.Holiday, isProvisional: true);
+
+            var confirmed = await admin.ConfirmProvisionalDayAsync(_yearId, date);
+
+            Assert.NotNull(confirmed);
+            Assert.False(confirmed!.IsProvisional);
+            Assert.Equal(DayType.Holiday, confirmed.DayType);
+            Assert.False(db.CalendarDays.Single(d => d.Date == date).IsProvisional);
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-005")]
+        public async Task Confirming_a_day_that_is_already_confirmed_is_a_no_op()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var date = new DateTime(2027, 3, 20);
+            await admin.DefineDayAsync(_yearId, date, DayType.Holiday, isProvisional: true);
+            await admin.ConfirmProvisionalDayAsync(_yearId, date);
+
+            var again = await admin.ConfirmProvisionalDayAsync(_yearId, date);
+
+            Assert.NotNull(again);
+            Assert.False(again!.IsProvisional);
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-005")]
+        public async Task Confirming_a_date_the_year_has_no_row_for_returns_null()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+
+            Assert.Null(await admin.ConfirmProvisionalDayAsync(_yearId, new DateTime(2027, 3, 20)));
+        }
+
+        [Fact]
+        [BusinessRule("BR-CAL-004")]
+        public async Task A_provisional_day_that_has_passed_cannot_be_confirmed()
+        {
+            using var db = CreateContext();
+            var admin = new CalendarAdmin(db, _clock);
+            var date = new DateTime(2026, 9, 20);
+            await admin.DefineDayAsync(_yearId, date, DayType.Holiday, isProvisional: true);
+            _clock.UtcNow = new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc);
+
+            await Assert.ThrowsAsync<CalendarPastDateEditException>(() =>
+                admin.ConfirmProvisionalDayAsync(_yearId, date));
+        }
+
         // --- BR-CAL-004 past-date guard -----------------------------------------
 
         [Fact]

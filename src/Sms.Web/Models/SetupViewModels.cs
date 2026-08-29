@@ -65,9 +65,10 @@ namespace Sms.Web.Models
         // PROFILE (ISchoolAdmin.DefineSchoolAsync)
         public int? SchoolId { get; set; }
 
-        [Display(Name = "Name (Arabic)")] public string? NameAr { get; set; }
+        // Labelled in the views, in both languages. A [Display] name can hold only one.
+        public string? NameAr { get; set; }
 
-        [Display(Name = "Name (English)")] public string? NameEn { get; set; }
+        public string? NameEn { get; set; }
 
         public string? LicenseNumber { get; set; }
 
@@ -210,6 +211,25 @@ namespace Sms.Web.Models
         /// </summary>
         public IReadOnlyDictionary<int, IReadOnlyList<Sms.Application.Lookups.LookupUsage>> Usage { get; set; }
             = new Dictionary<int, IReadOnlyList<Sms.Application.Lookups.LookupUsage>>();
+
+        /// <summary>
+        /// Whether the open list's values may be added to, renamed, reordered and retired here —
+        /// <see cref="Sms.Application.Lookups.SchoolAuthoredLookups"/>, not the tier on its own.
+        /// <para>
+        /// The view used to derive this from <c>Selected.Tier == ProductSeeded</c> and so locked
+        /// three lists the product deliberately ships empty for the school to fill. It is computed
+        /// by the controller now because the same answer has to hold for the POST that follows,
+        /// and a view deciding it separately is a view that can offer a button the action refuses.
+        /// </para>
+        /// </summary>
+        public bool CanEdit { get; set; }
+
+        /// <summary>
+        /// A product-tier list the school may nonetheless author — the case that needs a sentence
+        /// on screen, because "product" and "editable" read as a contradiction without one.
+        /// </summary>
+        public bool IsSchoolAuthoredProductList
+            => Selected != null && Selected.Tier == LookupCategoryTier.ProductSeeded && CanEdit;
 
         // new value form
         public string? Code { get; set; }

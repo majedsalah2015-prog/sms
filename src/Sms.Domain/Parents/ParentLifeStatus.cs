@@ -19,14 +19,14 @@ namespace Sms.Domain.Parents
     /// which the school notes without classifying.
     /// </para>
     /// <para>
-    /// <b>It lives here, in Parents, and Students uses it.</b> It was declared in
-    /// <c>Sms.Domain.Students.SocialProfileEnums</c> for the student social profile's
-    /// father/mother pair, which meant any file importing both module namespaces got
-    /// CS0104 the moment the parent register grew a status of its own — the exact
-    /// collision this codebase has already renamed three entities to avoid. One
-    /// definition in the module that owns the concept is the fix; the numbers are
-    /// unchanged because <c>Student.FatherStatus</c> and <c>MotherStatus</c> are
-    /// already persisted against them.
+    /// <b>It lives here, in Parents, and nothing outside Parents holds it.</b> It was
+    /// declared in <c>Sms.Domain.Students.SocialProfileEnums</c> for a father/mother
+    /// pair on the student social profile, which meant any file importing both module
+    /// namespaces got CS0104 the moment the parent register grew a status of its own —
+    /// the exact collision this codebase has already renamed three entities to avoid.
+    /// The pair itself ended on 2026-08-24 (owner request): a parent's status is one
+    /// fact about one person, so it is <see cref="Parent.LifeStatus"/> on their own row
+    /// rather than a copy on each of their children.
     /// </para>
     /// <para>
     /// SMALLINT-mapped and starting at 1 (DB/01 §5).

@@ -157,6 +157,13 @@ namespace Sms.ArchitectureTests
                 "AccountController.AccessDenied",
                 "AccountController.Login",
                 "AccountController.TwoFactor",
+                // The school's logo, which the sign-in screen wears (BR-SCH-006). Anonymous because
+                // the screen that draws it is: behind the fallback policy the browser's request for
+                // the image is answered with a redirect to the sign-in page, so the one screen every
+                // reader passes through would show a broken mark. It serves one image from one slot
+                // of one school — the deployment is single-tenant — and a school's logo is the least
+                // private thing it owns. Nothing else about the school is reachable through it.
+                "HomeController.BrandLogo",
                 "HomeController.Error",
                 "HomeController.SetLanguage",
             };

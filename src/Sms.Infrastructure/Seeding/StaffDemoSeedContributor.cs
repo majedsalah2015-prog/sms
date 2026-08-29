@@ -95,6 +95,12 @@ namespace Sms.Infrastructure.Seeding
             var jobTitles = await LookupAsync("JobTitle", cancellationToken);
             var nationalities = await LookupAsync("Nationality", cancellationToken);
             var idTypes = await LookupAsync("IdType", cancellationToken);
+
+            // The qualification catalogues (owner request 2026-08-27). Not guarded against below:
+            // an unseeded one leaves the classification off the credential, which is exactly what a
+            // school that has not authored its lists yet should see.
+            var educationLevels = await LookupAsync("EducationLevel", cancellationToken);
+            var academicGrades = await LookupAsync("AcademicGrade", cancellationToken);
             if (jobTitles.Count == 0 || nationalities.Count == 0) { return; }
 
             _audit.Reason = "تهيئة بيانات الكادر التجريبية";
@@ -128,18 +134,29 @@ namespace Sms.Infrastructure.Seeding
                     primaryIdTypeLookupId: idTypes.Count == 0 ? null : Resolve(idTypes, person.IdTypeCode),
                     primaryIdNo: person.IdNo,
                     primaryIdExpiry: person.IdExpiry,
+                    whatsAppNumber: person.WhatsApp,
                     cancellationToken: cancellationToken);
                 ids[person.IdNo] = employee.Id;
 
-                // Marital status and where the salary is paid — T1 with a required reason, so the
-                // ambient reason set above is doing real work here, not decoration.
+                // The personal block — marital status, the address, and every destination the pay
+                // can be sent to. T1 with a required reason on the money fields, so the ambient
+                // reason set above is doing real work here, not decoration.
                 await _employees.UpdatePersonalDetailsAsync(
-                    employee.Id, person.Marital, person.BankName, person.BankAccountNo, cancellationToken);
+                    employee.Id, person.Marital, person.BankName, person.BankAccountNo,
+                    person.Address, person.OriginTown,
+                    person.SpouseIdNo == null || idTypes.Count == 0 ? null : Resolve(idTypes, "NationalId"),
+                    person.SpouseIdNo, person.PalPay, person.JawwalPay, cancellationToken);
 
                 foreach (var q in person.Qualifications)
                 {
+                    // The written title stays even where the catalogue names the qualification: the
+                    // demo is showing a register that was typed before the lists existed and then
+                    // classified, which is the state every real import lands in.
                     await _employees.AddQualificationAsync(
                         employee.Id, q.TitleAr, q.TitleEn, q.Awarded, q.TeachingRelevant, q.Institution,
+                        educationLookupId: q.EducationCode == null || educationLevels.Count == 0 ? null : Resolve(educationLevels, q.EducationCode),
+                        academicGradeLookupId: q.GradeCode == null || academicGrades.Count == 0 ? null : Resolve(academicGrades, q.GradeCode),
+                        gpa: q.Gpa,
                         cancellationToken: cancellationToken);
                 }
 
@@ -297,7 +314,16 @@ namespace Sms.Infrastructure.Seeding
         // fixture is the shape of the set — which buckets fill, which tabs have content, who
         // reports to whom — and that is legible in a table and invisible in a script.
 
-        private sealed record Credential(string TitleAr, string TitleEn, string Institution, DateTime Awarded, bool TeachingRelevant);
+        /// <summary>
+        /// A degree or a licence. <paramref name="EducationCode"/>/<paramref name="GradeCode"/> name
+        /// rows in the "EducationLevel" and "AcademicGrade" catalogues; both are left null on the
+        /// entries that are licences rather than degrees, which is the case the qualifications tab
+        /// has to keep rendering (BR-EMP-004 covers all three kinds). No university or
+        /// specialization code, because those two catalogues ship empty for a school to author.
+        /// </summary>
+        private sealed record Credential(
+            string TitleAr, string TitleEn, string Institution, DateTime Awarded, bool TeachingRelevant,
+            string? EducationCode = null, string? GradeCode = null, decimal? Gpa = null);
 
         private sealed record Posting(string JobTitleCode, string UnitKey, string? ManagerIdNo, DateTime From);
 
@@ -310,7 +336,13 @@ namespace Sms.Infrastructure.Seeding
             Gender Gender, DateTime BirthDate, string NationalityCode,
             MaritalStatus Marital, string BankName, string BankAccountNo,
             Posting[] Postings, Deal[] Contracts, Credential[] Qualifications,
-            EmployeeStatus FinalStatus, string? StatusReason, int? MaxWeeklyPeriods);
+            EmployeeStatus FinalStatus, string? StatusReason, int? MaxWeeklyPeriods,
+            // The personal block (owner request 2026-08-27), defaulted so the roster above only
+            // states it where it is interesting. Left empty on most of the staff deliberately: a
+            // real register is patchy, and a demo where every field is filled hides the screens
+            // that have to read "—" without falling over.
+            string? Address = null, string? OriginTown = null, string? WhatsApp = null,
+            string? SpouseIdNo = null, string? PalPay = null, string? JawwalPay = null);
 
         private const string Principal = "900100011";
         private const string ViceHead = "900100022";
@@ -332,10 +364,15 @@ namespace Sms.Infrastructure.Seeding
                 new[] { new Deal(ContractType.FullTime, today.AddDays(-700), today.AddDays(372), 1450m, 300m, ContractStatus.Active) },
                 new[]
                 {
-                    new Credential("ماجستير الإدارة التربوية", "MA, Educational Administration", "الجامعة الإسلامية بغزة", today.AddDays(-3650), false),
-                    new Credential("بكالوريوس اللغة العربية", "BA, Arabic Language", "جامعة الأزهر - غزة", today.AddDays(-7300), true),
+                    new Credential("ماجستير الإدارة التربوية", "MA, Educational Administration", "الجامعة الإسلامية بغزة", today.AddDays(-3650), false, "Master", "Excellent", 3.81m),
+                    new Credential("بكالوريوس اللغة العربية", "BA, Arabic Language", "جامعة الأزهر - غزة", today.AddDays(-7300), true, "Bachelor", "VeryGood", 84.60m),
                 },
-                EmployeeStatus.Active, null, null),
+                EmployeeStatus.Active, null, null,
+                // The one record with the personal block filled end to end — it is the file a
+                // reviewer opens first, and the one that has to show every new field rendering.
+                Address: "غزة - حي الرمال الجنوبي - شارع الجلاء", OriginTown: "بيت دراس",
+                WhatsApp: "0599100011", SpouseIdNo: "900100099",
+                PalPay: "0599100011", JawwalPay: "0567100011"),
 
             // ------------------------------------- the deputy, promoted out of the classroom
             new Person(
@@ -353,10 +390,12 @@ namespace Sms.Infrastructure.Seeding
                 new[] { new Deal(ContractType.FullTime, today.AddDays(-700), today.AddDays(372), 1100m, 220m, ContractStatus.Active) },
                 new[]
                 {
-                    new Credential("ماجستير المناهج وطرق التدريس", "MA, Curricula and Teaching Methods", "الجامعة الإسلامية بغزة", today.AddDays(-2555), true),
-                    new Credential("بكالوريوس الرياضيات", "BSc, Mathematics", "جامعة الأزهر - غزة", today.AddDays(-6570), true),
+                    new Credential("ماجستير المناهج وطرق التدريس", "MA, Curricula and Teaching Methods", "الجامعة الإسلامية بغزة", today.AddDays(-2555), true, "Master", "Excellent", 3.74m),
+                    new Credential("بكالوريوس الرياضيات", "BSc, Mathematics", "جامعة الأزهر - غزة", today.AddDays(-6570), true, "Bachelor", "Good", 76.20m),
                 },
-                EmployeeStatus.Active, null, null),
+                EmployeeStatus.Active, null, null,
+                Address: "غزة - حي النصر", OriginTown: "المجدل", WhatsApp: "0598200022",
+                SpouseIdNo: "900100088", JawwalPay: "0567200022"),
 
             // ------------------------------------------- mathematics, moved between two units
             new Person(
@@ -372,10 +411,12 @@ namespace Sms.Infrastructure.Seeding
                 new[] { new Deal(ContractType.FullTime, today.AddDays(-23), today.AddDays(341), 780m, 120m, ContractStatus.Active) },
                 new[]
                 {
-                    new Credential("بكالوريوس الرياضيات", "BSc, Mathematics", "جامعة الأزهر - غزة", today.AddDays(-4380), true),
-                    new Credential("دبلوم التأهيل التربوي", "Postgraduate Diploma in Education", "الجامعة الإسلامية بغزة", today.AddDays(-3200), true),
+                    new Credential("بكالوريوس الرياضيات", "BSc, Mathematics", "جامعة الأزهر - غزة", today.AddDays(-4380), true, "Bachelor", "VeryGood", 82.10m),
+                    new Credential("دبلوم التأهيل التربوي", "Postgraduate Diploma in Education", "الجامعة الإسلامية بغزة", today.AddDays(-3200), true, "Diploma", "Good", 3.05m),
                 },
-                EmployeeStatus.Active, null, 24),
+                EmployeeStatus.Active, null, 24,
+                Address: "خان يونس - حي الأمل", OriginTown: "يبنا", WhatsApp: "0597300033",
+                PalPay: "0597300033"),
 
             // ------------------------- science, on a term contract that is about to run out ⏰
             new Person(
@@ -394,10 +435,14 @@ namespace Sms.Infrastructure.Seeding
                 },
                 new[]
                 {
-                    new Credential("بكالوريوس تعليم العلوم", "BSc, Science Education", "الجامعة الإسلامية بغزة", today.AddDays(-2200), true),
+                    new Credential("بكالوريوس تعليم العلوم", "BSc, Science Education", "الجامعة الإسلامية بغزة", today.AddDays(-2200), true, "Bachelor", "Excellent", 91.30m),
+                    // A licence: no qualification level, no classification, no GPA — the row that
+                    // proves the tab still reads when the four catalogues have nothing to say.
                     new Credential("شهادة السلامة المخبرية", "Laboratory Safety Certificate", "وزارة التربية والتعليم العالي", today.AddDays(-600), false),
                 },
-                EmployeeStatus.Active, null, 20),
+                // Single, so no spouse document — the pairing the personal tab must not insist on.
+                EmployeeStatus.Active, null, 20,
+                Address: "غزة - حي الشجاعية", OriginTown: "حمامة", WhatsApp: "0592400044"),
 
             // ---------------------------- the accountant: a passport holder, not a national ID
             new Person(

@@ -21,6 +21,12 @@ namespace Sms.Web.Models
         public string? Search { get; set; }
 
         /// <summary>
+        /// Whether deactivated accounts are being shown. Off by default; on, they are listed as
+        /// read-only rows, because nothing granted to an account that cannot sign in takes effect.
+        /// </summary>
+        public bool IncludeInactive { get; set; }
+
+        /// <summary>
         /// The account just provisioned, carried across the redirect so its one-time password can be
         /// shown once. Nothing stores it and no screen can show it again (BR-SEC-005).
         /// </summary>

@@ -77,6 +77,36 @@ namespace Sms.Infrastructure.Seeding
             await SeedValues("Curriculum", cancellationToken,
                 ("National", "المنهج الوطني", "National curriculum"), ("International", "منهج دولي", "International"), ("Bilingual", "ثنائي اللغة", "Bilingual"));
 
+            // The employee file's qualifications tab picks all four of these rather than typing them
+            // (doc/Modules/12 §8.2, BR-EMP-004; owner request 2026-08-27). "EducationLevel" above is
+            // the fourth — the qualification itself — deliberately shared with the parent record so
+            // "بكالوريوس" is one value across the product rather than two spellings of one.
+            //
+            // University, Specialization and Bank ship EMPTY on purpose. Which universities a school
+            // recognises is a local list a hundred entries long in one country and a different
+            // hundred in the next; seeding a sample would put five plausible-looking rows in a
+            // dropdown that is meant to be authored, and a registrar picking the least wrong of
+            // five is worse data than a registrar being told the list is not set up yet. All three
+            // are maintained on the lookup screen (Setup → Lookups) and on the staff reference
+            // screen — SchoolAuthoredLookups is what makes the tier stop meaning "read only" for
+            // them, which is the whole reason declaring them empty here is coherent rather than a
+            // dead end.
+            await _lookups.DefineCategoryAsync("University", LookupCategoryTier.ProductSeeded, "الجامعة", "University", cancellationToken);
+            await _lookups.DefineCategoryAsync("Specialization", LookupCategoryTier.ProductSeeded, "التخصص", "Specialization", cancellationToken);
+
+            // Declared here rather than conjured by the staff reference screen on first save: until
+            // it was, the category simply did not exist, so Setup → Lookups could not list a list
+            // the product says it owns.
+            await _lookups.DefineCategoryAsync("Bank", LookupCategoryTier.ProductSeeded, "البنك", "Bank", cancellationToken);
+
+            // The classification, unlike the two above, is not a local list: these five bands are
+            // what a transcript states, and a school that grades out of 100 still writes one of them
+            // on the certificate.
+            await _lookups.DefineCategoryAsync("AcademicGrade", LookupCategoryTier.ProductSeeded, "التقدير", "Academic Grade", cancellationToken);
+            await SeedValues("AcademicGrade", cancellationToken,
+                ("Excellent", "ممتاز", "Excellent"), ("VeryGood", "جيد جداً", "Very good"), ("Good", "جيد", "Good"),
+                ("Fair", "مقبول", "Fair"), ("Pass", "ناجح", "Pass"));
+
             await _lookups.DefineCategoryAsync("JobTitle", LookupCategoryTier.ProductSeeded, "المسمى الوظيفي", "Job Title", cancellationToken);
             await SeedValues("JobTitle", cancellationToken,
                 ("Teacher", "معلم", "Teacher"), ("Administrator", "إداري", "Administrator"), ("Accountant", "محاسب", "Accountant"),

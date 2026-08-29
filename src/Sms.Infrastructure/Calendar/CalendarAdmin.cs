@@ -51,6 +51,77 @@ namespace Sms.Infrastructure.Calendar
             return day;
         }
 
+        /// <summary>
+        /// One range, one transaction. Every day is validated first — a range that reaches into
+        /// the past or past the year end is refused whole, before a single row is written — and
+        /// the rows already present are loaded in one query rather than one lookup per day.
+        /// </summary>
+        public async Task<int> DefineDaysAsync(
+            int academicYearId, DateTime startDate, DateTime endDate, DayType dayType, CalendarAudience audience = CalendarAudience.All,
+            bool isProvisional = false, CancellationToken cancellationToken = default)
+        {
+            var from = startDate.Date;
+            var to = endDate.Date;
+            if (to < from)
+            {
+                (from, to) = (to, from);
+            }
+
+            if (CalendarChangeGuard.IsPastDate(from, _clock.UtcNow))
+            {
+                throw new CalendarPastDateEditException(from);
+            }
+
+            await EnsureWithinYearAsync(academicYearId, from, to, cancellationToken);
+
+            var existing = await _db.CalendarDays
+                .Where(d => d.AcademicYearId == academicYearId && d.Date >= from && d.Date <= to)
+                .ToDictionaryAsync(d => d.Date.Date, cancellationToken);
+
+            var painted = 0;
+            for (var date = from; date <= to; date = date.AddDays(1))
+            {
+                if (!existing.TryGetValue(date, out var day))
+                {
+                    day = new CalendarDay { AcademicYearId = academicYearId, Date = date };
+                    _db.CalendarDays.Add(day);
+                }
+
+                day.DayType = dayType;
+                day.Audience = audience;
+                day.Source = CalendarDaySource.Manual;
+                day.IsProvisional = isProvisional;
+                painted++;
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return painted;
+        }
+
+        public async Task<CalendarDay?> ConfirmProvisionalDayAsync(int academicYearId, DateTime date, CancellationToken cancellationToken = default)
+        {
+            if (CalendarChangeGuard.IsPastDate(date, _clock.UtcNow))
+            {
+                throw new CalendarPastDateEditException(date);
+            }
+
+            var day = await _db.CalendarDays.SingleOrDefaultAsync(
+                d => d.AcademicYearId == academicYearId && d.Date == date.Date, cancellationToken);
+            if (day == null)
+            {
+                return null;
+            }
+
+            if (!day.IsProvisional)
+            {
+                return day;
+            }
+
+            day.IsProvisional = false;
+            await _db.SaveChangesAsync(cancellationToken);
+            return day;
+        }
+
         public async Task<CalendarEvent> DefineEventAsync(
             int academicYearId, string nameAr, string nameEn, CalendarEventCategory category, DateTime startDate, DateTime endDate,
             CalendarAudience audience = CalendarAudience.All, bool isPortalVisible = true, CancellationToken cancellationToken = default)

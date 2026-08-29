@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -26,8 +28,14 @@ namespace Sms.Infrastructure.Notifications
             string bodyEn,
             CancellationToken cancellationToken = default)
         {
-            var template = await _db.Templates.SingleOrDefaultAsync(
-                t => t.EventCode == eventCode && t.Channel == channel, cancellationToken);
+            // Past the soft-active filter with the school predicate restored by hand, for the
+            // reason DefineSubscriptionRuleAsync below spells out: Template is
+            // ISoftActiveFiltered, so a template a school has retired is invisible to a plain
+            // query, and reading it as missing inserts a second row that dies on the unique
+            // index over (SchoolId, EventCode, Channel) — as a DbUpdateException no
+            // controller's catch would have translated.
+            var template = await _db.Templates.IgnoreQueryFilters().SingleOrDefaultAsync(
+                t => t.SchoolId == _db.CurrentSchoolId && t.EventCode == eventCode && t.Channel == channel, cancellationToken);
 
             if (template == null)
             {
@@ -85,6 +93,79 @@ namespace Sms.Infrastructure.Notifications
 
             await _db.SaveChangesAsync(cancellationToken);
             return rule;
+        }
+
+        // ------------------------------------------------------------------ reads
+
+        public async Task<IReadOnlyList<TemplateSummary>> ListTemplatesAsync(CancellationToken cancellationToken = default)
+        {
+            // IgnoreQueryFilters with the school predicate restored by hand: a deactivated
+            // template is exactly the row the studio must be able to show and revive, and the
+            // soft-active filter would report it missing.
+            var templates = await _db.Templates
+                .IgnoreQueryFilters()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId)
+                .ToListAsync(cancellationToken);
+
+            if (templates.Count == 0)
+            {
+                return new List<TemplateSummary>();
+            }
+
+            var templateIds = templates.Select(t => t.Id).ToList();
+            var versions = await _db.TemplateVersions
+                .Where(v => templateIds.Contains(v.TemplateId))
+                .ToListAsync(cancellationToken);
+
+            var latestByTemplate = versions
+                .GroupBy(v => v.TemplateId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(v => v.VersionNumber).First());
+
+            return templates
+                // A template with no version at all cannot happen through DefineTemplateAsync,
+                // which writes both in one save — but a hand-inserted row would, and a studio
+                // that throws on one is worse than one that does not list it.
+                .Where(t => latestByTemplate.ContainsKey(t.Id))
+                .Select(t =>
+                {
+                    var latest = latestByTemplate[t.Id];
+                    return new TemplateSummary(
+                        t.Id, t.EventCode, t.Channel, t.IsActive, t.CurrentVersionNumber,
+                        latest.Id, latest.VersionNumber, latest.PublishStatus, latest.ModifiedAtUtc ?? latest.CreatedAtUtc);
+                })
+                .OrderByDescending(t => t.LatestModifiedAtUtc)
+                .ToList();
+        }
+
+        public async Task<TemplateDetail?> GetTemplateAsync(int templateId, CancellationToken cancellationToken = default)
+        {
+            var template = await _db.Templates
+                .IgnoreQueryFilters()
+                .SingleOrDefaultAsync(t => t.Id == templateId && t.SchoolId == _db.CurrentSchoolId, cancellationToken);
+
+            if (template == null)
+            {
+                return null;
+            }
+
+            var versions = await _db.TemplateVersions
+                .Where(v => v.TemplateId == templateId)
+                .OrderByDescending(v => v.VersionNumber)
+                .ToListAsync(cancellationToken);
+
+            return versions.Count == 0 ? null : new TemplateDetail(template, versions, versions[0]);
+        }
+
+        public async Task<IReadOnlyList<(string EventCode, NotificationChannel Channel)>> ListTemplatedPairsAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var pairs = await _db.Templates
+                .IgnoreQueryFilters()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId)
+                .Select(t => new { t.EventCode, t.Channel })
+                .ToListAsync(cancellationToken);
+
+            return pairs.Select(p => (p.EventCode, p.Channel)).ToList();
         }
     }
 }

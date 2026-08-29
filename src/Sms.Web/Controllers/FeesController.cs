@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Fees;
+using Sms.Application.GlExport;
 using Sms.Application.ReadModels;
 using Sms.Application.Setup;
 using Sms.Application.Statements;
@@ -29,13 +30,15 @@ namespace Sms.Web.Controllers
     /// copy-from-last-year with % uplift, approval), 8.3 Charge explorer +
     /// bilingual tax-invoice document view (ZATCA Phase-1 QR payload),
     /// 8.4 Misc charge entry, 8.5 Credit note flow, 8.7 Student/payer
-    /// position (statement of account, as-of date, aging, drill to documents).
+    /// position — read payer-first here (statement of account, as-of date,
+    /// aging, drill to documents) and student-first in
+    /// <c>FeesController.StudentFinance.cs</c>.
     /// Deferred: 8.6 late-fee run console (M20 policy), 8.8 portal fees
     /// (E-304 already shows posted invoices), threshold routing / chain
     /// approval on misc charges and credit notes (WF not modelled).
     /// </summary>
     [Route("fees")]
-    public class FeesController : Controller
+    public partial class FeesController : Controller
     {
         private readonly IFeeAdmin _fees;
         private readonly IStatementService _statements;
@@ -45,8 +48,17 @@ namespace Sms.Web.Controllers
         private readonly IWorkingYearContext _workingYear;
         private readonly IClock _clock;
         private readonly IPermissionService _permissions;
+        private readonly IGlAccountDirectory? _glAccounts;
 
-        public FeesController(IFeeAdmin fees, IStatementService statements, ISystemSetupAdmin setup, AppDbContext db, IAuditContext audit, IWorkingYearContext workingYear, IClock clock, IPermissionService permissions)
+        /// <summary>
+        /// <paramref name="glAccounts"/> is optional on purpose, exactly as
+        /// <c>IGlPostingPort</c> is on <c>GlExportController</c>: it is registered
+        /// only by the ERP bridge, and a school running this system standalone
+        /// still configures GL export codes by hand against an accountant's own
+        /// ledger. Absent, the category screen offers no chart and keeps the
+        /// free-text field it always had.
+        /// </summary>
+        public FeesController(IFeeAdmin fees, IStatementService statements, ISystemSetupAdmin setup, AppDbContext db, IAuditContext audit, IWorkingYearContext workingYear, IClock clock, IPermissionService permissions, IGlAccountDirectory? glAccounts = null)
         {
             _fees = fees;
             _statements = statements;
@@ -56,6 +68,7 @@ namespace Sms.Web.Controllers
             _workingYear = workingYear;
             _clock = clock;
             _permissions = permissions;
+            _glAccounts = glAccounts;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -115,6 +128,29 @@ namespace Sms.Web.Controllers
             m.Rows = all.Select(c => new FeeCategoryCatalogViewModel.Row(c, lineCounts.FirstOrDefault(x => x.Key == c.Id)?.N ?? 0, chargeCounts.FirstOrDefault(x => x.Key == c.Id)?.N ?? 0)).ToList();
             var vat = await _setup.GetSettingAsync(SettingKeys.VatRate);
             m.DefaultVatRate = decimal.TryParse(vat, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) ? v : null;
+
+            // The chart of accounts, when a ledger is attached, so the GL export code is picked from
+            // the accounts that actually exist. A failure here is not this screen's failure: the
+            // catalogue must still open and stay editable if the ledger is down, so an empty list —
+            // which reads downstream as "no ledger" — is the right answer rather than a 500.
+            if (_glAccounts != null)
+            {
+                try
+                {
+                    m.GlAccounts = await _glAccounts.GetPostableAccountsAsync(HttpContext.RequestAborted);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception)
+                {
+                    // Deliberately swallowed, and narrowly: the catalogue is a school screen that
+                    // must keep opening when the ledger cannot answer. m.GlAccounts stays empty,
+                    // which the view reads as "no ledger" and renders as the free-text field.
+                }
+            }
+
             return View(m);
         }
 
@@ -535,13 +571,41 @@ namespace Sms.Web.Controllers
 
         // ================================================================== 8.7 Student/payer position
 
+        /// <summary>
+        /// <para>
+        /// <paramref name="parentId"/> exists because a <c>Payer</c> row is created by the first
+        /// charge (BR-FEE-004), not by being a guardian — so a school that has registered six
+        /// hundred families and billed two had a statement screen that could find two of them and
+        /// answered "no matching payers" for the rest. A guardian on file who has never been billed
+        /// is a legitimate answer to this search, and their statement is legitimately empty; saying
+        /// so is the difference between an account not yet opened and a person who does not exist.
+        /// </para>
+        /// </summary>
         [HttpGet("position")]
         [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.Position, ActionVerb.View)]
-        public async Task<IActionResult> Position(int? payerId = null, string? q = null, DateTime? asOf = null)
+        public async Task<IActionResult> Position(int? payerId = null, string? q = null, DateTime? asOf = null, int? parentId = null)
         {
             var m = new PayerPositionViewModel { Q = q, AsOf = asOf };
             m.Payers = await FinanceQueries.SearchPayersAsync(_db, q, take: 30);
-            if (payerId == null && m.Payers.Count == 1 && !string.IsNullOrWhiteSpace(q)) payerId = m.Payers[0].Payer.Id;
+            (m.Unbilled, m.UnbilledTotal) = await FinanceQueries.SearchUnbilledGuardiansAsync(_db, q, take: 30);
+
+            if (parentId != null)
+            {
+                m.SelectedUnbilled = await FinanceQueries.UnbilledGuardianAsync(_db, parentId.Value);
+                // Null means the guardian has since been billed — a charge posted between the search
+                // and the click. Fall through to their real payer rather than showing an empty
+                // statement that is now a lie.
+                if (m.SelectedUnbilled != null) return View(m);
+                payerId ??= await _db.Payers.AsNoTracking().Where(p => p.ParentId == parentId).Select(p => p.Id).FirstOrDefaultAsync();
+                if (payerId == 0) return NotFound();
+            }
+
+            if (payerId == null && m.Payers.Count == 1 && m.Unbilled.Count == 0 && !string.IsNullOrWhiteSpace(q)) payerId = m.Payers[0].Payer.Id;
+            if (payerId == null && m.Payers.Count == 0 && m.Unbilled.Count == 1 && !string.IsNullOrWhiteSpace(q))
+            {
+                m.SelectedUnbilled = m.Unbilled[0];
+                return View(m);
+            }
             if (payerId == null) return View(m);
             m.Selected = await FinanceQueries.CardAsync(_db, payerId.Value);
             if (m.Selected == null) return NotFound();
@@ -554,7 +618,7 @@ namespace Sms.Web.Controllers
             var now = _clock.UtcNow;
             m.Aging = m.OpenCharges.GroupBy(r => ReceivablesAgingBucketer.Bucket(r.Charge.PostedAtUtc, now)).ToDictionary(g => g.Key, g => g.Sum(r => r.Remaining));
             var perChild = new List<(Student, decimal)>();
-            foreach (var child in m.Selected.Children) perChild.Add((child, await _fees.ComputeStudentPositionAsync(child.Id)));
+            foreach (var child in m.Selected.Students) perChild.Add((child, await _fees.ComputeStudentPositionAsync(child.Id)));
             m.PerChild = perChild;
             return View(m);
         }

@@ -46,6 +46,22 @@ namespace Sms.Domain.Schools
 
         public string? Website { get; set; }
 
+        /// <summary>
+        /// BR-SCH-006: branding assets are attachments (doc 10), so the school row keeps a pointer
+        /// and re-uploading is a new version of one slot rather than a second file nobody can tell
+        /// apart from the first. A plain int? with no FK, exactly as Student.PhotoAttachmentId
+        /// (E-008) — the attachment is a different aggregate, and a real FK here would add another
+        /// cascade path into core.School for no reader's benefit.
+        /// <para>
+        /// Deliberately not [RequiresAuditReason]: a logo is not an identity field, so changing it
+        /// does not demand the reason BR-SCH-002 asks of a name. T1 still records the change.
+        /// </para>
+        /// </summary>
+        public int? LogoAttachmentId { get; set; }
+
+        /// <summary>The seal slot; same reasoning as <see cref="LogoAttachmentId"/> (BR-SCH-006).</summary>
+        public int? SealAttachmentId { get; set; }
+
         /// <summary>Resolved by SchoolTimeZoneConverter (E-009) — a Windows or IANA id per the host's tz database.</summary>
         public string TimeZoneId { get; set; } = "Arab Standard Time";
 

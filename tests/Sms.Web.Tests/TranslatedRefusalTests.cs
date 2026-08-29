@@ -86,5 +86,50 @@ namespace Sms.Web.Tests
                 source.Contains("IsArabic", StringComparison.Ordinal),
                 $"{fileName} calls UserMessage.For but defines no IsArabic — the translation would be decided by nothing.");
         }
+
+        /// <summary>
+        /// A literal handed straight to the flash bar, in whatever language the author happened to
+        /// be thinking in.
+        /// </summary>
+        private static readonly Regex UntranslatedFlash =
+            new(@"TempData\[""(Flash|Error|Message)""\]\s*(\+?=)\s*[@$]*""", RegexOptions.Compiled);
+
+        /// <summary>Anything on the line that makes the message bilingual — <c>T(en, ar)</c> or the refusal translator.</summary>
+        private static readonly Regex Translated =
+            new(@"\bT\(|UserMessage\.For\b", RegexOptions.Compiled);
+
+        /// <summary>
+        /// The success half of the same rule. Refusals were the loud half of this defect — an
+        /// Arabic administrator told in English that a save was rejected — but a save that says
+        /// "Permissions saved." to the same reader is the same defect being quiet about it, and
+        /// there was one of those, on the screen that hands out permissions.
+        /// <para>
+        /// Every message the flash bar shows goes through <c>T(en, ar)</c>, or through something
+        /// that does. That is checkable in the source and nowhere else: by the time the string
+        /// reaches <c>TempData</c> it is one string, and which language it is in is no longer a
+        /// question the running program can answer.
+        /// </para>
+        /// </summary>
+        [Theory]
+        [MemberData(nameof(Controllers))]
+        public void No_controller_puts_a_bare_literal_in_the_flash_bar(string fileName)
+        {
+            var path = Path.Combine(ControllersDirectory(), fileName);
+            var lines = File.ReadAllLines(path);
+
+            var offenders = lines
+                .Select((text, index) => (Text: text.Trim(), Line: index + 1))
+                .Where(l => UntranslatedFlash.IsMatch(l.Text) && !l.Text.StartsWith("//", StringComparison.Ordinal))
+                // A line that also calls a translator is translated: the literal on it is a
+                // separator or a prefix around the message, not the message.
+                .Where(l => !Translated.IsMatch(l.Text))
+                .ToList();
+
+            Assert.True(
+                offenders.Count == 0,
+                $"{fileName} assigns a bare string literal to the flash bar at line(s) " +
+                $"{string.Join(", ", offenders.Select(o => o.Line))}. Wrap it in T(\"…\", \"…\") so the " +
+                "reader gets the message in their own language.");
+        }
     }
 }

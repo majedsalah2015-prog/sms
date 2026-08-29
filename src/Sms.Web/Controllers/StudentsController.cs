@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
 using Sms.Application.Common.Interfaces;
+using Sms.Application.Parents;
 using Sms.Application.Students;
 using Sms.Domain.Common;
 using Sms.Domain.Sections;
@@ -38,6 +39,10 @@ namespace Sms.Web.Controllers
     public partial class StudentsController : Controller
     {
         private readonly IStudentAdmin _students;
+
+        /// <summary>The import creates guardian files as it goes; nothing else on this controller writes one.</summary>
+        private readonly IParentAdmin _parents;
+
         private readonly AppDbContext _db;
         private readonly IAuditContext _audit;
         private readonly IClock _clock;
@@ -45,9 +50,30 @@ namespace Sms.Web.Controllers
         private readonly IPermissionService _permissions;
         private readonly Sms.Web.Services.PersonPhotoService _photos;
 
-        public StudentsController(IStudentAdmin students, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions, Sms.Web.Services.PersonPhotoService photos)
+        /// <summary>The one gate every file in the product passes through — the photograph above and the documents tab below use it alike.</summary>
+        private readonly Sms.Web.Services.AttachmentIntake _intake;
+
+        private readonly ICurrentUser _currentUser;
+
+        /// <summary>
+        /// Seating a child in a section is a Sections operation with its own rules (capacity,
+        /// gender policy, the transfer's reason code). The placement screen reaches it through the
+        /// same port the section's own page uses rather than writing memberships itself — two
+        /// screens writing the same table by two different sets of checks is how one of them ends
+        /// up wrong.
+        /// </summary>
+        private readonly Sms.Application.Sections.ISectionAdmin _sections;
+
+        /// <summary>What an attachment calls this record. Written once so a typo cannot detach a whole file's documents.</summary>
+        private const string StudentEntity = "Student";
+
+        public StudentsController(IStudentAdmin students, IParentAdmin parents, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions, Sms.Web.Services.PersonPhotoService photos, Sms.Web.Services.AttachmentIntake intake, ICurrentUser currentUser, Sms.Application.Sections.ISectionAdmin sections)
         {
+            _sections = sections;
+            _intake = intake;
+            _currentUser = currentUser;
             _students = students;
+            _parents = parents;
             _db = db;
             _audit = audit;
             _clock = clock;
@@ -68,8 +94,11 @@ namespace Sms.Web.Controllers
             if (status != null) query = query.Where(s => s.Status == status);
             if (!string.IsNullOrWhiteSpace(q))
             {
+                // The mobile is searched as well as shown. A number is what a caller gives when
+                // they cannot spell the child's name, and a column you can read but not search is
+                // half a column.
                 var t = q.Trim();
-                query = query.Where(s => s.StudentNo.Contains(t) || s.FirstNameAr.Contains(t) || s.FamilyNameAr.Contains(t) || s.FirstNameEn.Contains(t) || s.FamilyNameEn.Contains(t) || (s.PrimaryIdNo != null && s.PrimaryIdNo.Contains(t)));
+                query = query.Where(s => s.StudentNo.Contains(t) || s.FirstNameAr.Contains(t) || s.FamilyNameAr.Contains(t) || s.FirstNameEn.Contains(t) || s.FamilyNameEn.Contains(t) || (s.PrimaryIdNo != null && s.PrimaryIdNo.Contains(t)) || (s.Mobile != null && s.Mobile.Contains(t)));
             }
 
             var total = await query.CountAsync();
@@ -82,7 +111,6 @@ namespace Sms.Web.Controllers
             var sections = await _db.Sections.AsNoTracking().Where(s => memberships.Select(m => m.SectionId).Contains(s.Id)).ToListAsync();
             var links = await _db.StudentGuardianLinks.AsNoTracking().Where(l => ids.Contains(l.StudentId) && l.EffectiveToUtc == null && l.IsPrimaryContact).ToListAsync();
             var parents = await _db.Parents.AsNoTracking().Where(p => links.Select(l => l.ParentId).Contains(p.Id)).ToListAsync();
-            var nats = await LookupAsync("Nationality");
 
             var rows = students.Select(s =>
             {
@@ -93,11 +121,16 @@ namespace Sms.Web.Controllers
                 var sec = m == null ? null : sections.FirstOrDefault(x => x.Id == m.SectionId);
                 var pl = links.FirstOrDefault(l => l.StudentId == s.Id);
                 var par = pl == null ? null : parents.FirstOrDefault(x => x.Id == pl.ParentId);
-                var nat = nats.FirstOrDefault(n => n.Id == s.NationalityLookupId);
-                return new StudentListViewModel.Row(s, g == null ? null : (IsArabic ? g.Name.NameAr : g.Name.NameEn), sec == null ? null : (IsArabic ? sec.NameAr : sec.NameEn), par == null ? null : (IsArabic ? par.NameAr : par.NameEn), nat == default ? "?" : (IsArabic ? nat.Ar : nat.En));
+                return new StudentListViewModel.Row(s, g == null ? null : (IsArabic ? g.Name.NameAr : g.Name.NameEn), sec == null ? null : (IsArabic ? sec.NameAr : sec.NameEn), par == null ? null : (IsArabic ? par.NameAr : par.NameEn));
             }).Where(r => grade == null || (r.GradeName != null && grades.Any(g => g.Id == grade && (IsArabic ? g.Name.NameAr : g.Name.NameEn) == r.GradeName))).ToList();
 
-            return View(new StudentListViewModel { Rows = rows, Query = q, Status = status, GradeId = grade, Grades = grades.OrderBy(g => g.SequenceOrder).ToList(), Total = total });
+            return View(new StudentListViewModel
+            {
+                Rows = rows, Query = q, Status = status, GradeId = grade,
+                Grades = grades.OrderBy(g => g.SequenceOrder).ToList(), Total = total,
+                CanPlace = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View, HttpContext.RequestAborted),
+            });
         }
 
         [HttpGet("new")]
@@ -121,8 +154,8 @@ namespace Sms.Web.Controllers
                 // refused must not leave a registered student behind it — the registrar would have
                 // to find the half-made record and finish it from the file screen, and the second
                 // attempt at this form is how a child ends up in the register twice.
-                var rejection = photo == null ? PhotoRejection.None : PersonPhotoService.Inspect(photo);
-                if (rejection != PhotoRejection.None) throw new InvalidOperationException(Labels.PhotoRejection(rejection, IsArabic));
+                var rejection = photo == null ? FileRejection.None : PersonPhotoService.Inspect(photo);
+                if (rejection != FileRejection.None) throw new InvalidOperationException(Labels.FileRejection(rejection, IsArabic, PersonPhotoService.PhotoFormats, PersonPhotoService.MaxPhotoBytes));
 
                 var student = await _students.RegisterStudentAsync(form.FirstNameAr!, form.FatherNameAr!, form.GrandfatherNameAr!, form.FamilyNameAr!, form.FirstNameEn!, form.FatherNameEn!, form.GrandfatherNameEn!, form.FamilyNameEn!,
                     form.Gender, form.DateOfBirth.Value, form.NationalityLookupId.Value, form.PrimaryIdTypeLookupId, string.IsNullOrWhiteSpace(form.PrimaryIdNo) ? null : form.PrimaryIdNo.Trim(), form.PrimaryIdExpiry);
@@ -186,6 +219,21 @@ namespace Sms.Web.Controllers
                 model.ActiveTab = "personal";
             }
 
+            // BR-ATT-004: the documents inherit this screen's access, and the restricted types
+            // follow the same permission as the rest of the sensitive data on the file.
+            model.Documents = new EntityDocumentsViewModel
+            {
+                Controller = "Students",
+                OwnerId = id,
+                OwnerName = IsArabic ? model.Student.FirstNameAr : model.Student.FirstNameEn,
+                Rows = await _intake.ListAsync(StudentEntity, id, model.CanSeeSocialProfile, HttpContext.RequestAborted),
+                Types = await _intake.TypesForAsync(ScreenCatalog.Modules.Students, model.CanSeeSocialProfile, HttpContext.RequestAborted),
+                CanEdit = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Edit, HttpContext.RequestAborted),
+                CanVerify = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Approve, HttpContext.RequestAborted),
+            };
+
             return View(model);
         }
 
@@ -219,10 +267,9 @@ namespace Sms.Web.Controllers
                 _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
                 await _students.UpdateSocialProfileAsync(
                     id,
-                    form.MotherName, form.MotherNationalId, form.MotherOccupation, form.MotherEducationLookupId, form.MotherMobile,
-                    form.FatherStatus, form.MotherStatus, form.Religion,
+                    form.Religion,
                     form.ResidencyStatus, form.FinancialStatus, form.RationCardNo,
-                    form.PlaceOfBirth, form.FamilySize, form.BirthOrder,
+                    form.PlaceOfBirth, form.FamilySize, form.BirthOrder, form.SiblingCount, form.Mobile,
                     HttpContext.RequestAborted);
                 TempData["Flash"] = T("Social profile updated.", "تم تحديث البيانات الاجتماعية.");
             }
@@ -249,7 +296,7 @@ namespace Sms.Web.Controllers
             var photo = await _photos.ReadAsync(photoId, HttpContext.RequestAborted);
             if (photo == null) { return NotFound(); }
 
-            return File(photo.Value.Content, photo.Value.ContentType);
+            return File(photo.Content, photo.ContentType);
         }
 
         [HttpPost("{id:int}/photo")]
@@ -272,7 +319,7 @@ namespace Sms.Web.Controllers
             }
             // Also an InvalidOperationException, and it carries a reason rather than a sentence —
             // the wording is chosen here, in the reader's language, never thrown from the service.
-            catch (PhotoRejectedException ex) { TempData["Error"] = Labels.PhotoRejection(ex.Rejection, IsArabic); }
+            catch (FileRejectedException ex) { TempData["Error"] = Labels.FileRejection(ex.Rejection, IsArabic, ex.AllowedFormats, ex.MaxBytes); }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
 
             return RedirectToAction(nameof(File), new { id, tab = "personal" });
@@ -301,12 +348,121 @@ namespace Sms.Web.Controllers
         private async Task AttachPhotoAsync(int studentId, IFormFile file)
         {
             var attachmentId = await _photos.SaveAsync(
-                file, "Student", studentId, ScreenCatalog.Modules.Students, HttpContext.RequestAborted);
+                file, StudentEntity, studentId, ScreenCatalog.Modules.Students, HttpContext.RequestAborted);
 
             var student = await _db.Students.SingleAsync(s => s.Id == studentId, HttpContext.RequestAborted);
             student.PhotoAttachmentId = attachmentId;
             await _db.SaveChangesAsync(HttpContext.RequestAborted);
         }
+
+        // ------------------------------------------------------------------ documents
+        //
+        // doc 10 §5 "Entity documents tab". The same partial, the same intake and the same four
+        // verbs the employee file uses — a birth certificate and a contract are filed by one
+        // mechanism, so the school learns it once. Access inherits from this screen (BR-ATT-004):
+        // whoever may open the student's file may see their documents, except the restricted types,
+        // which follow the social-profile permission the rest of the sensitive data follows.
+
+        [HttpPost("{id:int}/documents")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Edit)]
+        public async Task<IActionResult> UploadDocument(int id, string typeCode, IFormFile? file, string? title, DateTime? expiry)
+        {
+            if (!await _db.Students.AnyAsync(s => s.Id == id, HttpContext.RequestAborted)) { return NotFound(); }
+
+            try
+            {
+                await _intake.SaveAsync(
+                    file, typeCode, StudentEntity, id,
+                    titleAr: IsArabic ? title : null, titleEn: IsArabic ? null : title,
+                    expiryDateUtc: expiry, cancellationToken: HttpContext.RequestAborted);
+                TempData["Flash"] = T("Document attached.", "تم إرفاق المستند.");
+            }
+            catch (FileRejectedException ex) { TempData["Error"] = Labels.FileRejection(ex.Rejection, IsArabic, ex.AllowedFormats, ex.MaxBytes); }
+            catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException) { TempData["Error"] = T("That file does not meet this document type's rules.", "هذا الملف لا يستوفي قواعد نوع المستند."); }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+
+            return RedirectToAction(nameof(File), new { id, tab = "documents" });
+        }
+
+        [HttpGet("{id:int}/documents/{attachmentId:int}")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View)]
+        public async Task<IActionResult> DownloadDocument(int id, int attachmentId)
+        {
+            // BR-ATT-005: the file is served only after this endpoint has satisfied itself that the
+            // document belongs to the student in the route. Without the check, holding the file
+            // permission for one student would read every attachment in the school by guessing ids.
+            var owner = await _intake.OwnerOfAsync(attachmentId, HttpContext.RequestAborted);
+            if (owner.OwningEntityType != StudentEntity || owner.OwningEntityId != id) { return NotFound(); }
+
+            if (!await CanSeeRestrictedAsync() && await IsRestrictedDocumentAsync(attachmentId)) { return NotFound(); }
+
+            var stored = await _intake.ReadAsync(attachmentId, HttpContext.RequestAborted);
+            if (stored == null) { return NotFound(); }
+
+            // Inline rather than as a download: doc 10 §7 asks a viewer to show a document without
+            // making a copy of it first, and a browser can render every format this intake accepts.
+            return File(stored.Content, stored.ContentType);
+        }
+
+        [HttpPost("{id:int}/documents/verify")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Approve)]
+        public async Task<IActionResult> VerifyDocument(int id, int attachmentId)
+        {
+            var owner = await _intake.OwnerOfAsync(attachmentId, HttpContext.RequestAborted);
+            if (owner.OwningEntityType != StudentEntity || owner.OwningEntityId != id) { return NotFound(); }
+
+            try
+            {
+                await _intake.VerifyAsync(attachmentId, _currentUser.UserId, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Document marked as sighted.", "تم تأكيد مطابقة المستند.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+
+            return RedirectToAction(nameof(File), new { id, tab = "documents" });
+        }
+
+        [HttpPost("{id:int}/documents/void")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Deactivate)]
+        public async Task<IActionResult> VoidDocument(int id, int attachmentId, string? reason)
+        {
+            var owner = await _intake.OwnerOfAsync(attachmentId, HttpContext.RequestAborted);
+            if (owner.OwningEntityType != StudentEntity || owner.OwningEntityId != id) { return NotFound(); }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                TempData["Error"] = T("Say why the document is being voided.", "اذكر سبب إلغاء المستند.");
+                return RedirectToAction(nameof(File), new { id, tab = "documents" });
+            }
+
+            try
+            {
+                await _intake.VoidAsync(attachmentId, reason.Trim(), HttpContext.RequestAborted);
+                TempData["Flash"] = T("Document voided.", "تم إلغاء المستند.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+
+            return RedirectToAction(nameof(File), new { id, tab = "documents" });
+        }
+
+        /// <summary>BR-GLB-072: the same permission that opens the social profile opens the restricted documents beside it.</summary>
+        private Task<bool> CanSeeRestrictedAsync()
+            => _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.SocialProfile, ActionVerb.View, HttpContext.RequestAborted);
+
+        /// <summary>
+        /// Read past the soft-active filter so a retired type still says it was restricted — but
+        /// with the school put back by hand, because IgnoreQueryFilters drops the tenant filter too.
+        /// </summary>
+        private Task<bool> IsRestrictedDocumentAsync(int attachmentId)
+            => _db.Attachments.AsNoTracking()
+                .Where(a => a.Id == attachmentId)
+                .Join(
+                    _db.DocumentTypes.IgnoreQueryFilters().Where(t => t.SchoolId == _db.CurrentSchoolId),
+                    a => a.DocumentTypeId, t => t.Id, (a, t) => t.IsRestricted)
+                .SingleOrDefaultAsync(HttpContext.RequestAborted);
 
         [HttpPost("{id:int}/status")]
         [ValidateAntiForgeryToken]
@@ -370,7 +526,12 @@ namespace Sms.Web.Controllers
         [HttpPost("{id:int}/enroll")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Create)]
-        public async Task<IActionResult> Enroll(int id, int? gradeYearProfileId, DateTime? enrollmentDate, EnrollmentSourceType sourceType)
+        /// <summary>
+        /// One enrollment action, two screens. <paramref name="returnTo"/> sends the reader back
+        /// where they started: the placement screen's next step is seating the child in a section,
+        /// and bouncing them to the file's academic tab to get there would lose the thread.
+        /// </summary>
+        public async Task<IActionResult> Enroll(int id, int? gradeYearProfileId, DateTime? enrollmentDate, EnrollmentSourceType sourceType, string? returnTo = null)
         {
             try
             {
@@ -379,7 +540,9 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Enrollment recorded.", "تم تسجيل القيد.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
-            return RedirectToAction(nameof(File), new { id, tab = "academic" });
+            return returnTo == "placement"
+                ? RedirectToAction(nameof(Placement), new { id })
+                : RedirectToAction(nameof(File), new { id, tab = "academic" });
         }
 
         [HttpPost("{id:int}/delete")]

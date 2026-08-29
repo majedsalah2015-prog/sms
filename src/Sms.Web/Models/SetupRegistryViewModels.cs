@@ -56,6 +56,12 @@ namespace Sms.Web.Models
 
         public bool IncludeInactive { get; set; }
 
+        /// <summary>
+        /// The type the form is correcting, if any — the ?edit= on the URL. The code is the
+        /// identity, so editing locks that field and the save is the same upsert as adding.
+        /// </summary>
+        public int? EditId { get; set; }
+
         // --- the form ---------------------------------------------------------
 
         public string? Code { get; set; }

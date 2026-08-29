@@ -40,6 +40,14 @@
                     <div class="col-md-2"><label class="form-label small" asp-for="PrimaryIdTypeLookupId">@T("ID type", "نوع الهوية")</label><select asp-for="PrimaryIdTypeLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var t in Model.IdTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }</select></div>
                     <div class="col-md-2"><label class="form-label small" asp-for="PrimaryIdNo">@T("ID number", "رقم الهوية")</label><input asp-for="PrimaryIdNo" class="form-control form-control-sm" dir="ltr" /></div>
                     <div class="col-md-2"><label class="form-label small" asp-for="PrimaryIdExpiry">@T("ID expiry", "انتهاء الهوية")</label><input asp-for="PrimaryIdExpiry" asp-format="{0:yyyy-MM-dd}" type="date" class="form-control form-control-sm" /></div>
+                    @* The directory is the staff contact card (doc/Modules/12 §8.1), so the number is
+                       asked for while the new employee is still at the desk — the same reasoning that
+                       puts the photograph on this form rather than only on the file screen. *@
+                    <div class="col-md-3"><label class="form-label small" asp-for="Mobile">@T("Mobile", "الجوال")</label><input asp-for="Mobile" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" /><span asp-validation-for="Mobile" class="text-danger small"></span></div>
+                    @* The rest of the personal block is on the employee file, not here: a registration
+                       form that asks for a bank account before the person has a number is a form
+                       people abandon. This one number is on it because HR has the phone in hand. *@
+                    <div class="col-md-3"><label class="form-label small" asp-for="WhatsAppNumber">@T("WhatsApp", "الواتس اب")</label><input asp-for="WhatsAppNumber" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" /><span asp-validation-for="WhatsAppNumber" class="text-danger small"></span></div>
                 </div>
             </div>
             <div class="sms-card p-4">
@@ -59,19 +67,18 @@
                the record exists (doc/Modules/12 §8.1–8.2). *@
             <div class="sms-card p-4 mb-3">
                 <h2 class="h6 mb-3">@T("Photograph", "الصورة الشخصية")</h2>
-                <div class="sms-photo-panel text-center" data-photo-preview>
-                    <div class="sms-photo-frame mx-auto mb-2">
-                        <img data-photo-preview-image alt="@T("Chosen photo", "الصورة المختارة")" hidden />
-                        <span class="sms-photo-empty" data-photo-preview-placeholder aria-hidden="true"><i class="bi bi-person"></i></span>
-                    </div>
-                    <label class="visually-hidden" asp-for="Photo">@T("Photo file", "ملف الصورة")</label>
-                    <input asp-for="Photo" type="file" accept="image/jpeg,image/png" class="form-control form-control-sm" data-photo-preview-input />
-                    <div class="form-text">@T("JPEG or PNG, up to 2 MB. Optional — it can also be added from the employee file later.", "JPEG أو PNG، حتى 2 ميغابايت. اختيارية — ويمكن إضافتها لاحقاً من ملف الموظف.")</div>
-                    @* A browser never re-sends a file after a failed post, so the box above comes
-                       back empty even though a photograph was chosen. Saying so beats letting the
-                       registrar submit twice and wonder where it went. *@
-                    @if (!ViewData.ModelState.IsValid) { <div class="form-text fw-semibold">@T("Choose the photo again — a browser does not resend it after an error.", "اختر الصورة مرة أخرى — فالمتصفح لا يعيد إرسالها بعد الخطأ.")</div> }
-                </div>
+                @* The same upload box the student register and both file screens use, so a
+                   photograph is chosen the same way wherever the product asks for one. *@
+                <partial name="_FileUploadField" model="@(new FileUploadFieldViewModel {
+                    Id = "Photo", Name = "Photo",
+                    AllowedFormats = Sms.Web.Services.PersonPhotoService.PhotoFormats,
+                    MaxBytes = Sms.Web.Services.PersonPhotoService.MaxPhotoBytes,
+                    Shape = FileUploadShape.Portrait,
+                    Hint = T("Optional — it can also be added from the employee file later.", "اختيارية — ويمكن إضافتها لاحقاً من ملف الموظف.") })" />
+                @* A browser never re-sends a file after a failed post, so the box above comes
+                   back empty even though a photograph was chosen. Saying so beats letting the
+                   registrar submit twice and wonder where it went. *@
+                @if (!ViewData.ModelState.IsValid) { <div class="form-text fw-semibold">@T("Choose the photo again — a browser does not resend it after an error.", "اختر الصورة مرة أخرى — فالمتصفح لا يعيد إرسالها بعد الخطأ.")</div> }
             </div>
             <div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a><div class="form-text mt-3">@T("Contracts, qualifications and teacher designation are added from the Employee file after registration.", "تُضاف العقود والمؤهلات وتعيين المعلم من ملف الموظف بعد التسجيل.")</div></div></div>
     </div>

@@ -3,12 +3,16 @@
 @using Sms.Application.Setup
 @inject ISystemSetupAdmin SetupAdmin
 @inject Sms.Web.Navigation.ModuleVisibility Visibility
+@inject Sms.Web.Services.SchoolBrandMark BrandMark
 @model Sms.Web.Models.HomeDashboardViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     ViewData["Title"] = isRtl ? "الرئيسية" : "Home";
     ViewData["Breadcrumb"] = isRtl ? "الرئيسية" : "Home";
     string T(string en, string ar) => isRtl ? ar : en;
+
+    // BR-SCH-006: the school wears its own mark beside its own name once one is uploaded.
+    var brandLogoVersion = await BrandMark.VersionAsync();
 
     // The full module list still lives on this page, one disclosure below the departments. The
     // departments are how the work is organised; the modules are what the product contains, and a
@@ -39,7 +43,14 @@
 }
 
 <div class="sms-page-head">
-    <div>
+    <div class="sms-page-ident">
+        @* BR-SCH-006: the school's own mark beside its own name. Decorative — the name is next to it,
+           and there is nothing here for a screen reader to gain by hearing the file described. *@
+        @if (brandLogoVersion is int pageLogoVersion)
+        {
+            <img src="@Url.Action("BrandLogo", "Home", new { v = pageLogoVersion })" alt="" class="sms-page-logo" />
+        }
+        <div>
         <h1 class="sms-page-title">@(Model.HasSchool ? (isRtl ? Model.SchoolNameAr : Model.SchoolNameEn) : T("Welcome", "مرحباً"))</h1>
         <p class="text-muted mb-0">
             @if (Model.HasSchool)
@@ -55,6 +66,7 @@
                 @T("No school is defined yet — run the setup wizard (Module 01) or the demo seeder.", "لم يتم تعريف مدرسة بعد — شغّل معالج الإعداد (الوحدة 01) أو بيانات العرض التجريبي.")
             }
         </p>
+        </div>
     </div>
     <partial name="_HelpModal" model="help" />
 </div>

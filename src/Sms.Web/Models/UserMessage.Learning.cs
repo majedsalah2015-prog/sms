@@ -1,0 +1,284 @@
+using System;
+using System.Linq;
+using Sms.Application.Common.Exceptions;
+
+namespace Sms.Web.Models
+{
+    /// <summary>
+    /// Every refusal the academic modules can raise, in the reader's language.
+    /// <para>
+    /// Grading, examinations, attendance, the timetable, certificates, the school calendar, and the
+    /// year rollover. Most of these are met by a teacher rather than an administrator, and a teacher
+    /// meeting an untranslated refusal has no help desk sitting beside them — the sentence has to
+    /// carry the rule and the way out of it on its own.
+    /// </para>
+    /// <para>
+    /// Where a count decides what to do next — how many marks are missing, how many periods are
+    /// unplaced — it is carried in the message. Where an internal id is all the engine had, it is
+    /// dropped: the teacher knows which marksheet they opened.
+    /// </para>
+    /// </summary>
+    public static partial class UserMessage
+    {
+        private static string? Learning(Exception exception, bool arabic) => exception switch
+        {
+            // ---------------------------------------------------------------- M16 grading
+
+            GradingScaleLockedException => arabic
+                ? "سلّم التقدير مقفل ولم يعد يُعدَّل — فقد صدرت عليه نتائج منشورة، وتغيير حدوده الآن يغيّر تقديرات أُعلنت للأسر؛ أنشئ سلّماً جديداً للعام القادم (BR-GRA-001)."
+                : "The grading scale is locked and can no longer be edited — published results already rest on it, and moving its bands now would change grades families have already been told; make a new scale for next year instead (BR-GRA-001).",
+
+            BlueprintWeightMismatchException e => arabic
+                ? $"مجموع أوزان مكوّنات التقييم {Amount(e.ActualSum)} وليس 100 — عدّل الأوزان حتى تبلغ مئة قبل الاعتماد (BR-GRA-003)."
+                : $"The assessment component weights add up to {Amount(e.ActualSum)}, not 100 — adjust them until they reach one hundred before finalising (BR-GRA-003).",
+
+            BlueprintNotFinalizedException => arabic
+                ? "لم يُعتمد توزيع الدرجات بعد، ولا تُفتح كشوف الرصد على توزيع ما زال يُعدَّل — اعتمده أولاً (BR-GRA-003)."
+                : "The mark design has not been finalised, and marksheets are not opened against a design that is still being changed — finalise it first (BR-GRA-003).",
+
+            BlueprintLockedException => arabic
+                ? "توزيع الدرجات معتمد ولم تعد مكوّناته تُعدَّل — فقد فُتحت عليه كشوف رصد؛ أنشئ توزيعاً جديداً بدلاً منه (BR-GRA-003)."
+                : "The mark design is finalised and its components no longer change — marksheets have been opened against it; create a new design instead (BR-GRA-003).",
+
+            InvalidMarksheetStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة كشف الرصد الحالية: المسودة تُرفَع، والمرفوعة تُعتمد أو تُعاد، والمعتمدة تُنشَر (BR-GRA-005)."
+                : "That move is not available from the marksheet's current state: a draft is submitted, a submitted one is approved or returned, and an approved one is published (BR-GRA-005).",
+
+            UnresolvedMarkEntriesException e => arabic
+                ? $"بقي {Count(e.UnresolvedCount)} طالباً بلا درجة ولا غياب ولا إعفاء — الكشف يُرفَع مكتملاً حتى لا يُحسَب أحد صفراً بغير قصد (BR-GRA §9)."
+                : $"{Count(e.UnresolvedCount)} student(s) still have neither a mark, an absence, nor an exemption — a marksheet goes up complete, so that nobody is scored zero by omission (BR-GRA §9).",
+
+            GradingScaleInUseException e => arabic
+                ? $"يشير إلى هذا السلّم {Count(e.BlueprintCount)} توزيع درجات، فلا يُحذف — انقلها إلى سلّم آخر أولاً (BR-GRA-001)."
+                : $"{Count(e.BlueprintCount)} mark design(s) point at this scale, so it cannot be deleted — move them to another scale first (BR-GRA-001).",
+
+            BlueprintInUseException e => arabic
+                ? $"فُتح على هذا التوزيع {Count(e.MarksheetCount)} كشف رصد، فلا يُحذف — الدرجات المرصودة سجل لا يُنقض (BR-GRA-003)."
+                : $"{Count(e.MarksheetCount)} marksheet(s) were opened on this design, so it cannot be deleted — the marks in them are a record and stay (BR-GRA-003).",
+
+            MarksheetInUseException e => arabic
+                ? (e.Blocker == MarksheetDeleteBlocker.MarksEntered
+                    ? "رُصدت درجات في هذا الكشف، والدرجة مُدقَّقة من لحظة كتابتها — لا يُحذف الكشف بعدها (BR-GRA-011)."
+                    : "لم يعد الكشف مسودة، ولا يُحذف إلا كشف مسودة لم يُمسّ (BR-GRA-011).")
+                : (e.Blocker == MarksheetDeleteBlocker.MarksEntered
+                    ? "Marks have been entered on this marksheet, and a mark is audited from the moment it is typed — the sheet is not deleted afterwards (BR-GRA-011)."
+                    : "This marksheet has left draft, and only an untouched draft is deleted (BR-GRA-011)."),
+
+            // ---------------------------------------------------------------- M17 examinations
+
+            ExamBlueprintMismatchException => arabic
+                ? "مكوّن الدرجات المختار لا يخص هذه المادة أو هذه الفترة — اختر مكوّناً من توزيع درجات المادة نفسها في فترة جولة الاختبار (BR-EXM-002)."
+                : "The chosen mark component does not belong to this subject or this term — pick one from the subject's own design for the exam round's term (BR-EXM-002).",
+
+            ExamScheduleClashException e => arabic
+                ? $"بلغ هذا الصف حدّه من الاختبارات في يوم {Day(e.Date)} — وزّع الاختبار على يوم آخر؛ الحدّ موضوع حتى لا يُمتحن الطلاب أكثر مما يحتملون في اليوم (BR-EXM-003)."
+                : $"This grade already has as many exams as it may hold on {Day(e.Date)} — move this one to another day; the cap exists so students are not examined more in a day than they can bear (BR-EXM-003).",
+
+            InvalidExamRoundStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة جولة الاختبارات الحالية — افتحها لترى ما وصلت إليه (BR-EXM §4)."
+                : "That move is not available from the exam round's current state — open it to see where it stands (BR-EXM §4).",
+
+            SittingFullException => arabic
+                ? "بلغت القاعة سعتها للاختبار — سعة الاختبار أقل من السعة العادية لتباعد الطلاب؛ افتح جلسة أخرى أو اختر قاعة أوسع (BR-EXM-004)."
+                : "The room is at its exam capacity — exam seating spreads students out, so it holds fewer than usual; open another sitting or choose a larger room (BR-EXM-004).",
+
+            StudentNotSeatedException => arabic
+                ? "هذا الطالب غير مُقعَد في هذه الجلسة — أقعِده أولاً ثم سجّل حضوره أو درجته."
+                : "This student is not seated in this sitting — seat them first, then record their attendance or mark.",
+
+            // ---------------------------------------------------------------- M14 attendance
+
+            DuplicateAttendanceRecordException e => arabic
+                ? $"رُصد حضور هذا الطالب في {Day(e.Date)} من قبل — السجل واحد لكل يوم؛ افتح اليوم وعدّله بدل رصده مرة أخرى (BR-ATD-003)."
+                : $"This student's attendance for {Day(e.Date)} is already captured — there is one record per day; open that day and change it rather than capturing it again (BR-ATD-003).",
+
+            NoSectionMembershipOnDateException e => arabic
+                ? $"لم يكن هذا الطالب في أي شعبة يوم {Day(e.Date)}، ولا يُرصد الحضور لمن لا شعبة له — راجع تاريخ التحاقه بالشعبة (BR-ATD-003)."
+                : $"This student belonged to no section on {Day(e.Date)}, and attendance is not captured for a student with no section — check when they joined it (BR-ATD-003).",
+
+            InvalidJustificationReviewException => arabic
+                ? "لا تُتاح هذه الحركة من حالة العذر الحالية — قد يكون قد بُتّ فيه بالفعل (BR-ATD-005)."
+                : "That move is not available from the excuse's current state — it may already have been decided (BR-ATD-005).",
+
+            InvalidLeavePassTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة إذن الخروج الحالية: المطلوب يُعتمد أو يُرفض، والمعتمد يُستخدم عند البوابة (BR-ATD-006)."
+                : "That move is not available from the leave pass's current state: a requested pass is approved or refused, and an approved one is used at the gate (BR-ATD-006).",
+
+            // ---------------------------------------------------------------- M15 timetable
+
+            PlacementConflictException e => arabic
+                ? e.Conflict switch
+                {
+                    PlacementConflictKind.Teacher => "المعلّم مشغول بحصة أخرى في هذا الوقت — اختر معلّماً آخر أو حصة أخرى (BR-TTB-004).",
+                    PlacementConflictKind.Section => "الشعبة عندها حصة أخرى في هذا الوقت — لا تجلس شعبة في درسين معاً (BR-TTB-004).",
+                    _ => "القاعة مشغولة في هذا الوقت — اختر قاعة أخرى أو حصة أخرى (BR-TTB-004).",
+                }
+                : e.Conflict switch
+                {
+                    PlacementConflictKind.Teacher => "The teacher is already teaching in this period — choose another teacher, or another period (BR-TTB-004).",
+                    PlacementConflictKind.Section => "The section already has a lesson in this period — one class cannot sit in two (BR-TTB-004).",
+                    _ => "The room is already occupied in this period — choose another room, or another period (BR-TTB-004).",
+                },
+
+            TeacherNotAssignedException => arabic
+                ? "هذا المعلّم غير مُسنَد لتدريس هذه المادة لهذه الشعبة — أسنِده في شاشة الإسناد التدريسي أولاً (BR-TCH-002)."
+                : "This teacher is not assigned to teach this subject to this section — make the assignment on the teaching-assignments screen first (BR-TCH-002).",
+
+            IncompletePlacementException e => arabic
+                ? $"ينقص هذه المادة {Count(e.Shortfall)} حصة من نصابها الأسبوعي — الجدول لا يُعتمد وفيه نقص، فأكمل الحصص أو عدّل الخطة الأسبوعية (BR-TTB-003)."
+                : $"This subject is {Count(e.Shortfall)} period(s) short of its weekly plan — a timetable is not approved with gaps, so place the rest or change the plan (BR-TTB-003).",
+
+            InvalidTimetableVersionStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة نسخة الجدول الحالية: المسودة تُدقَّق، والمدقَّقة تُنشر أو تُعاد للمسودة (BR-TTB-002)."
+                : "That move is not available from the timetable version's current state: a draft is validated, and a validated one is published or sent back to draft (BR-TTB-002).",
+
+            TimetableVersionLockedException e => arabic
+                ? (e.Status == Sms.Domain.Timetable.TimetableVersionStatus.Published
+                    ? "نسخة الجدول منشورة والحصص مقفلة — التعديل بعد النشر يكون بنسخة جديدة، حتى يبقى ما رآه المعلّمون والأسر ثابتاً (BR-TTB-002/009)."
+                    : "نسخة الجدول قيد التدقيق والحصص مقفلة — أعِدها إلى المسودة إن أردت تعديلها (BR-TTB-002/009).")
+                : (e.Status == Sms.Domain.Timetable.TimetableVersionStatus.Published
+                    ? "The timetable version is published and its placements are locked — after publication a change means a new version, so what teachers and families were shown stays put (BR-TTB-002/009)."
+                    : "The timetable version is under review and its placements are locked — send it back to draft if you need to change it (BR-TTB-002/009)."),
+
+            PeriodSlotInUseException e => arabic
+                ? $"تشير إلى هذه الحصة {Count(e.PlacementCount)} حصة مجدولة، فلا تُحذف — انقلها أو احذفها أولاً (BR-TTB-001)."
+                : $"{Count(e.PlacementCount)} scheduled lesson(s) sit in this period slot, so it cannot be removed — move or delete them first (BR-TTB-001).",
+
+            SubstituteNotEligibleException => arabic
+                ? "هذا المعلّم لا يصلح بديلاً لهذه الحصة — إمّا أنه غير مؤهّل لتدريس المادة، وإمّا أنه مشغول في وقتها (BR-TTB-007)."
+                : "This teacher cannot cover the lesson — they are either not qualified for the subject, or already busy at that time (BR-TTB-007).",
+
+            // ---------------------------------------------------------------- M18 certificates
+
+            InvalidCertificateRequestStatusTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة طلب الوثيقة الحالية — افتحه لترى ما وصل إليه (BR-CRT-003)."
+                : "That move is not available from the document request's current state — open it to see where it stands (BR-CRT-003).",
+
+            CertificateFeeClearanceBlockedException e => arabic
+                ? $"على الأسرة مستحقات قدرها {Amount(e.Position)}، وهذه الوثيقة لا تُصرف قبل إخلاء الطرف المالي — سدّد المستحق، أو اطلب تجاوزاً من المدير مع كتابة سببه (BR-CRT-008)."
+                : $"The family owes {Amount(e.Position)}, and this document is not released before fee clearance — settle the balance, or ask the Principal to override it and say why (BR-CRT-008).",
+
+            CertificatePrerequisitesNotMetException => arabic
+                ? "لم تكتمل شروط هذه الوثيقة — قد تكون النتائج لم تُنشر بعد، أو لم يُخلَ الطرف المالي؛ افتح الطلب لترى الشرط الناقص (BR-CRT-001/003)."
+                : "This document's prerequisites are not met — results may not be published yet, or fees not cleared; open the request to see which one is missing (BR-CRT-001/003).",
+
+            CertificateKindNotGateableException => arabic
+                ? "لا تسمح حزمة الدولة المفعّلة بحجب هذا النوع من الوثائق بسبب رسوم غير مسددة، فلا يُضبَط عليه شرط إخلاء طرف (BR-CRT-008)."
+                : "The active country pack does not allow this kind of document to be withheld over unpaid fees, so no clearance rule can be set on it (BR-CRT-008).",
+
+            FeeClearanceRuleNotSupportedException => arabic
+                ? "قاعدة «لا متأخرات» لا يمكن تقييمها بعد، لأن المطالبات لا تحمل تواريخ استحقاق حتى الآن — اختر قاعدة أخرى إلى أن تُفعَّل جداول الأقساط (BR-CRT-008)."
+                : "The \"no overdue\" rule cannot be evaluated yet, because charges do not carry due dates — choose another rule until instalment schedules are in use (BR-CRT-008).",
+
+            CertificateNotIssuedException => arabic
+                ? "لا يُلغى إلا مستند صادر — هذه الوثيقة لم تصدر بعد أو أُلغيت من قبل (BR-CRT-006)."
+                : "Only an issued document can be revoked — this one has not been issued, or was revoked already (BR-CRT-006).",
+
+            // ---------------------------------------------------------------- M04 school calendar
+
+            CalendarPastDateEditException e => arabic
+                ? $"لا يُعدَّل تقويم يوم مضى — {Day(e.Date)} في الماضي، والحضور والحصص مرصودة عليه كما كان (BR-CAL-004)."
+                : $"A day that has passed is not re-written — {Day(e.Date)} is in the past, and attendance and lessons were recorded against it as it stood (BR-CAL-004).",
+
+            CalendarDateOutsideYearException e => arabic
+                ? $"{Day(e.Date)} خارج نطاق تواريخ العام الدراسي — اختر يوماً داخل العام، أو عدّل تواريخ العام أولاً (BR-GLB-051)."
+                : $"{Day(e.Date)} falls outside the academic year's dates — choose a day inside the year, or change the year's dates first (BR-GLB-051).",
+
+            // ---------------------------------------------------------------- M03 year rollover
+
+            RolloverYearStatusException e => arabic
+                ? $"لا تُشغَّل الترحيلة إلا من عام فعّال إلى عام قيد الإعداد — العام المختار حالته «{Labels.YearStatus(e.Actual, true)}» والمطلوب «{Labels.YearStatus(e.Expected, true)}» (BR-AYR-008)."
+                : $"A rollover runs from the active year into the year being prepared — the chosen year is {Labels.YearStatus(e.Actual, false)}, and this step needs it to be {Labels.YearStatus(e.Expected, false)} (BR-AYR-008).",
+
+            RolloverBatchStatusException e => RolloverStep(e, arabic),
+
+            PromotionPathIncompleteException e => arabic
+                ? (e.HasCycle
+                    ? "مسار الترفيع يدور على نفسه — صف يُرفَّع إلى صف يعود إليه؛ راجع السلسلة حتى تنتهي إلى صف التخرّج (BR-GRD-002)."
+                    : $"{Count(e.GradeLevelIdsMissingTarget.Count)} صفاً فيه طلاب مقيّدون ولا يحمل صفاً يُرفَّعون إليه ولا يُعدّ صف تخرّج — حدّد مسار الترفيع لكل منها قبل تشغيل الترحيلة (BR-GRD-002).")
+                : (e.HasCycle
+                    ? "The promotion path loops back on itself — a grade promoting into one that promotes back into it; follow the chain through until it ends at the leaving grade (BR-GRD-002)."
+                    : $"{Count(e.GradeLevelIdsMissingTarget.Count)} grade(s) have enrolled students but name no grade to promote into and are not marked as leaving — set a promotion path on each before running the rollover (BR-GRD-002)."),
+
+            TargetGradeProfileMissingException => arabic
+                ? "الصف الذي يُرفَّع إليه هذا الطالب غير معرَّف في العام الهدف — عرّفه في هيكل العام الجديد، أو أعد فتح الترحيلة لنسخ الصفوف، قبل البتّ."
+                : "The grade this student would move into does not exist in the target year — define it in the new year's structure, or re-open the batch to copy the grades across, before deciding.",
+
+            InvalidPromotionDecisionException e => arabic
+                ? e.Fault switch
+                {
+                    PromotionDecisionFault.MustDecide => "القرار اليدوي لا بد أن يبتّ — «غير محدد» ليس قراراً.",
+                    PromotionDecisionFault.GradeDoesNotGraduate => "لا يتخرّج طالب من صف ليس صف تخرّج — اختر الترفيع أو الإعادة.",
+                    PromotionDecisionFault.NoPromotionTarget => "صف هذا الطالب لا يحمل صفاً يُرفَّع إليه — حدّد مسار الترفيع للصف أولاً (BR-GRD-002).",
+                    _ => "الطلاب المتخرجون لا يُعاد تسجيلهم — أنهِ قيدهم بدل ترحيلهم.",
+                }
+                : e.Fault switch
+                {
+                    PromotionDecisionFault.MustDecide => "A manual decision has to decide — \"undecided\" is not one.",
+                    PromotionDecisionFault.GradeDoesNotGraduate => "A student does not graduate from a grade that is not the last one — promote or retain them instead.",
+                    PromotionDecisionFault.NoPromotionTarget => "This student's grade names no grade to promote into — set the grade's promotion path first (BR-GRD-002).",
+                    _ => "Graduating students are not re-registered — close their enrolment rather than rolling them over.",
+                },
+
+            PromotionsUndecidedException e => arabic
+                ? $"بقي {Count(e.UndecidedCount)} طالباً بلا قرار ترفيع — الترحيلة لا تُعتمد وفيها من لم يُبتّ في أمره (BR-AYR-008)."
+                : $"{Count(e.UndecidedCount)} student(s) still have no promotion decision — the batch is not approved while anyone is undecided (BR-AYR-008).",
+
+            NoSeatAvailableException => arabic
+                ? "لا مقعد متبقياً في هذا الصف للعام القادم — المقاعد المخططة هي عدد الشعب في سعة الشعبة؛ زد شعبة أو ارفع السعة المخططة أولاً (BR-GRD-006)."
+                : "There is no seat left in this grade for next year — planned seats are sections × section size; add a section or raise the planned size first (BR-GRD-006).",
+
+            PromotionNotDecidedException => arabic
+                ? "لم يُبتّ في ترفيع هذا الطالب بعد، ولا تُسنَد شعبة قبل معرفة الصف — احسم القرار أولاً."
+                : "This student's promotion has not been decided, and no section is assigned before the grade is known — decide it first.",
+
+            NoPayerForStudentException => arabic
+                ? "لا يوجد لهذا الطالب من تُقيَّد عليه الرسوم — اربط وليّ أمر مسؤولاً مالياً وله سجل دافع قبل ترحيل الرسوم (BR-FEE-004)."
+                : "This student has nobody to bill — link a financially responsible guardian with a payer record before fees can be carried over (BR-FEE-004).",
+
+            ChecklistNotGreenException e => arabic
+                ? $"قائمة «{e.ChecklistName}» لم تكتمل بعد — المتبقي: {string.Join("، ", e.Items.Where(i => !i.IsSatisfied).Select(i => i.Code))}. افتح القائمة لترى تفصيل كل بند وما ينقصه (BR-AYR-004/005)."
+                : $"The {e.ChecklistName} checklist is not green yet — outstanding: {string.Join(", ", e.Items.Where(i => !i.IsSatisfied).Select(i => i.Code))}. Open it to see what each item is still missing (BR-AYR-004/005).",
+
+            CarryForwardReconciliationException e => arabic
+                ? $"لا يتوازن الترحيل المالي: المستحقات في نهاية العام {Amount(e.ClosingReceivables)} والأرصدة المفتتحة المرحّلة {Amount(e.OpeningBalances)} — لا يُقفل العام حتى يتطابقا (BR-AYR-009)."
+                : $"The carry-forward does not reconcile: closing receivables are {Amount(e.ClosingReceivables)} while the opening balances posted are {Amount(e.OpeningBalances)} — the year does not close until they agree (BR-AYR-009).",
+
+            _ => null,
+        };
+
+        /// <summary>
+        /// The rollover's step guards. Two of the three are not about the batch at all — they fire
+        /// when the student has already been enrolled by some other route — so they are separated
+        /// out rather than folded into one sentence about a batch status the operator did not ask
+        /// about.
+        /// </summary>
+        private static string RolloverStep(RolloverBatchStatusException e, bool arabic) => e.Blocker switch
+        {
+            RolloverStepBlocker.AlreadyEnrolledInTargetYear => arabic
+                ? "هذا الطالب مقيَّد في العام الهدف بالفعل — إن أردت التراجع فاستخدم انسحاب القيد، لا الترحيلة."
+                : "This student is already enrolled in the target year — to undo that, withdraw the enrolment; the rollover is not the way back.",
+
+            RolloverStepBlocker.AlreadyEnrolled => arabic
+                ? "هذا الطالب مقيَّد بالفعل — نقله الآن يكون تحويلاً من شاشة القبول والتسجيل، لا ترحيلاً."
+                : "This student is already enrolled — moving them now is a transfer from the admissions screens, not a rollover.",
+
+            _ => arabic
+                ? $"لا تُتاح هذه الخطوة والترحيلة في مرحلة «{BatchStage(e.Actual, true)}» — تُتاح في: {string.Join("، ", e.Allowed.Select(s => BatchStage(s, true)))}."
+                : $"This step is not available while the batch is {BatchStage(e.Actual, false)} — it runs from: {string.Join(", ", e.Allowed.Select(s => BatchStage(s, false)))}.",
+        };
+
+        /// <summary>
+        /// The rollover batch's stage as the rollover console names it. Kept here rather than in
+        /// <c>Labels</c> because no screen shows this enum yet; when one does, it moves there and
+        /// this goes away.
+        /// </summary>
+        private static string BatchStage(Sms.Domain.Rollover.RolloverBatchStatus status, bool arabic) => status switch
+        {
+            Sms.Domain.Rollover.RolloverBatchStatus.Open => arabic ? "مفتوحة" : "open",
+            Sms.Domain.Rollover.RolloverBatchStatus.PromotionsApproved => arabic ? "الترفيعات معتمدة" : "promotions approved",
+            Sms.Domain.Rollover.RolloverBatchStatus.Activated => arabic ? "مفعّلة" : "activated",
+            _ => arabic ? "مغلقة" : "closed",
+        };
+    }
+}

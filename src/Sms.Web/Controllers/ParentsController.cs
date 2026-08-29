@@ -86,6 +86,7 @@ namespace Sms.Web.Controllers
         {
             Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
             IdTypes = await IdTypesAsync(),
+            EducationLevels = await LookupAsync("EducationLevel"),
         });
 
         [HttpPost("new")]
@@ -112,7 +113,7 @@ namespace Sms.Web.Controllers
 
                 var p = await _parents.RegisterParentAsync(
                     form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage,
-                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote);
+                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote, form.EducationLookupId);
                 if (form.ResidenceAreaId != null)
                 {
                     await _parents.SetResidenceAsync(p.Id, form.ResidenceAreaId, form.NeighbourhoodId);
@@ -126,6 +127,7 @@ namespace Sms.Web.Controllers
                 ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
                 form.Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync();
                 form.IdTypes = await IdTypesAsync();
+                form.EducationLevels = await LookupAsync("EducationLevel");
                 return View(form);
             }
         }
@@ -174,6 +176,7 @@ namespace Sms.Web.Controllers
                 Children = links.Where(l => l.EffectiveToUtc == null).Select(C).ToList(),
                 PastChildren = links.Where(l => l.EffectiveToUtc != null).Select(C).ToList(),
                 PossibleDuplicates = dups, PortalUserName = portal, IdTypes = await IdTypesAsync(),
+                EducationLevels = await LookupAsync("EducationLevel"),
                 Audit = audit.Select(a => (a.Action.ToString(), a.FieldName, a.OldValue, a.NewValue, a.OccurredAtUtc, a.ActorUserId, a.Reason)).ToList(),
             });
         }
@@ -197,7 +200,7 @@ namespace Sms.Web.Controllers
 
                 await _parents.UpdateParentAsync(
                     id, form.NameAr!.Trim(), form.NameEn!.Trim(), mobile, form.Email, form.Address, form.OccupationEmployer, form.PreferredLanguage,
-                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote);
+                    form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote, form.EducationLookupId);
                 TempData["Flash"] = T("Parent file updated.", "تم تحديث ملف ولي الأمر.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }

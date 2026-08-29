@@ -1,0 +1,194 @@
+@using System.Globalization
+@using Sms.Domain.Payroll
+@model AdvanceStatementViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Advance statement", "كشف السلف");
+    ViewData["Breadcrumb"] = T("Staff / Advances / Statement", "شؤون الموظفين / السلف / كشف السلف");
+    var s = Model.Statement;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "advstmt-help",
+        Title = T("The advance statement — help", "كشف السلف — مساعدة"),
+        Intro = T("One employee's advances end to end: what was lent, what has been recovered, what was forgiven, and what is still owed.", "سلف موظف واحد من أولها إلى آخرها: ما أُقرض، وما استُردّ، وما أُعفي، وما زال مستحقاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Recovered and waived are counted apart", "المستردّ والمعفى يُحسبان منفصلين"),
+                T("Both reduce the balance, but only one of them is money that came back. A statement that added them together would tell the school it had been repaid when it had not.", "كلاهما يخفّض الرصيد، لكن أحدهما فقط مال عاد. وكشف يجمعهما يقول للمدرسة إنها استُردّت وهي لم تُستردّ.")),
+            new HelpPanelViewModel.Item(
+                T("A request nobody disbursed owes nothing", "الطلب الذي لم يُصرف لا يُلزم بشيء"),
+                T("An advance still awaiting a decision, or approved but not yet handed over, appears here but contributes nothing to the totals — it is not money the employee has.", "السلفة التي تنتظر قراراً، أو التي ووفق عليها ولم تُسلَّم، تظهر هنا ولا تدخل الإجماليات — فهي ليست مالاً بيد الموظف.")),
+            new HelpPanelViewModel.Item(
+                T("Each recovered instalment names its payroll", "كل قسط مستردّ يسمّي مسيره"),
+                T("An instalment marked deducted carries the payroll number that took it, so \"recovered\" can be checked against a register rather than taken on trust.", "القسط المسجَّل كمستقطع يحمل رقم المسير الذي أخذه، ليُراجَع «المستردّ» على مسير حقيقي لا أن يُصدَّق كما هو.")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("One employee's advances, every instalment, and what is still owed.", "سلف موظف واحد، وكل قسط، وما زال مستحقاً.")</p>
+    </div>
+    <div class="d-flex gap-2">
+        @if (s != null)
+        {
+            <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+                <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+            </button>
+        }
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<div class="d-print-none"><partial name="_PayrollNav" /></div>
+
+@if (Model.Employees.Count == 0)
+{
+    <div class="sms-card">
+        <p class="text-muted mb-0">
+            @T("No employee has an advance on record yet, so there is nothing to state.", "لا يوجد موظف لديه سلفة مسجّلة بعد، فلا شيء يُكشف عنه.")
+            <a asp-action="Advances">@T("Record one", "سجّل واحدة")</a>
+        </p>
+    </div>
+}
+else
+{
+    <form method="get" class="sms-card mb-3 d-print-none">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label for="stmt-employee" class="form-label small text-muted">@T("Employee", "الموظف")</label>
+                <select id="stmt-employee" name="employeeId" class="form-select form-select-sm">
+                    @foreach (var e in Model.Employees)
+                    {
+                        <option value="@e.EmployeeId" selected="@(e.EmployeeId == Model.SelectedEmployeeId)">@e.EmployeeNo — @e.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100">@T("Show", "عرض")</button>
+            </div>
+        </div>
+    </form>
+
+    @if (s != null)
+    {
+        <div class="sms-card">
+            <header class="text-center mb-4">
+                <h2 class="h5 mb-1">@(isRtl ? Model.SchoolNameAr : Model.SchoolNameEn)</h2>
+                <p class="h6 mb-1">@T("Statement of salary advances", "كشف سلف موظف")</p>
+                <p class="text-muted small mb-0">
+                    @(isRtl ? s.Employee.NameAr : s.Employee.NameEn) &middot; <code>@s.Employee.EmployeeNo</code>
+                </p>
+            </header>
+
+            <div class="row text-center g-2 mb-4">
+                <div class="col">
+                    <div class="text-muted small">@T("Total advanced", "إجمالي المصروف")</div>
+                    <div class="fs-5" dir="ltr">@PayrollLabels.Money(s.TotalAdvanced)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Recovered", "المستردّ")</div>
+                    <div class="fs-5 text-success" dir="ltr">@PayrollLabels.Money(s.TotalDeducted)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Waived", "المعفى")</div>
+                    <div class="fs-5 text-info" dir="ltr">@PayrollLabels.Money(s.TotalWaived)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Still owed", "المتبقي")</div>
+                    <div class="fs-5 fw-bold" dir="ltr">@PayrollLabels.Money(s.TotalOutstanding)</div>
+                </div>
+            </div>
+
+            @if (s.Advances.Count == 0)
+            {
+                <p class="text-muted mb-0">@T("This employee has no advances.", "لا توجد سلف لهذا الموظف.")</p>
+            }
+
+            @foreach (var a in s.Advances)
+            {
+                <section class="mb-4">
+                    <h3 class="h6 d-flex flex-wrap gap-2 align-items-center">
+                        <code>@a.AdvanceNo</code>
+                        <span class="badge @PayrollLabels.AdvanceStatusBadge(a.Status)">@PayrollLabels.AdvanceStatus(a.Status, isRtl)</span>
+                        <span class="text-muted fw-normal small">
+                            @T("requested", "طُلبت") @a.RequestDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                            @if (a.DisbursedOn != null)
+                            {
+                                <text>&middot; @T("disbursed", "صُرفت") @a.DisbursedOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</text>
+                                @if (a.DisbursementMethod != null)
+                                {
+                                    <text> (@PayrollLabels.DisbursementMethod(a.DisbursementMethod.Value, isRtl))</text>
+                                }
+                            }
+                        </span>
+                        <a class="btn btn-sm btn-outline-secondary ms-auto d-print-none" asp-action="Advance" asp-route-id="@a.AdvanceId">@T("Open", "فتح")</a>
+                    </h3>
+
+                    @if (!string.IsNullOrWhiteSpace(a.Reason))
+                    {
+                        <p class="small text-muted mb-2">@T("Reason", "السبب"): @a.Reason</p>
+                    }
+
+                    <p class="small mb-2">
+                        @T("Amount", "المبلغ"): <span dir="ltr" class="fw-semibold">@PayrollLabels.Money(a.Amount)</span> &middot;
+                        @T("recovered", "المستردّ"): <span dir="ltr">@PayrollLabels.Money(a.DeductedTotal)</span> &middot;
+                        @T("waived", "المعفى"): <span dir="ltr">@PayrollLabels.Money(a.WaivedTotal)</span> &middot;
+                        @T("outstanding", "المتبقي"): <span dir="ltr" class="fw-bold">@PayrollLabels.Money(a.OutstandingBalance)</span>
+                    </p>
+
+                    @if (a.Installments.Count == 0)
+                    {
+                        <p class="small text-muted mb-0">@T("No schedule — this advance was never disbursed.", "لا يوجد جدول — لم تُصرف هذه السلفة.")</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table sms-table table-sm align-middle mb-0">
+                                <caption class="visually-hidden">@T("Instalments of this advance", "أقساط هذه السلفة")</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">#</th>
+                                        <th scope="col">@T("Due month", "شهر الاستحقاق")</th>
+                                        <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                                        <th scope="col">@T("Status", "الحالة")</th>
+                                        <th scope="col">@T("Payroll", "المسير")</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var i in a.Installments)
+                                    {
+                                        <tr>
+                                            <td>@i.SequenceNo</td>
+                                            <td>@PayrollLabels.Period(i.DueYear, i.DueMonth, isRtl)</td>
+                                            <td class="text-end" dir="ltr">@PayrollLabels.Money(i.Amount)</td>
+                                            <td><span class="badge @PayrollLabels.InstallmentStatusBadge(i.Status)">@PayrollLabels.InstallmentStatus(i.Status, isRtl)</span></td>
+                                            <td>
+                                                @if (string.IsNullOrWhiteSpace(i.PayrollRunNo))
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <code>@i.PayrollRunNo</code>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </section>
+            }
+
+            <div class="row mt-5 text-center small">
+                <div class="col"><div class="border-top pt-2 mx-4">@T("Employee signature", "توقيع الموظف")</div></div>
+                <div class="col"><div class="border-top pt-2 mx-4">@T("Accountant", "المحاسب")</div></div>
+            </div>
+        </div>
+    }
+}

@@ -48,6 +48,14 @@ namespace Sms.Infrastructure.Seeding
             ("INC", "DisciplineIncident", "INC-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
             ("MED", "ClinicVisit", "MED-{YEAR}-{SEQ:5}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
             ("LVE", "EmployeeLeave", "LVE-{YEAR}-{SEQ:4}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
+
+            // Payroll and staff advances (owner request, 2026-08-28). Both reset per calendar year
+            // because both are calendar-month documents, not academic-year ones — salaries run
+            // through the summer. PAY is strict for the same reason RCP is: a payroll run is a
+            // money document and a hole in its sequence is a question somebody has to answer. ADV
+            // is Normal because a withdrawn request should not oblige anyone to explain a gap.
+            ("PAY", "PayrollRun", "PAY-{GYEAR}-{SEQ:4}", ResetPolicy.PerCalendarYear, GapPolicy.Strict),
+            ("ADV", "SalaryAdvance", "ADV-{GYEAR}-{SEQ:5}", ResetPolicy.PerCalendarYear, GapPolicy.Normal),
             ("MSG", "OfficialMessage", "MSG-{YEAR}-{SEQ:6}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
             ("EXM", "Exam", "EXM-{YEAR}-{SEQ:3}", ResetPolicy.PerAcademicYear, GapPolicy.Normal),
             ("RTE", "TransportRoute", "RTE-{SEQ:3}", ResetPolicy.Never, GapPolicy.Normal),

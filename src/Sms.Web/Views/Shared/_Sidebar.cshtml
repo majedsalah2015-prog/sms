@@ -3,11 +3,14 @@
 @model IReadOnlyList<NavItem>
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    // Which entry is the screen being shown, decided once over the whole menu: asking each entry
+    // for itself cannot tell a module from one of its own screens, and would highlight both.
+    var active = NavLinks.Resolve(Model, ViewContext.RouteData.Values);
 }
 
 <nav class="sms-sidebar__nav" aria-label="@(isRtl ? "التنقل الرئيسي" : "Primary navigation")">
     @foreach (var nav in Model)
     {
-        @await Html.PartialAsync("_SidebarNode", new SidebarNode(nav, 0))
+        @await Html.PartialAsync("_SidebarNode", new SidebarNode(nav, 0, active))
     }
 </nav>

@@ -18,7 +18,11 @@ namespace Sms.Application.Common.Exceptions
         public ExamScheduleClashException(int gradeYearProfileId, DateTime date)
             : base($"Grade-year profile {gradeYearProfileId} already has the maximum exams scheduled on {date:yyyy-MM-dd} (BR-EXM-003).")
         {
+            Date = date;
         }
+
+        /// <summary>The day that is already full, so the refusal can show it back rather than describe it.</summary>
+        public DateTime Date { get; }
     }
 
     /// <summary>BR-EXM §4: the requested round status pair isn't a legal move.</summary>

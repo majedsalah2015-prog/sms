@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Sms.Domain.Classrooms;
@@ -17,6 +18,14 @@ namespace Sms.Application.Classrooms
         Task<Room> DefineRoomAsync(
             int floorId, string code, string nameAr, string nameEn, int roomTypeLookupId,
             int standardCapacity, int examCapacity, GenderPolicy wingTag, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Floor id → the next free room code on it (<see cref="RoomCodeGenerator"/>), so the
+        /// catalog screen fills the field instead of asking a registrar to invent one. The whole
+        /// map in one read: the screen offers a code for every floor in its picker, and the save
+        /// path resolves the same code from the same source rather than a second opinion.
+        /// </summary>
+        Task<IReadOnlyDictionary<int, string>> SuggestRoomCodesAsync(CancellationToken cancellationToken = default);
 
         Task<RoomFeature> AddFeatureAsync(int roomId, int featureLookupId, CancellationToken cancellationToken = default);
 

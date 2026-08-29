@@ -270,6 +270,109 @@
         'فصلي': 'Termly', 'الفصلي': 'Termly', 'فصلية': 'Termly', 'الفصلية': 'Termly',
         'مدرسي': 'School', 'المدرسي': 'School', 'مدرسية': 'School', 'المدرسية': 'School',
 
+        // ---- who reports to whom: the administrative tree an org unit is named from.
+        // The English name here is read by the ministry return, the payroll-prep register
+        // and every list that groups staff by unit, so "Almward Albshryh" would be wrong
+        // everywhere at once. Noun-adjective order flips between the languages — "الشؤون
+        // الأكاديمية" is Academic Affairs, not Affairs Academic — so the pairs a school
+        // actually uses are held whole and the matcher takes the longest one.
+        'الشؤون الأكاديمية': 'Academic Affairs', 'الشؤون الاكاديمية': 'Academic Affairs', 'الشئون الأكاديمية': 'Academic Affairs',
+        'الشؤون الإدارية': 'Administrative Affairs', 'الشؤون الادارية': 'Administrative Affairs',
+        'الشؤون المالية': 'Financial Affairs', 'الشؤون التعليمية': 'Educational Affairs', 'الشؤون القانونية': 'Legal Affairs',
+        // two adjectives sharing one noun invert further than the rules below reach —
+        // "Financial and Administrative Affairs", not Affairs Financial and Administrative
+        'الشؤون المالية والإدارية': 'Financial and Administrative Affairs', 'الشؤون المالية والادارية': 'Financial and Administrative Affairs',
+        'الشؤون الإدارية والمالية': 'Administrative and Financial Affairs', 'الشؤون الادارية والمالية': 'Administrative and Financial Affairs',
+        'شؤون الطلاب': 'Student Affairs', 'شئون الطلاب': 'Student Affairs', 'شؤون الطلبة': 'Student Affairs',
+        'شؤون الموظفين': 'Personnel Affairs', 'شؤون المعلمين': 'Teacher Affairs',
+        'الموارد البشرية': 'Human Resources', 'التوجيه والإرشاد': 'Guidance and Counselling', 'التوجيه والارشاد': 'Guidance and Counselling',
+        'الإرشاد الطلابي': 'Student Counselling', 'الارشاد الطلابي': 'Student Counselling',
+        'الإرشاد الأكاديمي': 'Academic Counselling', 'الارشاد الاكاديمي': 'Academic Counselling',
+        'تقنية المعلومات': 'Information Technology', 'تكنولوجيا المعلومات': 'Information Technology',
+        'الأمن والسلامة': 'Safety and Security', 'الامن والسلامة': 'Safety and Security',
+        'العلاقات العامة': 'Public Relations', 'ضمان الجودة': 'Quality Assurance', 'التطوير المهني': 'Professional Development',
+        'التدريب والتطوير': 'Training and Development', 'القبول والتسجيل': 'Admissions and Registration',
+        'الأنشطة الطلابية': 'Student Activities', 'الانشطة الطلابية': 'Student Activities',
+        'الخدمات الطلابية': 'Student Services', 'الخدمات المساندة': 'Support Services',
+        'النقل المدرسي': 'School Transport', 'الصحة المدرسية': 'School Health', 'الرعاية الاجتماعية': 'Social Welfare',
+        'الإدارة المدرسية': 'School Administration', 'الادارة المدرسية': 'School Administration',
+        'إدارة المدرسة': 'School Administration', 'ادارة المدرسة': 'School Administration',
+        'مدير المدرسة': 'School Principal', 'نائب المدير': 'Deputy Principal', 'وكيل المدرسة': 'Vice Principal',
+        'رئيس القسم': 'Head of Department', 'أمين المكتبة': 'Librarian', 'امين المكتبة': 'Librarian',
+        'أمين المستودع': 'Storekeeper', 'امين المستودع': 'Storekeeper',
+        'المستودعات والمشتريات': 'Stores and Procurement', 'المرافق والصيانة': 'Facilities and Maintenance',
+
+        'شؤون': 'Affairs', 'الشؤون': 'Affairs', 'شئون': 'Affairs', 'الشئون': 'Affairs',
+        'وحدة': 'Unit', 'الوحدة': 'Unit', 'وحدات': 'Units', 'الوحدات': 'Units',
+        'دائرة': 'Division', 'الدائرة': 'Division', 'مكتب': 'Office', 'المكتب': 'Office',
+        'لجنة': 'Committee', 'اللجنة': 'Committee', 'مجلس': 'Council', 'المجلس': 'Council',
+        'أقسام': 'Departments', 'الأقسام': 'Departments', 'اقسام': 'Departments', 'الاقسام': 'Departments',
+        'إدارات': 'Departments', 'الإدارات': 'Departments', 'ادارات': 'Departments', 'الادارات': 'Departments',
+        'أكاديمية': 'Academic', 'الأكاديمية': 'Academic', 'اكاديمية': 'Academic', 'الاكاديمية': 'Academic',
+        'أكاديمي': 'Academic', 'الأكاديمي': 'Academic', 'اكاديمي': 'Academic', 'الاكاديمي': 'Academic',
+        'إدارية': 'Administrative', 'الإدارية': 'Administrative', 'ادارية': 'Administrative', 'الادارية': 'Administrative',
+        'إداري': 'Administrative', 'الإداري': 'Administrative', 'اداري': 'Administrative', 'الاداري': 'Administrative',
+        'مالية': 'Finance', 'المالية': 'Finance', 'مالي': 'Financial', 'المالي': 'Financial',
+        'محاسبة': 'Accounting', 'المحاسبة': 'Accounting', 'حسابات': 'Accounts', 'الحسابات': 'Accounts',
+        'موارد': 'Resources', 'الموارد': 'Resources', 'بشرية': 'Human', 'البشرية': 'Human',
+        'طلاب': 'Students', 'الطلاب': 'Students', 'طلبة': 'Students', 'الطلبة': 'Students',
+        'طالبات': 'Students', 'الطالبات': 'Students', 'طالب': 'Student', 'الطالب': 'Student',
+        'طلابي': 'Student', 'الطلابي': 'Student', 'طلابية': 'Student', 'الطلابية': 'Student',
+        'معلم': 'Teacher', 'المعلم': 'Teacher',
+        'توجيه': 'Guidance', 'التوجيه': 'Guidance', 'إرشاد': 'Counselling', 'الإرشاد': 'Counselling',
+        'ارشاد': 'Counselling', 'الارشاد': 'Counselling',
+        'تقنية': 'Technology', 'التقنية': 'Technology', 'تكنولوجيا': 'Technology', 'التكنولوجيا': 'Technology',
+        'معلومات': 'Information', 'المعلومات': 'Information',
+        'أمن': 'Security', 'الأمن': 'Security', 'امن': 'Security', 'الامن': 'Security',
+        'سلامة': 'Safety', 'السلامة': 'Safety', 'علاقات': 'Relations', 'العلاقات': 'Relations',
+        'عامة': 'Public', 'العامة': 'Public', 'جودة': 'Quality', 'الجودة': 'Quality',
+        'تطوير': 'Development', 'التطوير': 'Development',
+        'مهني': 'Professional', 'المهني': 'Professional', 'مهنية': 'Professional', 'المهنية': 'Professional',
+        'تدريب': 'Training', 'التدريب': 'Training',
+        'مناهج': 'Curriculum', 'المناهج': 'Curriculum', 'منهج': 'Curriculum', 'المنهج': 'Curriculum',
+        'مشتريات': 'Procurement', 'المشتريات': 'Procurement',
+        'مستودعات': 'Stores', 'المستودعات': 'Stores', 'مخازن': 'Stores', 'المخازن': 'Stores',
+        'تغذية': 'Nutrition', 'التغذية': 'Nutrition',
+        'صحة': 'Health', 'الصحة': 'Health', 'صحية': 'Health', 'الصحية': 'Health',
+        'رعاية': 'Welfare', 'الرعاية': 'Welfare', 'دعم': 'Support', 'الدعم': 'Support',
+        'مساندة': 'Support', 'المساندة': 'Support', 'مرافق': 'Facilities', 'المرافق': 'Facilities',
+        'تربية': 'Education', 'التربية': 'Education', 'تعليم': 'Education', 'التعليم': 'Education',
+        'تعليمية': 'Educational', 'التعليمية': 'Educational', 'تعليمي': 'Educational', 'التعليمي': 'Educational',
+        'قانونية': 'Legal', 'القانونية': 'Legal', 'قانوني': 'Legal', 'القانوني': 'Legal',
+        'إشراف': 'Supervision', 'الإشراف': 'Supervision', 'اشراف': 'Supervision', 'الاشراف': 'Supervision',
+        'مشرف': 'Supervisor', 'المشرف': 'Supervisor', 'منسق': 'Coordinator', 'المنسق': 'Coordinator',
+        'رئيس': 'Head', 'الرئيس': 'Head', 'نائب': 'Deputy', 'النائب': 'Deputy',
+        'وكيل': 'Vice Principal', 'الوكيل': 'Vice Principal', 'مساعد': 'Assistant', 'المساعد': 'Assistant',
+        'سكرتير': 'Secretary', 'السكرتير': 'Secretary',
+        'مختبرات': 'Labs', 'المختبرات': 'Labs', 'معامل': 'Labs', 'المعامل': 'Labs',
+        'قاعات': 'Rooms', 'القاعات': 'Rooms', 'غرف': 'Rooms', 'الغرف': 'Rooms',
+        'مقاصف': 'Cafeterias', 'المقاصف': 'Cafeterias',
+        'أطفال': 'Children', 'الأطفال': 'Children', 'اطفال': 'Children', 'الاطفال': 'Children',
+        'حضانة': 'Nursery', 'الحضانة': 'Nursery',
+        'أرشيف': 'Archive', 'الأرشيف': 'Archive', 'ارشيف': 'Archive', 'الارشيف': 'Archive',
+        'وثائق': 'Records', 'الوثائق': 'Records',
+        'إعلام': 'Media', 'الإعلام': 'Media', 'اعلام': 'Media', 'الاعلام': 'Media',
+        'تسويق': 'Marketing', 'التسويق': 'Marketing', 'تواصل': 'Communication', 'التواصل': 'Communication',
+        'مركز': 'Centre', 'المركز': 'Centre', 'انضباط': 'Discipline', 'الانضباط': 'Discipline',
+        'أمناء': 'Trustees', 'الأمناء': 'Trustees', 'امناء': 'Trustees', 'الامناء': 'Trustees',
+        'تربوي': 'Educational', 'التربوي': 'Educational', 'تربوية': 'Educational', 'التربوية': 'Educational',
+        'تعلم': 'Learning', 'التعلم': 'Learning', 'دراسات': 'Studies', 'الدراسات': 'Studies',
+        'آباء': 'Parents', 'الآباء': 'Parents', 'اباء': 'Parents', 'الاباء': 'Parents',
+        'أولياء': 'Guardians', 'الأولياء': 'Guardians', 'اولياء': 'Guardians',
+
+        // the subjects a department is named after, in the ministry's English
+        'اللغة العربية': 'Arabic Language', 'اللغة الإنجليزية': 'English Language', 'اللغة الانجليزية': 'English Language',
+        'الدراسات الإسلامية': 'Islamic Studies', 'الدراسات الاسلامية': 'Islamic Studies',
+        'التربية الإسلامية': 'Islamic Education', 'التربية الاسلامية': 'Islamic Education',
+        'الدراسات الاجتماعية': 'Social Studies', 'التربية البدنية': 'Physical Education',
+        'التربية الفنية': 'Art Education', 'الحاسب الآلي': 'Computer Science', 'الحاسب الالي': 'Computer Science',
+        'أولياء الأمور': 'Parents', 'اولياء الامور': 'Parents', 'مصادر التعلم': 'Learning Resources',
+        'لغة': 'Language', 'اللغة': 'Language', 'عربية': 'Arabic', 'العربية': 'Arabic',
+        'إنجليزية': 'English', 'الإنجليزية': 'English', 'انجليزية': 'English', 'الانجليزية': 'English',
+        'رياضيات': 'Mathematics', 'الرياضيات': 'Mathematics', 'اجتماعيات': 'Social Studies', 'الاجتماعيات': 'Social Studies',
+        'إسلامية': 'Islamic', 'الإسلامية': 'Islamic', 'اسلامية': 'Islamic', 'الاسلامية': 'Islamic',
+        'بدنية': 'Physical', 'البدنية': 'Physical', 'فنية': 'Art', 'الفنية': 'Art', 'آلي': 'Computer', 'الآلي': 'Computer',
+
         // where and which one — the adjectives that finish a building's name
         'رئيسي': 'Main', 'الرئيسي': 'Main', 'رئيسية': 'Main', 'الرئيسية': 'Main',
         'أرضي': 'Ground', 'الأرضي': 'Ground', 'ارضي': 'Ground', 'الارضي': 'Ground',
@@ -299,12 +402,53 @@
         return { value: first, length: 1 };
     }
 
+    // A unit is named for the container and then what it contains — "قسم اللغات" — and
+    // English says those two the other way round: Languages Department, never Department
+    // Languages. That is the rule for every one of these container words rather than a
+    // fact about any one subject, so it is read once here instead of enumerated as a
+    // phrase per department. إدارة is a Department when it heads a name and the school's
+    // own Administration when it stands alone, which is why the whole-name lookup above
+    // gets first refusal.
+    var HEADS = {
+        'قسم': 'Department', 'القسم': 'Department',
+        'إدارة': 'Department', 'الإدارة': 'Department', 'ادارة': 'Department', 'الادارة': 'Department',
+        'وحدة': 'Unit', 'الوحدة': 'Unit', 'دائرة': 'Division', 'الدائرة': 'Division',
+        'مكتب': 'Office', 'المكتب': 'Office', 'لجنة': 'Committee', 'اللجنة': 'Committee',
+        'مجلس': 'Council', 'المجلس': 'Council', 'مركز': 'Centre', 'المركز': 'Centre'
+    };
+
+    // The same flip for the other half of the grammar: a noun followed by an adjective —
+    // "التغذية المدرسية" — is read adjective first in English, School Nutrition. Only these
+    // known adjectives move, and only when both halves are catalogued, so a second word
+    // nobody has translated is still left where the writer put it rather than reordered on
+    // a guess.
+    var ADJECTIVES = {
+        'المدرسية': 1, 'المدرسي': 1, 'التربوي': 1, 'التربوية': 1, 'التعليمية': 1, 'التعليمي': 1,
+        'الطلابي': 1, 'الطلابية': 1, 'الأكاديمي': 1, 'الأكاديمية': 1, 'الاكاديمي': 1, 'الاكاديمية': 1,
+        'الإداري': 1, 'الإدارية': 1, 'الاداري': 1, 'الادارية': 1, 'المهني': 1, 'المهنية': 1,
+        'الصحية': 1, 'القانوني': 1, 'القانونية': 1, 'الاجتماعي': 1, 'الاجتماعية': 1, 'البشرية': 1,
+        'الفنية': 1, 'البدنية': 1, 'الإسلامية': 1, 'الاسلامية': 1, 'العربية': 1,
+        'الإنجليزية': 1, 'الانجليزية': 1, 'العامة': 1, 'المالية': 1, 'المالي': 1
+    };
+
     function translateTerm(text) {
         var whole = normalize(text);
         if (!whole) { return ''; }
         if (TERMS[whole]) { return TERMS[whole]; }
 
         var words = whole.split(' ');
+
+        if (words.length === 2 && ADJECTIVES[words[1]] && TERMS[words[0]] && TERMS[words[1]]) {
+            return TERMS[words[1]] + ' ' + TERMS[words[0]];
+        }
+
+        if (words.length > 1 && HEADS[words[0]]) {
+            var rest = translateTerm(words.slice(1).join(' '));
+            // Not when a number follows: a container numbered rather than named keeps the
+            // English order it already had — Unit 3, the way Grade 3 and Floor 1 do.
+            if (rest && !/^\d/.test(rest)) { return rest + ' ' + HEADS[words[0]]; }
+        }
+
         var out = [];
         for (var i = 0; i < words.length; i++) {
             // Longest phrase first: "المرحلة الابتدائية" beats "المرحلة" + "الابتدائية",
@@ -323,9 +467,20 @@
             var digits = words[i].replace(/[٠-٩]/g, function (d) { return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)); });
             if (/^\d+$/.test(digits)) { out.push(digits); continue; }
 
+            // Arabic writes "and" joined to the word it introduces, so "التوجيه والإرشاد"
+            // arrives here as a word no dictionary can hold — and a unit named after two
+            // things is always written that way. Read the conjunction off and translate
+            // what is left. The whole word is looked up first, so وحدة and وكيل, which
+            // only begin with the same letter, are left alone.
+            var w = words[i];
+            if (!TERMS[w] && w.length > 2 && w.charAt(0) === 'و' && TERMS[w.slice(1)]) {
+                out.push('and', TERMS[w.slice(1)]);
+                continue;
+            }
+
             // Unknown word: transliterate rather than drop it. A name nobody
             // catalogued still has to come out as something a reader recognises.
-            out.push(TERMS[words[i]] || word(words[i]));
+            out.push(TERMS[w] || word(w));
         }
 
         return out.join(' ');

@@ -57,12 +57,21 @@ namespace Sms.Web.Controllers
 
         [HttpGet("")]
         [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.View)]
-        public async Task<IActionResult> Index(int? year = null)
+        public async Task<IActionResult> Index(int? year = null, string? q = null, int? subject = null)
         {
             var (years, yr) = await YearsAsync(year);
             var profiles = await _db.TeacherProfiles.AsNoTracking().ToListAsync();
+            var total = profiles.Count;
             var empIds = profiles.Select(p => p.EmployeeId).ToList();
-            var employees = await _db.Employees.AsNoTracking().Where(e => empIds.Contains(e.Id)).ToListAsync();
+            var employeeQuery = _db.Employees.AsNoTracking().Where(e => empIds.Contains(e.Id));
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                // A directory of three hundred names is read by number as often as by name, and the
+                // mobile is searched as well as filed — same fields the employee directory answers on.
+                var t = q.Trim();
+                employeeQuery = employeeQuery.Where(e => e.EmployeeNo.Contains(t) || e.FirstNameAr.Contains(t) || e.FatherNameAr.Contains(t) || e.FamilyNameAr.Contains(t) || e.FirstNameEn.Contains(t) || e.FamilyNameEn.Contains(t) || e.FatherNameEn.Contains(t) || (e.Mobile != null && e.Mobile.Contains(t)));
+            }
+            var employees = await employeeQuery.ToListAsync();
             var now = _clock.UtcNow;
             var activeContractEmp = await _db.Contracts.AsNoTracking().Where(c => empIds.Contains(c.EmployeeId) && c.Status == ContractStatus.Active && c.StartDate <= now && c.EndDate >= now).Select(c => c.EmployeeId).Distinct().ToListAsync();
             var tas = yr == null ? new List<TeacherAssignment>() : await _db.TeacherAssignments.AsNoTracking().Where(a => a.AcademicYearId == yr.Id && a.EffectiveToUtc == null).ToListAsync();
@@ -70,6 +79,17 @@ namespace Sms.Web.Controllers
             var subs = await _db.Subjects.IgnoreQueryFilters().AsNoTracking().Where(s => offs.Select(o => o.SubjectId).Contains(s.Id)).ToListAsync();
             var homerooms = yr == null ? new List<Sms.Domain.Sections.HomeroomAssignment>() : await _db.HomeroomAssignments.AsNoTracking().Where(h => h.AcademicYearId == yr.Id && h.EffectiveToUtc == null).ToListAsync();
             var hrSections = await _db.Sections.AsNoTracking().Where(s => homerooms.Select(h => h.SectionId).Contains(s.Id)).ToListAsync();
+
+            // "Who teaches Maths this year?" is the other half of the question the search box answers,
+            // and the year's assignments already say it. The picker offers the subjects actually
+            // taught; a subject retired mid-year stays listed while it is the one being filtered on,
+            // so the select cannot silently reset itself while the list keeps filtering.
+            var subjectOptions = subs.Where(s => s.IsActive || s.Id == subject).OrderBy(s => IsArabic ? s.Name.NameAr : s.Name.NameEn).ToList();
+            if (subject != null)
+            {
+                var teaching = tas.Where(a => offs.Any(o => o.Id == a.CurriculumOfferingId && o.SubjectId == subject)).Select(a => a.TeacherProfileId).Distinct().ToList();
+                profiles = profiles.Where(p => teaching.Contains(p.Id)).ToList();
+            }
 
             var rows = profiles.Select(p =>
             {
@@ -83,13 +103,13 @@ namespace Sms.Web.Controllers
             }).Where(r => r != null).Select(r => r!).OrderBy(r => r.Employee.EmployeeNo).ToList();
 
             var designatable = await _db.Employees.AsNoTracking().Where(e => !empIds.Contains(e.Id) && e.Status == EmployeeStatus.Active).OrderBy(e => e.EmployeeNo).Take(300).ToListAsync();
-            return View(new TeacherDirectoryViewModel { Rows = rows, Designatable = designatable, Year = yr, Years = years });
+            return View(new TeacherDirectoryViewModel { Rows = rows, Designatable = designatable, Year = yr, Years = years, Query = q, SubjectId = subject, Subjects = subjectOptions, Total = total });
         }
 
         [HttpPost("designate")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.Edit)]
-        public async Task<IActionResult> Designate(int? employeeId, int? maxWeeklyPeriods, int? year)
+        public async Task<IActionResult> Designate(int? employeeId, int? maxWeeklyPeriods, int? year, string? q = null, int? subject = null)
         {
             try
             {
@@ -99,13 +119,13 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Teacher designated (BR-TCH-001).", "عُيِّن المعلم (BR-TCH-001).");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
-            return RedirectToAction(nameof(Index), new { year });
+            return RedirectToAction(nameof(Index), new { year, q, subject });
         }
 
         [HttpPost("{teacherProfileId:int}/remove")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Teachers, ScreenCatalog.Teachers.Teachers_, ActionVerb.Deactivate)]
-        public async Task<IActionResult> RemoveDesignation(int teacherProfileId, int? year)
+        public async Task<IActionResult> RemoveDesignation(int teacherProfileId, int? year, string? q = null, int? subject = null)
         {
             try
             {
@@ -113,7 +133,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T("Teacher designation removed (the employee record is kept).", "أُزيل تعيين المعلم (سجل الموظف محفوظ).");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
-            return RedirectToAction(nameof(Index), new { year });
+            return RedirectToAction(nameof(Index), new { year, q, subject });
         }
 
         // ================================================================== 8.2 Assignment matrix

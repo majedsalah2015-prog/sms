@@ -119,7 +119,7 @@ namespace Sms.Infrastructure.Tests
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
         }
 
-        private LibraryAdmin CreateAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock), new NotificationPublisher(db));
+        private LibraryAdmin CreateAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock), new NotificationPublisher(db, new TestAddressBook()));
 
         private async Task<Copy> CatalogAsync(LibraryAdmin admin, string barcode = "B-001", decimal? cost = 45m)
         {

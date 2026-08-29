@@ -77,11 +77,47 @@ namespace Sms.Application.Common.Exceptions
         public int MemberCount { get; }
     }
 
-    /// <summary>A section can only be edited/deleted while its history (memberships, homeroom assignments, timetable) allows it.</summary>
+    /// <summary>Why a section will not take the change — capacity against who is already in it, or history against removal.</summary>
+    public enum SectionInUseReason
+    {
+        /// <summary>The new capacity is below the number of students already assigned.</summary>
+        CapacityBelowAssigned = 1,
+
+        /// <summary>Membership history exists — the section is closed, never deleted (BR-SCN-007).</summary>
+        HasHistory = 2,
+
+        /// <summary>Something outside the section's own tables still points at it.</summary>
+        ReferencedElsewhere = 3,
+    }
+
+    /// <summary>
+    /// A section can only be edited/deleted while its history (memberships, homeroom assignments,
+    /// timetable) allows it.
+    /// <para>
+    /// The reason used to be an English clause the caller composed, and the Web boundary kept it
+    /// verbatim inside an Arabic frame — half a sentence in the reader's language. It is a value
+    /// now, with the two numbers the capacity case needs, so the whole sentence can be said in
+    /// either language.
+    /// </para>
+    /// </summary>
     public class SectionInUseException : InvalidOperationException
     {
-        public SectionInUseException(int sectionId, string reason)
-            : base($"Section {sectionId} is in use: {reason}.")
+        public SectionInUseException(int sectionId, SectionInUseReason reason, int requested = 0, int existing = 0)
+            : base($"Section {sectionId} is in use: {Describe(reason, requested, existing)}.")
+        {
+            SectionId = sectionId;
+            Reason = reason;
+            Requested = requested;
+            Existing = existing;
+        }
+
+        /// <summary>
+        /// The overload for a database refusal on a foreign key nothing checked in advance. The
+        /// provider's message stays in the inner exception, where a log can read it, instead of
+        /// being spliced into a sentence shown to a registrar.
+        /// </summary>
+        public SectionInUseException(int sectionId, SectionInUseReason reason, Exception inner)
+            : base($"Section {sectionId} is in use: {Describe(reason, 0, 0)}.", inner)
         {
             SectionId = sectionId;
             Reason = reason;
@@ -89,7 +125,19 @@ namespace Sms.Application.Common.Exceptions
 
         public int SectionId { get; }
 
-        /// <summary>An English clause the caller composed. UserMessage translates the frame and keeps the clause — half a sentence in the reader's language beats none.</summary>
-        public string Reason { get; }
+        public SectionInUseReason Reason { get; }
+
+        /// <summary>The capacity that was asked for, when capacity is what was refused.</summary>
+        public int Requested { get; }
+
+        /// <summary>How many students are already in the section, or how many history rows exist.</summary>
+        public int Existing { get; }
+
+        private static string Describe(SectionInUseReason reason, int requested, int existing) => reason switch
+        {
+            SectionInUseReason.CapacityBelowAssigned => $"capacity {requested} is below the {existing} currently assigned student(s)",
+            SectionInUseReason.HasHistory => $"{existing} membership or homeroom record(s) exist — close the section instead (BR-SCN-007)",
+            _ => "other records still reference it",
+        };
     }
 }

@@ -1,0 +1,261 @@
+@using System.Globalization
+@model BulkPlacementViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Bulk placement", "الإسناد الجماعي");
+    ViewData["Breadcrumb"] = T("Students / bulk placement", "الطلاب / الإسناد الجماعي");
+
+    string Name(Sms.Domain.Students.Student s) => isRtl
+        ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}"
+        : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
+
+    string VerdictBadge(BulkPlacementViewModel.Verdict v) => v switch
+    {
+        BulkPlacementViewModel.Verdict.WillEnroll or BulkPlacementViewModel.Verdict.WillEnrollAndSeat or BulkPlacementViewModel.Verdict.WillSeat => "text-bg-success",
+        BulkPlacementViewModel.Verdict.AlreadyThere => "text-bg-secondary",
+        _ => "text-bg-warning",
+    };
+
+    string VerdictLabel(BulkPlacementViewModel.Verdict v) => v switch
+    {
+        BulkPlacementViewModel.Verdict.WillEnroll => T("Enrol", "قيد"),
+        BulkPlacementViewModel.Verdict.WillEnrollAndSeat => T("Enrol + seat", "قيد وإسناد"),
+        BulkPlacementViewModel.Verdict.WillSeat => T("Seat", "إسناد"),
+        BulkPlacementViewModel.Verdict.AlreadyThere => T("Nothing to do", "لا إجراء"),
+        BulkPlacementViewModel.Verdict.EnrolledElsewhere => T("Skipped", "متروك"),
+        BulkPlacementViewModel.Verdict.SectionFull => T("Enrol only — section full", "قيد فقط — الشعبة مكتملة"),
+        BulkPlacementViewModel.Verdict.GenderMismatch => T("Enrol only — gender policy", "قيد فقط — سياسة الجنس"),
+        _ => v.ToString(),
+    };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "bulk-placement-help",
+        Title = T("Bulk placement — help", "الإسناد الجماعي — مساعدة"),
+        Intro = T("Putting a whole intake into a grade-year in one pass. A student who is registered but not enrolled exists in the directory and nowhere else: the fee screens, the section board, attendance and the charge pickers all read through the year's enrollments, so an imported register stays invisible to them until this screen has run.", "قيد دفعة كاملة في صف سنوي بخطوة واحدة. الطالب المسجَّل غير المقيَّد موجود في الدليل ولا شيء غيره: فشاشات الرسوم ولوحة الشعب والحضور ومنتقيات الفوترة كلها تقرأ من قيود العام، ويبقى السجل المستورد غائباً عنها حتى تُنفَّذ هذه الشاشة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Preview before it writes", "المعاينة قبل الكتابة"), T("A bulk student change is previewed first and never committed blind (BR-STU-010). The preview names every selected child and what will happen to them; nothing is written until you confirm it. Each enrollment is audited on its own record as it is created.", "التغيير الجماعي على الطلاب يُعايَن أولاً ولا يُنفَّذ على العمياء (BR-STU-010). تسمّي المعاينة كل طالب محدَّد وما سيجري له؛ ولا يُكتب شيء حتى تؤكّد. ويُدقَّق كل قيد على سجله عند إنشائه.")),
+            new HelpPanelViewModel.Item(T("One enrollment per year", "قيد واحد لكل عام"), T("A student holds one open enrollment per academic year (BR-GLB-024). A child already enrolled this year in another grade is skipped and named, not moved — moving them is a decision about one child, taken on their own placement screen.", "للطالب قيد مفتوح واحد في كل عام دراسي (BR-GLB-024). والطفل المقيَّد هذا العام في صف آخر يُترك ويُسمَّى ولا يُنقل — فنقله قرار يخص طفلاً بعينه يُتَّخذ في شاشة إسناده.")),
+            new HelpPanelViewModel.Item(T("The section can refuse, the grade cannot", "الشعبة قد ترفض والصف لا"), T("Capacity (BR-SCN-002) and the section's gender policy (BR-SCN-003) are checked per child. A child the section refuses is still enrolled in the grade-year and left unseated, so the run never half-registers anyone. Choosing no section enrols only.", "تُفحص السعة (BR-SCN-002) وسياسة جنس الشعبة (BR-SCN-003) لكل طفل. والطفل الذي ترفضه الشعبة يُقيَّد في الصف السنوي ويُترك بلا مقعد، فلا يُسجَّل أحد نصف تسجيل. وترك الشعبة فارغة يقيّد فقط.")),
+            new HelpPanelViewModel.Item(T("Distribution is another screen", "التوزيع شاشة أخرى"), T("This screen seats everyone in one section or in none. Spreading a grade evenly — size balance, gender ratio, keep-apart pairs (BR-SCN-008) — is the assignment board's job; enrol here, then distribute there.", "هذه الشاشة تُسنِد الجميع إلى شعبة واحدة أو إلى لا شيء. أما توزيع الصف بالتساوي — توازن الأعداد ونسبة الجنس وأزواج الإبعاد (BR-SCN-008) — فمهمة لوحة التوزيع؛ قيِّد هنا ثم وزّع هناك.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Choose a grade-year, tick the students, preview, then place them.", "اختر صفاً سنوياً، وأشِّر على الطلاب، ثم عايِن ونفِّذ.")</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-mortarboard me-1" aria-hidden="true"></i>@T("Student directory", "دليل الطلاب")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.Error != null)
+{
+    <div class="alert alert-warning" role="alert">@Model.Error</div>
+}
+
+@* --- Where they are going. The destination is chosen first because it decides what the roll below
+     is even measured against: "unplaced" is a statement about a year, not about a student. *@
+<form method="get" class="sms-card p-3 mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+            <label class="form-label small text-muted" for="profileId">@T("Place into (grade-year)", "الوجهة (الصف السنوي)")</label>
+            <select id="profileId" name="profileId" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@T("— choose —", "— اختر —")</option>
+                @foreach (var p in Model.Profiles)
+                {
+                    <option value="@p.Id" selected="@(p.Id == Model.ProfileId)">@p.GradeName · @p.YearName</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label small text-muted" for="sectionId">@T("Section (optional)", "الشعبة (اختياري)")</label>
+            <select id="sectionId" name="sectionId" class="form-select form-select-sm" onchange="this.form.submit()" disabled="@(Model.Profile == null || Model.Sections.Count == 0)">
+                <option value="">@T("— enrol only, no section —", "— قيد فقط بلا شعبة —")</option>
+                @foreach (var s in Model.Sections)
+                {
+                    var left = System.Math.Max(0, s.Section.Capacity - s.Members);
+                    <option value="@s.Section.Id" selected="@(s.Section.Id == Model.SectionId)">@(isRtl ? s.Section.NameAr : s.Section.NameEn) — @T($"{left} seat(s) left", $"{left} مقعداً متبقياً")</option>
+                }
+            </select>
+            @if (Model.Profile != null && Model.Sections.Count == 0)
+            {
+                <div class="form-text">@T("This grade-year has no open sections — students will be enrolled without one.", "لا شعب مفتوحة لهذا الصف السنوي — سيُقيَّد الطلاب بلا شعبة.")</div>
+            }
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted" for="grade">@T("Currently in grade", "الصف الحالي")</label>
+            <select id="grade" name="grade" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@T("Any", "الكل")</option>
+                @foreach (var g in Model.Grades)
+                {
+                    <option value="@g.Id" selected="@(g.Id == Model.GradeFilter)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small text-muted" for="q">@T("Name or number", "الاسم أو الرقم")</label>
+            <div class="input-group input-group-sm">
+                <input id="q" name="q" value="@Model.Q" class="form-control form-control-sm" />
+                <button class="btn btn-outline-secondary" type="submit"><i class="bi bi-search" aria-hidden="true"></i></button>
+            </div>
+        </div>
+    </div>
+    <div class="form-check mt-2">
+        <input class="form-check-input" type="checkbox" id="placedToo" name="placedToo" value="true" checked="@Model.PlacedToo" onchange="this.form.submit()" />
+        <label class="form-check-label small" for="placedToo">@T("Show students already placed in the destination year too", "أظهر أيضاً الطلاب المقيَّدين في عام الوجهة")</label>
+    </div>
+</form>
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3"><div class="sms-tile"><span class="sms-tile__value">@Model.UnplacedTotal</span><span class="sms-tile__label">@T("not placed in the destination year", "بلا قيد في عام الوجهة")</span></div></div>
+    <div class="col-6 col-md-3"><div class="sms-tile"><span class="sms-tile__value">@Model.MatchCount</span><span class="sms-tile__label">@T("matched by the filter", "مطابق للتصفية")</span></div></div>
+    <div class="col-6 col-md-3"><div class="sms-tile"><span class="sms-tile__value">@(Model.GradeYearName ?? "—")</span><span class="sms-tile__label">@T("destination grade", "صف الوجهة")</span></div></div>
+    <div class="col-6 col-md-3"><div class="sms-tile"><span class="sms-tile__value">@(Model.SeatsLeft?.ToString() ?? "—")</span><span class="sms-tile__label">@T("seats left in the section", "مقاعد متبقية بالشعبة")</span></div></div>
+</div>
+
+@if (Model.HasPreview)
+{
+    @* --- BR-STU-010's dry run. It replaces the grid rather than sitting under it: the reader has
+         already made the selection, and the only question left is whether to commit it. *@
+    <div class="sms-card mb-3">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h2 class="h6 mb-0">@T("Preview — nothing has been written yet", "المعاينة — لم يُكتب شيء بعد")</h2>
+            <span class="text-muted small">
+                @T($"{Model.Preview.Count(r => r.Verdict != BulkPlacementViewModel.Verdict.AlreadyThere && r.Verdict != BulkPlacementViewModel.Verdict.EnrolledElsewhere)} to place · {Model.Preview.Count(r => r.Verdict == BulkPlacementViewModel.Verdict.EnrolledElsewhere || r.Verdict == BulkPlacementViewModel.Verdict.AlreadyThere)} left alone",
+                  $"{Model.Preview.Count(r => r.Verdict != BulkPlacementViewModel.Verdict.AlreadyThere && r.Verdict != BulkPlacementViewModel.Verdict.EnrolledElsewhere)} سيُنفَّذ · {Model.Preview.Count(r => r.Verdict == BulkPlacementViewModel.Verdict.EnrolledElsewhere || r.Verdict == BulkPlacementViewModel.Verdict.AlreadyThere)} دون تغيير")
+            </span>
+        </div>
+        <div class="table-responsive" style="max-height:26rem;overflow-y:auto">
+            <table class="table table-sm sms-table mb-0">
+                <caption class="visually-hidden">@T("What the commit will do to each selected student", "ما سينفّذه الحفظ على كل طالب محدَّد")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                    <th scope="col">@T("Name", "الاسم")</th>
+                    <th scope="col">@T("Outcome", "النتيجة")</th>
+                    <th scope="col">@T("Why", "التفصيل")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var r in Model.Preview)
+                {
+                    <tr>
+                        <td><code>@r.Student.StudentNo</code></td>
+                        <td class="fw-semibold">@Name(r.Student)</td>
+                        <td><span class="badge @VerdictBadge(r.Verdict)">@VerdictLabel(r.Verdict)</span></td>
+                        <td class="small text-muted">@r.Reason</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+        <div class="p-3 border-top d-flex gap-2 align-items-center flex-wrap">
+            @if (Model.CanEnroll)
+            {
+                <form method="post" asp-action="BulkPlacementCommit">
+                    <input type="hidden" name="profileId" value="@Model.ProfileId" />
+                    <input type="hidden" name="sectionId" value="@Model.SectionId" />
+                    <input type="hidden" name="q" value="@Model.Q" />
+                    <input type="hidden" name="grade" value="@Model.GradeFilter" />
+                    <input type="hidden" name="placedToo" value="@Model.PlacedToo.ToString().ToLowerInvariant()" />
+                    <input type="hidden" name="enrollmentDate" value="@Model.EnrollmentDate.ToString("yyyy-MM-dd")" />
+                    @foreach (var r in Model.Preview)
+                    {
+                        <input type="hidden" name="studentIds" value="@r.Student.Id" />
+                    }
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-check2-all me-1" aria-hidden="true"></i>@T("Place them", "نفِّذ الإسناد")</button>
+                </form>
+            }
+            else
+            {
+                <span class="text-muted small">@T("You may preview this run but not commit it.", "يمكنك معاينة هذه الدفعة لا تنفيذها.")</span>
+            }
+            <a class="btn btn-outline-secondary" asp-action="BulkPlacement" asp-route-profileId="@Model.ProfileId" asp-route-sectionId="@Model.SectionId" asp-route-q="@Model.Q" asp-route-grade="@Model.GradeFilter" asp-route-placedToo="@Model.PlacedToo">@T("Back to the list", "عودة للقائمة")</a>
+            @if (!Model.CanSeat && Model.Section != null)
+            {
+                <span class="text-muted small">@T("You may not seat students in sections, so only the enrollments will be created.", "لا تملك إسناد الطلاب إلى الشعب، فستُنشأ القيود فقط.")</span>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <form method="post" asp-action="BulkPlacementPreview" class="sms-card">
+        <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h2 class="h6 mb-0">@T("Students", "الطلاب")</h2>
+            <div class="d-flex gap-2 align-items-center">
+                <label class="small text-muted" for="enrollmentDate">@T("Enrollment date", "تاريخ القيد")</label>
+                <input id="enrollmentDate" type="date" name="enrollmentDate" class="form-control form-control-sm" style="max-width:11rem" value="@Model.EnrollmentDate.ToString("yyyy-MM-dd")" />
+                <button class="btn btn-primary btn-sm" type="submit" disabled="@(Model.Profile == null)"><i class="bi bi-eye me-1" aria-hidden="true"></i>@T("Preview", "معاينة")</button>
+            </div>
+        </div>
+        <input type="hidden" name="profileId" value="@Model.ProfileId" />
+        <input type="hidden" name="sectionId" value="@Model.SectionId" />
+        <input type="hidden" name="q" value="@Model.Q" />
+        <input type="hidden" name="grade" value="@Model.GradeFilter" />
+        <input type="hidden" name="placedToo" value="@Model.PlacedToo.ToString().ToLowerInvariant()" />
+
+        @if (Model.Rows.Count == 0)
+        {
+            <p class="text-muted p-3 mb-0">
+                @if (Model.Profile == null)
+                {
+                    @T("Choose a destination grade-year above; the list then shows the students who are not in it yet.", "اختر صف الوجهة أعلاه؛ عندها تعرض القائمة الطلاب غير المقيَّدين فيه بعد.")
+                }
+                else
+                {
+                    @T("No students match. Every registered student is already placed in this year, or the filter is too narrow.", "لا طلاب مطابقين. إما أن كل طالب مسجَّل مقيَّد في هذا العام، أو أن التصفية ضيّقة.")
+                }
+            </p>
+        }
+        else
+        {
+            <div class="table-responsive" style="max-height:32rem;overflow-y:auto">
+                <table class="table table-sm sms-table mb-0">
+                    <caption class="visually-hidden">@T("Students available to place, with where they sit today", "الطلاب المتاحون للإسناد، مع موضعهم الحالي")</caption>
+                    <thead><tr>
+                        <th scope="col" style="width:2.5rem">
+                            <input class="form-check-input" type="checkbox" id="pickAll" aria-label="@T("Select all", "تحديد الكل")" onclick="document.querySelectorAll('.pick').forEach(c => c.checked = this.checked)" />
+                        </th>
+                        <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col">@T("Gender", "الجنس")</th>
+                        <th scope="col">@T("DOB", "الميلاد")</th>
+                        <th scope="col">@T("Currently", "الوضع الحالي")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var r in Model.Rows)
+                    {
+                        <tr>
+                            <td><input class="form-check-input pick" type="checkbox" name="studentIds" value="@r.Student.Id" aria-label="@T($"Select {r.Student.StudentNo}", $"تحديد {r.Student.StudentNo}")" /></td>
+                            <td><a asp-action="Placement" asp-route-id="@r.Student.Id"><code>@r.Student.StudentNo</code></a></td>
+                            <td class="fw-semibold">@Name(r.Student)</td>
+                            <td>@(r.Student.Gender == Sms.Domain.Common.Gender.Male ? T("M", "ذ") : T("F", "أ"))</td>
+                            <td><bdi dir="ltr">@r.Student.DateOfBirth.ToString("yyyy-MM-dd")</bdi></td>
+                            <td class="small">
+                                @if (r.GradeName == null)
+                                {
+                                    <span class="text-muted">@T("no enrollment", "بلا قيد")</span>
+                                }
+                                else
+                                {
+                                    <span class="@(r.InTargetYear ? "text-success" : "text-muted")">@r.GradeName@(r.SectionName == null ? "" : " / " + r.SectionName)@(r.YearName == null ? "" : " · " + r.YearName)</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            @if (Model.IsTruncated)
+            {
+                <p class="text-muted small p-3 mb-0">@T($"Showing the first {Model.Rows.Count} of {Model.MatchCount} matches — narrow the filter to reach the rest.", $"تُعرض أول {Model.Rows.Count} من {Model.MatchCount} مطابقة — ضيّق التصفية للوصول إلى البقية.")</p>
+            }
+        }
+    </form>
+}

@@ -48,9 +48,13 @@ namespace Sms.Web.Controllers
 
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
+        /// <param name="floor">
+        /// Keeps that floor selected in the "New room" form — how DefineRoom hands the
+        /// screen back after a save so the next room on the same floor is one form away.
+        /// </param>
         [HttpGet("")]
         [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Rooms, ActionVerb.View)]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? floor = null)
         {
             var buildings = await _db.Buildings.AsNoTracking().OrderBy(b => b.Name.NameEn).ToListAsync();
             var floors = await _db.Floors.AsNoTracking().OrderBy(f => f.SequenceOrder).ToListAsync();
@@ -66,11 +70,17 @@ namespace Sms.Web.Controllers
                 features.Where(f => f.RoomId == r.Id).Select(f => featureNames.FirstOrDefault(x => x.Id == f.FeatureLookupId) is { } fn ? (IsArabic ? fn.Ar : fn.En) : "?").ToList(),
                 unavailable.Contains(r.Id), sectionsUsing.TryGetValue(r.Id, out var n) ? n : null);
 
+            var nextCodes = await _rooms.SuggestRoomCodesAsync();
+            var selectedFloorId = floor is { } f0 && floors.Any(x => x.Id == f0) ? floor : null;
+
             return View(new RoomCatalogViewModel
             {
                 Buildings = buildings.Select(b => new RoomCatalogViewModel.BuildingNode(b, floors.Where(f => f.BuildingId == b.Id).Select(f => new RoomCatalogViewModel.FloorNode(f, rooms.Where(r => r.FloorId == f.Id).Select(Row).ToList())).ToList())).ToList(),
                 RoomTypes = types,
                 Floors = floors.Select(f => { var b = buildings.First(x => x.Id == f.BuildingId); return (f.Id, b.Name.NameAr, b.Name.NameEn, f.Name.NameAr, f.Name.NameEn); }).ToList(),
+                NextRoomCodes = nextCodes,
+                RoomFloorId = selectedFloorId,
+                RoomCode = selectedFloorId is { } sf && nextCodes.TryGetValue(sf, out var next) ? next : null,
                 TotalRooms = rooms.Count,
                 TotalSeats = rooms.Sum(r => r.StandardCapacity),
                 FloorOrder = floors.Count + 1,
@@ -82,7 +92,7 @@ namespace Sms.Web.Controllers
         [RequirePermission(ScreenCatalog.Modules.Classrooms, ScreenCatalog.Classrooms.Buildings, ActionVerb.Create)]
         public async Task<IActionResult> DefineBuilding(RoomCatalogViewModel form)
         {
-            try { Require(form.BuildingNameAr, "Name (Arabic)"); Require(form.BuildingNameEn, "Name (English)"); await _rooms.DefineBuildingAsync(form.BuildingNameAr!, form.BuildingNameEn!); TempData["Flash"] = T("Building created.", "تم إنشاء المبنى."); }
+            try { Require(form.BuildingNameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.BuildingNameEn, "Name (English)", "الاسم (إنجليزي)"); await _rooms.DefineBuildingAsync(form.BuildingNameAr!, form.BuildingNameEn!); TempData["Flash"] = T("Building created.", "تم إنشاء المبنى."); }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(Index));
         }
@@ -95,7 +105,7 @@ namespace Sms.Web.Controllers
             try
             {
                 if (form.FloorBuildingId == null) throw new InvalidOperationException(T("Choose a building.", "اختر مبنى."));
-                Require(form.FloorNameAr, "Name (Arabic)"); Require(form.FloorNameEn, "Name (English)");
+                Require(form.FloorNameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.FloorNameEn, "Name (English)", "الاسم (إنجليزي)");
                 await _rooms.DefineFloorAsync(form.FloorBuildingId.Value, form.FloorNameAr!, form.FloorNameEn!, form.FloorOrder ?? 1);
                 TempData["Flash"] = T("Floor created.", "تم إنشاء الطابق.");
             }
@@ -111,13 +121,26 @@ namespace Sms.Web.Controllers
             try
             {
                 if (form.RoomFloorId == null || form.RoomTypeId == null) throw new InvalidOperationException(T("Choose a floor and a room type.", "اختر طابقاً ونوع القاعة."));
-                Require(form.RoomCode, "Code"); Require(form.RoomNameAr, "Name (Arabic)"); Require(form.RoomNameEn, "Name (English)");
-                var r = await _rooms.DefineRoomAsync(form.RoomFloorId.Value, form.RoomCode!.Trim().ToUpperInvariant(), form.RoomNameAr!, form.RoomNameEn!, form.RoomTypeId.Value, form.StandardCapacity ?? 30, form.ExamCapacity ?? 20, form.WingTag);
-                TempData["Flash"] = T("Room created.", "تم إنشاء القاعة.");
-                return RedirectToAction(nameof(Details), new { id = r.Id });
+
+                // The screen fills Code from the floor, but it stays editable and a
+                // browser can still post it empty — resolve it from the same map the
+                // screen read rather than refusing over a field nobody was asked to type.
+                var code = form.RoomCode?.Trim();
+                if (string.IsNullOrWhiteSpace(code))
+                {
+                    code = (await _rooms.SuggestRoomCodesAsync()).TryGetValue(form.RoomFloorId.Value, out var next) ? next : null;
+                }
+                Require(code, "Code", "الرمز"); Require(form.RoomNameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.RoomNameEn, "Name (English)", "الاسم (إنجليزي)");
+
+                var r = await _rooms.DefineRoomAsync(form.RoomFloorId.Value, code!.ToUpperInvariant(), form.RoomNameAr!, form.RoomNameEn!, form.RoomTypeId.Value, form.StandardCapacity ?? 30, form.ExamCapacity ?? 20, form.WingTag);
+                TempData["Flash"] = T($"Room {r.Code} created — add the next one.", $"تم إنشاء القاعة {r.Code} — أضف التالية.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
-            return RedirectToAction(nameof(Index));
+
+            // Back to the catalog, not to the new room's page: rooms are entered a floor
+            // at a time, and a detail page every save meant navigating back before each
+            // one. The floor rides the query string so it stays selected for the next.
+            return RedirectToAction(nameof(Index), new { floor = form.RoomFloorId });
         }
 
         // --- Edit / delete (soft: deactivate) for building / floor / room ---------
@@ -139,7 +162,7 @@ namespace Sms.Web.Controllers
             form.Id = id; form.Kind = "building";
             try
             {
-                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
                 await _rooms.UpdateBuildingAsync(id, form.NameAr!.Trim(), form.NameEn!.Trim());
                 TempData["Flash"] = T("Building updated.", "تم تحديث المبنى.");
                 return RedirectToAction(nameof(Index));
@@ -175,7 +198,7 @@ namespace Sms.Web.Controllers
             try
             {
                 if (form.BuildingId == null) throw new InvalidOperationException(T("Choose a building.", "اختر مبنى."));
-                Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
                 await _rooms.UpdateFloorAsync(id, form.BuildingId.Value, form.NameAr!.Trim(), form.NameEn!.Trim(), form.Order ?? 1);
                 TempData["Flash"] = T("Floor updated.", "تم تحديث الطابق.");
                 return RedirectToAction(nameof(Index));
@@ -216,7 +239,7 @@ namespace Sms.Web.Controllers
             try
             {
                 if (form.FloorId == null || form.RoomTypeId == null) throw new InvalidOperationException(T("Choose a floor and a room type.", "اختر طابقاً ونوع القاعة."));
-                Require(form.Code, T("Code", "الرمز")); Require(form.NameAr, T("Name (Arabic)", "الاسم (عربي)")); Require(form.NameEn, T("Name (English)", "الاسم (إنجليزي)"));
+                Require(form.Code, "Code", "الرمز"); Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
                 await _rooms.UpdateRoomAsync(id, form.FloorId.Value, form.Code!.Trim().ToUpperInvariant(), form.NameAr!.Trim(), form.NameEn!.Trim(), form.RoomTypeId.Value, form.StandardCapacity ?? 30, form.ExamCapacity ?? 20, form.WingTag);
                 TempData["Flash"] = T("Room updated.", "تم تحديث القاعة.");
                 return RedirectToAction(nameof(Details), new { id });
@@ -504,7 +527,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(purpose, "Purpose");
+                Require(purpose, "Purpose", "الغرض");
                 if (start == null || end == null || end <= start) throw new InvalidOperationException(T("A valid start/end is required.", "بداية ونهاية صحيحتان مطلوبتان."));
                 var yearId = academicYearId ?? _workingYear.AcademicYearId;
                 var b = await _rooms.RequestBookingAsync(id, yearId, purpose!.Trim(), DateTime.SpecifyKind(start.Value, DateTimeKind.Utc), DateTime.SpecifyKind(end.Value, DateTimeKind.Utc), _currentUser.UserId);
@@ -525,9 +548,14 @@ namespace Sms.Web.Controllers
                 values.Where(v => featCat != null && v.LookupCategoryId == featCat.Id).Select(v => (v.Id, v.Name.NameAr, v.Name.NameEn)).ToList());
         }
 
-        private static void Require(string? v, string f)
+        /// <summary>
+        /// Both names, never one: passing a single string put the English field name
+        /// inside the Arabic sentence ("الحقل Name (Arabic) مطلوب.") on the building,
+        /// floor and booking forms. Same shape as EmployeesController.Reference.
+        /// </summary>
+        private static void Require(string? v, string fieldEn, string fieldAr)
         {
-            if (string.IsNullOrWhiteSpace(v)) throw new InvalidOperationException(T($"{f} is required.", $"الحقل {f} مطلوب."));
+            if (string.IsNullOrWhiteSpace(v)) throw new InvalidOperationException(T($"{fieldEn} is required.", $"الحقل «{fieldAr}» مطلوب."));
         }
     }
 }

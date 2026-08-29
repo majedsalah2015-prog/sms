@@ -201,6 +201,36 @@ namespace Sms.Web.Models
         public TransportSubscriptionStatus? Status { get; set; }
 
         public string? Search { get; set; }
+
+        /// <summary>
+        /// The students the subscribe form may pick from: this year's active enrolments, narrowed by
+        /// the shared student search. Only enrolled children are offered because a subscription hangs
+        /// off an enrolment — offering anyone else is offering a refusal.
+        /// </summary>
+        public IReadOnlyList<StudentOption> Candidates { get; set; } = new List<StudentOption>();
+
+        /// <summary>How many students matched before the cap — the screen says so when it shows fewer.</summary>
+        public int CandidateCount { get; set; }
+
+        /// <summary>True when the cap swallowed part of the match; a silent truncation reads as "that is everyone".</summary>
+        public bool CandidatesTruncated { get; set; }
+
+        /// <summary>The picker's own search term, kept apart from <see cref="Search"/>: one narrows the list above, the other the form below.</summary>
+        public string? StudentQuery { get; set; }
+
+        /// <summary>The student the picker is currently holding, so a refused post comes back with the choice intact.</summary>
+        public int? SelectedStudentId { get; set; }
+
+        /// <summary>
+        /// A student as the subscribe form offers one: the id travels with the label because the form
+        /// posts an id, while the label is what the clerk actually reads. Nested because Sms.Web.Models
+        /// already owns a StudentOption for the discount desk, and the two answer different questions.
+        /// </summary>
+        public sealed record StudentOption(int Id, StudentLabel Label)
+        {
+            /// <summary>Number first, then the name: two children in a school share a name more often than a clerk expects.</summary>
+            public string Text(bool arabic) => $"{Label.StudentNo} — {Label.Name(arabic)}";
+        }
     }
 
     public sealed class TripsViewModel

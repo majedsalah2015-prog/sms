@@ -1,4 +1,5 @@
 using System;
+using Sms.Application.Common.Guards;
 
 namespace Sms.Application.Common.Exceptions
 {
@@ -21,12 +22,20 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>A building/floor/room can only be removed (deactivated) while nothing active still sits under or on it.</summary>
+    /// <remarks>
+    /// The blocking references travel as a bilingual <see cref="UsageReport"/>, not as an English
+    /// clause — see <see cref="GradeStructureInUseException"/> for why.
+    /// </remarks>
     public class RoomInUseException : InvalidOperationException
     {
-        public RoomInUseException(string reason)
-            : base($"Cannot remove: {reason}.")
+        public RoomInUseException(UsageReport usage)
+            : base($"Cannot remove: {usage.Describe(arabic: false)}.")
         {
+            Usage = usage;
         }
+
+        /// <summary>Everything that still sits under or on the building, floor or room.</summary>
+        public UsageReport Usage { get; }
     }
 
     /// <summary>BR-ROM-004: the room is under maintenance or reserved for the requested window.</summary>

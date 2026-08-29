@@ -21,13 +21,15 @@ namespace Sms.Web.Controllers
 {
     /// <summary>
     /// doc/Modules/04 §8.1–8.2: year calendar board (month grids, day-type
-    /// painting over ranges, Hijri overlay, working-day counters per
-    /// semester/term — BR-CAL-006 live) and the event manager, plus publish
-    /// versions (BR-CAL-007). Weekend days come from the E-101
-    /// Regional.WorkingDays setting through WorkingWeek; day types resolve
-    /// through CalendarDayResolver exactly as the engine does. §8.3 amendment
-    /// impact review and §8.4 portal view are deferred (need Attendance/Exam/
-    /// Timetable session lists and the portal shell).
+    /// painting over dragged ranges, Hijri overlay, working-day counters per
+    /// semester/term against the configured ministry minimum — BR-CAL-006 live,
+    /// warning and never blocking) and the event manager, plus publish versions
+    /// (BR-CAL-007) and confirmation of provisional Hijri days (BR-CAL-005).
+    /// Weekend days come from the E-101 Regional.WorkingDays setting through
+    /// WorkingWeek; day types resolve through CalendarDayResolver exactly as the
+    /// engine does. §8.3 amendment impact review and §8.4 portal view are
+    /// deferred (need Attendance/Exam/Timetable session lists and the portal
+    /// shell).
     /// </summary>
     [Route("calendar")]
     public class CalendarController : Controller
@@ -89,14 +91,13 @@ namespace Sms.Web.Controllers
                     throw new InvalidOperationException(T("End date must be on or after the start date.", "تاريخ النهاية يجب أن يكون في أو بعد البداية."));
                 }
 
-                var painted = 0;
-                for (var d = form.Date.Value.Date; d <= end.Date; d = d.AddDays(1))
-                {
-                    await _calendar.DefineDayAsync(form.AcademicYearId, d, form.DayType, form.Audience, form.IsProvisional);
-                    painted++;
-                }
-
-                TempData["Flash"] = T($"{painted} day(s) painted as {form.DayType}.", $"تم تعيين {painted} يوم/أيام كـ {form.DayType}.");
+                // One call, one transaction. Painting a summer holiday day by day saved once per
+                // row and left half a range behind when a day in the middle was refused.
+                var painted = await _calendar.DefineDaysAsync(form.AcademicYearId, form.Date.Value, end, form.DayType, form.Audience, form.IsProvisional);
+                var type = CalendarLabels.DayType(form.DayType, IsArabic);
+                TempData["Flash"] = painted == 1
+                    ? T($"One day painted as {type}.", $"تم تعيين يوم واحد كـ{type}.")
+                    : T($"{painted} days painted as {type}.", $"تم تعيين {painted} يوماً كـ{type}.");
             }
             catch (InvalidOperationException ex)
             {
@@ -104,6 +105,36 @@ namespace Sms.Web.Controllers
             }
 
             return RedirectToAction(nameof(Index), new { year = form.AcademicYearId });
+        }
+
+        /// <summary>
+        /// BR-CAL-005: clears the provisional flag once the moon-sighting date is known. The rule
+        /// says a Hijri-mapped holiday is "flagged until confirmed", and until now nothing could
+        /// confirm one — the ◔ went on the board and stayed there for the rest of the year.
+        /// Confirming does not move the day; a holiday that landed a day later is repainted with
+        /// the paint tool, which is the same amendment any other date change is.
+        /// </summary>
+        [HttpPost("day/confirm")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Calendar, ScreenCatalog.Calendar.Calendar_, ActionVerb.Edit)]
+        public async Task<IActionResult> ConfirmDay(int academicYearId, DateTime date)
+        {
+            try
+            {
+                var day = await _calendar.ConfirmProvisionalDayAsync(academicYearId, date);
+                if (day == null)
+                {
+                    return NotFound();
+                }
+
+                TempData["Flash"] = T($"{date:yyyy-MM-dd} confirmed — no longer provisional.", $"تم تأكيد {date:yyyy-MM-dd} — لم يعد مبدئياً.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Index), new { year = academicYearId });
         }
 
         [HttpPost("event")]
@@ -140,10 +171,9 @@ namespace Sms.Web.Controllers
 
                 if (form.MarkAsHoliday)
                 {
-                    for (var d = form.StartDate.Value.Date; d <= end.Date; d = d.AddDays(1))
-                    {
-                        await _calendar.DefineDayAsync(form.AcademicYearId, d, DayType.Holiday, form.Audience, isProvisional: form.Category == CalendarEventCategory.Religious);
-                    }
+                    await _calendar.DefineDaysAsync(
+                        form.AcademicYearId, form.StartDate.Value, end, DayType.Holiday, form.Audience,
+                        isProvisional: form.Category == CalendarEventCategory.Religious);
                 }
 
                 TempData["Flash"] = T("Event saved.", "تم حفظ الحدث.");
@@ -311,6 +341,13 @@ namespace Sms.Web.Controllers
                 }
             }
 
+            // BR-CAL-006: the ministry minimum is a school setting, not shipped reference data —
+            // doc/Modules/04 §14 Q1 leaves the per-country values open. Unset means no warning.
+            var minimumSetting = await _setup.GetSettingAsync(SettingKeys.MinimumInstructionalDays, year.Id);
+            int? minimum = int.TryParse(minimumSetting, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedMinimum) ? parsedMinimum : null;
+
+            var today = _clock.UtcNow.Date;
+
             var lastPublish = versions.FirstOrDefault()?.PublishedAtUtc;
             var hasUnpublished = lastPublish == null
                 ? days.Count > 0 || events.Count > 0
@@ -331,6 +368,9 @@ namespace Sms.Web.Controllers
                 HasUnpublishedEdits = hasUnpublished,
                 InstructionalDays = counters[0].WorkingDays,
                 OverrideCount = days.Count,
+                ProvisionalDays = days.Where(d => d.IsProvisional).OrderBy(d => d.Date).ToList(),
+                MinimumInstructionalDays = minimum,
+                PaintFloor = year.EndDate.Date < today ? null : (today > year.StartDate.Date ? today : year.StartDate.Date),
             };
         }
 

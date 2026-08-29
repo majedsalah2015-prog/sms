@@ -113,7 +113,7 @@ namespace Sms.Infrastructure.Tests
 
         private NumberIssuer Issuer(AppDbContext db) => new(db, _tenant, _tenant, _clock);
 
-        private HealthAdmin CreateHealth(AppDbContext db) => new(db, Issuer(db), _clock, _tenant, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), new NotificationPublisher(db), new AttendanceAdmin(db));
+        private HealthAdmin CreateHealth(AppDbContext db) => new(db, Issuer(db), _clock, _tenant, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), new NotificationPublisher(db, new TestAddressBook()), new AttendanceAdmin(db));
 
         private CafeteriaAdmin CreateAdmin(AppDbContext db) => new(db, Issuer(db), _clock, _audit, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), new FeeAdmin(db, Issuer(db), _clock), CreateHealth(db));
 

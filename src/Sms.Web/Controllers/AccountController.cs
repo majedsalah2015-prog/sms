@@ -90,13 +90,13 @@ namespace Sms.Web.Controllers
             {
                 var pending = new ClaimsIdentity(TwoFactorScheme);
                 pending.AddClaim(new Claim(ClaimTypes.NameIdentifier, outcome.UserAccountId.ToString(CultureInfo.InvariantCulture)));
-                pending.AddClaim(new Claim("remember", model.RememberMe ? "1" : "0"));
+                pending.AddClaim(new Claim("remember", model.RememberMe == true ? "1" : "0"));
                 await HttpContext.SignInAsync(TwoFactorScheme, new ClaimsPrincipal(pending),
                     new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5), IsPersistent = false });
                 return RedirectToAction(nameof(TwoFactor), new { returnUrl = model.ReturnUrl });
             }
 
-            await SignInSessionAsync(outcome.Session!, outcome.MustChangePassword, model.RememberMe);
+            await SignInSessionAsync(outcome.Session!, outcome.MustChangePassword, model.RememberMe == true);
             return outcome.MustChangePassword
                 ? RedirectToAction(nameof(ChangePassword))
                 : LocalRedirect(SafeReturnUrl(model.ReturnUrl));

@@ -315,14 +315,26 @@ namespace Sms.Application.Notifications
             All.Where(e => string.Equals(e.ModuleCode, moduleCode, StringComparison.OrdinalIgnoreCase)).ToList();
 
         /// <summary>
-        /// Whether a channel has a transport behind it in this deployment, mirroring
-        /// <c>Startup</c>'s <c>IChannelSender</c> registrations: in-app is real,
-        /// email/SMS/WhatsApp are <c>StubChannelSender</c> because no provider has
-        /// been chosen (doc 09 §9 Q1, BR-NOT-009). A rule on a stubbed channel is
-        /// configuration recorded ahead of a decision, not a message anybody gets —
-        /// which is exactly why the seeder does not enable one.
+        /// Whether a channel has a real transport behind it in this deployment, mirroring
+        /// <c>Startup</c>'s <c>IChannelSender</c> registrations.
+        /// <para>
+        /// In-app writes a row. SMS and WhatsApp post to the school's registered gateway
+        /// (<c>TwilioStyleChannelSender</c>) — real, but see <see cref="ChannelNeedsGateway"/>:
+        /// they deliver nothing until somebody registers one in the provider console.
+        /// Email is still <c>StubChannelSender</c>, because doc 09 §9 Q1's SMTP decision is
+        /// unmade — a rule on it is configuration recorded ahead of a decision, not a
+        /// message anybody gets, which is why the seeder does not enable one.
+        /// </para>
         /// </summary>
-        public static bool ChannelDelivers(NotificationChannel channel) => channel == NotificationChannel.InApp;
+        public static bool ChannelDelivers(NotificationChannel channel) => channel != NotificationChannel.Email;
+
+        /// <summary>
+        /// Whether the channel's transport is real but useless until a gateway is registered
+        /// against it (doc/Modules/33 §8.3). A screen showing these columns should point at
+        /// the provider console rather than imply the channel is either dead or ready.
+        /// </summary>
+        public static bool ChannelNeedsGateway(NotificationChannel channel)
+            => channel is NotificationChannel.Sms or NotificationChannel.WhatsApp;
 
         private static NotificationEvent E(
             string code,

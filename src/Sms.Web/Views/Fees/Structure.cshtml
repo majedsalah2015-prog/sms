@@ -16,6 +16,7 @@
         {
             new HelpPanelViewModel.Item(T("Grid", "الشبكة"), T("Rows are the year's grade profiles, columns the active categories. Type the amounts along a grade's row, then Save beside its total (↵ in any cell does the same); a draft cell can also be approved ✓ or removed 🗑 on its own.", "الصفوف ملفات الصفوف للعام والأعمدة الفئات الفعّالة. اكتب المبالغ على امتداد سطر الصف ثم احفظ بجوار المجموع (أو اضغط ↵ في أي خلية)؛ ويمكن اعتماد ✓ خلية المسودة أو حذفها 🗑 وحدها.")),
             new HelpPanelViewModel.Item(T("Save / Clear a row", "حفظ / تصفير سطر"), T("Save writes the whole row at once: an empty cell with an amount becomes a Draft line, a changed draft amount is updated against the reason typed beside it (T1), a blank cell changes nothing, and an approved price is left alone. Clear removes the row's draft lines only — an approved price leaves the list by withdrawal, with a reason (BR-GLB-005).", "يكتب الحفظ السطر كاملاً: الخلية الفارغة ذات المبلغ تصبح سطر مسودة، ومبلغ المسودة المتغيّر يُحدَّث بالسبب المكتوب بجواره (T1)، والخلية الفارغة لا تغيّر شيئاً، والسعر المعتمد يبقى كما هو. أما التصفير فيحذف مسودات السطر فقط — إذ لا يخرج السعر المعتمد إلا بالسحب مع ذكر السبب (BR-GLB-005).")),
+            new HelpPanelViewModel.Item(T("Calculator", "الآلة الحاسبة"), T("The 🖩 beside an amount opens a calculator seeded with what the cell already holds — work out 10 × 450 and press OK to put the answer in the field. Enter accepts, Esc closes without writing.", "زر 🖩 بجوار المبلغ يفتح آلة حاسبة تبدأ بما في الخلية — احسب ١٠ × ٤٥٠ واضغط موافق ليوضع الناتج في الحقل. Enter يقبل وEsc يغلق دون كتابة.")),
             new HelpPanelViewModel.Item(T("Copy from last year", "نسخ من العام السابق"), T("Copies every approved line of the source year into this year's matching grades (by grade level) as Draft, with an optional % uplift. Existing pairs are skipped.", "ينسخ كل الأسطر المعتمدة من العام المصدر إلى صفوف هذا العام المطابقة كمسودات مع نسبة رفع اختيارية. الأزواج الموجودة تُتخطى.")),
             new HelpPanelViewModel.Item(T("Approve all", "اعتماد الكل"), T("Approves every Draft line of the year in one go — use after review.", "يعتمد كل مسودات العام دفعة واحدة — بعد المراجعة.")),
         },
@@ -94,7 +95,10 @@ else
                             else
                             {
                                 <div class="d-flex gap-1 justify-content-center align-items-center">
-                                    <input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
+                                    <div class="input-group input-group-sm" style="width:8.75rem">
+                                        <input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control text-end" value="@line.Amount.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
+                                        <button type="button" class="btn btn-outline-secondary" data-sms-calc title="@T("Calculator", "الآلة الحاسبة")" aria-label="@T($"Calculator — {p.Grade.Name.NameEn} × {c.NameEn}", $"الآلة الحاسبة — {p.Grade.Name.NameAr} × {c.NameAr}")"><i class="bi bi-calculator" aria-hidden="true"></i></button>
+                                    </div>
                                     <input form="@rid" name="reason_@c.Id" class="form-control form-control-sm" style="width:6rem" placeholder="@T("reason", "السبب")" title="@T("Reason for amount change (T1)", "سبب تغيير المبلغ (T1)")" aria-label="@T($"Reason — {p.Grade.Name.NameEn} × {c.NameEn}", $"السبب — {p.Grade.Name.NameAr} × {c.NameAr}")" />
                                     <form method="post" asp-action="ApproveLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Approve", "اعتماد")" aria-label="@T("Approve", "اعتماد")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
                                     <form method="post" asp-action="DeleteLine" asp-route-id="@line.Id" asp-route-year="@yid" class="d-inline"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove draft", "حذف المسودة")" aria-label="@T("Remove draft", "حذف المسودة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form>
@@ -104,7 +108,15 @@ else
                         }
                         else
                         {
-                            <div class="d-flex justify-content-center"><input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control form-control-sm text-end" style="width:6.5rem" placeholder="—" title="@T("Type an amount and save the row", "اكتب مبلغاً واحفظ السطر")" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" /></div>
+                            @* A term price is rarely a figure someone knows; it is 10 months × 450, or last
+                               year's less the sibling share. The calculator hands the answer to the field so
+                               the sum is not worked out on paper beside the screen. *@
+                            <div class="d-flex justify-content-center">
+                                <div class="input-group input-group-sm" style="width:8.75rem">
+                                    <input form="@rid" name="amount_@c.Id" type="number" step="0.01" min="0" class="form-control text-end" placeholder="—" title="@T("Type an amount and save the row", "اكتب مبلغاً واحفظ السطر")" aria-label="@T($"Amount — {p.Grade.Name.NameEn} × {c.NameEn}", $"المبلغ — {p.Grade.Name.NameAr} × {c.NameAr}")" />
+                                    <button type="button" class="btn btn-outline-secondary" data-sms-calc title="@T("Calculator", "الآلة الحاسبة")" aria-label="@T($"Calculator — {p.Grade.Name.NameEn} × {c.NameEn}", $"الآلة الحاسبة — {p.Grade.Name.NameAr} × {c.NameAr}")"><i class="bi bi-calculator" aria-hidden="true"></i></button>
+                                </div>
+                            </div>
                         }
                         </td>
                     }
@@ -130,4 +142,7 @@ else
         </table></div>
         <div class="p-2 small text-muted">@T("Amounts are net of VAT; the VAT rate is applied from the category at posting time and snapshotted on each invoice (BR-GLB-061).", "المبالغ صافية قبل الضريبة؛ تُطبَّق نسبة الضريبة من الفئة عند الترحيل وتُسجَّل على كل فاتورة (BR-GLB-061).")</div>
     </div>
+
+    @* One dialog for the whole grid — it takes its field from the button that opened it. *@
+    <partial name="_Calculator" />
 }

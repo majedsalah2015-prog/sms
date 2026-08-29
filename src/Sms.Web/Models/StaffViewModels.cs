@@ -14,7 +14,12 @@ namespace Sms.Web.Models
 
     public sealed class EmployeeListViewModel
     {
-        public sealed record Row(Employee Employee, string? Position, string? OrgUnit, Contract? CurrentContract, bool IsTeacher, string NationalityName);
+        /// <summary>
+        /// The directory is the staff contact card (doc/Modules/12 §8.1), so the columns it carries
+        /// are the ones a reader rings or files by. Nationality is not one of them — it stays on the
+        /// employee file, where it is read once per person rather than three hundred times per page.
+        /// </summary>
+        public sealed record Row(Employee Employee, string? Position, string? OrgUnit, Contract? CurrentContract, bool IsTeacher);
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
 
@@ -47,6 +52,8 @@ namespace Sms.Web.Models
         public int? PrimaryIdTypeLookupId { get; set; }
         public string? PrimaryIdNo { get; set; }
         public DateTime? PrimaryIdExpiry { get; set; }
+        public string? Mobile { get; set; }
+        public string? WhatsAppNumber { get; set; }
         public int? UserAccountId { get; set; }
 
         /// <summary>
@@ -77,6 +84,15 @@ namespace Sms.Web.Models
 
         public sealed record TeachingRow(TeacherAssignment Assignment, Subject? Subject, Section? Section, CurriculumOffering? Offering);
 
+        /// <summary>
+        /// One qualification with its four catalogue values already resolved to the reader's
+        /// language. Resolved in the controller rather than in the view because the view has no
+        /// business joining four lookup lists per row, and because a retired catalogue value must
+        /// still render — the names come from an <c>IgnoreQueryFilters</c> read, so deactivating a
+        /// university does not blank the degrees awarded by it.
+        /// </summary>
+        public sealed record QualificationRow(Qualification Qualification, string? Education, string? University, string? Specialization, string? AcademicGrade);
+
         public Employee Employee { get; set; } = null!;
 
         public string ActiveTab { get; set; } = "personal";
@@ -89,7 +105,7 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<Contract> Contracts { get; set; } = Array.Empty<Contract>();
 
-        public IReadOnlyList<Qualification> Qualifications { get; set; } = Array.Empty<Qualification>();
+        public IReadOnlyList<QualificationRow> Qualifications { get; set; } = Array.Empty<QualificationRow>();
 
         public TeacherProfile? TeacherProfile { get; set; }
 
@@ -108,6 +124,17 @@ namespace Sms.Web.Models
         public IReadOnlyList<(int Id, string Ar, string En)> Positions { get; set; } = Array.Empty<(int, string, string)>();
         public IReadOnlyList<OrgUnit> OrgUnits { get; set; } = Array.Empty<OrgUnit>();
         public IReadOnlyList<Employee> Managers { get; set; } = Array.Empty<Employee>();
+
+        // The qualifications tab's four catalogues (BR-EMP-004; owner request 2026-08-27). These
+        // are the pickers, so they are the *active* values only — a retired university must not be
+        // offered for a new degree, while the degrees already awarded by it keep its name above.
+        public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
+        public IReadOnlyList<(int Id, string Ar, string En)> Universities { get; set; } = Array.Empty<(int, string, string)>();
+        public IReadOnlyList<(int Id, string Ar, string En)> Specializations { get; set; } = Array.Empty<(int, string, string)>();
+        public IReadOnlyList<(int Id, string Ar, string En)> AcademicGrades { get; set; } = Array.Empty<(int, string, string)>();
+
+        /// <summary>doc 10 §5: the entity documents tab, drawn by the same partial the student file uses.</summary>
+        public EntityDocumentsViewModel Documents { get; set; } = new();
     }
 
     public sealed class OrgChartViewModel
@@ -149,6 +176,20 @@ namespace Sms.Web.Models
         public AcademicYear? Year { get; set; }
 
         public IReadOnlyList<AcademicYear> Years { get; set; } = Array.Empty<AcademicYear>();
+
+        /// <summary>Free-text filter: employee number, either language's name, or mobile.</summary>
+        public string? Query { get; set; }
+
+        /// <summary>Filter to teachers carrying an assignment of this subject in the selected year.</summary>
+        public int? SubjectId { get; set; }
+
+        /// <summary>The subjects actually taught in the selected year — the only ones worth offering as a filter.</summary>
+        public IReadOnlyList<Subject> Subjects { get; set; } = Array.Empty<Subject>();
+
+        /// <summary>Designated teachers before the filter, so the head can read "8 of 42".</summary>
+        public int Total { get; set; }
+
+        public bool IsFiltered => !string.IsNullOrWhiteSpace(Query) || SubjectId != null;
     }
 
     public sealed class AssignmentMatrixViewModel
@@ -233,6 +274,7 @@ namespace Sms.Web.Models
             Sms.Domain.Employees.MaritalStatus.Married => ar ? "متزوج / متزوجة" : "Married",
             Sms.Domain.Employees.MaritalStatus.Divorced => ar ? "مطلق / مطلقة" : "Divorced",
             Sms.Domain.Employees.MaritalStatus.Widowed => ar ? "أرمل / أرملة" : "Widowed",
+            Sms.Domain.Employees.MaritalStatus.Other => ar ? "غير ذلك" : "Other",
             _ => m.ToString(),
         };
 

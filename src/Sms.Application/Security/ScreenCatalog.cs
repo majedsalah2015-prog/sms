@@ -82,6 +82,12 @@ namespace Sms.Application.Security
             /// <summary>Module 25. Behaviour: the code, what was recorded against it, and the cases that follow.</summary>
             public const string Discipline = "DIS";
 
+            /// <summary>Module 32. Human-composed communication: announcements, threads, official letters.</summary>
+            public const string Messaging = "MSG";
+
+            /// <summary>Module 33. The administration surface over doc 09's notification engine — templates, gateways, the delivery log, the budget.</summary>
+            public const string Notifications = "NTF";
+
             /// <summary>Module 36. The screens that decide what every other screen may be reached by.</summary>
             public const string SystemAdministration = "SYS";
 
@@ -172,6 +178,13 @@ namespace Sms.Application.Security
             public const string Directory = "Directory";
             public const string File = "File";
             public const string Guardians = "Guardians";
+
+            /// <summary>
+            /// Putting a student into a grade-year. <c>Create</c> is the write — the single
+            /// placement form and the bulk placement screen both demand it. <c>View</c> opens the
+            /// bulk screen without granting the write, so a registrar can read the year's unplaced
+            /// roll before anyone hands them the right to change it (BR-SEC-010).
+            /// </summary>
             public const string Enrollment = "Enrollment";
 
             /// <summary>BR-GLB-072 restricted category: mother's particulars, family circumstances, ration card, religion. Its own screen code so it can be withheld from roles that legitimately hold the rest of the file.</summary>
@@ -191,6 +204,39 @@ namespace Sms.Application.Security
             public const string File = "File";
             public const string Contracts = "Contracts";
             public const string OrgChart = "OrgChart";
+
+            /// <summary>
+            /// الثوابت — the qualification, university, specialization and bank catalogues the staff
+            /// file picks from. Its own screen code rather than a corner of <see cref="File"/>:
+            /// authoring a school's reference lists is a different act from filling in one
+            /// employee's record, and a registrar who may do the second should not automatically be
+            /// able to rename a university on every record that names it (BR-SEC-010).
+            /// </summary>
+            public const string Reference = "Reference";
+
+            /// <summary>
+            /// مسير الرواتب — the monthly payroll run, its register, the payslips and the bank
+            /// transfer list (owner request, 2026-08-28).
+            /// <para>
+            /// Its own screen code, apart from <see cref="Contracts"/>, because it is the same 🔒
+            /// restricted category (BR-EMP-003, BR-EMP-010: salary data is HR + Principal only) but
+            /// a different act. A payroll officer who runs the month should not thereby be able to
+            /// rewrite the contracts the run reads from, and whoever drafts contracts has no
+            /// business signing off the payment.
+            /// </para>
+            /// </summary>
+            public const string Payroll = "Payroll";
+
+            /// <summary>
+            /// سلف الموظفين — advance requests, their approval and disbursement, the repayment
+            /// schedule, and the advances statements (owner request, 2026-08-28).
+            /// <para>
+            /// Separate from <see cref="Payroll"/>: an advance is decided one employee at a time,
+            /// often by a different person from the one who runs the month, and the school-wide
+            /// outstanding-advances report is a finance question rather than a payroll one.
+            /// </para>
+            /// </summary>
+            public const string Advances = "Advances";
         }
 
         public static class Teachers
@@ -234,6 +280,16 @@ namespace Sms.Application.Security
             public const string Categories = "Categories";
             public const string Structure = "Structure";
             public const string Position = "Position";
+
+            /// <summary>
+            /// doc/Modules/19 §8.7 read from the student's side. <see cref="Position"/> answers
+            /// "what does this payer owe"; this one answers "what is this student's fee made of,
+            /// and what is left on it" — the question a finance clerk is asked at the counter,
+            /// where the name that arrives is the child's and not the guardian's. Separately
+            /// grantable because it opens the whole roll: reading one family's position is not
+            /// the right to browse every family's (BR-SEC-010).
+            /// </summary>
+            public const string StudentFinance = "StudentFinance";
 
             /// <summary>doc/Modules/19 §8 "GL export". Under Fees, not the accounting module: the batch is built from this system's documents, and the ledger only receives it.</summary>
             public const string GlExport = "GlExport";
@@ -280,6 +336,9 @@ namespace Sms.Application.Security
             public const string Dashboard = "Dashboard";
             public const string Layouts = "Layouts";
             public const string Widgets = "Widgets";
+
+            /// <summary>doc/Modules/31 — the school's own figures read straight rather than through a widget layout.</summary>
+            public const string Statistics = "Statistics";
         }
 
         public static class Cafeteria
@@ -326,6 +385,36 @@ namespace Sms.Application.Security
             public const string Safety = "Safety";
         }
 
+        public static class Messaging
+        {
+            /// <summary>doc/Modules/32 §8.1 — compose a broadcast, build its audience, pick its channels, submit it for approval and send it.</summary>
+            public const string Announcements = "Announcements";
+        }
+
+        public static class Notifications
+        {
+            /// <summary>
+            /// doc/Modules/33 §8.2 — the bilingual template studio and its
+            /// draft → test-send → publish lifecycle (BR-NTF-001).
+            /// </summary>
+            public const string Templates = "Templates";
+
+            /// <summary>
+            /// doc/Modules/33 §8.3 — the gateways a school reaches parents through, and their
+            /// credentials (BR-NTF-003). <c>Configure</c> is the only verb that writes here:
+            /// entering a WhatsApp token is not an act of the same kind as filling in a form,
+            /// and the person trusted with the rest of the module is not automatically the
+            /// person trusted with the school's messaging account.
+            /// </summary>
+            public const string Providers = "Providers";
+
+            /// <summary>doc/Modules/33 §8.4 — the delivery log, the failure queue, and the retry (BR-NTF-005).</summary>
+            public const string Deliveries = "Deliveries";
+
+            /// <summary>doc/Modules/33 §8.5 — what the metered channels have spent this month against their ceiling (BR-NTF-004).</summary>
+            public const string Budgets = "Budgets";
+        }
+
         public static class SystemAdministration
         {
             /// <summary>The role designer: which permissions each role carries.</summary>
@@ -370,7 +459,7 @@ namespace Sms.Application.Security
             // nothing could yet write one.
             S(Modules.Setup, Setup.ContentPack, "Content pack", "حزمة المحتوى", ActionVerb.View, ActionVerb.Configure),
             S(Modules.Setup, Setup.Numbering, "Numbering series", "سلاسل الترقيم", ActionVerb.View, ActionVerb.Configure),
-            S(Modules.Setup, Setup.Documents, "Document types", "أنواع المستندات", ActionVerb.View, ActionVerb.Configure),
+            S(Modules.Setup, Setup.Documents, "Document types", "أنواع المستندات", ActionVerb.View, ActionVerb.Configure, ActionVerb.Deactivate),
             S(Modules.Setup, Setup.Notifications, "Notification defaults", "الإشعارات الافتراضية", ActionVerb.View, ActionVerb.Configure),
 
             // ---- School
@@ -418,7 +507,7 @@ namespace Sms.Application.Security
             S(Modules.Students, Students.File, "Student file", "ملف الطالب", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
             S(Modules.Students, Students.SocialProfile, "Social profile", "البيانات الاجتماعية", ActionVerb.View, ActionVerb.Edit),
             S(Modules.Students, Students.Guardians, "Guardians", "أولياء الأمر", ActionVerb.Edit, ActionVerb.Deactivate),
-            S(Modules.Students, Students.Enrollment, "Enrollment", "التسجيل", ActionVerb.Create),
+            S(Modules.Students, Students.Enrollment, "Enrollment", "التسجيل", ActionVerb.View, ActionVerb.Create),
 
             // ---- Parents
             S(Modules.Parents, Parents.Directory, "Parent directory", "دليل أولياء الأمور", ActionVerb.View, ActionVerb.Create),
@@ -430,6 +519,17 @@ namespace Sms.Application.Security
             S(Modules.Employees, Employees.File, "Employee file", "ملف الموظف", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
             S(Modules.Employees, Employees.Contracts, "Contracts", "العقود", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Approve),
             S(Modules.Employees, Employees.OrgChart, "Organization chart", "الهيكل التنظيمي", Crud),
+            S(Modules.Employees, Employees.Reference, "Staff reference lists", "ثوابت الموظفين", Crud),
+
+            // Owner request, 2026-08-28. Post is the verb that moves the money — marking a run paid
+            // and handing an advance over — and is deliberately distinct from Approve, so signing a
+            // register off and paying it can be two people (doc 06 §4.1's own reading of Post).
+            S(Modules.Employees, Employees.Payroll, "Payroll", "مسير الرواتب",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate,
+                ActionVerb.Approve, ActionVerb.Post, ActionVerb.Print, ActionVerb.Export),
+            S(Modules.Employees, Employees.Advances, "Salary advances", "سلف الموظفين",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate,
+                ActionVerb.Approve, ActionVerb.Post, ActionVerb.Print),
 
             // ---- Teachers
             S(Modules.Teachers, Teachers.Teachers_, "Teachers", "المعلمون", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate),
@@ -463,6 +563,13 @@ namespace Sms.Application.Security
             S(Modules.Fees, Fees.Categories, "Fee categories", "فئات الرسوم", Crud),
             S(Modules.Fees, Fees.Structure, "Fee structure", "هيكل الرسوم", CrudApprove),
             S(Modules.Fees, Fees.Position, "Financial position", "كشف الحساب", ReadOnly),
+
+            // Print is a verb of its own here, not decoration: the list and the breakdown are a
+            // clerk reading the file, while the statement is a formal document handed to a family
+            // over the counter. A school that lets a receptionist look up a balance without letting
+            // them issue statements can express exactly that, and cannot if the two share a verb.
+            S(Modules.Fees, Fees.StudentFinance, "Student finance", "مالية الطلاب", ActionVerb.View, ActionVerb.Print),
+
             S(Modules.Fees, Fees.GlExport, "GL export", "الترحيل المحاسبي", ActionVerb.View, ActionVerb.Post, ActionVerb.Deactivate, ActionVerb.Export),
             S(Modules.Fees, Fees.GlMapping, "GL account mapping", "ربط الحسابات", ActionVerb.View, ActionVerb.Configure),
 
@@ -482,7 +589,7 @@ namespace Sms.Application.Security
 
             // ---- Discounts
             S(Modules.Discounts, Discounts.Grants, "Discount grants", "منح الخصم", ActionVerb.View, ActionVerb.Submit, ActionVerb.Approve, ActionVerb.Deactivate),
-            S(Modules.Discounts, Discounts.Types, "Discount types", "أنواع الخصم", ActionVerb.View, ActionVerb.Create),
+            S(Modules.Discounts, Discounts.Types, "Discount types", "أنواع الخصم", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
             S(Modules.Discounts, Discounts.Scholarships, "Scholarship programs", "برامج المنح", ActionVerb.View, ActionVerb.Create, ActionVerb.Submit),
             S(Modules.Discounts, Discounts.Renewals, "Renewal queue", "طابور التجديد", ActionVerb.View, ActionVerb.Create, ActionVerb.Approve),
             S(Modules.Discounts, Discounts.Waivers, "Waivers", "الإعفاءات", ActionVerb.View, ActionVerb.Submit, ActionVerb.Approve),
@@ -495,7 +602,8 @@ namespace Sms.Application.Security
             // ---- Dashboards
             S(Modules.Dashboards, Dashboards.Dashboard, "Dashboard", "لوحة المعلومات", ActionVerb.View, ActionVerb.Edit, ActionVerb.Post),
             S(Modules.Dashboards, Dashboards.Layouts, "Layout templates", "قوالب اللوحات", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit),
-            S(Modules.Dashboards, Dashboards.Widgets, "Widget catalog", "دليل الأدوات", ActionVerb.View, ActionVerb.Create, ActionVerb.Configure),
+            S(Modules.Dashboards, Dashboards.Widgets, "Widget catalog", "دليل الأدوات", ActionVerb.View, ActionVerb.Create, ActionVerb.Configure, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Dashboards, Dashboards.Statistics, "School statistics", "إحصائيات المدرسة", ReadOnly),
 
             // ---- Cafeteria
             S(Modules.Cafeteria, Cafeteria.Pos, "Cafeteria POS", "نقطة بيع المقصف", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
@@ -540,6 +648,40 @@ namespace Sms.Application.Security
                 ActionVerb.View, ActionVerb.Edit),
             S(Modules.Discipline, Discipline.Analytics, "Behaviour analytics", "تحليلات السلوك",
                 ActionVerb.View),
+
+            // ---- Messaging
+            //
+            // Four verbs on one screen because a broadcast passes through different hands
+            // (BR-MSG-001): a homeroom teacher writes one for their own section and sends it
+            // themselves; anything wider is decided by a VP or the Principal first. Post
+            // rather than Create is the send, because sending runs an engine — it resolves
+            // the audience and queues a message per guardian per channel, and on the metered
+            // channels it spends the school's money. Whoever may write an announcement is not
+            // therefore whoever may spend that.
+            //
+            // No Submit: submission is not an act here. Saving an announcement wider than a
+            // section puts it in PendingApproval by itself, so a separate verb would be a
+            // grant that gates nothing.
+            S(Modules.Messaging, Messaging.Announcements, "Announcements", "الإعلانات",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Approve, ActionVerb.Post),
+
+            // ---- Notifications
+            //
+            // Approve is publish (BR-NTF-001): a published version is what every future
+            // delivery renders from and is immutable once sent against, so putting one live
+            // is a decision, not an edit. Submit is the test send that must precede it —
+            // separate because it costs a real message on a real channel.
+            // No Deactivate: retiring a template has no screen yet. The port supports it and
+            // the entity is ISoftActiveFiltered, but a catalogued verb no action requires is a
+            // permission a school can grant and never use.
+            S(Modules.Notifications, Notifications.Templates, "Template studio", "استوديو القوالب",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Submit, ActionVerb.Approve),
+            S(Modules.Notifications, Notifications.Providers, "Provider console", "كونسول المزوّدين",
+                ActionVerb.View, ActionVerb.Configure, ActionVerb.Deactivate),
+            S(Modules.Notifications, Notifications.Deliveries, "Delivery operations", "عمليات التسليم",
+                ActionVerb.View, ActionVerb.Post),
+            S(Modules.Notifications, Notifications.Budgets, "Messaging budget", "ميزانية المراسلة",
+                ActionVerb.View, ActionVerb.Configure),
 
             // ---- System administration
             //

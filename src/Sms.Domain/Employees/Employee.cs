@@ -67,6 +67,35 @@ namespace Sms.Domain.Employees
         /// </summary>
         public int? PhotoAttachmentId { get; set; }
 
+        /// <summary>
+        /// رقم الجوال — the number the school rings to reach this employee.
+        /// <para>
+        /// doc/Modules/12 §8.1 calls the directory "the basic contact card for all staff", and a
+        /// contact card with no way to make contact is not one. Mirrors
+        /// <c>Student.Mobile</c> exactly, down to the column length, because the same registrar
+        /// types the same shape of number into both.
+        /// </para>
+        /// <para>
+        /// Field-audited like the rest of the record (T1) but deliberately not
+        /// <c>[RequiresAuditReason]</c>: a phone number changes when a person changes phones, and
+        /// demanding a written justification for that would teach everyone here to type a full
+        /// stop into the reason box — which is how a mandatory reason stops meaning anything on
+        /// the fields that need one (the name, the ID, the bank account).
+        /// </para>
+        /// </summary>
+        public string? Mobile { get; set; }
+
+        /// <summary>
+        /// رقم الواتس اب — owner request, 2026-08-27.
+        /// <para>
+        /// A column of its own rather than an assumption that <see cref="Mobile"/> reaches the same
+        /// application: plenty of staff carry a second line for it, and a school that messages its
+        /// teachers on the wrong number learns so one absence at a time. Same length and same audit
+        /// treatment as the mobile beside it — a number that changes with the handset.
+        /// </para>
+        /// </summary>
+        public string? WhatsAppNumber { get; set; }
+
         public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
 
         /// <summary>
@@ -75,6 +104,47 @@ namespace Sms.Domain.Employees
         /// </summary>
         [RequiresAuditReason]
         public MaritalStatus? MaritalStatus { get; set; }
+
+        /// <summary>
+        /// نوع هوية الزوج/الزوجة — core.LookupValue, category "IdType", the same catalogue the
+        /// employee's own document is chosen from (owner request, 2026-08-27).
+        /// <para>
+        /// A spouse is not a person this system keeps a record of, and this pair is not the start of
+        /// one: it is two cells off the school's staff register, recorded because allowances and
+        /// ministry returns are filed against them. Nothing here reads the number, and no rule
+        /// requires it — including when <see cref="MaritalStatus"/> says married, because a register
+        /// being typed up months after the fact frequently has the status and not the document.
+        /// </para>
+        /// </summary>
+        public int? SpouseIdTypeLookupId { get; set; }
+
+        /// <summary>رقم هوية الزوج/الزوجة. See <see cref="SpouseIdTypeLookupId"/>.</summary>
+        public string? SpouseIdNo { get; set; }
+
+        /// <summary>
+        /// العنوان — where this employee lives now, as one written line.
+        /// <para>
+        /// Free text rather than the governorate → area → neighbourhood hierarchy
+        /// <c>Parent</c> points at (<c>Sms.Domain.Geography</c>). That hierarchy exists to answer
+        /// "which students live in this area", which drives transport routing and catchment
+        /// reporting; nothing asks it of staff, and pointing an employee at it would oblige every
+        /// school to catalogue its teachers' neighbourhoods before it could record an address at
+        /// all. If a staff-by-area question ever arrives, this is the field that gets promoted.
+        /// </para>
+        /// </summary>
+        public string? Address { get; set; }
+
+        /// <summary>
+        /// البلدة الأصلية — the town or village the employee's family is from, which in this
+        /// product's first deployment is a distinct question from where they live now and is asked
+        /// on every staff form (owner request, 2026-08-27).
+        /// <para>
+        /// Free text for the same reason as <see cref="Address"/>, and one more: the list a school
+        /// would pick from is a historical gazetteer, not the current residence catalogue, and
+        /// authoring one is content work rather than an engineering decision.
+        /// </para>
+        /// </summary>
+        public string? OriginTown { get; set; }
 
         /// <summary>
         /// اسم البنك — where this employee's salary is paid.
@@ -103,5 +173,26 @@ namespace Sms.Domain.Employees
         /// </summary>
         [RequiresAuditReason]
         public string? BankAccountNo { get; set; }
+
+        /// <summary>
+        /// رقم محفظة بالي بي — the mobile wallet a school pays into when the employee has no bank
+        /// account, or is paid outside the payroll run (owner request, 2026-08-27).
+        /// <para>
+        /// Audited with a mandatory reason for exactly the reason <see cref="BankAccountNo"/> is:
+        /// this is a destination for money. That the amount is smaller and the rail is a phone
+        /// rather than a bank changes nothing about who should be able to alter it quietly.
+        /// </para>
+        /// <para>
+        /// Stored as written. The wallet is keyed by a mobile number today, but the field is not
+        /// declared as one — a school that records an account reference instead should not have its
+        /// entry refused by a validator this system invented.
+        /// </para>
+        /// </summary>
+        [RequiresAuditReason]
+        public string? PalPayWalletNo { get; set; }
+
+        /// <summary>رقم محفظة جوال بي. The second wallet in the same market; see <see cref="PalPayWalletNo"/>.</summary>
+        [RequiresAuditReason]
+        public string? JawwalPayWalletNo { get; set; }
     }
 }

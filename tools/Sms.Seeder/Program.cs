@@ -94,6 +94,15 @@ namespace Sms.Seeder
                 options.UseSqlServer(configuration.GetConnectionString("Sms")
                     ?? "Server=(localdb)\\mssqllocaldb;Database=SmsDemoTenant;Trusted_Connection=True;"));
             services.AddScoped<IAuditContext, AuditContext>();
+
+            // BR-NTF-003's credential protection. Nothing here writes a gateway token — the
+            // seeder has none to write — but NotificationOpsAdmin takes the protector, and this
+            // harness builds its own container, so the port has to be here or the run dies at
+            // container build with a message about a service nobody in the seed cares about.
+            services.AddDataProtection();
+            services.AddHttpClient();
+            services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+
             services.AddScoped<SmsDbContext>(sp => sp.GetRequiredService<AppDbContext>());
             services.AddScoped<IAuditEventWriter, AuditEventWriter>();
             services.AddSingleton<IPasswordHasher, PasswordHasher>();
@@ -105,6 +114,12 @@ namespace Sms.Seeder
 
             // S3/E-305 demo tenant - every admin service DemoSeedContributor composes.
             services.AddScoped<ISchoolAdmin, SchoolAdmin>();
+
+            // The publisher snapshots the address each delivery went to (BR-NOT-008), so it
+            // needs the address book even here, where nothing is actually sent: the seeder
+            // composes admins that publish, and an unregistered port fails the whole run at
+            // container build rather than at the one contributor that would have used it.
+            services.AddScoped<IRecipientAddressBook, RecipientAddressBook>();
             services.AddScoped<INotificationPublisher, NotificationPublisher>();
             services.AddScoped<ISystemSetupAdmin, SystemSetupAdmin>();
             services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
@@ -140,6 +155,12 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, WidgetRegistrySeedContributor>();
             services.AddScoped<ISeedContributor, WorkflowCatalogSeedContributor>();
             services.AddScoped<ISeedContributor, NotificationDefaultsSeedContributor>();
+
+            // The wording behind those rules. Ordered after them by ISeedContributor.Order, not
+            // by this line — but registered next to them so the pair is read as a pair: a rule
+            // with no template notifies nobody, and a template with no rule is never consulted.
+            services.AddScoped<INotificationOpsAdmin, NotificationOpsAdmin>();
+            services.AddScoped<ISeedContributor, NotificationTemplateSeedContributor>();
             services.AddScoped<ISeedContributor, DemoSeedContributor>();
             services.AddScoped<ISeedContributor, StaffDemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();

@@ -1,0 +1,146 @@
+@using System.Globalization
+@using Sms.Domain.Payroll
+@model PayrollIndexViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Payroll runs", "مسيرات الرواتب");
+    ViewData["Breadcrumb"] = T("Staff / Payroll", "شؤون الموظفين / الرواتب");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "payroll-help",
+        Title = T("Payroll — help", "الرواتب — مساعدة"),
+        Intro = T("One payroll per calendar month. Open the month, generate its lines from the active contracts, adjust what needs adjusting, approve it, then record that it was paid — that last step is what recovers the month's advance instalments.", "مسير واحد لكل شهر ميلادي. افتح الشهر، ثم أنشئ بنوده من العقود السارية، وعدّل ما يلزم، ثم اعتمده، ثم سجّل الصرف — وهذه الخطوة الأخيرة هي التي تستقطع أقساط السلف المستحقة للشهر."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("One month, one payroll", "شهر واحد، مسير واحد"),
+                T("A month already covered by a payroll that has not been cancelled cannot be opened again. Cancel the existing one first if it was opened by mistake — its number is kept either way.", "لا يمكن فتح شهر يغطيه مسير لم يُلغَ. ألغِ القائم أولاً إن كان قد فُتح بالخطأ — ويبقى رقمه محفوظاً في الحالتين.")),
+            new HelpPanelViewModel.Item(
+                T("Salary comes from the contract", "الراتب يأتي من العقد"),
+                T("Generating reads the basic and the allowances off each employee's active contract for that month and snapshots them onto the line. Changing a contract afterwards does not move a payroll that was already generated.", "الإنشاء يقرأ الراتب الأساسي والبدلات من عقد كل موظف الساري في ذلك الشهر ويثبّتهما في البند. وتعديل العقد بعد ذلك لا يغيّر مسيراً أُنشئ من قبل.")),
+            new HelpPanelViewModel.Item(
+                T("Approving is not paying", "الاعتماد غير الصرف"),
+                T("Approving freezes the arithmetic. Recording the payment is a separate step, with its own permission, and it is the one that marks the advance instalments recovered.", "الاعتماد يجمّد الحساب. أما تسجيل الصرف فخطوة منفصلة لها صلاحيتها الخاصة، وهي التي تسجّل استقطاع أقساط السلف.")),
+            new HelpPanelViewModel.Item(
+                T("What this does not do", "ما لا يفعله هذا النظام"),
+                T("No accounting entry is posted for a payroll run — the general ledger knows nothing about salaries yet. There are no attendance or unpaid-leave deductions, because staff attendance and leave are not built. A mid-month joiner is paid in full; nothing prorates.", "لا يُرحَّل أي قيد محاسبي عن المسير — فالأستاذ العام لا يعرف شيئاً عن الرواتب بعد. ولا توجد استقطاعات دوام أو إجازات بلا راتب لأن دوام الموظفين والإجازات غير مبنيين. ومن يلتحق في منتصف الشهر يُصرف له الشهر كاملاً دون تجزئة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Open a month, build it from the contracts, approve it, pay it.", "افتح الشهر، وابنِه من العقود، ثم اعتمده واصرفه.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_PayrollNav" />
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Open a month", "فتح شهر")</h2>
+
+            @if (Model.PayableEmployeeCount == 0)
+            {
+                <div class="alert alert-warning py-2 small mb-3" role="alert">
+                    @T("No employee holds an active contract, so a payroll would come out empty. Activate the contracts first.", "لا يوجد موظف يحمل عقداً سارياً، لذا سيخرج المسير فارغاً. فعّل العقود أولاً.")
+                    <a class="alert-link" asp-controller="Employees" asp-action="Contracts">@T("Contract manager", "إدارة العقود")</a>
+                </div>
+            }
+            else
+            {
+                <p class="small text-muted mb-3">
+                    @T($"{Model.PayableEmployeeCount} employee(s) hold an active contract.", $"{Model.PayableEmployeeCount} موظفاً يحملون عقوداً سارية.")
+                </p>
+            }
+
+            <form method="post" asp-action="Open">
+                @Html.AntiForgeryToken()
+                <div class="row g-2">
+                    <div class="col-7">
+                        <label for="period-month" class="form-label small text-muted">@T("Month", "الشهر")</label>
+                        <select id="period-month" name="PeriodMonth" class="form-select form-select-sm" required>
+                            @for (var m = 1; m <= 12; m++)
+                            {
+                                <option value="@m" selected="@(m == Model.DefaultMonth)">@PayrollLabels.MonthName(m, isRtl)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-5">
+                        <label for="period-year" class="form-label small text-muted">@T("Year", "السنة")</label>
+                        <input type="number" id="period-year" name="PeriodYear" class="form-control form-control-sm"
+                               min="2000" max="2200" required value="@Model.DefaultYear" />
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <label for="payment-date" class="form-label small text-muted">@T("Intended payment date", "تاريخ الصرف المتوقع")</label>
+                    <input type="date" id="payment-date" name="PaymentDate" class="form-control form-control-sm" required
+                           value="@(new DateTime(Model.DefaultYear, Model.DefaultMonth, DateTime.DaysInMonth(Model.DefaultYear, Model.DefaultMonth)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))" />
+                </div>
+                <div class="mt-2">
+                    <label for="run-notes" class="form-label small text-muted">@T("Notes (optional)", "ملاحظات (اختياري)")</label>
+                    <textarea id="run-notes" name="Notes" rows="2" maxlength="500" class="form-control form-control-sm"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm mt-3">
+                    <i class="bi bi-calendar-plus me-1" aria-hidden="true"></i>@T("Open payroll", "فتح المسير")
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Months", "الأشهر")</h2>
+
+            @if (Model.Runs.Count == 0)
+            {
+                <p class="text-muted mb-0">
+                    @T("No payroll has been run yet. Open a month on the left — it starts as a draft and nothing is committed until you approve it.", "لم يُنشأ أي مسير بعد. افتح شهراً من النموذج المجاور — يبدأ مسودة ولا يُثبَّت شيء حتى تعتمده.")
+                </p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table sms-table align-middle">
+                        <caption class="visually-hidden">@T("Payroll runs, newest month first", "مسيرات الرواتب، الأحدث أولاً")</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">@T("Period", "الشهر")</th>
+                                <th scope="col">@T("Number", "الرقم")</th>
+                                <th scope="col">@T("Status", "الحالة")</th>
+                                <th scope="col" class="text-end">@T("Employees", "الموظفون")</th>
+                                <th scope="col" class="text-end">@T("Gross", "الإجمالي")</th>
+                                <th scope="col" class="text-end">@T("Net", "الصافي")</th>
+                                <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var run in Model.Runs)
+                            {
+                                <tr>
+                                    <td>@PayrollLabels.Period(run.PeriodYear, run.PeriodMonth, isRtl)</td>
+                                    <td class="text-nowrap"><code>@run.RunNo</code></td>
+                                    <td><span class="badge @PayrollLabels.RunStatusBadge(run.Status)">@PayrollLabels.RunStatus(run.Status, isRtl)</span></td>
+                                    <td class="text-end">@run.LineCount</td>
+                                    <td class="text-end" dir="ltr">@PayrollLabels.Money(run.TotalGross)</td>
+                                    <td class="text-end fw-semibold" dir="ltr">@PayrollLabels.Money(run.TotalNet)</td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="Run" asp-route-id="@run.Id">
+                                            @T("Open", "فتح")
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

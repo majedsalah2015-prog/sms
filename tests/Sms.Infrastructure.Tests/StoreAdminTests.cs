@@ -138,7 +138,7 @@ namespace Sms.Infrastructure.Tests
         private CafeteriaAdmin Cafeteria(AppDbContext db)
         {
             var events = new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit);
-            return new CafeteriaAdmin(db, Issuer(db), _clock, _audit, events, Fees(db), new HealthAdmin(db, Issuer(db), _clock, _tenant, events, new NotificationPublisher(db), new AttendanceAdmin(db)));
+            return new CafeteriaAdmin(db, Issuer(db), _clock, _audit, events, Fees(db), new HealthAdmin(db, Issuer(db), _clock, _tenant, events, new NotificationPublisher(db, new TestAddressBook()), new AttendanceAdmin(db)));
         }
 
         private async Task<(StoreItem Shirt, StoreVariant Small, StoreVariant Medium)> ShirtAsync(StoreAdmin admin, decimal price = 100m, int stock = 5)

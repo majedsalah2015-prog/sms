@@ -1,0 +1,152 @@
+@using System.Globalization
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model BudgetConsoleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Messaging budget", "ميزانية المراسلة");
+    ViewData["Breadcrumb"] = T("Notifications / Budget", "الإشعارات / الميزانية");
+
+    string Channel(NotificationChannel c) => c == NotificationChannel.Sms ? T("SMS", "رسالة نصية") : "WhatsApp";
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "bud-help",
+        Title = T("Messaging budget — help", "ميزانية المراسلة — مساعدة"),
+        Intro = T("WhatsApp and SMS are billed per message. This is where a school puts a ceiling on how many go out in a month, and decides what happens when it is reached (BR-NTF-004).",
+                  "يُحاسَب واتساب والرسائل النصية على كل رسالة. وهنا تضع المدرسة سقفاً لعدد ما يخرج في الشهر، وتقرّر ما يحدث عند بلوغه (BR-NTF-004)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Warning at 80%, stopping is a choice", "تنبيه عند 80%، والإيقاف اختيار"),
+                T("The eighty-per-cent mark always warns. Whether reaching the ceiling actually stops sending is the switch below, off by default — because a school that hits its ceiling in a bad week should not discover it by way of the messages that did not go.",
+                  "تُنبِّه علامة الثمانين بالمئة دائماً. أما هل يوقف بلوغ السقف الإرسال فعلاً فذلك المفتاح أدناه، وهو مطفأ افتراضياً — لأن المدرسة التي تبلغ سقفها في أسبوع سيئ لا ينبغي أن تكتشف ذلك من الرسائل التي لم تخرج.")),
+            new HelpPanelViewModel.Item(
+                T("Safety messages are never stopped", "رسائل السلامة لا تُوقَف أبداً"),
+                T("BR-NTF-004 exempts the safety classes from the hard stop, whatever the budget says. A child who did not board the bus is not a message a ceiling gets to cancel.",
+                  "تستثني القاعدة BR-NTF-004 أصناف السلامة من الإيقاف الصارم مهما قالت الميزانية. فالطفل الذي لم يصعد الحافلة ليست رسالته مما يلغيه سقف.")),
+            new HelpPanelViewModel.Item(
+                T("An announcement is not a safety class", "الإعلان ليس من صنف السلامة"),
+                T("A broadcast composed by a person carries no exemption. With the hard stop on and the ceiling reached, sending one on a metered channel is refused — send it in-app, or raise the ceiling.",
+                  "لا يحمل البث الذي يؤلّفه شخص أي استثناء. فمع تفعيل الإيقاف الصارم وبلوغ السقف، يُرفض إرساله على قناة محاسَبة — أرسله داخل النظام، أو ارفع السقف.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("What the metered channels have spent this month, against what the school allowed.",
+               "ما أنفقته القنوات المحاسَبة هذا الشهر، مقابل ما سمحت به المدرسة.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_NotificationsNav" />
+
+<form asp-action="Budgets" method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label class="form-label small" for="period">@T("Month", "الشهر")</label>
+        <input class="form-control form-control-sm" id="period" name="period" dir="ltr"
+               value="@Model.PeriodKey" placeholder="yyyy-MM" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Show", "عرض")</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    @foreach (var row in Model.Rows)
+    {
+        <div class="col-md-6">
+            <div class="sms-card h-100">
+                <div class="p-3">
+                    <h2 class="h6 d-flex justify-content-between align-items-center">
+                        <span>
+                            <i class="bi @(row.Channel == NotificationChannel.WhatsApp ? "bi-whatsapp" : "bi-chat-left-text") me-1" aria-hidden="true"></i>
+                            @Channel(row.Channel)
+                        </span>
+                        <span dir="ltr" class="fs-5">
+                            @row.MessageCount@(row.HasLimit ? " / " + row.Limit : "")
+                        </span>
+                    </h2>
+
+                    @if (row.HasLimit)
+                    {
+                        var barClass = row.IsOverLimit ? "bg-danger" : row.IsAlerting ? "bg-warning" : "bg-success";
+                        <div class="progress" style="height: .6rem;" role="progressbar"
+                             aria-valuenow="@row.PercentUsed" aria-valuemin="0" aria-valuemax="100"
+                             aria-label="@Channel(row.Channel)">
+                            <div class="progress-bar @barClass" style="width: @(row.PercentUsed)%;"></div>
+                        </div>
+                        <p class="small mt-2 mb-0 @(row.IsOverLimit ? "text-danger" : row.IsAlerting ? "text-warning" : "text-muted")">
+                            @if (row.IsOverLimit)
+                            {
+                                @(row.HardStopEnabled
+                                    ? T("The ceiling is reached and the hard stop is on — only safety messages are going out.",
+                                        "بلغ السقف والإيقاف الصارم مفعَّل — ولا يخرج إلا رسائل السلامة.")
+                                    : T("The ceiling is reached. Sending continues because the hard stop is off.",
+                                        "بلغ السقف. ويستمر الإرسال لأن الإيقاف الصارم مطفأ."))
+                            }
+                            else if (row.IsAlerting)
+                            {
+                                @T("Past eighty per cent of the month's ceiling.", "تجاوز ثمانين بالمئة من سقف الشهر.")
+                            }
+                            else
+                            {
+                                @T($"{row.PercentUsed}% of this month's ceiling.", $"{row.PercentUsed}% من سقف هذا الشهر.")
+                            }
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="small text-muted mb-0">
+                            @T("No ceiling set — sending is not counted against anything.",
+                               "لا سقف مضبوط — والإرسال لا يُحسب على شيء.")
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="sms-card">
+    <div class="p-3">
+        <h2 class="h5 mb-3">@T("Set the ceiling", "ضبط السقف")</h2>
+        <form asp-action="SaveBudgets" method="post" asp-route-period="@Model.PeriodKey">
+            @Html.AntiForgeryToken()
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label" for="smsLimit">@T("SMS per month", "رسائل نصية شهرياً")</label>
+                    <input class="form-control" id="smsLimit" name="smsLimit" type="number" min="0" dir="ltr"
+                           value="@Model.LimitFor(NotificationChannel.Sms)" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="whatsAppLimit">@T("WhatsApp per month", "رسائل واتساب شهرياً")</label>
+                    <input class="form-control" id="whatsAppLimit" name="whatsAppLimit" type="number" min="0" dir="ltr"
+                           value="@Model.LimitFor(NotificationChannel.WhatsApp)" />
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="hardStop" name="hardStop" value="true"
+                               checked="@Model.HardStopEnabled" />
+                        <label class="form-check-label" for="hardStop">
+                            @T("Stop sending at the ceiling", "أوقف الإرسال عند السقف")
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">@T("Save", "حفظ")</button>
+                </div>
+            </div>
+            <p class="form-text mt-2 mb-0">
+                @T("Zero means no ceiling. Safety-class notifications are exempt from the stop whatever these say (BR-NTF-004).",
+                   "الصفر يعني لا سقف. وإشعارات صنف السلامة مستثناة من الإيقاف مهما قالت هذه القيم (BR-NTF-004).")
+            </p>
+        </form>
+    </div>
+</div>

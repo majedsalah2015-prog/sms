@@ -32,6 +32,7 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
+using Sms.Domain.Payroll;
 using Sms.Domain.Backup;
 using Sms.Domain.ReadModels;
 using Sms.Domain.Reports;
@@ -229,6 +230,20 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<Contract> Contracts => Set<Contract>();
 
         public DbSet<Qualification> Qualifications => Set<Qualification>();
+
+        // Payroll and staff advances (owner request, 2026-08-28). Kept beside the rest of Module
+        // 12's people because that is the schema they live in; see Sms.Domain.Payroll.PayrollRun
+        // for the stated deviation from doc/Modules/12 §2, which scopes payroll calculation out.
+
+        public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+
+        public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
+
+        public DbSet<PayrollLineAdjustment> PayrollLineAdjustments => Set<PayrollLineAdjustment>();
+
+        public DbSet<SalaryAdvance> SalaryAdvances => Set<SalaryAdvance>();
+
+        public DbSet<SalaryAdvanceInstallment> SalaryAdvanceInstallments => Set<SalaryAdvanceInstallment>();
 
         public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
 

@@ -74,11 +74,12 @@
             <th scope="col">@T("Max size", "أقصى حجم")</th>
             <th scope="col">@T("Rules", "القواعد")</th>
             <th scope="col">@T("Files", "الملفات")</th>
+            <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
         </tr></thead>
         <tbody>
         @if (Model.Rows.Count == 0)
         {
-            <tr><td colspan="6" class="p-3 text-muted">@T("No document type is defined, so nothing can be attached anywhere in the product yet.", "لا يوجد نوع مستند معرَّف، فلا يمكن إرفاق شيء في أي مكان بالنظام بعد.")</td></tr>
+            <tr><td colspan="7" class="p-3 text-muted">@T("No document type is defined, so nothing can be attached anywhere in the product yet.", "لا يوجد نوع مستند معرَّف، فلا يمكن إرفاق شيء في أي مكان بالنظام بعد.")</td></tr>
         }
         else
         {
@@ -111,6 +112,23 @@
                         }
                     </td>
                     <td>@(row.AttachmentCount == 0 ? T("—", "—") : row.AttachmentCount.ToString(CultureInfo.InvariantCulture))</td>
+                    <td class="text-end text-nowrap">
+                        <a class="btn btn-sm btn-outline-primary" asp-action="Documents" asp-route-module="@Model.ModuleFilter" asp-route-includeInactive="@Model.IncludeInactive" asp-route-edit="@row.Type.Id" asp-fragment="define" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                        @if (row.Type.IsActive)
+                        {
+                            @* The file count is said before the click: retiring never touches
+                               what is already filed, it only stops the next upload offering it. *@
+                            var stopText = row.AttachmentCount == 0
+                                ? T("Retire this document type? Nothing has been filed under it, so it simply stops being offered.", "إيقاف نوع المستند هذا؟ لم يُحفظ تحته شيء، فلن يتغير سوى أنه يتوقف عن الظهور في الخيارات.")
+                                : T($"Retire this document type? {row.AttachmentCount} file(s) are already filed under it. Those stay attached and readable — it only stops being offered for new uploads (BR-GLB-005).",
+                                    $"إيقاف نوع المستند هذا؟ محفوظ تحته بالفعل {row.AttachmentCount} من الملفات، وهي تبقى مرفقة وقابلة للقراءة — وإنما يتوقف عن الظهور عند الرفع الجديد (BR-GLB-005).");
+                            <form method="post" asp-action="SetDocumentTypeActive" asp-route-id="@row.Type.Id" asp-route-active="false" asp-route-module="@Model.ModuleFilter" asp-route-includeInactive="@Model.IncludeInactive" class="d-inline" onsubmit="return confirm('@Html.Raw(stopText.Replace("'", "\\'"))');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Retire", "إيقاف")" aria-label="@T("Retire", "إيقاف")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button></form>
+                        }
+                        else
+                        {
+                            <form method="post" asp-action="SetDocumentTypeActive" asp-route-id="@row.Type.Id" asp-route-active="true" asp-route-module="@Model.ModuleFilter" asp-route-includeInactive="@Model.IncludeInactive" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")" aria-label="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button></form>
+                        }
+                    </td>
                 </tr>
             }
         }
@@ -120,50 +138,70 @@
 
 <div class="sms-card">
     <div class="p-3">
-        <h2 class="h6 mb-3">@T("Define a document type", "تعريف نوع مستند")</h2>
+        @{ var editing = Model.EditId != null; }
+        <h2 class="h6 mb-3" id="define">
+            @if (editing)
+            {
+                <i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Correct this document type", "تصحيح نوع المستند")<code class="small ms-2">@Model.Code</code>
+            }
+            else
+            {
+                <i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("Define a document type", "تعريف نوع مستند")
+            }
+        </h2>
+        @if (editing)
+        {
+            @* The code is the identity — attachments already point at it, so it is shown and
+               posted but never retyped. Changing it would orphan every file filed under it. *@
+            <p class="small text-muted">@T("Everything but the code can be changed. The code is what the files already filed under this type point at, so it stays.", "كل شيء قابل للتغيير عدا الرمز. فالرمز هو ما تشير إليه الملفات المحفوظة تحت هذا النوع، ولذلك يبقى كما هو.")</p>
+        }
         <form method="post" asp-action="Documents" class="row g-3">
             <div class="col-md-3">
                 <label class="form-label" for="Code">@T("Code", "الرمز") *</label>
-                <input id="Code" name="Code" class="form-control" maxlength="30" required aria-required="true" dir="ltr" placeholder="STU-BIRTH-CERT" />
+                <input id="Code" name="Code" class="form-control" maxlength="30" required aria-required="true" dir="ltr" placeholder="STU-BIRTH-CERT" value="@Model.Code" readonly="@editing" />
             </div>
             <div class="col-md-2">
                 <label class="form-label" for="ModuleCode">@T("Module", "الوحدة") *</label>
-                <input id="ModuleCode" name="ModuleCode" class="form-control" maxlength="6" required aria-required="true" dir="ltr" placeholder="STU" />
+                <input id="ModuleCode" name="ModuleCode" class="form-control" maxlength="6" required aria-required="true" dir="ltr" placeholder="STU" value="@Model.ModuleCode" />
             </div>
             <div class="col-md-3">
                 <label class="form-label" for="NameAr">@T("Name (Arabic)", "الاسم (عربي)") *</label>
-                <input id="NameAr" name="NameAr" class="form-control" maxlength="80" required aria-required="true" dir="rtl" />
+                <input id="NameAr" name="NameAr" class="form-control" maxlength="80" required aria-required="true" dir="rtl" value="@Model.NameAr" />
             </div>
             <div class="col-md-4">
                 <label class="form-label" for="NameEn">@T("Name (English)", "الاسم (إنجليزي)") *</label>
-                <input id="NameEn" name="NameEn" class="form-control" maxlength="80" required aria-required="true" dir="ltr" />
+                <input id="NameEn" name="NameEn" class="form-control" maxlength="80" required aria-required="true" dir="ltr" value="@Model.NameEn" />
             </div>
 
             <div class="col-md-5">
                 <span class="form-label d-block">@T("Allowed formats", "الصيغ المسموحة")</span>
                 <div class="d-flex gap-3 flex-wrap">
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPdf" name="AllowPdf" value="true" checked /><label class="form-check-label" for="AllowPdf">PDF</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowJpg" name="AllowJpg" value="true" checked /><label class="form-check-label" for="AllowJpg">JPG</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPng" name="AllowPng" value="true" checked /><label class="form-check-label" for="AllowPng">PNG</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowDocx" name="AllowDocx" value="true" /><label class="form-check-label" for="AllowDocx">DOCX</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowXlsx" name="AllowXlsx" value="true" /><label class="form-check-label" for="AllowXlsx">XLSX</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPdf" name="AllowPdf" value="true" checked="@Model.AllowPdf" /><label class="form-check-label" for="AllowPdf">PDF</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowJpg" name="AllowJpg" value="true" checked="@Model.AllowJpg" /><label class="form-check-label" for="AllowJpg">JPG</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowPng" name="AllowPng" value="true" checked="@Model.AllowPng" /><label class="form-check-label" for="AllowPng">PNG</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowDocx" name="AllowDocx" value="true" checked="@Model.AllowDocx" /><label class="form-check-label" for="AllowDocx">DOCX</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="AllowXlsx" name="AllowXlsx" value="true" checked="@Model.AllowXlsx" /><label class="form-check-label" for="AllowXlsx">XLSX</label></div>
                 </div>
             </div>
             <div class="col-md-2">
                 <label class="form-label" for="MaxSizeMb">@T("Max size (MB)", "أقصى حجم (م.ب)")</label>
-                <input id="MaxSizeMb" name="MaxSizeMb" type="number" min="1" max="25" class="form-control" />
+                <input id="MaxSizeMb" name="MaxSizeMb" type="number" min="1" max="25" class="form-control" value="@Model.MaxSizeMb" />
             </div>
             <div class="col-md-5">
                 <span class="form-label d-block">@T("Rules", "القواعد")</span>
                 <div class="d-flex gap-3 flex-wrap">
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsMandatoryByDefault" name="IsMandatoryByDefault" value="true" /><label class="form-check-label" for="IsMandatoryByDefault">@T("mandatory by default", "إلزامي افتراضاً")</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsExpiryTracked" name="IsExpiryTracked" value="true" /><label class="form-check-label" for="IsExpiryTracked">@T("tracks expiry", "يتتبّع الانتهاء")</label></div>
-                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsRestricted" name="IsRestricted" value="true" /><label class="form-check-label" for="IsRestricted">@T("restricted category", "فئة مقيَّدة")</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsMandatoryByDefault" name="IsMandatoryByDefault" value="true" checked="@Model.IsMandatoryByDefault" /><label class="form-check-label" for="IsMandatoryByDefault">@T("mandatory by default", "إلزامي افتراضاً")</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsExpiryTracked" name="IsExpiryTracked" value="true" checked="@Model.IsExpiryTracked" /><label class="form-check-label" for="IsExpiryTracked">@T("tracks expiry", "يتتبّع الانتهاء")</label></div>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" id="IsRestricted" name="IsRestricted" value="true" checked="@Model.IsRestricted" /><label class="form-check-label" for="IsRestricted">@T("restricted category", "فئة مقيَّدة")</label></div>
                 </div>
             </div>
 
             <div class="col-12">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>@(editing ? T("Save changes", "حفظ التعديل") : T("Save", "حفظ"))</button>
+                @if (editing)
+                {
+                    <a class="btn btn-outline-secondary ms-2" asp-action="Documents" asp-route-module="@Model.ModuleFilter" asp-route-includeInactive="@Model.IncludeInactive">@T("Cancel", "إلغاء")</a>
+                }
             </div>
         </form>
     </div>

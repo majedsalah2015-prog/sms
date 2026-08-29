@@ -18,7 +18,11 @@ namespace Sms.Application.Common.Exceptions
         public BlueprintWeightMismatchException(int blueprintId, decimal actualSum)
             : base($"Blueprint {blueprintId}'s component weights sum to {actualSum}, not 100 (BR-GRA-003).")
         {
+            ActualSum = actualSum;
         }
+
+        /// <summary>What the weights actually add up to, so the designer is shown the gap rather than left to find it.</summary>
+        public decimal ActualSum { get; }
     }
 
     /// <summary>The blueprint is not finalized (locked) yet — marksheets can't be created against an in-progress weight design.</summary>
@@ -54,7 +58,11 @@ namespace Sms.Application.Common.Exceptions
         public UnresolvedMarkEntriesException(int marksheetId, int unresolvedCount)
             : base($"Marksheet {marksheetId} has {unresolvedCount} unresolved mark entries (BR-GRA §9).")
         {
+            UnresolvedCount = unresolvedCount;
         }
+
+        /// <summary>How many students still have neither a mark, an absence, nor an exemption.</summary>
+        public int UnresolvedCount { get; }
     }
 
     /// <summary>BR-GRA-001: a scale referenced by a blueprint cannot be deleted.</summary>
@@ -63,7 +71,11 @@ namespace Sms.Application.Common.Exceptions
         public GradingScaleInUseException(int gradingScaleId, int blueprintCount)
             : base($"Grading scale {gradingScaleId} is referenced by {blueprintCount} blueprint(s) and cannot be deleted (BR-GRA-001).")
         {
+            BlueprintCount = blueprintCount;
         }
+
+        /// <summary>How many mark designs point at the scale — what has to be moved off it first.</summary>
+        public int BlueprintCount { get; }
     }
 
     /// <summary>BR-GRA-003: a blueprint with marksheets cannot be deleted.</summary>
@@ -72,15 +84,36 @@ namespace Sms.Application.Common.Exceptions
         public BlueprintInUseException(int blueprintId, int marksheetCount)
             : base($"Blueprint {blueprintId} has {marksheetCount} marksheet(s) and cannot be deleted (BR-GRA-003).")
         {
+            MarksheetCount = marksheetCount;
         }
+
+        /// <summary>How many marksheets were built on this design.</summary>
+        public int MarksheetCount { get; }
+    }
+
+    /// <summary>Why a marksheet survived a delete — the two ways BR-GRA-011 protects it.</summary>
+    public enum MarksheetDeleteBlocker
+    {
+        /// <summary>It has left Draft, so it is a submitted or published document rather than a form.</summary>
+        NotDraft = 1,
+
+        /// <summary>Marks are already in it, and a mark is audited from the moment it is first typed.</summary>
+        MarksEntered = 2,
     }
 
     /// <summary>BR-GRA-011: only an untouched Draft marksheet may be deleted — marks are audited from first entry.</summary>
     public class MarksheetInUseException : InvalidOperationException
     {
-        public MarksheetInUseException(int marksheetId, string reason)
-            : base($"Marksheet {marksheetId} cannot be deleted: {reason} (BR-GRA-011).")
+        public MarksheetInUseException(int marksheetId, MarksheetDeleteBlocker blocker, MarksheetStatus status)
+            : base($"Marksheet {marksheetId} cannot be deleted: {(blocker == MarksheetDeleteBlocker.NotDraft ? $"it is {status}" : "marks have already been entered")} (BR-GRA-011).")
         {
+            Blocker = blocker;
+            Status = status;
         }
+
+        public MarksheetDeleteBlocker Blocker { get; }
+
+        /// <summary>Where the marksheet stands, so the refusal can name it in the reader's language.</summary>
+        public MarksheetStatus Status { get; }
     }
 }

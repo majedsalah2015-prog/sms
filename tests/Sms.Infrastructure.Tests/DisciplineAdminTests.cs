@@ -83,7 +83,7 @@ namespace Sms.Infrastructure.Tests
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
         }
 
-        private DisciplineAdmin CreateAdmin(AppDbContext db) => new(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock, _audit, _tenant, new NotificationPublisher(db));
+        private DisciplineAdmin CreateAdmin(AppDbContext db) => new(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock, _audit, _tenant, new NotificationPublisher(db, new TestAddressBook()));
 
         // Consequences by index: 0 verbal (rank 1), 1 written (2), 2 detention (3), 3 summons (4), 4 external suspension (5, suspension-class)
         private static Task<BehaviorCode> StandardCodeAsync(DisciplineAdmin admin, int? maxSuspensionDays = 3) => admin.DefineBehaviorCodeAsync(

@@ -92,6 +92,11 @@ namespace Sms.Infrastructure.Tests
             Assert.True(account.MustChangePassword); // BR-SEC-005 one-time credential
             var parent = await db.Parents.SingleAsync(p => p.PrimaryMobile == PortalDemoAccountSeedContributor.DemoParentMobile);
             Assert.Equal(account.Id, parent.UserAccountId);
+
+            // Both directions. The account's own PersonId is what every screen starting from an
+            // account reads to name who it belongs to (BR-GLB-002); with it null the directory shows
+            // a login and no human being.
+            Assert.Equal(parent.Id, account.PersonId);
         }
 
         [Fact]
@@ -105,6 +110,30 @@ namespace Sms.Infrastructure.Tests
             await CreateContributor(db).SeedAsync();
 
             Assert.Equal(1, await db.UserAccounts.CountAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName));
+        }
+
+        /// <summary>
+        /// Every database seeded before the forward link was written has an account pointing at
+        /// nobody. Re-running the seeder is the repair — the demo tenants already out there are not
+        /// worth a migration, and this contributor is run again on every start anyway.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-002")]
+        public async Task Repairs_an_account_seeded_without_its_half_of_the_link()
+        {
+            using var db = CreateContext();
+            db.Parents.Add(DemoParent());
+            await db.SaveChangesAsync();
+            await CreateContributor(db).SeedAsync();
+
+            var account = await db.UserAccounts.SingleAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName);
+            account.PersonId = null; // the state the old contributor left behind
+            await db.SaveChangesAsync();
+
+            await CreateContributor(db).SeedAsync();
+
+            var parent = await db.Parents.SingleAsync(p => p.PrimaryMobile == PortalDemoAccountSeedContributor.DemoParentMobile);
+            Assert.Equal(parent.Id, (await db.UserAccounts.SingleAsync(u => u.Id == account.Id)).PersonId);
         }
 
         [Fact]
@@ -136,6 +165,7 @@ namespace Sms.Infrastructure.Tests
             var account = await db.UserAccounts.SingleAsync(u => u.UserName == PortalDemoAccountSeedContributor.StudentUserName);
             Assert.Equal(AccountType.Student, account.AccountType);
             Assert.Equal(account.Id, (await db.Students.SingleAsync(s => s.Id == student.Id)).UserAccountId);
+            Assert.Equal(student.Id, account.PersonId);
         }
 
         [Fact]

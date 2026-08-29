@@ -58,12 +58,12 @@ namespace Sms.Infrastructure.Installments
         {
             if (splits.Count == 0 || !InstallmentScheduleBuilder.SplitsSumToHundred(splits.Select(s => s.Percent).ToList()))
             {
-                throw new InvalidTemplateSplitException("splits must sum to 100%");
+                throw new InvalidTemplateSplitException(TemplateSplitFault.SplitsDoNotSumTo100);
             }
 
             if (splits.Any(s => s.DueDate == null && s.OffsetDaysFromYearStart == null))
             {
-                throw new InvalidTemplateSplitException("every split needs a due date or an offset from year start");
+                throw new InvalidTemplateSplitException(TemplateSplitFault.SplitHasNoDueDateRule);
             }
 
             var template = new PlanTemplate
@@ -145,12 +145,12 @@ namespace Sms.Infrastructure.Installments
         {
             if (splits.Count == 0 || !InstallmentScheduleBuilder.SplitsSumToHundred(splits.Select(s => s.Percent).ToList()))
             {
-                throw new InvalidTemplateSplitException("splits must sum to 100%");
+                throw new InvalidTemplateSplitException(TemplateSplitFault.SplitsDoNotSumTo100);
             }
 
             if (splits.Any(s => s.DueDate == null && s.OffsetDaysFromYearStart == null))
             {
-                throw new InvalidTemplateSplitException("every split needs a due date or an offset from year start");
+                throw new InvalidTemplateSplitException(TemplateSplitFault.SplitHasNoDueDateRule);
             }
         }
 

@@ -22,10 +22,12 @@ namespace Sms.Infrastructure.Notifications
         private const string SchoolDefaultLanguage = "en"; // stand-in until a School entity carries a real default (S1).
 
         private readonly AppDbContext _db;
+        private readonly IRecipientAddressBook _addresses;
 
-        public NotificationPublisher(AppDbContext db)
+        public NotificationPublisher(AppDbContext db, IRecipientAddressBook addresses)
         {
             _db = db;
+            _addresses = addresses;
         }
 
         public async Task PublishAsync(
@@ -55,6 +57,15 @@ namespace Sms.Infrastructure.Notifications
                 var version = await _db.TemplateVersions.SingleAsync(
                     v => v.TemplateId == template.Id && v.VersionNumber == template.CurrentVersionNumber, cancellationToken);
 
+                // Resolved once per channel rather than per recipient: the address book is a
+                // query, and a hundred-guardian absence run would otherwise be a hundred of them.
+                // A recipient missing from the answer gets a delivery with no address, which the
+                // sender fails with a reason a registrar can act on (BR-NTF-005) — deliberately
+                // not a silent skip, because a parent who was never written to and a parent whose
+                // number is wrong need to look different in the log.
+                var addresses = await _addresses.ResolveAsync(
+                    recipients.Select(r => r.UserId).Distinct().ToList(), rule.Channel, cancellationToken);
+
                 foreach (var recipient in recipients)
                 {
                     var useArabic = string.Equals(
@@ -72,6 +83,7 @@ namespace Sms.Infrastructure.Notifications
                         TemplateVersionId = version.Id,
                         RenderedSubject = TemplateRenderer.Render(subjectTemplate, payload),
                         RenderedBody = TemplateRenderer.Render(bodyTemplate, payload),
+                        RecipientAddress = addresses.TryGetValue(recipient.UserId, out var address) ? address : null,
                         Status = DeliveryStatus.Queued,
                     });
                 }

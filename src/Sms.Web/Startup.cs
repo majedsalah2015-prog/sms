@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using System.Net.Http;
 using Sms.Web.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -77,6 +78,7 @@ using Sms.Application.Dashboards;
 using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
+using Sms.Application.Payroll;
 using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.GlExport;
@@ -127,6 +129,7 @@ using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Dashboards;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Payroll;
 using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.GlExport;
@@ -227,6 +230,60 @@ namespace Sms.Web
                 options.Filters.Add<RequirePasswordChangeFilter>();
                 // BR-SEC-010: portal accounts never see staff URLs (404, not 403).
                 options.Filters.Add<Sms.Web.Security.PortalAreaFilter>();
+
+                // MVC infers [Required] from a non-nullable reference type, and this project has
+                // <Nullable>enable</Nullable> everywhere — so `public string UserName` was carrying
+                // a hidden required rule whose message is the framework's English one, ahead of the
+                // bilingual attribute written beside it. The inferred rule is switched off and the
+                // written one governs: a field that must be filled says so through
+                // [RequiredField], where the sentence can be read by the person being refused.
+                options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+
+                // The other half of a bilingual form. Sms.Web.Models' own validation attributes
+                // cover the rules an author wrote; these cover the ones the binder raises on its
+                // own — a date typed into a date box wrong, a letter in a number field — and their
+                // English defaults reached the screen exactly the same way, with nothing in the
+                // source to notice.
+                //
+                // The delegates run per request, so CurrentUICulture is the reader's, not the
+                // process's; a message chosen here at startup would be the wrong language for
+                // everybody but the first visitor.
+                var messages = options.ModelBindingMessageProvider;
+                bool Ar() => System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+
+                messages.SetValueIsInvalidAccessor(value => Ar()
+                    ? $"القيمة {value} غير صالحة."
+                    : $"The value {value} is not valid.");
+                messages.SetValueMustNotBeNullAccessor(value => Ar()
+                    ? "هذا الحقل مطلوب."
+                    : "This field is required.");
+                messages.SetMissingBindRequiredValueAccessor(field => Ar()
+                    ? $"لم تصل قيمة للحقل «{field}»."
+                    : $"A value for the '{field}' field was not supplied.");
+                messages.SetMissingKeyOrValueAccessor(() => Ar()
+                    ? "هذا الحقل مطلوب."
+                    : "A value is required.");
+                messages.SetMissingRequestBodyRequiredValueAccessor(() => Ar()
+                    ? "لم يصل أي محتوى في الطلب."
+                    : "A non-empty request body is required.");
+                messages.SetAttemptedValueIsInvalidAccessor((value, field) => Ar()
+                    ? $"القيمة {value} غير صالحة للحقل «{field}»."
+                    : $"The value {value} is not valid for {field}.");
+                messages.SetUnknownValueIsInvalidAccessor(field => Ar()
+                    ? $"القيمة المُدخَلة غير صالحة للحقل «{field}»."
+                    : $"The supplied value is not valid for {field}.");
+                messages.SetValueMustBeANumberAccessor(field => Ar()
+                    ? $"يجب أن يكون «{field}» رقماً."
+                    : $"The field {field} must be a number.");
+                messages.SetNonPropertyAttemptedValueIsInvalidAccessor(value => Ar()
+                    ? $"القيمة {value} غير صالحة."
+                    : $"The value {value} is not valid.");
+                messages.SetNonPropertyUnknownValueIsInvalidAccessor(() => Ar()
+                    ? "القيمة المُدخَلة غير صالحة."
+                    : "The supplied value is not valid.");
+                messages.SetNonPropertyValueMustBeANumberAccessor(() => Ar()
+                    ? "يجب أن تكون القيمة رقماً."
+                    : "The field must be a number.");
             })
             // The embedded ERP modules ship their controllers and compiled views in Razor class
             // libraries; MVC finds neither without being told the assemblies are part of this
@@ -337,15 +394,37 @@ namespace Sms.Web
 
             // E-007 notifications core (doc 09): publish queues Deliveries atomically
             // with the business event; the dispatcher drains them through whichever
-            // channel senders are registered. Email/SMS/WhatsApp are stub transports
-            // pending a provider decision (doc 09 §9 Q1) — only In-App is live.
+            // channel senders are registered.
+            //
+            // WhatsApp and SMS are live transports as of M32/M33's screens: the owner
+            // chose an official intermediary (Twilio / 360dialog), so both channels
+            // resolve to TwilioStyleChannelSender, which reads the school's own
+            // credentials off msg.Provider at dispatch. A deployment that has
+            // registered no gateway fails those deliveries with a stated reason
+            // instead of reporting a send nobody received — which is what the stub
+            // used to do, and the reason it is gone from these two channels.
+            //
+            // Email is still stubbed: doc 09 §9 Q1's SMTP decision is unmade, and a
+            // stub that claims success is only tolerable where nothing yet depends on
+            // it. It is registered so the dispatch loop stays exercised end to end.
+            services.AddHttpClient();
+            services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+            services.AddScoped<IRecipientAddressBook, RecipientAddressBook>();
             services.AddScoped<INotificationPublisher, NotificationPublisher>();
             services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
             services.AddScoped<INotificationConfigAdmin, NotificationConfigAdmin>();
             services.AddScoped<IChannelSender, InAppChannelSender>();
             services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Email));
-            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Sms));
-            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.WhatsApp));
+            services.AddScoped<IChannelSender>(sp => new TwilioStyleChannelSender(
+                NotificationChannel.Sms,
+                sp.GetRequiredService<AppDbContext>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<ISecretProtector>()));
+            services.AddScoped<IChannelSender>(sp => new TwilioStyleChannelSender(
+                NotificationChannel.WhatsApp,
+                sp.GetRequiredService<AppDbContext>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<ISecretProtector>()));
 
             // E-008 attachments core (doc 10): typed upload/version pipeline with a
             // mandatory scan gate. No virus-scan vendor/ICAP adapter chosen yet
@@ -366,7 +445,16 @@ namespace Sms.Web
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
             services.AddScoped<IAttachmentService, AttachmentService>();
             services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
+
+            // Every file the product takes goes through the intake (doc 10 §5); the photo service is
+            // one slot of it, kept as its own type only because a face has its own frame and limit.
+            services.AddScoped<Sms.Web.Services.AttachmentIntake>();
             services.AddScoped<Sms.Web.Services.PersonPhotoService>();
+            services.AddScoped<Sms.Web.Services.SchoolBrandingService>();
+
+            // The shell's read of the same slot: asked once per request by the layout, again by
+            // whichever page draws the school's name, and memoised across the two.
+            services.AddScoped<Sms.Web.Services.SchoolBrandMark>();
 
             // E-010 lookup framework (BR-SET-001/002/007). The seeder harness
             // (SeedRunner + ISeedContributor implementations) is registered in
@@ -455,6 +543,15 @@ namespace Sms.Web
             // clearance are deferred entirely.
             services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
             services.AddScoped<ITeacherAdmin, TeacherAdmin>();
+
+            // Payroll and staff advances (owner request, 2026-08-28). A stated deviation from
+            // doc/Modules/12 §2 and BR-EMP-007, which scope payroll calculation out of the product
+            // and hand it to whatever the school runs payroll on — see Sms.Domain.Payroll.PayrollRun
+            // for what was asked for, what was built, and what was deliberately left out. No GL
+            // journal is posted for a run; that was the owner's call and it is the next piece.
+            services.AddScoped<IPayrollAdmin, PayrollAdmin>();
+            services.AddScoped<ISalaryAdvanceAdmin, SalaryAdvanceAdmin>();
+            services.AddScoped<IPayrollStatements, PayrollStatements>();
 
             // S3/E-301 (Attendance, doc/Modules/14, BR-ATD-002/003/005/006/007).
             // Daily mode only - Period mode needs Module 15's timetable sessions,
@@ -675,6 +772,13 @@ namespace Sms.Web
             // PermissionService, but for an arbitrary target user.
             services.AddScoped<IDashboardAdmin, DashboardAdmin>();
             services.AddScoped<IDashboardQuery, DashboardQuery>();
+
+            // The same discipline one screen wider: doc/Modules/31 §1's question
+            // asked of the school rather than of a persona. Takes IGlLedgerSummary
+            // as an optional dependency, so the expenses section appears exactly
+            // when the ERP bridge is registered and says "no ledger attached"
+            // rather than "zero" when it is not.
+            services.AddScoped<IStatisticsQuery, StatisticsQuery>();
 
             // S7/E-703 (Messaging + Notifications admin, doc/Modules/32+33,
             // BR-MSG-001/002/004, BR-NTF-001/002/004). Messaging (human-composed:

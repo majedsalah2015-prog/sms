@@ -172,6 +172,13 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<(int Id, string BuildingAr, string BuildingEn, string Ar, string En)> Floors { get; set; } = Array.Empty<(int, string, string, string, string)>();
 
+        /// <summary>
+        /// Floor id → the next free room code on it (BR-ROM-001). The form fills Code from
+        /// this when a floor is chosen, so nobody types "A-101" thirty times; the field stays
+        /// editable, and a blank one is filled server-side from the same map.
+        /// </summary>
+        public IReadOnlyDictionary<int, string> NextRoomCodes { get; set; } = new Dictionary<int, string>();
+
         public int TotalRooms { get; set; }
 
         public int TotalSeats { get; set; }

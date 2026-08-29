@@ -1,7 +1,17 @@
 using System;
+using Sms.Domain.Discounts;
 
 namespace Sms.Application.Common.Exceptions
 {
+    /// <summary>The type catalog was asked to change a discount type this school does not have.</summary>
+    public class DiscountTypeNotFoundException : InvalidOperationException
+    {
+        public DiscountTypeNotFoundException(int discountTypeId)
+            : base($"Discount type {discountTypeId} does not exist in this school.")
+        {
+        }
+    }
+
     /// <summary>BR-DIS-001: the proposed grant would breach the stacking policy (non-stackable type present, or combined % over the cap).</summary>
     public class DiscountStackingViolationException : InvalidOperationException
     {
@@ -32,10 +42,18 @@ namespace Sms.Application.Common.Exceptions
     /// <summary>WF-04: only a Proposed grant can be approved/rejected; only an Approved one revoked.</summary>
     public class InvalidDiscountGrantStateException : InvalidOperationException
     {
-        public InvalidDiscountGrantStateException(int discountGrantId, string expected)
+        public InvalidDiscountGrantStateException(int discountGrantId, DiscountGrantStatus expected)
             : base($"Discount grant {discountGrantId} is not {expected} (BR-DIS-003/008).")
         {
+            Expected = expected;
         }
+
+        /// <summary>
+        /// The state the grant would have had to be in — Proposed to decide it, Approved to revoke
+        /// it. Carried as the domain value, not the English word, so the Web boundary can say it in
+        /// either language without matching on the sentence.
+        /// </summary>
+        public DiscountGrantStatus Expected { get; }
     }
 
     /// <summary>BR-DIS-008 / doc §9: revocation effective date ≥ today.</summary>
@@ -44,7 +62,11 @@ namespace Sms.Application.Common.Exceptions
         public RevocationDateInPastException(DateTime effectiveDate)
             : base($"Revocation effective date {effectiveDate:yyyy-MM-dd} is in the past (BR-DIS-008).")
         {
+            EffectiveDate = effectiveDate;
         }
+
+        /// <summary>The date that was refused, so the message can show it back rather than describe it.</summary>
+        public DateTime EffectiveDate { get; }
     }
 
     /// <summary>BR-DIS-006 / doc §9: waiver ≤ target charge remainder.</summary>

@@ -9,7 +9,11 @@ namespace Sms.Application.Common.Exceptions
         public DuplicateAttendanceRecordException(int enrollmentId, DateTime date)
             : base($"Attendance for enrollment {enrollmentId} on {date:yyyy-MM-dd} is already captured (BR-ATD-003).")
         {
+            Date = date;
         }
+
+        /// <summary>The day already captured.</summary>
+        public DateTime Date { get; }
     }
 
     /// <summary>BR-ATD-003: the enrollment has no section-membership row covering the capture date.</summary>
@@ -18,7 +22,11 @@ namespace Sms.Application.Common.Exceptions
         public NoSectionMembershipOnDateException(int enrollmentId, DateTime date)
             : base($"Enrollment {enrollmentId} has no section membership as of {date:yyyy-MM-dd} (BR-ATD-003).")
         {
+            Date = date;
         }
+
+        /// <summary>The day on which the student belonged to no section.</summary>
+        public DateTime Date { get; }
     }
 
     /// <summary>BR-ATD-005: the requested justification review state pair isn't legal.</summary>

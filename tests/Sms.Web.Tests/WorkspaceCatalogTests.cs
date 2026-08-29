@@ -36,9 +36,11 @@ namespace Sms.Web.Tests
         {
             // The list, in the order it was asked for: finance, students, secretariat, teaching
             // staff, reports, timetable, cover rota — plus transport, asked for after the first
-            // seven and placed beside the timetable because both are about where people have to be.
+            // seven and placed beside the timetable because both are about where people have to be,
+            // and users & permissions, asked for after those and last because it is the one
+            // department that is about the system rather than about the school.
             Assert.Equal(
-                new[] { "finance", "students", "secretariat", "teachers", "reports", "timetable", "transport", "cover" },
+                new[] { "finance", "students", "secretariat", "teachers", "reports", "timetable", "transport", "cover", "security" },
                 WorkspaceCatalog.Workspaces.Select(w => w.Key).ToArray());
         }
 

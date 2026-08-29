@@ -1,0 +1,149 @@
+@using System.Globalization
+@using Sms.Application.Payroll
+@model PayrollPrintViewModel<OutstandingAdvancesReport>
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var r = Model.Content;
+    ViewData["Title"] = T("Outstanding advances", "السلف القائمة");
+    ViewData["Breadcrumb"] = T("Staff / Advances / Outstanding", "شؤون الموظفين / السلف / السلف القائمة");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "outstanding-help",
+        Title = T("Outstanding advances — help", "السلف القائمة — مساعدة"),
+        Intro = T("Everything the school is still owed by its staff, on one page, with the next instalment due against each.", "كل ما هو مستحق للمدرسة على موظفيها في صفحة واحدة، مع القسط القادم أمام كل سلفة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Only advances still running appear", "لا تظهر إلا السلف القائمة"),
+                T("A settled, rejected or cancelled advance is not on this page — it owes nothing. To see an employee's whole history, open their advance statement.", "السلفة المسدَّدة أو المرفوضة أو الملغاة ليست في هذه الصفحة، فهي لا تُلزم بشيء. ولرؤية تاريخ موظف كاملاً افتح كشف سلفه.")),
+            new HelpPanelViewModel.Item(
+                T("The next instalment is the one to plan around", "القسط القادم هو ما يُخطَّط عليه"),
+                T("It is the earliest month still scheduled. If it is a month already behind you, no payroll has picked it up yet — open that month and generate its lines.", "هو أقرب شهر ما زال مجدولاً. وإن كان شهراً مضى فلم يلتقطه مسير بعد — افتح ذلك الشهر وأنشئ بنوده.")),
+            new HelpPanelViewModel.Item(
+                T("Waived is not recovered", "المعفى ليس مستردّاً"),
+                T("The two columns are kept apart so the totals answer both questions: what came back, and what the school chose to write off.", "يُفصل العمودان ليجيب الإجمالي عن السؤالين معاً: ما الذي عاد، وما الذي اختارت المدرسة إسقاطه.")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("What the school is owed by its staff, across everybody.", "ما هو مستحق للمدرسة على موظفيها، لدى الجميع.")</p>
+    </div>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<div class="d-print-none"><partial name="_PayrollNav" /></div>
+
+<div class="sms-card">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@(isRtl ? Model.SchoolNameAr : Model.SchoolNameEn)</h2>
+        <p class="h6 mb-1">@T("Outstanding salary advances", "كشف السلف القائمة")</p>
+        <p class="text-muted small mb-0">
+            @T("As at", "حتى تاريخ") @Model.PrintedAtUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        </p>
+    </header>
+
+    @if (r.Rows.Count == 0)
+    {
+        <p class="text-muted mb-0">
+            @T("No advance is currently being repaid — nothing is owed.", "لا توجد سلفة قيد السداد حالياً — ولا شيء مستحق.")
+        </p>
+    }
+    else
+    {
+        <div class="row text-center g-2 mb-4">
+            <div class="col">
+                <div class="text-muted small">@T("Advances running", "سلف قيد السداد")</div>
+                <div class="fs-5">@r.Rows.Count</div>
+            </div>
+            <div class="col">
+                <div class="text-muted small">@T("Total advanced", "إجمالي المصروف")</div>
+                <div class="fs-5" dir="ltr">@PayrollLabels.Money(r.TotalAdvanced)</div>
+            </div>
+            <div class="col">
+                <div class="text-muted small">@T("Recovered", "المستردّ")</div>
+                <div class="fs-5 text-success" dir="ltr">@PayrollLabels.Money(r.TotalDeducted)</div>
+            </div>
+            <div class="col">
+                <div class="text-muted small">@T("Waived", "المعفى")</div>
+                <div class="fs-5 text-info" dir="ltr">@PayrollLabels.Money(r.TotalWaived)</div>
+            </div>
+            <div class="col">
+                <div class="text-muted small">@T("Still owed", "المتبقي")</div>
+                <div class="fs-5 fw-bold" dir="ltr">@PayrollLabels.Money(r.TotalOutstanding)</div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table sms-table table-sm align-middle">
+                <caption class="visually-hidden">@T("Every advance still being repaid, with its balance and next instalment", "كل سلفة ما زالت قيد السداد مع رصيدها وقسطها القادم")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">@T("Employee no", "الرقم الوظيفي")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col">@T("Advance", "السلفة")</th>
+                        <th scope="col">@T("Disbursed", "تاريخ الصرف")</th>
+                        <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                        <th scope="col" class="text-end">@T("Recovered", "المستردّ")</th>
+                        <th scope="col" class="text-end">@T("Waived", "المعفى")</th>
+                        <th scope="col" class="text-end">@T("Outstanding", "المتبقي")</th>
+                        <th scope="col" class="text-end">@T("Left", "الأقساط المتبقية")</th>
+                        <th scope="col">@T("Next due", "القسط القادم")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var n = 0; }
+                    @foreach (var row in r.Rows)
+                    {
+                        n++;
+                        <tr>
+                            <td>@n</td>
+                            <td class="text-nowrap"><code>@row.Employee.EmployeeNo</code></td>
+                            <td>@(isRtl ? row.Employee.NameAr : row.Employee.NameEn)</td>
+                            <td class="text-nowrap"><code>@row.AdvanceNo</code></td>
+                            <td class="text-nowrap">@(row.DisbursedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(row.Amount)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(row.Deducted)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(row.Waived)</td>
+                            <td class="text-end fw-bold" dir="ltr">@PayrollLabels.Money(row.Outstanding)</td>
+                            <td class="text-end">@row.RemainingInstallments</td>
+                            <td>
+                                @if (row.NextDueYear == null || row.NextDueMonth == null)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    @PayrollLabels.Period(row.NextDueYear.Value, row.NextDueMonth.Value, isRtl)
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="5">@T("Total", "الإجمالي")</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalAdvanced)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalDeducted)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalWaived)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(r.TotalOutstanding)</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+
+    <p class="text-muted small mt-4 mb-0">
+        @T("Printed", "طُبع"): @Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC
+    </p>
+</div>

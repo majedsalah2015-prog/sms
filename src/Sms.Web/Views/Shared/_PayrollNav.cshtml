@@ -1,0 +1,33 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+
+    // Grouped by what the reader is doing: running the month, lending money, reading a statement.
+    var tabs = new (string Action, string En, string Ar, string Icon, string[] Also)[]
+    {
+        ("Index", "Payroll runs", "مسيرات الرواتب", "bi-calendar3", new[] { "Run", "Register", "Payslip", "BankTransfer" }),
+        ("Advances", "Salary advances", "سلف الموظفين", "bi-cash-coin", new[] { "Advance" }),
+        ("AdvanceStatement", "Advance statement", "كشف السلف", "bi-file-earmark-text", new string[0]),
+        ("OutstandingAdvances", "Outstanding advances", "السلف القائمة", "bi-hourglass-split", new string[0]),
+    };
+
+    bool Active((string Action, string En, string Ar, string Icon, string[] Also) t) =>
+        string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase)
+        || t.Also.Any(a => string.Equals(a, action, StringComparison.OrdinalIgnoreCase));
+}
+<nav aria-label="@(isRtl ? "الرواتب والسلف" : "Payroll and advances")">
+    <ul class="nav nav-pills sms-subnav mb-4">
+        @foreach (var t in tabs)
+        {
+            var isActive = Active(t);
+            <li class="nav-item">
+                <a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)"
+                   asp-controller="Payroll" asp-action="@t.Action">
+                    <i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)
+                    <i class="bi bi-lock ms-1" aria-hidden="true"></i><span class="visually-hidden">@(isRtl ? "مقيّد" : "restricted")</span>
+                </a>
+            </li>
+        }
+    </ul>
+</nav>

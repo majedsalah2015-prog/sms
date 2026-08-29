@@ -1,0 +1,219 @@
+@using System.Globalization
+@using Sms.Application.Messaging
+@using Sms.Domain.Messaging
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model ComposeAnnouncementViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Compose an announcement", "إنشاء إعلان");
+    ViewData["Breadcrumb"] = T("Messaging / Compose", "المراسلات / إنشاء إعلان");
+
+    string Scope(AudienceScope s) => s switch
+    {
+        AudienceScope.Section => T("One section", "شعبة واحدة"),
+        AudienceScope.Grade => T("A whole grade", "صف كامل"),
+        AudienceScope.Stage => T("A whole stage", "مرحلة كاملة"),
+        _ => T("The whole school", "المدرسة كلها"),
+    };
+
+    string ChannelName(NotificationChannel c) => c switch
+    {
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        _ => "WhatsApp",
+    };
+
+    // In-app is not offered as a choice: every announcement lands in the portal regardless,
+    // because that copy is the school's own record of what it told which families.
+    var pickable = new[] { NotificationChannel.WhatsApp, NotificationChannel.Sms, NotificationChannel.Email };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "cmp-help",
+        Title = T("Compose — help", "إنشاء إعلان — مساعدة"),
+        Intro = T("Write it in both languages, choose who it goes to, and see how many people that is and what it costs before you send it.",
+                  "اكتبه باللغتين، واختر من يذهب إليه، وانظر كم شخصاً هم وكم يكلّف قبل أن ترسل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("The count is the count", "العدد هو العدد"),
+                T("The number below is resolved the same way the send resolves it: guardians of currently-enrolled students in the chosen slice, one row per family, only those with a portal account. If it says nought, the send would reach nobody and is refused.",
+                  "العدد أدناه يُحسب بالطريقة نفسها التي يحسبها بها الإرسال: أولياء أمور الطلاب المسجَّلين حالياً في الشريحة المختارة، سطر لكل أسرة، ومن لهم حساب في البوابة فقط. فإن كان صفراً فالإرسال لا يبلغ أحداً ويُرفض.")),
+            new HelpPanelViewModel.Item(
+                T("What the metered channels cost", "ما تكلّفه القنوات المحاسَبة"),
+                T("WhatsApp and SMS are billed per message per recipient, so ticking both doubles it. The estimate below is that multiplication, and the budget console is where a ceiling on it lives.",
+                  "يُحاسَب واتساب والرسائل النصية على كل رسالة لكل مستلِم، فتحديد الاثنتين يضاعفه. والتقدير أدناه هو ذلك الضرب، وكونسول الميزانية هو موضع السقف عليه.")),
+            new HelpPanelViewModel.Item(
+                T("Sending is not scheduled", "الإرسال غير مجدول"),
+                T("It goes when the send button is pressed. Scheduling an announcement for later is in doc/Modules/32 §8.1 and is not built.",
+                  "يخرج عند الضغط على زر الإرسال. أما جدولة الإعلان لوقت لاحق فهي في doc/Modules/32 §8.1 وغير مبنية.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("Bilingual, audience-targeted, and costed before it goes.",
+               "ثنائي اللغة، موجَّه إلى جمهور بعينه، ومُقدَّرة كلفته قبل خروجه.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_NotificationsNav" />
+
+<div asp-validation-summary="All" class="alert alert-danger" role="alert"
+     style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+@* The audience picker reloads the page rather than scripting a count: the number shown has to
+   be the number the send uses, and a second implementation of "who is in this grade" is how the
+   two drift apart. *@
+<form asp-action="Compose" method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label class="form-label small" for="scope">@T("Send to", "أرسل إلى")</label>
+        <select class="form-select form-select-sm" id="scope" name="scope" onchange="this.form.submit()">
+            @foreach (AudienceScope s in Enum.GetValues(typeof(AudienceScope)))
+            {
+                <option value="@((int)s)" selected="@(Model.Scope == s)">@Scope(s)</option>
+            }
+        </select>
+    </div>
+
+    @if (Model.Scope != AudienceScope.SchoolWide)
+    {
+        <div class="col-auto">
+            <label class="form-label small" for="targetId">@T("Which one", "أيها")</label>
+            <select class="form-select form-select-sm" id="targetId" name="targetId" onchange="this.form.submit()">
+                <option value="">@T("choose…", "اختر…")</option>
+                @foreach (var t in Model.Targets)
+                {
+                    <option value="@t.Id" selected="@(Model.TargetId == t.Id)">
+                        @(isRtl ? t.NameAr : t.NameEn) — @T($"{t.RecipientCount} guardian(s)", $"{t.RecipientCount} ولي أمر")
+                    </option>
+                }
+            </select>
+        </div>
+    }
+
+    <input type="hidden" name="channelMask" value="@Model.ChannelMask" />
+    <div class="col-auto">
+        <noscript><button type="submit" class="btn btn-sm btn-outline-secondary">@T("Update", "تحديث")</button></noscript>
+    </div>
+</form>
+
+@if (Model.Preview is { } preview)
+{
+    <div class="alert @(preview.RecipientCount == 0 ? "alert-danger" : "alert-info")">
+        <strong>@T($"{preview.RecipientCount} guardian(s)", $"{preview.RecipientCount} ولي أمر")</strong>
+        @if (preview.RecipientCount == 0)
+        {
+            @T(" — this reaches nobody. Either nobody is enrolled here, or none of their guardians has a portal account.",
+               " — لا يبلغ هذا أحداً. فإما ألا أحد مسجَّل هنا، وإما ألا حساب في البوابة لأي من أولياء أمورهم.")
+        }
+        else
+        {
+            @T(" will receive this in the portal.", " سيستلمونه في البوابة.")
+
+            if (preview.CostedMessageCount > 0)
+            {
+                <span> @T($"The ticked metered channels add {preview.CostedMessageCount} billable message(s).",
+                          $"والقنوات المحاسَبة المحدَّدة تضيف {preview.CostedMessageCount} رسالة محاسَبة.")</span>
+            }
+
+            if (preview.RequiresApproval)
+            {
+                <span class="d-block mt-1">
+                    @T("This audience is wider than one section, so it will be submitted for approval rather than sent straight away (BR-MSG-001).",
+                       "هذا الجمهور أوسع من شعبة واحدة، فسيُرسل للاعتماد بدل الخروج فوراً (BR-MSG-001).")
+                </span>
+            }
+        }
+    </div>
+}
+
+<form asp-action="Compose" method="post">
+    @Html.AntiForgeryToken()
+    <input type="hidden" asp-for="Scope" />
+    <input type="hidden" asp-for="TargetId" />
+
+    <div class="sms-card mb-4">
+        <div class="p-3">
+            <h2 class="h5 mb-3">@T("The announcement", "نص الإعلان")</h2>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" asp-for="TitleEn">@T("Title (English)", "العنوان (إنجليزي)")</label>
+                    <input class="form-control" asp-for="TitleEn" dir="ltr" maxlength="200" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" asp-for="TitleAr">@T("Title (Arabic)", "العنوان (عربي)")</label>
+                    <input class="form-control" asp-for="TitleAr" dir="rtl" maxlength="200" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" asp-for="BodyEn">@T("Body (English)", "النص (إنجليزي)")</label>
+                    <textarea class="form-control" asp-for="BodyEn" dir="ltr" rows="7"></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" asp-for="BodyAr">@T("Body (Arabic)", "النص (عربي)")</label>
+                    <textarea class="form-control" asp-for="BodyAr" dir="rtl" rows="7"></textarea>
+                </div>
+            </div>
+            <p class="form-text mt-2 mb-0">
+                @T("Each family reads the language they chose, so both sides are required — and neither should carry a child's marks, balance or behaviour (BR-MSG-007).",
+                   "تقرأ كل أسرة اللغة التي اختارتها، فالجانبان مطلوبان — ولا ينبغي أن يحمل أيهما درجات طفل ولا رصيده ولا سلوكه (BR-MSG-007).")
+            </p>
+        </div>
+    </div>
+
+    <div class="sms-card mb-4">
+        <div class="p-3">
+            <h2 class="h5 mb-3">@T("Also send on", "أرسل أيضاً على")</h2>
+            <p class="text-muted small">
+                @T("It always lands in the portal. These are in addition to that.",
+                   "يصل دائماً إلى البوابة. وهذه إضافة إليها.")
+            </p>
+
+            @foreach (var c in pickable)
+            {
+                var bit = AnnouncementChannels.ToMask(new[] { c });
+                var deliverable = Model.CanDeliverOn(c);
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="ch-@c" name="channelPicks" value="@bit"
+                           checked="@Model.Picked(c)" />
+                    <label class="form-check-label" for="ch-@c">
+                        @ChannelName(c)
+                        @if (AnnouncementChannels.IsCosted(c))
+                        {
+                            <span class="badge bg-warning text-dark ms-1">@T("billed per message", "محاسَبة على كل رسالة")</span>
+                        }
+                        @if (!deliverable)
+                        {
+                            <small class="d-block text-danger">
+                                @(c == NotificationChannel.Email
+                                    ? T("No email transport is configured in this deployment — nothing would be delivered.",
+                                        "لا يوجد ناقل بريد مهيّأ في هذا التركيب — ولن يُسلَّم شيء.")
+                                    : T("No gateway is registered for this channel — every message would fail. Register one under Gateways first.",
+                                        "لا توجد بوابة مسجّلة لهذه القناة — وستفشل كل رسالة. سجّل واحدة من «البوابات» أولاً."))
+                            </small>
+                        }
+                    </label>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")
+        </button>
+        <a class="btn btn-outline-secondary" asp-action="Index">@T("Cancel", "إلغاء")</a>
+    </div>
+
+    <p class="form-text mt-2">
+        @T("Saving does not send. The announcement appears in the list, where it is approved if it needs to be, and sent from there.",
+           "الحفظ لا يُرسل. يظهر الإعلان في القائمة، حيث يُعتمد إن لزم، ويُرسل من هناك.")
+    </p>
+</form>

@@ -458,12 +458,12 @@ namespace Sms.Infrastructure.Grading
             var marksheet = await _db.Marksheets.SingleAsync(m => m.Id == marksheetId, cancellationToken);
             if (marksheet.Status != MarksheetStatus.Draft)
             {
-                throw new MarksheetInUseException(marksheetId, $"it is {marksheet.Status}");
+                throw new MarksheetInUseException(marksheetId, MarksheetDeleteBlocker.NotDraft, marksheet.Status);
             }
             var entries = await _db.MarkEntries.Where(e => e.MarksheetId == marksheetId).ToListAsync(cancellationToken);
             if (entries.Any(e => e.Score != null || e.IsAbsent || e.IsExempt))
             {
-                throw new MarksheetInUseException(marksheetId, "marks have already been entered");
+                throw new MarksheetInUseException(marksheetId, MarksheetDeleteBlocker.MarksEntered, marksheet.Status);
             }
 
             _db.MarkEntries.RemoveRange(entries);

@@ -149,7 +149,7 @@ namespace Sms.Infrastructure.Sections
             var currentCount = await _db.SectionMemberships.CountAsync(m => m.SectionId == sectionId && m.EffectiveToUtc == null, cancellationToken);
             if (capacity < currentCount)
             {
-                throw new SectionInUseException(sectionId, $"capacity {capacity} is below the {currentCount} currently assigned student(s)");
+                throw new SectionInUseException(sectionId, SectionInUseReason.CapacityBelowAssigned, capacity, currentCount);
             }
 
             var nameTaken = await _db.Sections.AnyAsync(
@@ -174,13 +174,13 @@ namespace Sms.Infrastructure.Sections
             var memberships = await _db.SectionMemberships.CountAsync(m => m.SectionId == sectionId, cancellationToken);
             if (memberships > 0)
             {
-                throw new SectionInUseException(sectionId, $"{memberships} membership record(s) exist — close the section instead (BR-SCN-007)");
+                throw new SectionInUseException(sectionId, SectionInUseReason.HasHistory, existing: memberships);
             }
 
             var homerooms = await _db.HomeroomAssignments.CountAsync(h => h.SectionId == sectionId, cancellationToken);
             if (homerooms > 0)
             {
-                throw new SectionInUseException(sectionId, $"{homerooms} homeroom assignment(s) exist — close the section instead");
+                throw new SectionInUseException(sectionId, SectionInUseReason.HasHistory, existing: homerooms);
             }
 
             _db.Sections.Remove(section);
@@ -190,7 +190,7 @@ namespace Sms.Infrastructure.Sections
             }
             catch (DbUpdateException ex)
             {
-                throw new SectionInUseException(sectionId, "other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ")");
+                throw new SectionInUseException(sectionId, SectionInUseReason.ReferencedElsewhere, ex);
             }
         }
 

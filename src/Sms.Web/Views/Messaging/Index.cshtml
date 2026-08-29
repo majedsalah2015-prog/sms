@@ -1,0 +1,177 @@
+@using System.Globalization
+@using Sms.Application.Messaging
+@using Sms.Domain.Messaging
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model AnnouncementListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Announcements", "الإعلانات");
+    ViewData["Breadcrumb"] = T("Messaging / Announcements", "المراسلات / الإعلانات");
+
+    string Scope(AudienceScope s) => s switch
+    {
+        AudienceScope.Section => T("Section", "شعبة"),
+        AudienceScope.Grade => T("Grade", "صف"),
+        AudienceScope.Stage => T("Stage", "مرحلة"),
+        _ => T("Whole school", "المدرسة كلها"),
+    };
+
+    string Status(AnnouncementStatus s) => s switch
+    {
+        AnnouncementStatus.Draft => T("Draft", "مسودة"),
+        AnnouncementStatus.PendingApproval => T("Awaiting approval", "بانتظار الاعتماد"),
+        _ => T("Sent", "أُرسل"),
+    };
+
+    string Badge(AnnouncementStatus s) => s switch
+    {
+        AnnouncementStatus.Draft => "bg-secondary",
+        AnnouncementStatus.PendingApproval => "bg-warning text-dark",
+        _ => "bg-success",
+    };
+
+    string ChannelName(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("portal", "البوابة"),
+        NotificationChannel.Email => T("email", "بريد"),
+        NotificationChannel.Sms => T("SMS", "نصية"),
+        _ => "WhatsApp",
+    };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "ann-help",
+        Title = T("Announcements — help", "الإعلانات — مساعدة"),
+        Intro = T("A broadcast written by a person and addressed to a slice of the school. Every one of them also lands in the portal, whatever else it is sent on — that copy is the school's record of what it told which families, and when.",
+                  "بثٌّ يكتبه شخص ويوجَّه إلى شريحة من المدرسة. وكل واحد منها يصل إلى البوابة أيضاً مهما أُرسل عليه من قنوات — وتلك النسخة هي سجل المدرسة لما أبلغت به أي الأسر ومتى."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Who needs to approve", "من يلزم اعتماده"),
+                T("A homeroom teacher's announcement to their own section goes out without asking anybody — BR-MSG-001 gives speed where the audience is small and the sender is accountable for it. A grade, a stage or the whole school waits for a VP or the Principal.",
+                  "إعلان معلم الفصل إلى شعبته يخرج دون استئذان أحد — تعطي القاعدة BR-MSG-001 السرعة حيث الجمهور صغير والمرسِل مسؤول عنه. أما الصف أو المرحلة أو المدرسة كلها فينتظر وكيلاً أو المدير.")),
+            new HelpPanelViewModel.Item(
+                T("Reach is people, not children", "الوصول أشخاص لا أبناء"),
+                T("A family with three children in the grade is counted and messaged once. That is deliberate — BR-MSG-007 exists so a school does not flood the same phone three times with the same sentence.",
+                  "الأسرة التي لها ثلاثة أبناء في الصف تُحسب مرة وتُراسَل مرة. وذلك مقصود — وُضعت القاعدة BR-MSG-007 لئلا تُغرق المدرسة الهاتف نفسه ثلاث مرات بالجملة نفسها.")),
+            new HelpPanelViewModel.Item(
+                T("Do not put marks or fees in one", "لا تضع درجات ولا رسوماً فيه"),
+                T("BR-MSG-007 keeps personal detail out of broadcasts — a message that goes to two hundred families is not the place for one child's balance. Say that the statement is ready and let the portal say the rest.",
+                  "تُبقي القاعدة BR-MSG-007 التفاصيل الشخصية خارج البث — فالرسالة التي تذهب إلى مئتي أسرة ليست موضع رصيد طفل بعينه. قل إن الكشف جاهز، ودع البوابة تقول الباقي.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("What this school has broadcast, to whom, and how far it actually got.",
+               "ما بثّته هذه المدرسة، وإلى من، وإلى أي مدى وصل فعلاً.")
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-primary" asp-action="Compose">
+            <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Compose", "إنشاء إعلان")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_NotificationsNav" />
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("Announcement", "الإعلان")</th>
+            <th scope="col">@T("Audience", "الجمهور")</th>
+            <th scope="col">@T("Channels", "القنوات")</th>
+            <th scope="col">@T("State", "الحالة")</th>
+            <th scope="col">@T("Reach", "الوصول")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Announcements.Count == 0)
+        {
+            <tr><td colspan="6" class="p-3 text-muted">
+                @T("Nothing has been announced yet.", "لم يُعلن شيء بعد.")
+            </td></tr>
+        }
+        else
+        {
+            @foreach (var row in Model.Announcements)
+            {
+                var a = row.Announcement;
+                var label = isRtl ? row.AudienceLabelAr : row.AudienceLabelEn;
+                <tr>
+                    <td>
+                        <strong>@(isRtl ? a.TitleAr : a.TitleEn)</strong>
+                        <small class="d-block text-muted text-truncate" style="max-width: 28rem;">@(isRtl ? a.BodyAr : a.BodyEn)</small>
+                    </td>
+                    <td>
+                        @Scope(a.AudienceScope)
+                        @if (!string.IsNullOrWhiteSpace(label))
+                        {
+                            <small class="d-block text-muted">@label</small>
+                        }
+                    </td>
+                    <td>
+                        <span class="badge bg-light text-dark">@ChannelName(NotificationChannel.InApp)</span>
+                        @foreach (var c in AnnouncementChannels.FromMask(a.ChannelMask).Where(c => c != NotificationChannel.InApp))
+                        {
+                            <span class="badge bg-light text-dark">@ChannelName(c)</span>
+                        }
+                    </td>
+                    <td>
+                        <span class="badge @Badge(a.Status)">@Status(a.Status)</span>
+                        @if (a.SentAtUtc is { } sent)
+                        {
+                            <small class="d-block text-muted" dir="ltr">@sent.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</small>
+                        }
+                    </td>
+                    <td>
+                        @if (a.ReachCount is { } reach)
+                        {
+                            <span>@T($"{reach} guardian(s)", $"{reach} ولي أمر")</span>
+                            <small class="d-block text-muted">@T($"{row.DeliveryCount} message(s)", $"{row.DeliveryCount} رسالة")</small>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td class="text-end">
+                        <div class="d-flex gap-1 justify-content-end">
+                            @if (a.Status == AnnouncementStatus.PendingApproval && a.ApprovedAtUtc == null)
+                            {
+                                <form asp-action="Approve" asp-route-id="@a.Id" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Approve", "اعتماد")</button>
+                                </form>
+                            }
+
+                            @if (a.Status != AnnouncementStatus.Sent)
+                            {
+                                <form asp-action="Send" asp-route-id="@a.Id" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-send me-1" aria-hidden="true"></i>@T("Send", "إرسال")
+                                    </button>
+                                </form>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<p class="text-muted small mt-3">
+    @T("Threads, official letters, the moderation queue and archive search (doc/Modules/32 §8.2–§8.6) are not built. Official letters additionally wait on a document engine — see docs/Status.",
+       "المحادثات والخطابات الرسمية وطابور المراجعة وبحث الأرشيف (doc/Modules/32 §8.2–§8.6) غير مبنية. والخطابات الرسمية تنتظر أيضاً محرّك مستندات — انظر docs/Status.")
+</p>

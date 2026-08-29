@@ -7,8 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Security;
+using Sms.Application.Students;
 using Sms.Application.Transport;
 using Sms.Domain.Security;
+using Sms.Domain.Students;
 using Sms.Domain.Transport;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
@@ -399,14 +401,32 @@ namespace Sms.Web.Controllers
 
         // ------------------------------------------------------------------ subscriptions
 
+        /// <summary>
+        /// The picker cap. doc/Modules/23 §8.3 asks the subscription desk for a student search, and a
+        /// flat list of every enrolment is not one — the clerk narrows first, and what the cap left out
+        /// is stated on screen rather than swallowed.
+        /// </summary>
+        private const int StudentPickerCap = 200;
+
         [HttpGet("subscriptions")]
         [RequirePermission(ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Subscriptions, ActionVerb.View)]
-        public async Task<IActionResult> Subscriptions(TransportSubscriptionStatus? status = null, string? q = null)
+        public async Task<IActionResult> Subscriptions(
+            TransportSubscriptionStatus? status = null, string? q = null, string? stuQ = null, int? studentId = null)
         {
             var query = _db.TransportSubscriptions.AsNoTracking().Where(s => s.AcademicYearId == _year.AcademicYearId);
             if (status is { } wanted)
             {
                 query = query.Where(s => s.Status == wanted);
+            }
+
+            // The search used to run in memory over an already-capped page, so a student whose
+            // subscription was not among the 500 newest could not be found at all — the screen answered
+            // "no subscriptions match" for a child who plainly had one. It is a subquery now: the
+            // database narrows first and the cap applies to what matched.
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var matchingIds = StudentSearch.Matching(_db.Students.AsNoTracking(), q).Select(s => s.Id);
+                query = query.Where(s => matchingIds.Contains(s.StudentId));
             }
 
             var subscriptions = await query.OrderByDescending(s => s.StartDate).Take(500).ToListAsync();
@@ -419,24 +439,73 @@ namespace Sms.Web.Controllers
             var byStudent = students.ToDictionary(
                 s => s.Id, s => new StudentLabel(s.StudentNo, s.NameAr, s.NameEn));
 
-            if (!string.IsNullOrWhiteSpace(q))
-            {
-                var term = q.Trim();
-                var matching = new HashSet<int>(students
-                    .Where(s => s.StudentNo.Contains(term, StringComparison.OrdinalIgnoreCase)
-                                || s.NameAr.Contains(term) || s.NameEn.Contains(term, StringComparison.OrdinalIgnoreCase))
-                    .Select(s => s.Id));
-                subscriptions = subscriptions.Where(s => matching.Contains(s.StudentId)).ToList();
-            }
-
-            return View(new SubscriptionsViewModel
+            var model = new SubscriptionsViewModel
             {
                 Subscriptions = subscriptions,
                 Students = byStudent,
                 Stops = await StopLabelsAsync(),
                 Status = status,
                 Search = q,
-            });
+                StudentQuery = string.IsNullOrWhiteSpace(stuQ) ? null : stuQ.Trim(),
+                SelectedStudentId = studentId,
+            };
+
+            await FillStudentPickerAsync(model);
+            return View(model);
+        }
+
+        /// <summary>
+        /// Fills the subscribe form's student picker. Only this year's active enrolments are offered:
+        /// a subscription hangs off an enrolment (<see cref="ITransportAdmin.SubscribeAsync"/> loads
+        /// one before it does anything else), so a student without one is not a choice the desk has —
+        /// offering them would be offering a refusal.
+        /// </summary>
+        private async Task FillStudentPickerAsync(SubscriptionsViewModel model)
+        {
+            var enrolledIds = await _db.Enrollments.AsNoTracking()
+                .Where(e => e.AcademicYearId == _year.AcademicYearId && e.Status == EnrollmentStatus.Active)
+                .Select(e => e.StudentId).Distinct().ToListAsync();
+
+            var candidates = StudentSearch.Matching(
+                _db.Students.AsNoTracking().Where(s => enrolledIds.Contains(s.Id)), model.StudentQuery);
+
+            var matched = await candidates
+                .OrderBy(s => s.StudentNo)
+                .Select(s => new
+                {
+                    s.Id, s.StudentNo,
+                    NameAr = s.FirstNameAr + " " + s.FatherNameAr + " " + s.FamilyNameAr,
+                    NameEn = s.FirstNameEn + " " + s.FatherNameEn + " " + s.FamilyNameEn,
+                })
+                .ToListAsync();
+
+            model.CandidateCount = matched.Count;
+            model.CandidatesTruncated = matched.Count > StudentPickerCap;
+            var options = matched.Take(StudentPickerCap)
+                .Select(s => new SubscriptionsViewModel.StudentOption(s.Id, new StudentLabel(s.StudentNo, s.NameAr, s.NameEn)))
+                .ToList();
+
+            // A student chosen before the clerk narrowed the search must survive the narrowing: the
+            // filter governs the list, not the choice already made. Loaded past the filter, appended
+            // to the list, so the select still has an option to keep selected.
+            if (model.SelectedStudentId is int sid && options.All(o => o.Id != sid) && enrolledIds.Contains(sid))
+            {
+                var chosen = await _db.Students.AsNoTracking()
+                    .Where(s => s.Id == sid)
+                    .Select(s => new
+                    {
+                        s.Id, s.StudentNo,
+                        NameAr = s.FirstNameAr + " " + s.FatherNameAr + " " + s.FamilyNameAr,
+                        NameEn = s.FirstNameEn + " " + s.FatherNameEn + " " + s.FamilyNameEn,
+                    })
+                    .SingleOrDefaultAsync();
+                if (chosen != null)
+                {
+                    options.Add(new SubscriptionsViewModel.StudentOption(chosen.Id, new StudentLabel(chosen.StudentNo, chosen.NameAr, chosen.NameEn)));
+                }
+            }
+
+            model.Candidates = options;
         }
 
         [HttpPost("subscriptions")]
@@ -444,8 +513,25 @@ namespace Sms.Web.Controllers
         [RequirePermission(ScreenCatalog.Modules.Transport, ScreenCatalog.Transport.Subscriptions, ActionVerb.Create)]
         public async Task<IActionResult> Subscribe(
             int studentId, int payerId, int? amRouteStopId, int? pmRouteStopId,
-            DateTime startDate, DateTime? endDate, bool isSelfReleaseAllowed)
+            DateTime startDate, DateTime? endDate, bool isSelfReleaseAllowed,
+            TransportSubscriptionStatus? status = null, string? q = null, string? stuQ = null)
         {
+            // The picker only offers this year's enrolments, but a posted id can still name a student
+            // who has none — a stale tab, a bookmarked form, a year rolled over since the page loaded.
+            // SubscribeAsync would answer that with EF's own "Sequence contains no elements", and
+            // UserMessage falls back to an exception's raw text, so an Arabic screen would print an
+            // English sentence about sequences. Say what actually happened instead.
+            var enrolled = await _db.Enrollments.AsNoTracking().AnyAsync(
+                e => e.StudentId == studentId && e.AcademicYearId == _year.AcademicYearId,
+                HttpContext.RequestAborted);
+            if (!enrolled)
+            {
+                TempData["Error"] = IsArabic
+                    ? "لا يوجد لهذا الطالب تسجيل في العام الدراسي الحالي، فلا شيء يُشترَك في النقل."
+                    : "That student has no enrolment in the working year, so there is nothing to subscribe to transport.";
+                return RedirectToAction(nameof(Subscriptions), new { status, q, stuQ, studentId });
+            }
+
             try
             {
                 await _transport.SubscribeAsync(
@@ -455,9 +541,14 @@ namespace Sms.Web.Controllers
             catch (Exception ex) when (ex is InvalidOperationException or ArgumentException)
             {
                 TempData["Error"] = UserMessage.For(ex, IsArabic);
+
+                // A refused post comes back to the list the clerk was looking at, still holding the
+                // student they picked: re-finding the child in order to correct a date is the kind of
+                // small punishment that teaches people to keep a second tab open.
+                return RedirectToAction(nameof(Subscriptions), new { status, q, stuQ, studentId });
             }
 
-            return RedirectToAction(nameof(Subscriptions));
+            return RedirectToAction(nameof(Subscriptions), new { status, q, stuQ });
         }
 
         [HttpPost("subscriptions/{id:int}/stops")]

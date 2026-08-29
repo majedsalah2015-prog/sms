@@ -11,7 +11,7 @@ namespace Sms.Web.Navigation
     /// </summary>
     public sealed class NavItem
     {
-        public NavItem(string key, string titleEn, string titleAr, string icon, string? controller = null, string? action = null, object? routeValues = null, string? area = null, string? url = null)
+        public NavItem(string key, string titleEn, string titleAr, string icon, string? controller = null, string? action = null, object? routeValues = null, string? area = null, string? url = null, IReadOnlyCollection<string>? siblingActions = null)
         {
             Key = key;
             TitleEn = titleEn;
@@ -22,6 +22,7 @@ namespace Sms.Web.Navigation
             RouteValues = routeValues;
             Area = area;
             Url = url;
+            SiblingActions = siblingActions;
         }
 
         public string Key { get; }
@@ -60,6 +61,15 @@ namespace Sms.Web.Navigation
         /// both of them on either.
         /// </summary>
         public string? Url { get; }
+
+        /// <summary>
+        /// Other actions of the same controller that are still <b>this</b> screen, or <c>null</c> for
+        /// the ordinary case. The assignment board needs it: its "propose a distribution" POST
+        /// renders the board back rather than redirecting, so without this the highlight — and the
+        /// group standing open around it — would jump to the Sections module the moment a registrar
+        /// asked for a proposal.
+        /// </summary>
+        public IReadOnlyCollection<string>? SiblingActions { get; }
 
         public List<NavItem> Items { get; } = new();
 

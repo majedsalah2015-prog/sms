@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Deliberately 32-bit, and the only project here that is.
+
+    The Access ODBC driver is registered per bitness, and a school machine that has ever had
+    Office on it almost always has the 32-bit one — Office 2007/2010 install nothing else. A
+    64-bit process cannot load a 32-bit driver, so Sms.Web (AnyCPU, therefore 64-bit) gets
+    IM002 "no default driver" from a file that Access itself opens fine on the same desktop.
+    Installing the 64-bit Access Database Engine is the alternative, and its installer refuses
+    to run while 32-bit Office is present.
+
+    So the read happens over here instead, in a process of the right bitness, and the answer
+    crosses back as JSON on stdout. Framework-dependent win-x86: the x86 .NET runtime ships
+    with anything that has 32-bit Office-era tooling, and self-contained would add 70 MB to
+    the deployment for one console app.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PlatformTarget>x86</PlatformTarget>
+    <AssemblyName>Sms.AccessBridge</AssemblyName>
+    <RootNamespace>Sms.AccessBridge</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Data.Odbc" Version="5.0.0" />
+  </ItemGroup>
+
+</Project>

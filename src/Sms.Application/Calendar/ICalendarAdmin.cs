@@ -13,6 +13,31 @@ namespace Sms.Application.Calendar
             int academicYearId, DateTime date, DayType dayType, CalendarAudience audience = CalendarAudience.All,
             bool isProvisional = false, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Paints a whole date range in one transaction (doc/Modules/04 §8.1 "day-type painting
+        /// (drag ranges)"), returning how many days it wrote. The board used to call
+        /// <see cref="DefineDayAsync"/> once per day, which saved once per row against a change
+        /// tracker that kept every previous one, and left a half-painted range behind whenever a
+        /// day in the middle was refused. Same rules as the single-day call: throws
+        /// <see cref="Common.Exceptions.CalendarPastDateEditException"/> or
+        /// <see cref="Common.Exceptions.CalendarDateOutsideYearException"/> before writing
+        /// anything, so a refused range leaves the calendar exactly as it was.
+        /// </summary>
+        Task<int> DefineDaysAsync(
+            int academicYearId, DateTime startDate, DateTime endDate, DayType dayType, CalendarAudience audience = CalendarAudience.All,
+            bool isProvisional = false, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// BR-CAL-005: confirms a provisional day once its Hijri-mapped Gregorian date is known.
+        /// The rule reads "entered provisionally and confirmed later (flagged until confirmed)" —
+        /// the flag could be set and never cleared, so a religious holiday stayed marked uncertain
+        /// for the rest of the year. Idempotent: confirming an already-confirmed day is a no-op.
+        /// Returns null when the year has no row for that date, and throws
+        /// <see cref="Common.Exceptions.CalendarPastDateEditException"/> for a past one
+        /// (BR-CAL-004 — a day that has already happened is a record, not a draft).
+        /// </summary>
+        Task<CalendarDay?> ConfirmProvisionalDayAsync(int academicYearId, DateTime date, CancellationToken cancellationToken = default);
+
         Task<CalendarEvent> DefineEventAsync(
             int academicYearId, string nameAr, string nameEn, CalendarEventCategory category, DateTime startDate, DateTime endDate,
             CalendarAudience audience = CalendarAudience.All, bool isPortalVisible = true, CancellationToken cancellationToken = default);

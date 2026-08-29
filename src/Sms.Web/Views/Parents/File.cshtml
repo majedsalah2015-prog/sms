@@ -52,6 +52,12 @@
                     <div class="col-md-3"><label class="form-label small" for="par-PrimaryMobile">@T("Primary mobile", "الجوال الأساسي")</label><input name="PrimaryMobile" id="par-PrimaryMobile" class="form-control form-control-sm" dir="ltr" value="@p.PrimaryMobile" /></div>
                     <div class="col-md-4"><label class="form-label small" for="par-Email">@T("Email", "البريد")</label><input name="Email" id="par-Email" type="email" class="form-control form-control-sm" dir="ltr" value="@p.Email" /></div>
                     <div class="col-md-3"><label class="form-label small" for="par-OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input name="OccupationEmployer" id="par-OccupationEmployer" class="form-control form-control-sm" value="@p.OccupationEmployer" /></div>
+                    <div class="col-md-3"><label class="form-label small" for="par-EducationLookupId">@T("Education level", "المؤهل العلمي")</label>
+                        <select name="EducationLookupId" id="par-EducationLookupId" class="form-select form-select-sm">
+                            <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
+                            @foreach (var e in Model.EducationLevels) { <option value="@e.Id" selected="@(p.EducationLookupId == e.Id)">@(isRtl ? e.Ar : e.En)</option> }
+                        </select>
+                    </div>
                     <div class="col-md-2"><label class="form-label small" for="par-PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select name="PreferredLanguage" id="par-PreferredLanguage" class="form-select form-select-sm"><option value="ar" selected="@(p.PreferredLanguage == "ar")">العربية</option><option value="en" selected="@(p.PreferredLanguage == "en")">English</option></select></div>
                     <div class="col-md-8"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@p.Address" /></div>
 

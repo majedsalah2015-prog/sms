@@ -51,6 +51,28 @@ namespace Sms.Web.Models
         public int InstructionalDays { get; set; }
 
         public int OverrideCount { get; set; }
+
+        /// <summary>
+        /// BR-CAL-005: the days still flagged provisional, so the screen can show which Hijri
+        /// holidays are still waiting on a confirmed Gregorian date instead of only marking them
+        /// ◔ on a grid of three hundred cells.
+        /// </summary>
+        public IReadOnlyList<CalendarDay> ProvisionalDays { get; set; } = Array.Empty<CalendarDay>();
+
+        /// <summary>
+        /// BR-CAL-006: the configured ministry minimum (<c>Regional.MinimumInstructionalDays</c>),
+        /// or null when the school has not set one. Compared against the whole-year count — the
+        /// setting is one number for the year, so a per-semester comparison would be inventing a
+        /// threshold nobody configured.
+        /// </summary>
+        public int? MinimumInstructionalDays { get; set; }
+
+        /// <summary>
+        /// The earliest date the paint tool may write (BR-CAL-003): today, or the year start when
+        /// the year has not begun. Null when the year ended — nothing in it can be painted at all,
+        /// and a form that refuses every submit is worse than one that says why.
+        /// </summary>
+        public DateTime? PaintFloor { get; set; }
     }
 
     public sealed class CalendarDayFormViewModel
@@ -138,6 +160,32 @@ namespace Sms.Web.Models
             CalendarAudience.StudentsOnly => isRtl ? "الطلاب فقط" : "Students only",
             CalendarAudience.StaffOnly => isRtl ? "الموظفون فقط" : "Staff only",
             _ => audience.ToString(),
+        };
+
+        /// <summary>
+        /// What a day type means to the modules that read it (BR-CAL-001). The board named these
+        /// itself while the paint confirmation printed the enum, so an Arabic reader who painted
+        /// an exam week was told «تم تعيين ٧ أيام كـ ExamPeriodWorking» — the same leak
+        /// <see cref="Audience"/> was written to close. Both now read from here.
+        /// </summary>
+        public static string DayType(Sms.Domain.Calendar.DayType dayType, bool isRtl) => dayType switch
+        {
+            Sms.Domain.Calendar.DayType.Working => isRtl ? "عمل" : "Working",
+            Sms.Domain.Calendar.DayType.Weekend => isRtl ? "عطلة أسبوعية" : "Weekend",
+            Sms.Domain.Calendar.DayType.Holiday => isRtl ? "إجازة" : "Holiday",
+            Sms.Domain.Calendar.DayType.Partial => isRtl ? "يوم جزئي" : "Partial day",
+            Sms.Domain.Calendar.DayType.ExamPeriodWorking => isRtl ? "فترة اختبارات" : "Exam period",
+            _ => dayType.ToString(),
+        };
+
+        /// <summary>The event category, in the reader's language (BR-CAL-002).</summary>
+        public static string Category(CalendarEventCategory category, bool isRtl) => category switch
+        {
+            CalendarEventCategory.National => isRtl ? "وطني" : "National",
+            CalendarEventCategory.Religious => isRtl ? "ديني" : "Religious",
+            CalendarEventCategory.SchoolEvent => isRtl ? "حدث مدرسي" : "School event",
+            CalendarEventCategory.ProfessionalDay => isRtl ? "يوم مهني" : "Professional day",
+            _ => category.ToString(),
         };
     }
 

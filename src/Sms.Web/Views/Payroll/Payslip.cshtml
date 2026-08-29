@@ -1,0 +1,175 @@
+@using System.Globalization
+@using Sms.Application.Payroll
+@using Sms.Domain.Payroll
+@model PayrollPrintViewModel<Payslip>
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var p = Model.Content;
+    var period = PayrollLabels.Period(p.PeriodYear, p.PeriodMonth, isRtl);
+    var name = isRtl ? p.Employee.NameAr : p.Employee.NameEn;
+    ViewData["Title"] = T($"Payslip — {name}", $"قسيمة راتب — {name}");
+    ViewData["Breadcrumb"] = T("Staff / Payroll / Payslip", "شؤون الموظفين / الرواتب / قسيمة الراتب");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "payslip-help",
+        Title = T("The payslip — help", "قسيمة الراتب — مساعدة"),
+        Intro = T("One employee, one month, with every figure broken out — this is the sheet handed to the person whose salary it is.", "موظف واحد وشهر واحد وكل رقم مفصّل — وهذه هي الورقة التي تُسلَّم لصاحب الراتب."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Additions raise the gross, deductions only the net", "الإضافات ترفع الإجمالي، والاستقطاعات تمس الصافي فقط"),
+                T("Anything added is inside the gross line; anything deducted, including the advance instalment, comes off below it. That is why the two halves of the sheet are separated by the gross.", "كل مضاف يقع داخل سطر الإجمالي، وكل مستقطَع — ومنه قسط السلفة — يُخصم تحته. ولهذا يفصل الإجمالي بين نصفَي الورقة.")),
+            new HelpPanelViewModel.Item(
+                T("The advance line says where the loan stands", "سطر السلفة يقول أين وصلت"),
+                T("It names the advance, which instalment this is out of how many, and what will still be owed once this one is counted — so the employee can check it against their own statement.", "يسمّي السلفة، وأيّ قسط هذا من كم، وما سيبقى مستحقاً بعد احتسابه — ليقارنه الموظف بكشفه.")),
+            new HelpPanelViewModel.Item(
+                T("A draft payslip says so", "قسيمة المسودة تقول ذلك"),
+                T("Until the payroll is marked paid the figures can still change, and the sheet carries a notice saying it. Print the final copy after payment is recorded.", "حتى يُسجَّل صرف المسير تبقى الأرقام قابلة للتغيير، وتحمل الورقة تنبيهاً بذلك. اطبع النسخة النهائية بعد تسجيل الصرف.")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@T("Payslip", "قسيمة الراتب")</h1>
+        <p class="text-muted mb-0">@name &middot; @period</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Run" asp-route-id="@p.RunId">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to payroll", "عودة إلى المسير")
+        </a>
+        <a class="btn btn-sm btn-outline-secondary" asp-action="AdvanceStatement" asp-route-employeeId="@p.Employee.EmployeeId">
+            <i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Advance statement", "كشف السلف")
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="sms-card mx-auto" style="max-width:46rem">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@(isRtl ? Model.SchoolNameAr : Model.SchoolNameEn)</h2>
+        <p class="h6 mb-1">@T("Payslip", "قسيمة راتب")</p>
+        <p class="text-muted small mb-0">
+            @period &middot; <code>@p.RunNo</code> &middot;
+            <span class="badge @PayrollLabels.RunStatusBadge(p.RunStatus)">@PayrollLabels.RunStatus(p.RunStatus, isRtl)</span>
+        </p>
+    </header>
+
+    @if (p.RunStatus != PayrollRunStatus.Paid)
+    {
+        <div class="alert alert-warning py-2 small" role="alert">
+            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+            @T("This payroll has not been paid yet — the figures below can still change.", "لم يُصرف هذا المسير بعد، والأرقام أدناه قابلة للتغيير.")
+        </div>
+    }
+
+    <dl class="row mb-4">
+        <dt class="col-sm-4 text-muted small">@T("Employee", "الموظف")</dt>
+        <dd class="col-sm-8">@name</dd>
+
+        <dt class="col-sm-4 text-muted small">@T("Employee no", "الرقم الوظيفي")</dt>
+        <dd class="col-sm-8"><code>@p.Employee.EmployeeNo</code></dd>
+
+        <dt class="col-sm-4 text-muted small">@T("Payment date", "تاريخ الصرف")</dt>
+        <dd class="col-sm-8">@p.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+
+        <dt class="col-sm-4 text-muted small">@T("Paid to", "مصروف إلى")</dt>
+        <dd class="col-sm-8">
+            @if (string.IsNullOrWhiteSpace(p.BankAccountNo))
+            {
+                <span class="text-muted">@T("No bank account on file", "لا يوجد حساب بنكي مسجّل")</span>
+            }
+            else
+            {
+                @p.BankName<text> </text><span dir="ltr"><code>@p.BankAccountNo</code></span>
+            }
+        </dd>
+    </dl>
+
+    <table class="table sms-table table-sm align-middle mb-0">
+        <caption class="visually-hidden">@T("Pay components for this month", "مكوّنات الراتب لهذا الشهر")</caption>
+        <thead>
+            <tr>
+                <th scope="col">@T("Item", "البند")</th>
+                <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>@T("Basic salary", "الراتب الأساسي")</td>
+                <td class="text-end" dir="ltr">@PayrollLabels.Money(p.BasicSalary)</td>
+            </tr>
+            <tr>
+                <td>@T("Allowances", "البدلات")</td>
+                <td class="text-end" dir="ltr">@PayrollLabels.Money(p.Allowances)</td>
+            </tr>
+
+            @foreach (var a in p.Adjustments.Where(a => a.Kind == PayrollAdjustmentKind.Addition))
+            {
+                <tr class="text-success">
+                    <td>@a.Description <span class="badge bg-success">@PayrollLabels.AdjustmentKind(a.Kind, isRtl)</span></td>
+                    <td class="text-end" dir="ltr">@PayrollLabels.Money(a.Amount)</td>
+                </tr>
+            }
+
+            <tr class="fw-semibold border-top">
+                <td>@T("Gross pay", "إجمالي الراتب")</td>
+                <td class="text-end" dir="ltr">@PayrollLabels.Money(p.GrossPay)</td>
+            </tr>
+
+            @foreach (var a in p.Adjustments.Where(a => a.Kind == PayrollAdjustmentKind.Deduction))
+            {
+                <tr class="text-danger">
+                    <td>@a.Description <span class="badge bg-warning text-dark">@PayrollLabels.AdjustmentKind(a.Kind, isRtl)</span></td>
+                    <td class="text-end" dir="ltr">−@PayrollLabels.Money(a.Amount)</td>
+                </tr>
+            }
+
+            @foreach (var i in p.AdvanceInstallments)
+            {
+                <tr class="text-danger">
+                    <td>
+                        @T("Advance instalment", "قسط سلفة") <code>@i.AdvanceNo</code>
+                        <span class="text-muted small">
+                            (@T($"instalment {i.SequenceNo} of {i.InstallmentCount}", $"القسط {i.SequenceNo} من {i.InstallmentCount}") &middot;
+                            @T("remaining after this", "المتبقي بعده"): <span dir="ltr">@PayrollLabels.Money(i.RemainingAfterThis)</span>)
+                        </span>
+                    </td>
+                    <td class="text-end" dir="ltr">−@PayrollLabels.Money(i.Amount)</td>
+                </tr>
+            }
+
+            @if (p.DeductionsTotal == 0m && p.AdvanceDeduction == 0m)
+            {
+                <tr class="text-muted">
+                    <td colspan="2" class="small">@T("No deductions this month.", "لا توجد استقطاعات هذا الشهر.")</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr class="fw-bold fs-6 border-top">
+                <td>@T("Net pay", "صافي الراتب")</td>
+                <td class="text-end" dir="ltr">@PayrollLabels.Money(p.NetPay)</td>
+            </tr>
+        </tfoot>
+    </table>
+
+    @if (!string.IsNullOrWhiteSpace(p.Notes))
+    {
+        <p class="small text-muted mt-3 mb-0"><strong>@T("Note", "ملاحظة"):</strong> @p.Notes</p>
+    }
+
+    <div class="row mt-5 text-center small">
+        <div class="col"><div class="border-top pt-2 mx-4">@T("Employee signature", "توقيع الموظف")</div></div>
+        <div class="col"><div class="border-top pt-2 mx-4">@T("Accountant", "المحاسب")</div></div>
+    </div>
+
+    <p class="text-muted small mt-4 mb-0">
+        @T("Printed", "طُبع"): @Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC
+    </p>
+</div>

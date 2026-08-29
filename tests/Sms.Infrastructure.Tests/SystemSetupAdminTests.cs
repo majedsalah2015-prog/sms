@@ -70,7 +70,7 @@ namespace Sms.Infrastructure.Tests
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
         }
 
-        private SystemSetupAdmin CreateAdmin(AppDbContext db) => new(db, _tenant, _clock, _user, _audit, new NotificationPublisher(db));
+        private SystemSetupAdmin CreateAdmin(AppDbContext db) => new(db, _tenant, _clock, _user, _audit, new NotificationPublisher(db, new TestAddressBook()));
 
         private static CountryPackDefinition Ksa(decimal vat = 0.15m) => new(
             "KSA-01", "السعودية", "Saudi Arabia", "SA", "SAR", "Arab Standard Time", vat, true,

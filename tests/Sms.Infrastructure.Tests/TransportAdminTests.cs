@@ -147,7 +147,7 @@ namespace Sms.Infrastructure.Tests
         private TransportAdmin CreateAdmin(AppDbContext db)
         {
             var issuer = new NumberIssuer(db, _tenant, _tenant, _clock);
-            return new TransportAdmin(db, issuer, _clock, _audit, _tenant, new FeeAdmin(db, issuer, _clock), new NotificationPublisher(db));
+            return new TransportAdmin(db, issuer, _clock, _audit, _tenant, new FeeAdmin(db, issuer, _clock), new NotificationPublisher(db, new TestAddressBook()));
         }
 
         private async Task<(Bus Bus, TransportStaff Driver)> RoadworthyBusAsync(TransportAdmin admin, int capacity = 30)

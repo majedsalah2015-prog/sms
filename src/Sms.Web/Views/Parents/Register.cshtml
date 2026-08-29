@@ -36,6 +36,12 @@
                     <div class="col-md-3"><label class="form-label small" asp-for="PrimaryMobile">@T("Primary mobile", "الجوال الأساسي") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="PrimaryMobile" class="form-control form-control-sm" dir="ltr" placeholder="05xxxxxxxx" required aria-required="true" /><span asp-validation-for="PrimaryMobile" class="text-danger small"></span></div>
                     <div class="col-md-4"><label class="form-label small" asp-for="Email">@T("Email", "البريد")</label><input asp-for="Email" type="email" class="form-control form-control-sm" dir="ltr" /></div>
                     <div class="col-md-3"><label class="form-label small" asp-for="OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input asp-for="OccupationEmployer" class="form-control form-control-sm" /></div>
+                    <div class="col-md-3"><label class="form-label small" asp-for="EducationLookupId">@T("Education level", "المؤهل العلمي")</label>
+                        <select asp-for="EducationLookupId" class="form-select form-select-sm">
+                            <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
+                            @foreach (var e in Model.EducationLevels) { <option value="@e.Id" selected="@(e.Id == Model.EducationLookupId)">@(isRtl ? e.Ar : e.En)</option> }
+                        </select>
+                    </div>
                     <div class="col-md-2"><label class="form-label small" asp-for="PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select asp-for="PreferredLanguage" class="form-select form-select-sm"><option value="ar">العربية</option><option value="en">English</option></select></div>
                     <div class="col-12"><label class="form-label small" asp-for="Address">@T("Address", "العنوان")</label><input asp-for="Address" class="form-control form-control-sm" placeholder="@T("street, building, landmark", "الشارع والعمارة وعلامة مميزة")" /></div>
                 </div>

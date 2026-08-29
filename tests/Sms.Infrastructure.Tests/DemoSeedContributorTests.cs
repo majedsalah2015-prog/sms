@@ -96,7 +96,7 @@ namespace Sms.Infrastructure.Tests
         public void Dispose() => _connection.Dispose();
 
         private SystemSetupAdmin CreateSetupAdmin(AppDbContext db, AuditContext audit) =>
-            new(db, _tenant, _clock, _user, audit, new NotificationPublisher(db));
+            new(db, _tenant, _clock, _user, audit, new NotificationPublisher(db, new TestAddressBook()));
 
         private AppDbContext CreateContext(AuditContext audit)
         {

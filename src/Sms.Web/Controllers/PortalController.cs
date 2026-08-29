@@ -158,7 +158,7 @@ namespace Sms.Web.Controllers
             var photoId = await _db.Students.AsNoTracking()
                 .Where(s => s.Id == id).Select(s => s.PhotoAttachmentId).SingleOrDefaultAsync();
             var photo = await _photos.ReadAsync(photoId, HttpContext.RequestAborted);
-            return photo == null ? NotFound() : File(photo.Value.Content, photo.Value.ContentType);
+            return photo == null ? NotFound() : File(photo.Content, photo.ContentType);
         }
 
         // ================================================================== My statement (BR-SEC-013: re-auth after 15 idle minutes)

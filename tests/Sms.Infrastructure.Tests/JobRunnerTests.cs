@@ -323,7 +323,7 @@ namespace Sms.Infrastructure.Tests
             var configAdmin = new NotificationConfigAdmin(db);
             await configAdmin.DefineTemplateAsync("Test.Event", NotificationChannel.InApp, null, null, "ar", "en");
             await configAdmin.DefineSubscriptionRuleAsync("Test.Event", NotificationChannel.InApp, NotificationTiming.Immediate, isEnabled: true);
-            await new NotificationPublisher(db).PublishAsync(
+            await new NotificationPublisher(db, new TestAddressBook()).PublishAsync(
                 "Test.Event",
                 new[] { new NotificationRecipient(account.Id, "en") },
                 new Dictionary<string, string>());

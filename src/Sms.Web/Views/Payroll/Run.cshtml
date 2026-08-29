@@ -1,0 +1,386 @@
+@using System.Globalization
+@using Sms.Domain.Payroll
+@model PayrollRunViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var period = PayrollLabels.Period(Model.PeriodYear, Model.PeriodMonth, isRtl);
+    ViewData["Title"] = T($"Payroll — {period}", $"مسير الرواتب — {period}");
+    ViewData["Breadcrumb"] = T("Staff / Payroll", "شؤون الموظفين / الرواتب");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "run-help",
+        Title = T("This payroll — help", "هذا المسير — مساعدة"),
+        Intro = T("Everything on a draft can be changed. Approving freezes it; recording the payment closes it for good and recovers the advance instalments it carries.", "كل ما في المسودة قابل للتعديل. والاعتماد يجمّدها، وتسجيل الصرف يغلقها نهائياً ويستقطع أقساط السلف المحمولة فيها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Regenerating discards adjustments", "إعادة الإنشاء تُلغي البنود اليدوية"),
+                T("Rebuilding the lines from the contracts throws away every addition and deduction entered by hand, along with the lines that carried them. It is a regeneration, not a merge.", "إعادة بناء البنود من العقود تُلغي كل إضافة واستقطاع أُدخلا يدوياً مع البنود التي تحملهما. فهي إعادة إنشاء لا دمج.")),
+            new HelpPanelViewModel.Item(
+                T("Net can never go below zero", "الصافي لا ينزل تحت الصفر"),
+                T("A payroll cannot be approved while any employee's deductions exceed their pay. Reduce the deduction, or waive that month's advance instalment on the advance itself.", "لا يُعتمد المسير ما دامت استقطاعات أي موظف تتجاوز راتبه. خفّض الاستقطاع، أو أعفِ قسط السلفة لذلك الشهر من شاشة السلفة نفسها.")),
+            new HelpPanelViewModel.Item(
+                T("Advance instalments are recovered on payment", "أقساط السلف تُستقطع عند الصرف"),
+                T("The instalment shown against each employee is a plan until the payroll is marked paid. That step is what writes it against their advance and settles an advance whose last instalment has gone.", "القسط الظاهر أمام كل موظف يبقى خطة حتى يُسجَّل صرف المسير. وتلك الخطوة هي التي تقيّده على سلفته وتُسدِّد السلفة التي ذهب آخر أقساطها.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">
+            @period
+            <span class="badge @PayrollLabels.RunStatusBadge(Model.Status) align-middle">@PayrollLabels.RunStatus(Model.Status, isRtl)</span>
+        </h1>
+        <p class="text-muted mb-0">
+            <code>@Model.RunNo</code> &middot;
+            @T("payment date", "تاريخ الصرف"): @Model.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("All months", "كل الأشهر")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_PayrollNav" />
+
+@if (Model.HasUnpayableLines)
+{
+    <div class="alert alert-danger py-2" role="alert">
+        <i class="bi bi-exclamation-octagon me-1" aria-hidden="true"></i>
+        @T("Some employees' deductions exceed their pay. The rows are marked below; this payroll cannot be approved until every net is zero or more.", "استقطاعات بعض الموظفين تتجاوز رواتبهم. البنود المعنية مميّزة أدناه، ولا يمكن اعتماد المسير حتى يصبح كل صافٍ صفراً أو أكثر.")
+    </div>
+}
+
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="sms-card h-100">
+            <h2 class="h6 mb-3">@T("Totals", "الإجماليات")</h2>
+            <div class="row text-center g-2">
+                <div class="col">
+                    <div class="text-muted small">@T("Employees", "الموظفون")</div>
+                    <div class="fs-5 fw-semibold">@Model.Lines.Count</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Gross", "الإجمالي")</div>
+                    <div class="fs-5" dir="ltr">@PayrollLabels.Money(Model.TotalGross)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Deductions", "الاستقطاعات")</div>
+                    <div class="fs-5" dir="ltr">@PayrollLabels.Money(Model.TotalDeductions)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Advances", "أقساط السلف")</div>
+                    <div class="fs-5" dir="ltr">@PayrollLabels.Money(Model.TotalAdvanceDeduction)</div>
+                </div>
+                <div class="col">
+                    <div class="text-muted small">@T("Net payable", "الصافي المستحق")</div>
+                    <div class="fs-5 fw-bold text-success" dir="ltr">@PayrollLabels.Money(Model.TotalNet)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="sms-card h-100">
+            <h2 class="h6 mb-3">@T("Statements", "الكشوفات")</h2>
+            <div class="d-grid gap-2">
+                <a class="btn btn-sm btn-outline-primary" asp-action="Register" asp-route-id="@Model.Id">
+                    <i class="bi bi-table me-1" aria-hidden="true"></i>@T("Monthly register", "مسير الرواتب الشهري")
+                </a>
+                <a class="btn btn-sm btn-outline-primary" asp-action="BankTransfer" asp-route-id="@Model.Id">
+                    <i class="bi bi-bank me-1" aria-hidden="true"></i>@T("Bank transfer list", "كشف التحويل البنكي")
+                </a>
+                <a class="btn btn-sm btn-outline-secondary" asp-action="RegisterCsv" asp-route-id="@Model.Id">
+                    <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>@T("Register as CSV", "المسير كملف CSV")
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="sms-card mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+        @if (Model.IsEditable)
+        {
+            <form method="post" asp-action="Generate" asp-route-id="@Model.Id"
+                  onsubmit="return confirm('@T("Rebuilding the lines discards every hand-entered addition and deduction on this payroll. Continue?", "إعادة بناء البنود تُلغي كل إضافة واستقطاع أُدخلا يدوياً في هذا المسير. هل تريد المتابعة؟")');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>
+                    @(Model.Lines.Count == 0 ? T("Generate lines", "إنشاء البنود") : T("Rebuild from contracts", "إعادة البناء من العقود"))
+                </button>
+            </form>
+
+            <form method="post" asp-action="Approve" asp-route-id="@Model.Id" class="d-inline">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-success" @(Model.Lines.Count == 0 ? "disabled" : null)>
+                    <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Approve", "اعتماد")
+                </button>
+            </form>
+
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse"
+                    data-bs-target="#run-details" aria-expanded="false" aria-controls="run-details">
+                <i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Payment date &amp; notes", "تاريخ الصرف والملاحظات")
+            </button>
+
+            <form method="post" asp-action="Cancel" asp-route-id="@Model.Id" class="d-inline ms-auto"
+                  onsubmit="return confirm('@T("Cancel this payroll? Its number is kept and the month becomes free again.", "إلغاء هذا المسير؟ يبقى رقمه محفوظاً ويعود الشهر متاحاً.")');">
+                @Html.AntiForgeryToken()
+                <input type="text" name="reason" class="form-control form-control-sm d-inline-block w-auto" maxlength="500"
+                       placeholder="@T("Reason (optional)", "السبب (اختياري)")" aria-label="@T("Cancellation reason", "سبب الإلغاء")" />
+                <button type="submit" class="btn btn-sm btn-outline-danger">@T("Cancel payroll", "إلغاء المسير")</button>
+            </form>
+        }
+        else if (Model.Status == PayrollRunStatus.Approved)
+        {
+            <form method="post" asp-action="MarkPaid" asp-route-id="@Model.Id" class="d-flex gap-2 align-items-end">
+                @Html.AntiForgeryToken()
+                <div>
+                    <label for="paid-on" class="form-label small text-muted mb-0">@T("Paid on", "تاريخ الصرف")</label>
+                    <input type="date" id="paid-on" name="paidOn" class="form-control form-control-sm" required
+                           value="@Model.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                </div>
+                <button type="submit" class="btn btn-sm btn-success">
+                    <i class="bi bi-cash-stack me-1" aria-hidden="true"></i>@T("Record payment", "تسجيل الصرف")
+                </button>
+            </form>
+
+            <form method="post" asp-action="Reopen" asp-route-id="@Model.Id" class="d-inline ms-auto">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Reopen as draft", "إعادة إلى المسودة")
+                </button>
+            </form>
+        }
+        else if (Model.Status == PayrollRunStatus.Paid)
+        {
+            <p class="mb-0 text-success">
+                <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>
+                @T("Paid and closed. The advance instalments this payroll carried have been recovered.", "مصروف ومغلق. وقد استُقطعت أقساط السلف التي حملها هذا المسير.")
+            </p>
+        }
+        else
+        {
+            <p class="mb-0 text-danger">
+                <i class="bi bi-x-circle-fill me-1" aria-hidden="true"></i>
+                @T("Cancelled. Its month is free for another payroll.", "ملغى. وشهره متاح لمسير آخر.")
+            </p>
+        }
+    </div>
+
+    @if (Model.IsEditable)
+    {
+        <div class="collapse mt-3" id="run-details">
+            <form method="post" asp-action="UpdateRun" asp-route-id="@Model.Id" class="row g-2 align-items-end border-top pt-3">
+                @Html.AntiForgeryToken()
+                <div class="col-md-3">
+                    <label for="run-payment-date" class="form-label small text-muted mb-0">@T("Intended payment date", "تاريخ الصرف المتوقع")</label>
+                    <input type="date" id="run-payment-date" name="paymentDate" class="form-control form-control-sm" required
+                           value="@Model.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                </div>
+                <div class="col-md-7">
+                    <label for="run-notes-edit" class="form-label small text-muted mb-0">@T("Notes", "ملاحظات")</label>
+                    <input type="text" id="run-notes-edit" name="notes" maxlength="500" class="form-control form-control-sm" value="@Model.Notes" />
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">@T("Save", "حفظ")</button>
+                </div>
+            </form>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.Notes))
+    {
+        <p class="small text-muted mt-3 mb-0"><strong>@T("Notes", "ملاحظات"):</strong> @Model.Notes</p>
+    }
+</div>
+
+<div class="sms-card">
+    <h2 class="h6 mb-3">@T("Employees on this payroll", "الموظفون في هذا المسير")</h2>
+
+    @if (Model.Lines.Count == 0)
+    {
+        <p class="text-muted mb-0">
+            @T("Nothing on this payroll yet. Generate the lines to bring in everyone holding an active contract for the month.", "لا يوجد شيء في هذا المسير بعد. أنشئ البنود لإدراج كل من يحمل عقداً سارياً في هذا الشهر.")
+        </p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table sms-table align-middle">
+                <caption class="visually-hidden">@T("Payroll lines with pay components and net", "بنود المسير مع مكوّنات الراتب والصافي")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">@T("Employee", "الموظف")</th>
+                        <th scope="col" class="text-end">@T("Basic", "الأساسي")</th>
+                        <th scope="col" class="text-end">@T("Allowances", "البدلات")</th>
+                        <th scope="col" class="text-end">@T("Additions", "الإضافات")</th>
+                        <th scope="col" class="text-end">@T("Deductions", "الاستقطاعات")</th>
+                        <th scope="col" class="text-end">@T("Advance", "قسط السلفة")</th>
+                        <th scope="col" class="text-end">@T("Net", "الصافي")</th>
+                        <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var line in Model.Lines)
+                    {
+                        <tr class="@(line.IsUnpayable ? "table-danger" : null)">
+                            <td>
+                                <div class="fw-semibold">@line.Name</div>
+                                <div class="small text-muted"><code>@line.EmployeeNo</code></div>
+                                @if (line.Adjustments.Count > 0)
+                                {
+                                    <ul class="list-unstyled small mb-0 mt-1">
+                                        @foreach (var a in line.Adjustments)
+                                        {
+                                            <li class="d-flex align-items-center gap-1">
+                                                <span class="badge @(a.Kind == PayrollAdjustmentKind.Addition ? "bg-success" : "bg-warning text-dark")">@PayrollLabels.AdjustmentKind(a.Kind, isRtl)</span>
+                                                <span>@a.Description</span>
+                                                <span dir="ltr">@PayrollLabels.Money(a.Amount)</span>
+                                                @if (Model.IsEditable)
+                                                {
+                                                    <form method="post" asp-action="RemoveAdjustment" asp-route-id="@Model.Id" asp-route-adjustmentId="@a.Id" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0 lh-1"
+                                                                title="@T("Remove this adjustment", "حذف هذا البند")">
+                                                            <i class="bi bi-x-circle" aria-hidden="true"></i>
+                                                            <span class="visually-hidden">@T($"Remove {a.Description}", $"حذف {a.Description}")</span>
+                                                        </button>
+                                                    </form>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                            </td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.BasicSalary)</td>
+                            <td class="text-end" dir="ltr">@PayrollLabels.Money(line.Allowances)</td>
+                            <td class="text-end text-success" dir="ltr">@PayrollLabels.Money(line.AdditionsTotal)</td>
+                            <td class="text-end text-danger" dir="ltr">@PayrollLabels.Money(line.DeductionsTotal)</td>
+                            <td class="text-end text-danger" dir="ltr">@PayrollLabels.Money(line.AdvanceDeduction)</td>
+                            <td class="text-end fw-bold" dir="ltr">@PayrollLabels.Money(line.NetPay)</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Payslip" asp-route-lineId="@line.LineId">
+                                    <i class="bi bi-receipt" aria-hidden="true"></i>
+                                    <span class="visually-hidden">@T("Payslip", "قسيمة الراتب")</span>
+                                </a>
+                                @if (Model.IsEditable)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse"
+                                            data-bs-target="#adj-@line.LineId" aria-expanded="false" aria-controls="adj-@line.LineId">
+                                        <i class="bi bi-plus-slash-minus" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@T("Adjust", "تعديل")</span>
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+
+                        @if (Model.IsEditable)
+                        {
+                            <tr class="collapse" id="adj-@line.LineId">
+                                <td colspan="8" class="bg-light">
+                                    <div class="row g-3">
+                                        <div class="col-lg-7">
+                                            <form method="post" asp-action="AddAdjustment" asp-route-id="@Model.Id" class="row g-2 align-items-end">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="LineId" value="@line.LineId" />
+                                                <div class="col-3">
+                                                    <label class="form-label small text-muted mb-0" for="kind-@line.LineId">@T("Kind", "النوع")</label>
+                                                    <select id="kind-@line.LineId" name="Kind" class="form-select form-select-sm">
+                                                        <option value="@((int)PayrollAdjustmentKind.Addition)">@PayrollLabels.AdjustmentKind(PayrollAdjustmentKind.Addition, isRtl)</option>
+                                                        <option value="@((int)PayrollAdjustmentKind.Deduction)">@PayrollLabels.AdjustmentKind(PayrollAdjustmentKind.Deduction, isRtl)</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-5">
+                                                    <label class="form-label small text-muted mb-0" for="desc-@line.LineId">@T("Description", "البيان")</label>
+                                                    <input type="text" id="desc-@line.LineId" name="Description" maxlength="200" required class="form-control form-control-sm" />
+                                                </div>
+                                                <div class="col-2">
+                                                    <label class="form-label small text-muted mb-0" for="amt-@line.LineId">@T("Amount", "المبلغ")</label>
+                                                    <input type="number" id="amt-@line.LineId" name="Amount" step="0.01" min="0.01" required class="form-control form-control-sm" dir="ltr" />
+                                                </div>
+                                                <div class="col-2">
+                                                    <button type="submit" class="btn btn-sm btn-primary w-100">@T("Add", "إضافة")</button>
+                                                </div>
+                                            </form>
+
+                                            @if (line.Adjustments.Count > 0)
+                                            {
+                                                <p class="small text-muted mt-2 mb-0">
+                                                    @T("Remove an adjustment with the × beside it in the employee column, or rebuild the payroll to clear them all.", "احذف البند بعلامة × المجاورة له في عمود الموظف، أو أعد بناء المسير لمسحها جميعاً.")
+                                                </p>
+                                            }
+                                        </div>
+                                        <div class="col-lg-5">
+                                            <form method="post" asp-action="SetLineNotes" asp-route-id="@Model.Id" asp-route-lineId="@line.LineId" class="row g-2 align-items-end">
+                                                @Html.AntiForgeryToken()
+                                                <div class="col-9">
+                                                    <label class="form-label small text-muted mb-0" for="note-@line.LineId">@T("Payslip note", "ملاحظة على القسيمة")</label>
+                                                    <input type="text" id="note-@line.LineId" name="notes" maxlength="300" class="form-control form-control-sm" value="@line.Notes" />
+                                                </div>
+                                                <div class="col-3">
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">@T("Save", "حفظ")</button>
+                                                </div>
+                                            </form>
+
+                                            <form method="post" asp-action="RemoveLine" asp-route-id="@Model.Id" asp-route-lineId="@line.LineId" class="mt-2"
+                                                  onsubmit="return confirm('@T("Take this employee off the payroll?", "إزالة هذا الموظف من المسير؟")');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-person-dash me-1" aria-hidden="true"></i>@T("Remove from payroll", "إزالة من المسير")
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td>@T("Total", "الإجمالي")</td>
+                        <td colspan="4"></td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(Model.TotalAdvanceDeduction)</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(Model.TotalNet)</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    }
+
+    @if (Model.IsEditable && Model.Candidates.Count > 0)
+    {
+        <hr />
+        <h3 class="h6 mb-2">@T("Add an employee by hand", "إضافة موظف يدوياً")</h3>
+        <p class="small text-muted">
+            @T("For someone the contract query missed. If no active contract covers the month, enter the basic and allowances here — otherwise leave them blank and the contract is read.", "لمن لم تشمله العقود. إن لم يوجد عقد ساري يغطي الشهر فأدخل الأساسي والبدلات هنا، وإلا فاتركهما فارغين ليُقرأ العقد.")
+        </p>
+        <form method="post" asp-action="AddLine" asp-route-id="@Model.Id" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-5">
+                <label for="add-employee" class="form-label small text-muted mb-0">@T("Employee", "الموظف")</label>
+                <select id="add-employee" name="employeeId" class="form-select form-select-sm" required>
+                    @foreach (var c in Model.Candidates)
+                    {
+                        <option value="@c.EmployeeId">@c.EmployeeNo — @c.Name @(c.HasActiveContract ? "" : T("(no contract)", "(بلا عقد)"))</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="add-basic" class="form-label small text-muted mb-0">@T("Basic (optional)", "الأساسي (اختياري)")</label>
+                <input type="number" id="add-basic" name="basicSalary" step="0.01" min="0" class="form-control form-control-sm" dir="ltr" />
+            </div>
+            <div class="col-md-3">
+                <label for="add-allow" class="form-label small text-muted mb-0">@T("Allowances (optional)", "البدلات (اختياري)")</label>
+                <input type="number" id="add-allow" name="allowances" step="0.01" min="0" class="form-control form-control-sm" dir="ltr" />
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">@T("Add", "إضافة")</button>
+            </div>
+        </form>
+    }
+</div>

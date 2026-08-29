@@ -14,9 +14,22 @@ namespace Sms.Web.Models
 
     public sealed class StudentListViewModel
     {
-        public sealed record Row(Student Student, string? GradeName, string? SectionName, string? PrimaryParent, string NationalityName);
+        /// <summary>
+        /// Nationality was a column here until 2026-08-26 (owner request). It stays on the record
+        /// and on the file — certificates and ministry returns read it — but a directory row is
+        /// read to find and reach a child, and a nationality answers neither question. The
+        /// student's own mobile took the width instead.
+        /// </summary>
+        public sealed record Row(Student Student, string? GradeName, string? SectionName, string? PrimaryParent);
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
+
+        /// <summary>
+        /// Whether to offer the placement screen from a row (BR-SEC-010 — the button disappears
+        /// rather than refusing). It opens on the student file's own View right, and what can be
+        /// done there is gated again by the two rights that screen's forms carry.
+        /// </summary>
+        public bool CanPlace { get; set; }
 
         public string? Query { get; set; }
 
@@ -63,24 +76,12 @@ namespace Sms.Web.Models
 
         public string? Reason { get; set; }
 
-        // ---- mother's particulars + social profile (owner request, 2026-08-21) ----
+        // ---- social profile ----
         // Nullable throughout: this is a section a registrar fills over time, often from a document
         // that arrives after the student does. A required field here would block registration on
-        // paperwork the school does not have yet.
-
-        public string? MotherName { get; set; }
-
-        public string? MotherNationalId { get; set; }
-
-        public string? MotherOccupation { get; set; }
-
-        public int? MotherEducationLookupId { get; set; }
-
-        public string? MotherMobile { get; set; }
-
-        public ParentLifeStatus? FatherStatus { get; set; }
-
-        public ParentLifeStatus? MotherStatus { get; set; }
+        // paperwork the school does not have yet. The mother's own particulars left this form on
+        // 2026-08-24 (owner request), and the father's and mother's life status with them — all of it
+        // is guardian data now, edited on each parent's own file as Parent.LifeStatus.
 
         public Religion? Religion { get; set; }
 
@@ -95,6 +96,12 @@ namespace Sms.Web.Models
         public int? FamilySize { get; set; }
 
         public int? BirthOrder { get; set; }
+
+        /// <summary>عدد الأخوة — the child's brothers and sisters, not the household size above.</summary>
+        public int? SiblingCount { get; set; }
+
+        /// <summary>The student's own line; the family's numbers live on each guardian's file.</summary>
+        public string? Mobile { get; set; }
 
         // register-time extras
         public int? GradeYearProfileId { get; set; }
@@ -140,7 +147,10 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<Parent> Parents { get; set; } = Array.Empty<Parent>();
 
-        // ---- social profile tab ----
+        // ---- guardians tab ----
+        //
+        // Read-only here: a guardian's qualification is named on the student file so the registrar can
+        // see it beside the child, and edited on the parent file, which is the one place it lives.
 
         public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
 
@@ -156,6 +166,9 @@ namespace Sms.Web.Models
 
         public IReadOnlyDictionary<string, int> ReadThroughCounts { get; set; } = new Dictionary<string, int>();
 
+        /// <summary>doc 10 §5: the entity documents tab, drawn by the same partial the employee file uses.</summary>
+        public EntityDocumentsViewModel Documents { get; set; } = new();
+
         public string ActiveTab { get; set; } = "personal";
 
         /// <summary>
@@ -168,6 +181,50 @@ namespace Sms.Web.Models
 
         /// <summary>False leaves the section readable and its form absent — a reader is not an editor.</summary>
         public bool CanEditSocialProfile { get; set; }
+    }
+
+    /// <summary>
+    /// One child's placement — the grade-year they are enrolled in and the section they sit in
+    /// (doc/Modules/10 §8, doc/Modules/06 §8.2, BR-SCN-005/006, BR-GLB-024).
+    /// <para>
+    /// Both halves already existed and neither could be reached from the student. Enrolling was a
+    /// form at the bottom of the file's academic tab; seating was on the section's own page, which
+    /// asks "who is in this section" and answers it with a picker of every unseated child in the
+    /// grade. Moving one student meant knowing which section they were in before you could find
+    /// them — the one fact the person asking usually does not have. This screen asks the question
+    /// from the child's end instead, and writes through the same two services.
+    /// </para>
+    /// </summary>
+    public sealed class StudentPlacementViewModel
+    {
+        /// <summary>A section of the student's own grade-year, with what is left of its seats.</summary>
+        public sealed record SectionOption(Section Section, int Members, bool IsCurrent);
+
+        public Student Student { get; set; } = null!;
+
+        /// <summary>The open enrollment (no exit date). Null = the student is registered but sits in no grade yet.</summary>
+        public Enrollment? Enrollment { get; set; }
+
+        public GradeLevel? Grade { get; set; }
+
+        public AcademicYear? Year { get; set; }
+
+        /// <summary>The open membership; null when the student is enrolled in a grade but not yet seated.</summary>
+        public SectionMembership? Membership { get; set; }
+
+        public Section? Section { get; set; }
+
+        /// <summary>Sections of <see cref="Enrollment"/>'s own grade-year only — a section of another grade is not a placement, it is a mistake.</summary>
+        public IReadOnlyList<SectionOption> Sections { get; set; } = Array.Empty<SectionOption>();
+
+        /// <summary>Grade-years available to enroll into, newest year first.</summary>
+        public IReadOnlyList<(int ProfileId, string GradeAr, string GradeEn, string YearAr, string YearEn)> Profiles { get; set; } = Array.Empty<(int, string, string, string, string)>();
+
+        /// <summary>STU/Enrollment/Create — putting the child in a grade.</summary>
+        public bool CanEnroll { get; set; }
+
+        /// <summary>SEC/Roster/Edit — seating them in a section, and moving them between sections.</summary>
+        public bool CanSeat { get; set; }
     }
 
     // ---------------------------------------------------------------- Parents (doc/Modules/11 §8)
@@ -215,6 +272,11 @@ namespace Sms.Web.Models
 
         public string? OccupationEmployer { get; set; }
 
+        /// <summary>المؤهل العلمي — the "EducationLevel" lookup category, which the student register used to draw on for the mother.</summary>
+        public int? EducationLookupId { get; set; }
+
+        public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
+
         public string PreferredLanguage { get; set; } = "ar";
 
         /// <summary>منطقة — recorded on the family, not once per child.</summary>
@@ -241,6 +303,9 @@ namespace Sms.Web.Models
 
         /// <summary>The "IdType" lookup, for the identity tab's picker.</summary>
         public IReadOnlyList<(int Id, string Ar, string En)> IdTypes { get; set; } = Array.Empty<(int, string, string)>();
+
+        /// <summary>The "EducationLevel" lookup, beside it.</summary>
+        public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
 
         public IReadOnlyList<Parent> PossibleDuplicates { get; set; } = Array.Empty<Parent>();
 

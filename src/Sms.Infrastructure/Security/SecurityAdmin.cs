@@ -208,17 +208,50 @@ namespace Sms.Infrastructure.Security
 
         // ------------------------------------------------------------------ assignments
 
+        /// <summary>
+        /// Who holds which role. Each row carries the person behind the account, and the search
+        /// matches them: an administrator looking for a colleague types the name on their door or
+        /// the number on their file, not <c>emp-1042</c>.
+        /// <para>
+        /// The search runs in memory because it spans four tables — <c>sec.UserAccount</c> and the
+        /// three people registers it points into — and no single SQL predicate reaches across them.
+        /// The role assignments are then loaded for the accounts that matched, so typing narrows the
+        /// expensive half of the query rather than only the cheap one.
+        /// </para>
+        /// <para>
+        /// <paramref name="includeInactive"/> lifts the soft-active filter, and with it every other
+        /// filter on the query — so the school scope it would otherwise inherit is restated here
+        /// (ADR-2, BR-GLB-010), exactly as <c>UserAccountAdmin.Accounts()</c> does.
+        /// </para>
+        /// </summary>
         public async Task<IReadOnlyList<UserRoleSummary>> ListUserRolesAsync(
-            string? search = null, CancellationToken cancellationToken = default)
+            string? search = null, bool includeInactive = false, CancellationToken cancellationToken = default)
         {
-            var accounts = _db.UserAccounts.AsNoTracking();
+            var accounts = includeInactive
+                ? _db.UserAccounts.IgnoreQueryFilters().Where(u => u.SchoolId == _db.CurrentSchoolId)
+                : _db.UserAccounts;
+
+            var users = await accounts.AsNoTracking()
+                .OrderBy(u => u.UserName)
+                .ToListAsync(cancellationToken);
+
+            var people = await AccountPeople.LoadAsync(_db, users, cancellationToken);
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var term = search.Trim();
-                accounts = accounts.Where(u => u.UserName.Contains(term));
+                users = users
+                    .Where(u =>
+                    {
+                        var person = people.Of(u);
+                        return AccountPeople.Contains(u.UserName, term)
+                               || AccountPeople.Contains(person.NameAr, term)
+                               || AccountPeople.Contains(person.NameEn, term)
+                               || AccountPeople.Contains(person.Reference, term);
+                    })
+                    .ToList();
             }
 
-            var users = await accounts.OrderBy(u => u.UserName).ToListAsync(cancellationToken);
             var userIds = users.Select(u => u.Id).ToList();
 
             var assignments = await _db.RoleAssignments.AsNoTracking()
@@ -227,14 +260,19 @@ namespace Sms.Infrastructure.Security
                 .ToListAsync(cancellationToken);
 
             return users
-                .Select(u => new UserRoleSummary(
-                    u.Id, u.UserName, u.AccountType, u.IsActive,
-                    assignments
-                        .Where(a => a.UserAccountId == u.Id && a.Role != null)
-                        .Select(a => new UserRoleGrant(
-                            a.Role!.Id, a.Role.Code, a.Role.Name.NameAr, a.Role.Name.NameEn, Administers(a.Role)))
-                        .OrderBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
-                        .ToList()))
+                .Select(u =>
+                {
+                    var person = people.Of(u);
+                    return new UserRoleSummary(
+                        u.Id, u.UserName, u.AccountType, u.IsActive,
+                        person.NameAr, person.NameEn, person.Reference,
+                        assignments
+                            .Where(a => a.UserAccountId == u.Id && a.Role != null)
+                            .Select(a => new UserRoleGrant(
+                                a.Role!.Id, a.Role.Code, a.Role.Name.NameAr, a.Role.Name.NameEn, Administers(a.Role)))
+                            .OrderBy(r => r.Code, StringComparer.OrdinalIgnoreCase)
+                            .ToList());
+                })
                 .ToList();
         }
 

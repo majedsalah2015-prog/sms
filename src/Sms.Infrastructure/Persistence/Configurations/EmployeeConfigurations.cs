@@ -25,6 +25,18 @@ namespace Sms.Infrastructure.Persistence.Configurations
 
             builder.Property(x => x.PrimaryIdNo).HasMaxLength(30);
 
+            // 20 to match ppl.Student.Mobile and ppl.Parent.PrimaryMobile — the same number is
+            // often typed into more than one of them, and a length that differed between people
+            // would truncate on one screen and not the other.
+            builder.Property(x => x.Mobile).HasMaxLength(20);
+            builder.Property(x => x.WhatsAppNumber).HasMaxLength(20);
+
+            // The personal block (owner request 2026-08-27). The spouse's number matches the
+            // employee's own PrimaryIdNo length — the same kind of document, often the same issuer.
+            builder.Property(x => x.SpouseIdNo).HasMaxLength(30);
+            builder.Property(x => x.Address).HasMaxLength(250);
+            builder.Property(x => x.OriginTown).HasMaxLength(100);
+
             // Disbursement details (doc/Modules/12 §7 extension, owner request 2026-08-23).
             // Both nullable: a school importing an old register rarely has them for everyone, and
             // an employee who is paid in cash has neither. Lengths are generous rather than
@@ -32,6 +44,11 @@ namespace Sms.Infrastructure.Persistence.Configurations
             // written however the school writes it.
             builder.Property(x => x.BankName).HasMaxLength(120);
             builder.Property(x => x.BankAccountNo).HasMaxLength(40);
+
+            // The mobile wallets are keyed by a phone number today, so 20 matches the mobile above —
+            // wide enough for a country code and the punctuation people type into one anyway.
+            builder.Property(x => x.PalPayWalletNo).HasMaxLength(20);
+            builder.Property(x => x.JawwalPayWalletNo).HasMaxLength(20);
         }
     }
 
@@ -80,6 +97,13 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.TitleAr).HasMaxLength(150).IsRequired();
             builder.Property(x => x.TitleEn).HasMaxLength(150).IsRequired();
             builder.Property(x => x.InstitutionName).HasMaxLength(150);
+
+            // المعدل — held as written on the certificate, out of 4 or out of 100 (owner request
+            // 2026-08-27). No FK on the four lookup ids beside it: lookup references are loose ints
+            // throughout this model, and a real FK would make retiring a catalogue value a
+            // migration rather than a deactivation.
+            builder.Property(x => x.Gpa).HasColumnType("decimal(5,2)");
+
             builder.HasOne<Employee>().WithMany().HasForeignKey(x => x.EmployeeId);
         }
     }

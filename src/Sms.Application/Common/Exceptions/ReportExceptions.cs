@@ -9,7 +9,11 @@ namespace Sms.Application.Common.Exceptions
         public MissingRequiredParametersException(int reportDefinitionId, IReadOnlyList<string> missingKeys)
             : base($"Report {reportDefinitionId} is missing required parameters: {string.Join(", ", missingKeys)} (doc/Modules/30 §9).")
         {
+            MissingKeys = missingKeys;
         }
+
+        /// <summary>The parameter keys still to be filled in, so the screen can name them rather than only count them.</summary>
+        public IReadOnlyList<string> MissingKeys { get; }
     }
 
     /// <summary>BR-RPT-002: the runner does not hold the report's View permission — deny by default.</summary>

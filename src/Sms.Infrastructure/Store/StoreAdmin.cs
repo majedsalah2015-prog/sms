@@ -158,14 +158,14 @@ namespace Sms.Infrastructure.Store
                     var verdict = AccountChargeEvaluator.Evaluate(policy?.IsAllowed ?? false, policy?.CapPerSale, total);
                     if (!verdict.Allowed)
                     {
-                        throw new AccountChargeNotAllowedException($"category {category} disabled");
+                        throw new AccountChargeNotAllowedException(AccountChargeRefusal.CategoryDisabled, category);
                     }
 
                     if (verdict.NeedsFinanceOverride)
                     {
                         if (string.IsNullOrWhiteSpace(financeOverrideReason))
                         {
-                            throw new AccountChargeNotAllowedException($"total {total} exceeds the {category} cap — Finance (P2) override required");
+                            throw new AccountChargeNotAllowedException(AccountChargeRefusal.CapExceeded, category);
                         }
 
                         overrideReason = financeOverrideReason;
@@ -177,7 +177,7 @@ namespace Sms.Infrastructure.Store
             {
                 if (!tillSessionId.HasValue || (await _db.TillSessions.SingleAsync(s => s.Id == tillSessionId.Value, cancellationToken)).Status != TillSessionStatus.Open)
                 {
-                    throw new StoreTenderRejectedException("cash/card sales need an open till session (BR-PAY-001)");
+                    throw new StoreTenderRejectedException(StoreTenderRefusal.TillSessionNotOpen);
                 }
             }
 
@@ -186,21 +186,21 @@ namespace Sms.Infrastructure.Store
             {
                 if (!allowWalletTender || !studentId.HasValue)
                 {
-                    throw new StoreTenderRejectedException("wallet tender disabled or no student");
+                    throw new StoreTenderRejectedException(StoreTenderRefusal.WalletTenderUnavailable);
                 }
 
-                wallet = await _db.Wallets.SingleOrDefaultAsync(w => w.HolderKind == WalletHolderKind.Student && w.HolderId == studentId.Value, cancellationToken) ?? throw new StoreTenderRejectedException("no wallet");
+                wallet = await _db.Wallets.SingleOrDefaultAsync(w => w.HolderKind == WalletHolderKind.Student && w.HolderId == studentId.Value, cancellationToken) ?? throw new StoreTenderRejectedException(StoreTenderRefusal.NoWallet);
                 var balance = (await _db.WalletLedgerEntries.Where(e => e.WalletId == wallet.Id).Select(e => e.Amount).ToListAsync(cancellationToken)).Sum();
                 if (balance - total < -wallet.OverdraftAllowance)
                 {
-                    throw new StoreTenderRejectedException("insufficient wallet balance");
+                    throw new StoreTenderRejectedException(StoreTenderRefusal.InsufficientWalletBalance);
                 }
             }
 
             if (tender != StoreTender.Wallet && !studentId.HasValue)
             {
                 // Charges post against a student's payer (Module 19 model); anonymous walk-in cash needs a "walk-in" payer model - flagged, not built.
-                throw new StoreTenderRejectedException("charge-backed tenders need a student");
+                throw new StoreTenderRejectedException(StoreTenderRefusal.StudentRequired);
             }
 
             foreach (var line in lines)

@@ -1,0 +1,50 @@
+@using System.Globalization
+@using Sms.Application.Dashboards
+@model BarChartViewModel
+@*
+    A horizontal bar chart. Every bar is measured against the longest one, so the
+    shape of the distribution is what the reader sees rather than seven bars all
+    nearly full.
+
+    Rendered as a list of rows with a percentage width — no SVG. The browser
+    mirrors a percentage width under RTL by itself, the labels stay selectable
+    text that reflows on a phone, and there are no coordinates to get wrong in a
+    culture that writes its digits differently.
+*@
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var ceiling = Model.Ceiling;
+    var total = Model.Slices.Sum(s => s.Value);
+}
+
+@if (Model.Slices.Count == 0 || ceiling <= 0m)
+{
+    <p class="text-muted small mb-0">@Model.EmptyText</p>
+}
+else
+{
+    <div role="table" aria-label="@Model.Title">
+        @foreach (var slice in Model.Slices)
+        {
+            var width = ChartGeometry.BarPercent(slice.Value, ceiling);
+            var share = ChartGeometry.Percent(slice.Value, total);
+            <div class="sms-bar-row" role="row">
+                <span class="sms-bar-label" role="rowheader" title="@StatisticsLabels.Name(slice, isRtl)">@StatisticsLabels.Name(slice, isRtl)</span>
+                @*
+                    The track carries the accessible value, not the fill: a screen
+                    reader announcing "8 of 214" has said the whole row, and the
+                    fill inside it is decoration by then.
+                *@
+                <span class="sms-bar-track" role="cell"
+                      aria-valuenow="@StatisticsLabels.Value(slice.Value, Model.IsMoney)"
+                      aria-valuemin="0" aria-valuemax="@StatisticsLabels.Value(ceiling, Model.IsMoney)">
+                    <span class="sms-bar-fill" style="width:@width.ToString("0.#", CultureInfo.InvariantCulture)%"></span>
+                </span>
+                <span class="sms-bar-value" role="cell">
+                    <bdi dir="ltr">@StatisticsLabels.Value(slice.Value, Model.IsMoney)</bdi>
+                    <span class="text-muted">(<bdi dir="ltr">@share.ToString("0.#", CultureInfo.InvariantCulture)%</bdi>)</span>
+                </span>
+            </div>
+        }
+    </div>
+}

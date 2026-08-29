@@ -73,7 +73,7 @@ namespace Sms.Infrastructure.Tests
         }
 
         private SnapshotRefreshService CreateRefresher(AppDbContext db)
-            => new(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db), new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock)));
+            => new(db, _clock, new InstallmentAdmin(db, _clock, _audit, _tenant, new NotificationPublisher(db, new TestAddressBook()), new FeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock)));
 
         // ---------------------------------------------------------------- views
 

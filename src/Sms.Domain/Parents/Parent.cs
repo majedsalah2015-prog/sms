@@ -75,6 +75,23 @@ namespace Sms.Domain.Parents
 
         public string? OccupationEmployer { get; set; }
 
+        /// <summary>
+        /// المؤهل العلمي — references core.LookupValue, category "EducationLevel", the same
+        /// catalogue the student register drew on while the mother's qualification lived on
+        /// <c>Student</c> (owner request, 2026-08-24).
+        /// <para>
+        /// A lookup rather than an enum for the reason the category was created with: what counts
+        /// as a qualification is a local decision, and a school that needs "Tawjihi" where another
+        /// needs "Secondary" must be able to say so without a code change.
+        /// </para>
+        /// <para>
+        /// Not <see cref="RequiresAuditReasonAttribute"/>: a qualification is a fact being recorded,
+        /// not a decision being defended. The change is still captured field-level, because the
+        /// class is T1.
+        /// </para>
+        /// </summary>
+        public int? EducationLookupId { get; set; }
+
         /// <summary>"ar" or "en" — BR-NOT-001's recipient-language input.</summary>
         public string PreferredLanguage { get; set; } = "ar";
 

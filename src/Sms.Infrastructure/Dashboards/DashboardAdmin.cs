@@ -35,6 +35,37 @@ namespace Sms.Infrastructure.Dashboards
             return widget;
         }
 
+        public async Task UpdateWidgetAsync(
+            int widgetDefinitionId, string owningModuleCode, string titleAr, string titleEn, int requiredPermissionId,
+            WidgetRefreshClass refreshClass, string drillTargetCode, bool isPortalEligible, CancellationToken cancellationToken = default)
+        {
+            // IgnoreQueryFilters: a retired widget is still editable — fixing its permission is
+            // exactly what someone does before putting it back on a dashboard.
+            var widget = await _db.WidgetDefinitions.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(w => w.Id == widgetDefinitionId, cancellationToken)
+                ?? throw new WidgetDefinitionNotFoundException(widgetDefinitionId);
+
+            widget.OwningModuleCode = owningModuleCode;
+            widget.TitleAr = titleAr;
+            widget.TitleEn = titleEn;
+            widget.RequiredPermissionId = requiredPermissionId;
+            widget.RefreshClass = refreshClass;
+            widget.DrillTargetCode = drillTargetCode;
+            widget.IsPortalEligible = isPortalEligible;
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task SetWidgetActiveAsync(int widgetDefinitionId, bool isActive, CancellationToken cancellationToken = default)
+        {
+            var widget = await _db.WidgetDefinitions.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(w => w.Id == widgetDefinitionId, cancellationToken)
+                ?? throw new WidgetDefinitionNotFoundException(widgetDefinitionId);
+
+            widget.IsActive = isActive;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<LayoutTemplate> DefineLayoutTemplateAsync(int roleId, CancellationToken cancellationToken = default)
         {
             var template = new LayoutTemplate { RoleId = roleId };

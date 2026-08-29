@@ -59,8 +59,17 @@ namespace Sms.Application.Security
         Task SetRolePermissionsAsync(
             int roleId, IReadOnlyCollection<PermissionKey> granted, CancellationToken cancellationToken = default);
 
-        /// <summary>Staff accounts and the roles each one holds.</summary>
-        Task<IReadOnlyList<UserRoleSummary>> ListUserRolesAsync(string? search = null, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Accounts and the roles each one holds. <paramref name="search"/> matches the user name,
+        /// the person's name in either language, and the file number they are registered under.
+        /// <para>
+        /// <paramref name="includeInactive"/> reads past the soft-active filter. Off by default,
+        /// because the everyday question here is who can reach what today; on, it is the only place
+        /// in the product that shows a deactivated account at all.
+        /// </para>
+        /// </summary>
+        Task<IReadOnlyList<UserRoleSummary>> ListUserRolesAsync(
+            string? search = null, bool includeInactive = false, CancellationToken cancellationToken = default);
 
         /// <summary>Idempotent: an assignment that exists but was revoked is reactivated rather than duplicated.</summary>
         Task<RoleAssignment> AssignRoleAsync(int userAccountId, int roleId, CancellationToken cancellationToken = default);
@@ -89,8 +98,18 @@ namespace Sms.Application.Security
 
     public sealed record RoleDetail(RoleSummary Role, IReadOnlyList<RoleScreenGrants> Screens);
 
+    /// <summary>
+    /// One account as the assignment screen lists it.
+    /// <para>
+    /// The person's own name and file number travel with it because a user name answers nobody's
+    /// question — a school office does not know who <c>emp-1042</c> is, and an administrator handing
+    /// out a role has a person in mind rather than a login. They are null for an
+    /// <see cref="AccountType.System"/> account, which belongs to no person by design.
+    /// </para>
+    /// </summary>
     public sealed record UserRoleSummary(
         int UserAccountId, string UserName, AccountType AccountType, bool IsActive,
+        string? PersonNameAr, string? PersonNameEn, string? PersonReference,
         IReadOnlyList<UserRoleGrant> Roles);
 
     public sealed record UserRoleGrant(int RoleId, string Code, string NameAr, string NameEn, bool CanAdministerPermissions);

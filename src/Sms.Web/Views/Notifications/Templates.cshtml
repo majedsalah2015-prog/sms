@@ -1,0 +1,197 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model TemplateStudioViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Template studio", "استوديو القوالب");
+    ViewData["Breadcrumb"] = T("Notifications / Template studio", "الإشعارات / استوديو القوالب");
+
+    string Channel(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("In-app", "داخل النظام"),
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        _ => "WhatsApp",
+    };
+
+    string Status(TemplatePublishStatus s) => s switch
+    {
+        TemplatePublishStatus.Draft => T("Draft", "مسودة"),
+        TemplatePublishStatus.TestSent => T("Test sent", "أُرسل اختبارها"),
+        _ => T("Published", "منشورة"),
+    };
+
+    string Badge(TemplatePublishStatus s) => s switch
+    {
+        TemplatePublishStatus.Draft => "bg-secondary",
+        TemplatePublishStatus.TestSent => "bg-warning text-dark",
+        _ => "bg-success",
+    };
+
+    string EventName(string code)
+        => NotificationEventCatalog.TryGet(code, out var e) ? (isRtl ? e.TitleAr : e.TitleEn) : code;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "tpl-help",
+        Title = T("Template studio — help", "استوديو القوالب — مساعدة"),
+        Intro = T("A template is the wording of one kind of message on one channel. Until an event has one, the system knows it should tell somebody and has nothing to say — so it says nothing, silently and by design (BR-NOT-003).",
+                  "القالب هو صياغة نوع واحد من الرسائل على قناة واحدة. وما لم يكن للحدث قالب، يعرف النظام أن عليه إبلاغ أحدهم ولا يجد ما يقوله — فلا يقول شيئاً، بصمت وعن قصد (BR-NOT-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Draft, test, publish — in that order", "مسودة، ثم اختبار، ثم نشر"),
+                T("BR-NTF-001 will not let a version go live until a real test message has gone out on its own channel. That is not ceremony: a WhatsApp template that the gateway rejects looks perfectly fine on this screen, and the test is the only place that difference shows before a parent is the one who notices.",
+                  "لا تسمح القاعدة BR-NTF-001 بنشر نسخة قبل خروج رسالة اختبار حقيقية على قناتها. وليس هذا تكلّفاً: فقالب واتساب الذي ترفضه البوابة يبدو سليماً تماماً على هذه الشاشة، والاختبار هو الموضع الوحيد الذي يظهر فيه الفرق قبل أن يكون ولي الأمر هو من يكتشفه.")),
+            new HelpPanelViewModel.Item(
+                T("Editing never rewrites what was sent", "التعديل لا يعيد كتابة ما أُرسل"),
+                T("Saving creates a new version. Messages already delivered keep pointing at the version they were rendered from, so a parent's copy and the school's record never drift apart (BR-NOT-008).",
+                  "الحفظ ينشئ نسخة جديدة. وتبقى الرسائل المُسلَّمة مشيرة إلى النسخة التي بُنيت منها، فلا تفترق نسخة ولي الأمر عن سجل المدرسة (BR-NOT-008).")),
+            new HelpPanelViewModel.Item(
+                T("Placeholders must be ones the event supplies", "الرموز يجب أن يوفّرها الحدث"),
+                T("Write {DueDate} and the event's own date lands there. Write {dueDate} and the reader gets those nine characters, because the match is exact. The editor lists what each event actually carries, and refuses to save a name that is not on the list.",
+                  "اكتب {DueDate} فيحلّ محلها تاريخ الحدث نفسه. واكتب {dueDate} فيستلم القارئ هذه الأحرف كما هي، لأن المطابقة حرفية. والمحرِّر يعرض ما يحمله كل حدث فعلاً، ويرفض حفظ اسم ليس في القائمة.")),
+        },
+    };
+
+    var events = NotificationEventCatalog.Events;
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("The wording behind every automatic message, in both languages, versioned.",
+               "صياغة كل رسالة آلية، باللغتين، ومحفوظة بإصداراتها.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_NotificationsNav" />
+
+<div class="sms-card mb-4">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@ViewData["Title"]</caption>
+        <thead><tr>
+            <th scope="col">@T("Event", "الحدث")</th>
+            <th scope="col">@T("Channel", "القناة")</th>
+            <th scope="col">@T("Latest version", "أحدث نسخة")</th>
+            <th scope="col">@T("Live version", "النسخة الفعّالة")</th>
+            <th scope="col">@T("Changed", "آخر تعديل")</th>
+            <th scope="col"></th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Templates.Count == 0)
+        {
+            <tr><td colspan="6" class="p-3 text-muted">
+                @T("No template has been written yet, so no automatic message can be sent — the engine skips any event with nothing to say.",
+                   "لم يُكتب أي قالب بعد، فلا يمكن إرسال أي رسالة آلية — والمحرّك يتجاوز كل حدث لا يجد له نصاً.")
+            </td></tr>
+        }
+        else
+        {
+            @foreach (var row in Model.Templates)
+            {
+                <tr class="@(row.IsActive ? "" : "text-muted")">
+                    <td>
+                        @EventName(row.EventCode)
+                        <small class="d-block text-muted"><code>@row.EventCode</code></small>
+                    </td>
+                    <td>@Channel(row.Channel)</td>
+                    <td>
+                        <span class="badge @Badge(row.LatestStatus)">@Status(row.LatestStatus)</span>
+                        <span class="ms-1">v@(row.LatestVersionNumber)</span>
+                    </td>
+                    <td>
+                        @if (row.LatestStatus == TemplatePublishStatus.Published || row.CurrentVersionNumber != row.LatestVersionNumber)
+                        {
+                            <span>v@(row.CurrentVersionNumber)</span>
+                        }
+                        else
+                        {
+                            <span class="text-warning">@T("none yet", "لا شيء بعد")</span>
+                        }
+                    </td>
+                    <td dir="ltr">@row.LatestModifiedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="Template" asp-route-id="@row.TemplateId">
+                            @T("Open", "فتح")
+                        </a>
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table></div>
+</div>
+
+<div class="sms-card">
+    <div class="p-3">
+        <h2 class="h5 mb-3">@T("Write a template", "كتابة قالب")</h2>
+        <form asp-action="SaveTemplate" method="post">
+            @Html.AntiForgeryToken()
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label" for="eventCode">@T("Event", "الحدث")</label>
+                    <select class="form-select" id="eventCode" name="eventCode" required>
+                        @foreach (var group in events.GroupBy(e => e.ModuleCode))
+                        {
+                            <optgroup label="@group.Key">
+                                @foreach (var e in group)
+                                {
+                                    <option value="@e.Code">
+                                        @(isRtl ? e.TitleAr : e.TitleEn)@(e.HasPublisher ? "" : T(" — not raised yet", " — لا يُطلق بعد"))
+                                    </option>
+                                }
+                            </optgroup>
+                        }
+                    </select>
+                    <div class="form-text">
+                        @T("An event marked \"not raised yet\" has no module publishing it — you may write its wording now, and nothing will send it until that module does.",
+                           "الحدث الموسوم «لا يُطلق بعد» لا تُطلقه أي وحدة — يمكنك كتابة صياغته الآن، ولن يُرسله شيء حتى تفعل تلك الوحدة.")
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="channel">@T("Channel", "القناة")</label>
+                    <select class="form-select" id="channel" name="channel" required>
+                        @foreach (var c in NotificationEventCatalog.Channels)
+                        {
+                            <option value="@((int)c)">@Channel(c)</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="subjectEn">@T("Subject (English)", "الموضوع (إنجليزي)")</label>
+                    <input class="form-control" id="subjectEn" name="subjectEn" dir="ltr" maxlength="200" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="subjectAr">@T("Subject (Arabic)", "الموضوع (عربي)")</label>
+                    <input class="form-control" id="subjectAr" name="subjectAr" dir="rtl" maxlength="200" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="bodyEn">@T("Body (English)", "النص (إنجليزي)")</label>
+                    <textarea class="form-control" id="bodyEn" name="bodyEn" dir="ltr" rows="5" required></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="bodyAr">@T("Body (Arabic)", "النص (عربي)")</label>
+                    <textarea class="form-control" id="bodyAr" name="bodyAr" dir="rtl" rows="5" required></textarea>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-3 mb-2">
+                @T("Both languages are required. Which one a parent receives is decided by their own preference, so a blank side is a blank message to whoever chose that language.",
+                   "اللغتان مطلوبتان. وتُحدَّد اللغة التي يستلمها ولي الأمر بتفضيله هو، فالجانب الفارغ رسالةٌ فارغة لمن اختار تلك اللغة.")
+            </p>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Save as draft", "حفظ كمسودة")
+            </button>
+        </form>
+    </div>
+</div>

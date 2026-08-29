@@ -1,0 +1,366 @@
+@using System.Globalization
+@using Sms.Domain.Payroll
+@model SalaryAdvanceViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var name = isRtl ? Model.Employee.NameAr : Model.Employee.NameEn;
+    ViewData["Title"] = T($"Advance {Model.AdvanceNo}", $"سلفة {Model.AdvanceNo}");
+    ViewData["Breadcrumb"] = T("Staff / Advances", "شؤون الموظفين / السلف");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "advance-help",
+        Title = T("This advance — help", "هذه السلفة — مساعدة"),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Disbursed money cannot be cancelled", "المصروف لا يُلغى"),
+                T("A request can be rejected or cancelled while nobody has handed money over. Once it is disbursed the only ways out are repayment and waiving.", "يمكن رفض الطلب أو إلغاؤه ما دام أحد لم يسلّم مالاً. أما بعد الصرف فلا مخرج إلا السداد أو الإعفاء.")),
+            new HelpPanelViewModel.Item(
+                T("Waiving forgives, it does not collect", "الإعفاء إسقاط لا تحصيل"),
+                T("A waived instalment reduces the balance without anybody paying it. It is counted separately from what was actually recovered, on every statement.", "القسط المعفى يخفّض الرصيد دون أن يدفعه أحد. ويُحسب منفصلاً عمّا استُردّ فعلاً في كل الكشوفات.")),
+            new HelpPanelViewModel.Item(
+                T("A month already approved is locked", "الشهر المعتمد مقفل"),
+                T("An instalment whose month is covered by an approved or paid payroll cannot be waived or rescheduled. Reopen that payroll as a draft first.", "لا يُعفى ولا يُعاد جدولة قسط يقع شهره ضمن مسير معتمد أو مصروف. أعد ذلك المسير إلى المسودة أولاً.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">
+            <code>@Model.AdvanceNo</code>
+            <span class="badge @PayrollLabels.AdvanceStatusBadge(Model.Status) align-middle">@PayrollLabels.AdvanceStatus(Model.Status, isRtl)</span>
+        </h1>
+        <p class="text-muted mb-0">@name &middot; <code>@Model.Employee.EmployeeNo</code></p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Advances"><i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("All advances", "كل السلف")</a>
+        <a class="btn btn-sm btn-outline-primary" asp-action="AdvanceStatement" asp-route-employeeId="@Model.Employee.EmployeeId">
+            <i class="bi bi-file-earmark-text me-1" aria-hidden="true"></i>@T("Statement", "كشف السلف")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_PayrollNav" />
+
+<div class="row g-3">
+    <div class="col-lg-5">
+        <div class="sms-card mb-3">
+            <h2 class="h6 mb-3">@T("The request", "الطلب")</h2>
+            <dl class="row mb-0">
+                <dt class="col-5 text-muted small">@T("Amount", "المبلغ")</dt>
+                <dd class="col-7 fw-semibold" dir="ltr">@PayrollLabels.Money(Model.Amount)</dd>
+
+                <dt class="col-5 text-muted small">@T("Instalments", "عدد الأقساط")</dt>
+                <dd class="col-7">@Model.InstallmentCount</dd>
+
+                <dt class="col-5 text-muted small">@T("First deduction", "أول استقطاع")</dt>
+                <dd class="col-7">@PayrollLabels.Period(Model.FirstDeductionYear, Model.FirstDeductionMonth, isRtl)</dd>
+
+                <dt class="col-5 text-muted small">@T("Requested on", "تاريخ الطلب")</dt>
+                <dd class="col-7">@Model.RequestDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+
+                @if (!string.IsNullOrWhiteSpace(Model.Reason))
+                {
+                    <dt class="col-5 text-muted small">@T("Reason", "السبب")</dt>
+                    <dd class="col-7">@Model.Reason</dd>
+                }
+
+                @if (Model.DecisionAtUtc != null)
+                {
+                    <dt class="col-5 text-muted small">@T("Decided on", "تاريخ القرار")</dt>
+                    <dd class="col-7">@Model.DecisionAtUtc.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+                }
+
+                @if (!string.IsNullOrWhiteSpace(Model.DecisionNote))
+                {
+                    <dt class="col-5 text-muted small">@T("Decision note", "ملاحظة القرار")</dt>
+                    <dd class="col-7">@Model.DecisionNote</dd>
+                }
+
+                @if (Model.DisbursedOn != null)
+                {
+                    <dt class="col-5 text-muted small">@T("Disbursed on", "تاريخ الصرف")</dt>
+                    <dd class="col-7">@Model.DisbursedOn.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</dd>
+
+                    <dt class="col-5 text-muted small">@T("Method", "طريقة الصرف")</dt>
+                    <dd class="col-7">
+                        @(Model.DisbursementMethod == null ? "—" : PayrollLabels.DisbursementMethod(Model.DisbursementMethod.Value, isRtl))
+                        @if (!string.IsNullOrWhiteSpace(Model.DisbursementRefNo))
+                        {
+                            <span class="text-muted small" dir="ltr">(<code>@Model.DisbursementRefNo</code>)</span>
+                        }
+                    </dd>
+                }
+            </dl>
+        </div>
+
+        @if (Model.Status == SalaryAdvanceStatus.Disbursed || Model.Status == SalaryAdvanceStatus.Settled)
+        {
+            <div class="sms-card mb-3">
+                <h2 class="h6 mb-3">@T("Balance", "الرصيد")</h2>
+                <div class="row text-center g-2">
+                    <div class="col">
+                        <div class="text-muted small">@T("Recovered", "المستردّ")</div>
+                        <div class="fs-6 text-success" dir="ltr">@PayrollLabels.Money(Model.DeductedTotal)</div>
+                    </div>
+                    <div class="col">
+                        <div class="text-muted small">@T("Waived", "المعفى")</div>
+                        <div class="fs-6 text-info" dir="ltr">@PayrollLabels.Money(Model.WaivedTotal)</div>
+                    </div>
+                    <div class="col">
+                        <div class="text-muted small">@T("Outstanding", "المتبقي")</div>
+                        <div class="fs-6 fw-bold" dir="ltr">@PayrollLabels.Money(Model.OutstandingBalance)</div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Actions", "الإجراءات")</h2>
+
+            @if (Model.IsEditable)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary mb-3" data-bs-toggle="collapse"
+                        data-bs-target="#edit-request" aria-expanded="false" aria-controls="edit-request">
+                    <i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Correct the request", "تصحيح الطلب")
+                </button>
+
+                <div class="collapse mb-3" id="edit-request">
+                    <form method="post" asp-action="UpdateAdvance" asp-route-id="@Model.Id">
+                        @Html.AntiForgeryToken()
+                        <div class="row g-2">
+                            <div class="col-7">
+                                <label for="edit-amount" class="form-label small text-muted">@T("Amount", "المبلغ")</label>
+                                <input type="number" id="edit-amount" name="Amount" step="0.01" min="0.01" required
+                                       class="form-control form-control-sm" dir="ltr" value="@Model.Amount.ToString("0.00", CultureInfo.InvariantCulture)" />
+                            </div>
+                            <div class="col-5">
+                                <label for="edit-count" class="form-label small text-muted">@T("Instalments", "الأقساط")</label>
+                                <input type="number" id="edit-count" name="InstallmentCount" min="1" max="60" required
+                                       class="form-control form-control-sm" dir="ltr" value="@Model.InstallmentCount" />
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <label for="edit-date" class="form-label small text-muted">@T("Request date", "تاريخ الطلب")</label>
+                            <input type="date" id="edit-date" name="RequestDate" required class="form-control form-control-sm"
+                                   value="@Model.RequestDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                        </div>
+                        <fieldset class="row g-2 mt-1">
+                            <legend class="form-label small text-muted col-12 mb-1">@T("First deduction from", "أول استقطاع من شهر")</legend>
+                            <div class="col-7">
+                                <label for="edit-month" class="visually-hidden">@T("Month", "الشهر")</label>
+                                <select id="edit-month" name="FirstDeductionMonth" class="form-select form-select-sm" required>
+                                    @for (var m = 1; m <= 12; m++)
+                                    {
+                                        <option value="@m" selected="@(m == Model.FirstDeductionMonth)">@PayrollLabels.MonthName(m, isRtl)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label for="edit-year" class="visually-hidden">@T("Year", "السنة")</label>
+                                <input type="number" id="edit-year" name="FirstDeductionYear" min="2000" max="2200" required
+                                       class="form-control form-control-sm" value="@Model.FirstDeductionYear" />
+                            </div>
+                        </fieldset>
+                        <div class="mt-2">
+                            <label for="edit-reason" class="form-label small text-muted">@T("Reason for the advance", "سبب السلفة")</label>
+                            <input type="text" id="edit-reason" name="Reason" maxlength="500" class="form-control form-control-sm" value="@Model.Reason" />
+                        </div>
+                        <div class="mt-2">
+                            <label for="edit-audit" class="form-label small text-muted">@T("Why is the request changing?", "ما سبب تعديل الطلب؟")</label>
+                            <input type="text" id="edit-audit" name="AuditReason" maxlength="500" required class="form-control form-control-sm" />
+                            <div class="form-text">@T("Required — the amount and the instalment count are audited, and a change to either needs a stated reason.", "مطلوب — المبلغ وعدد الأقساط مدقَّقان، وتغيير أيّهما يحتاج سبباً مكتوباً.")</div>
+                        </div>
+                        <button type="submit" class="btn btn-sm btn-outline-primary mt-2">@T("Save the correction", "حفظ التصحيح")</button>
+                    </form>
+                </div>
+            }
+
+            @if (Model.IsDecidable)
+            {
+                <form method="post" asp-action="ApproveAdvance" asp-route-id="@Model.Id" class="mb-3">
+                    @Html.AntiForgeryToken()
+                    <label for="approve-note" class="form-label small text-muted">@T("Decision note (optional)", "ملاحظة القرار (اختياري)")</label>
+                    <input type="text" id="approve-note" name="note" maxlength="500" class="form-control form-control-sm mb-2" />
+                    <button type="submit" class="btn btn-sm btn-success">
+                        <i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Approve", "موافقة")
+                    </button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" formaction="@Url.Action("RejectAdvance", new { id = Model.Id })">
+                        <i class="bi bi-x me-1" aria-hidden="true"></i>@T("Reject", "رفض")
+                    </button>
+                </form>
+                <p class="small text-muted">@T("Approving does not move money and creates no instalments.", "الموافقة لا تحرّك مالاً ولا تُنشئ أقساطاً.")</p>
+            }
+
+            @if (Model.IsDisbursable)
+            {
+                <form method="post" asp-action="DisburseAdvance" asp-route-id="@Model.Id" class="mb-3">
+                    @Html.AntiForgeryToken()
+                    <h3 class="h6">@T("Hand the money over", "تسليم المبلغ")</h3>
+                    <div class="mb-2">
+                        <label for="disb-date" class="form-label small text-muted">@T("Disbursed on", "تاريخ الصرف")</label>
+                        <input type="date" id="disb-date" name="DisbursedOn" required class="form-control form-control-sm"
+                               value="@DateTime.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    </div>
+                    <div class="mb-2">
+                        <label for="disb-method" class="form-label small text-muted">@T("Method", "طريقة الصرف")</label>
+                        <select id="disb-method" name="Method" class="form-select form-select-sm">
+                            @foreach (AdvanceDisbursementMethod m in Enum.GetValues(typeof(AdvanceDisbursementMethod)))
+                            {
+                                <option value="@((int)m)">@PayrollLabels.DisbursementMethod(m, isRtl)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label for="disb-ref" class="form-label small text-muted">@T("Reference (optional)", "المرجع (اختياري)")</label>
+                        <input type="text" id="disb-ref" name="ReferenceNo" maxlength="60" class="form-control form-control-sm" dir="ltr" />
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-cash-stack me-1" aria-hidden="true"></i>@T("Disburse and schedule", "صرف وجدولة")
+                    </button>
+                </form>
+            }
+
+            @if (Model.Status == SalaryAdvanceStatus.Requested || Model.Status == SalaryAdvanceStatus.Approved)
+            {
+                <form method="post" asp-action="CancelAdvance" asp-route-id="@Model.Id"
+                      onsubmit="return confirm('@T("Cancel this advance?", "إلغاء هذه السلفة؟")');">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="note" maxlength="500" class="form-control form-control-sm mb-2"
+                           placeholder="@T("Reason (optional)", "السبب (اختياري)")" aria-label="@T("Cancellation reason", "سبب الإلغاء")" />
+                    <button type="submit" class="btn btn-sm btn-outline-danger">@T("Cancel advance", "إلغاء السلفة")</button>
+                </form>
+            }
+
+            @if (Model.IsRunning)
+            {
+                <form method="post" asp-action="WaiveRemaining" asp-route-id="@Model.Id" class="mb-3"
+                      onsubmit="return confirm('@T("Waive everything still owed on this advance? It will be settled and nobody will pay the rest.", "إعفاء كل ما تبقى على هذه السلفة؟ ستُغلق ولن يدفع أحد الباقي.")');">
+                    @Html.AntiForgeryToken()
+                    <input type="text" name="note" maxlength="500" class="form-control form-control-sm mb-2"
+                           placeholder="@T("Reason (optional)", "السبب (اختياري)")" aria-label="@T("Waiver reason", "سبب الإعفاء")" />
+                    <button type="submit" class="btn btn-sm btn-outline-warning">
+                        <i class="bi bi-eraser me-1" aria-hidden="true"></i>@T("Waive the remaining balance", "إعفاء المتبقي")
+                    </button>
+                </form>
+
+                <hr />
+                <form method="post" asp-action="RescheduleAdvance" asp-route-id="@Model.Id">
+                    @Html.AntiForgeryToken()
+                    <h3 class="h6">@T("Re-cut the remaining schedule", "إعادة جدولة المتبقي")</h3>
+                    <p class="small text-muted">@T("Instalments already recovered or waived stay as they are; only what has not happened yet is replaced.", "تبقى الأقساط المستردّة أو المعفاة كما هي، ويُستبدل فقط ما لم يحدث بعد.")</p>
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label for="res-count" class="form-label small text-muted">@T("Instalments", "الأقساط")</label>
+                            <input type="number" id="res-count" name="InstallmentCount" min="1" max="60" required class="form-control form-control-sm" dir="ltr" />
+                        </div>
+                        <div class="col-4">
+                            <label for="res-month" class="form-label small text-muted">@T("From month", "من شهر")</label>
+                            <select id="res-month" name="FirstDeductionMonth" class="form-select form-select-sm" required>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    <option value="@m">@PayrollLabels.MonthName(m, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4">
+                            <label for="res-year" class="form-label small text-muted">@T("Year", "السنة")</label>
+                            <input type="number" id="res-year" name="FirstDeductionYear" min="2000" max="2200" required
+                                   class="form-control form-control-sm" value="@DateTime.UtcNow.Year" />
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <label for="res-reason" class="form-label small text-muted">@T("Why is the schedule changing?", "ما سبب تعديل الجدول؟")</label>
+                        <input type="text" id="res-reason" name="AuditReason" maxlength="500" required class="form-control form-control-sm" />
+                        <div class="form-text">@T("Required — what an employee owes each month is not changed without a stated reason.", "مطلوب — ما يُستقطع من الموظف شهرياً لا يتغيّر دون سبب مكتوب.")</div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-outline-primary mt-2">@T("Rebuild schedule", "إعادة بناء الجدول")</button>
+                </form>
+            }
+
+            @if (Model.Status == SalaryAdvanceStatus.Settled)
+            {
+                <p class="mb-0 text-success">
+                    <i class="bi bi-check-circle-fill me-1" aria-hidden="true"></i>@T("Settled — nothing is owed on this advance.", "مسدَّدة — لا يوجد مستحق على هذه السلفة.")
+                </p>
+            }
+            else if (Model.Status == SalaryAdvanceStatus.Rejected || Model.Status == SalaryAdvanceStatus.Cancelled)
+            {
+                <p class="mb-0 text-muted">
+                    <i class="bi bi-x-circle me-1" aria-hidden="true"></i>@T("Closed without any money being handed over.", "أُغلقت دون تسليم أي مبلغ.")
+                </p>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Repayment schedule", "جدول السداد")</h2>
+
+            @if (Model.Installments.Count == 0)
+            {
+                <p class="text-muted mb-0">
+                    @T("No schedule yet — instalments are cut when the advance is disbursed.", "لا يوجد جدول بعد — تُقطع الأقساط عند صرف السلفة.")
+                </p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table sms-table table-sm align-middle">
+                        <caption class="visually-hidden">@T("Instalments with their due month, status and the payroll that recovered each", "الأقساط مع شهر الاستحقاق والحالة والمسير الذي استقطع كلاً منها")</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">@T("Due month", "شهر الاستحقاق")</th>
+                                <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                                <th scope="col">@T("Status", "الحالة")</th>
+                                <th scope="col">@T("Payroll", "المسير")</th>
+                                <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var i in Model.Installments)
+                            {
+                                <tr>
+                                    <td>@i.SequenceNo</td>
+                                    <td>@PayrollLabels.Period(i.DueYear, i.DueMonth, isRtl)</td>
+                                    <td class="text-end" dir="ltr">@PayrollLabels.Money(i.Amount)</td>
+                                    <td>
+                                        <span class="badge @PayrollLabels.InstallmentStatusBadge(i.Status)">@PayrollLabels.InstallmentStatus(i.Status, isRtl)</span>
+                                        @if (!string.IsNullOrWhiteSpace(i.WaiverNote))
+                                        {
+                                            <div class="small text-muted">@i.WaiverNote</div>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (string.IsNullOrWhiteSpace(i.PayrollRunNo))
+                                        {
+                                            <span class="text-muted">—</span>
+                                        }
+                                        else
+                                        {
+                                            <code>@i.PayrollRunNo</code>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (i.Status == SalaryAdvanceInstallmentStatus.Scheduled && Model.IsRunning)
+                                        {
+                                            <form method="post" asp-action="WaiveInstallment" asp-route-id="@Model.Id" asp-route-installmentId="@i.InstallmentId"
+                                                  onsubmit="return confirm('@T("Waive this instalment? Nobody will pay it.", "إعفاء هذا القسط؟ لن يدفعه أحد.")');">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-sm btn-outline-warning">@T("Waive", "إعفاء")</button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

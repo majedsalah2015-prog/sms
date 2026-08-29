@@ -63,6 +63,7 @@ namespace Sms.Web.Controllers
         private readonly ISystemSetupAdmin _setup;
         private readonly IDashboardAdmin _dashboards;
         private readonly IDashboardQuery _widgets;
+        private readonly IStatisticsQuery _statistics;
         private readonly IReadModelQuery _readModels;
         private readonly ISnapshotRefreshService _snapshots;
         private readonly IPermissionService _permissions;
@@ -72,12 +73,13 @@ namespace Sms.Web.Controllers
         private readonly IClock _clock;
 
         public DashboardsController(
-            ISystemSetupAdmin setup, IDashboardAdmin dashboards, IDashboardQuery widgets, IReadModelQuery readModels, ISnapshotRefreshService snapshots,
+            ISystemSetupAdmin setup, IDashboardAdmin dashboards, IDashboardQuery widgets, IStatisticsQuery statistics, IReadModelQuery readModels, ISnapshotRefreshService snapshots,
             IPermissionService permissions, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, IClock clock)
         {
             _setup = setup;
             _dashboards = dashboards;
             _widgets = widgets;
+            _statistics = statistics;
             _readModels = readModels;
             _snapshots = snapshots;
             _permissions = permissions;
@@ -257,13 +259,64 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { year, date = date?.ToString("yyyy-MM-dd") });
         }
 
+        // ================================================================== 8.1 Statistics — the same figures at school scope
+
+        /// <summary>
+        /// doc/Modules/31 §1's "one glance" question asked of the school rather
+        /// than of a persona: how many students and staff, what was billed, what
+        /// came in, and — from the attached ledger — what went out.
+        /// <para>
+        /// A screen of its own rather than five more panels on
+        /// <see cref="Index"/>: that one is a landing page whose whole purpose is
+        /// what needs attention *today*, and five multi-chart sections would bury
+        /// it. It carries its own permission for the same reason it is separate —
+        /// it puts the school's whole financial year on one page, which is a wider
+        /// read than any one dashboard, and worth being able to withhold from
+        /// someone who may still open theirs.
+        /// </para>
+        /// <para>
+        /// Nothing here is cached. Every figure is computed on request from the
+        /// owning module's own calculator (BR-DSH-002), so the as-of stamp is
+        /// always "now" and there is no snapshot to go stale — the same choice
+        /// <c>Attendance/Analytics</c> made, and for the same reason: a reader who
+        /// changes the year expects the page to have changed with it.
+        /// </para>
+        /// </summary>
+        [HttpGet("statistics")]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Statistics, ActionVerb.View)]
+        public async Task<IActionResult> Statistics(int? year = null)
+        {
+            var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
+
+            var m = new StatisticsViewModel
+            {
+                Years = years,
+                Year = years.FirstOrDefault(y => y.Id == (year ?? _workingYear.AcademicYearId))
+                    ?? years.FirstOrDefault(y => y.Status == AcademicYearStatus.Active)
+                    ?? years.FirstOrDefault(),
+                AsOfUtc = _clock.UtcNow,
+            };
+
+            if (m.Year != null)
+            {
+                m.Stats = await _statistics.GetAsync(m.Year.Id, HttpContext.RequestAborted);
+            }
+
+            return View(m);
+        }
+
         // ================================================================== 8.2 Layout administrator — widget registry
 
         [HttpGet("widgets")]
         [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.View)]
-        public async Task<IActionResult> Widgets()
+        public async Task<IActionResult> Widgets(int? edit = null)
         {
-            var widgets = await _db.WidgetDefinitions.AsNoTracking().OrderBy(w => w.Code).ToListAsync();
+            // IgnoreQueryFilters: a retired widget still belongs on the registry — it is the
+            // screen that retires it, and a row that vanished on retirement could never be
+            // corrected or put back. Active ones sort first.
+            var widgets = await _db.WidgetDefinitions.IgnoreQueryFilters().AsNoTracking()
+                .Where(w => w.SchoolId == _db.CurrentSchoolId)
+                .OrderByDescending(w => w.IsActive).ThenBy(w => w.Code).ToListAsync();
             var permissionIds = widgets.Select(w => w.RequiredPermissionId).Distinct().ToList();
             var referenced = await _db.Permissions.AsNoTracking().Where(p => permissionIds.Contains(p.Id)).ToListAsync();
             var inTemplates = (await _db.LayoutTemplateWidgets.AsNoTracking().Select(x => x.WidgetDefinitionId).ToListAsync())
@@ -282,6 +335,7 @@ namespace Sms.Web.Controllers
                 Permissions = await _db.Permissions.AsNoTracking()
                     .OrderBy(p => p.ModuleCode).ThenBy(p => p.ScreenCode).ThenBy(p => p.Action).ToListAsync(),
                 Unregistered = DashboardPanels.All.Where(p => widgets.All(w => w.Code != p.Code)).ToList(),
+                EditId = edit,
             };
 
             return View(m);
@@ -295,10 +349,13 @@ namespace Sms.Web.Controllers
             WidgetRefreshClass refreshClass, string? drillTargetCode, bool isPortalEligible)
         {
             code = code?.Trim().ToUpperInvariant() ?? string.Empty;
-            if (await _db.WidgetDefinitions.AnyAsync(w => w.Code == code))
+            // IgnoreQueryFilters: the unique index does not care whether a row is active, so a
+            // retired widget's code is not free. Checking through the filter reported it as free
+            // and the insert then hit the index instead of this sentence.
+            if (await _db.WidgetDefinitions.IgnoreQueryFilters().AnyAsync(w => w.Code == code && w.SchoolId == _db.CurrentSchoolId))
             {
                 // (SchoolId, Code) is unique — refused here as a message rather than as a DbUpdateException.
-                TempData["Error"] = T("A widget with that code is already registered.", "يوجد عنصر مسجَّل بهذا الرمز.");
+                TempData["Error"] = T("A widget with that code is already registered — it may be a retired one; show it in the registry and reactivate it.", "يوجد عنصر مسجَّل بهذا الرمز — وربما كان موقوفاً؛ اعرضه في السجل وأعد تفعيله.");
                 return RedirectToAction(nameof(Widgets));
             }
 
@@ -321,9 +378,9 @@ namespace Sms.Web.Controllers
                 return NotFound();
             }
 
-            if (await _db.WidgetDefinitions.AnyAsync(w => w.Code == panel.Code))
+            if (await _db.WidgetDefinitions.IgnoreQueryFilters().AnyAsync(w => w.Code == panel.Code && w.SchoolId == _db.CurrentSchoolId))
             {
-                TempData["Error"] = T("That panel is already registered.", "هذه اللوحة مسجَّلة بالفعل.");
+                TempData["Error"] = T("That panel is already registered — it may be a retired row; reactivate it in the registry.", "هذه اللوحة مسجَّلة بالفعل — وربما كان صفّها موقوفاً؛ أعد تفعيله من السجل.");
                 return RedirectToAction(nameof(Widgets));
             }
 
@@ -331,6 +388,59 @@ namespace Sms.Web.Controllers
                 panel.Code, panel.OwningModuleCode, panel.TitleAr, panel.TitleEn, requiredPermissionId,
                 panel.RefreshClass, panel.DrillTargetCode, panel.IsPortalEligible, HttpContext.RequestAborted);
             TempData["Flash"] = string.Format(T("Panel {0} registered — it is now permission-gated.", "سُجِّلت اللوحة {0} — صارت خاضعة للصلاحية."), panel.Code);
+            return RedirectToAction(nameof(Widgets));
+        }
+
+        /// <summary>
+        /// doc/Modules/33 §8.2. Corrects a registered widget in place. The registry could only be
+        /// appended to, so a widget registered against the wrong permission — the mistake that
+        /// makes a panel invisible to exactly the people it was built for (BR-DSH-001) — could
+        /// not be repaired, only shadowed by a second row under a new code.
+        /// <para>The code is not editable: layout templates and personalizations point at the row.</para>
+        /// </summary>
+        [HttpPost("widgets/{id:int}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.Edit)]
+        public async Task<IActionResult> EditWidget(
+            int id, string owningModuleCode, string titleAr, string titleEn, int requiredPermissionId,
+            WidgetRefreshClass refreshClass, string? drillTargetCode, bool isPortalEligible)
+        {
+            try
+            {
+                await _dashboards.UpdateWidgetAsync(
+                    id, owningModuleCode?.Trim() ?? string.Empty, titleAr?.Trim() ?? string.Empty, titleEn?.Trim() ?? string.Empty,
+                    requiredPermissionId, refreshClass, drillTargetCode?.Trim() ?? string.Empty, isPortalEligible, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Widget updated.", "حُدِّث العنصر.");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Widgets));
+        }
+
+        /// <summary>
+        /// BR-GLB-005: retires a widget or puts it back. Templates already carrying it keep the
+        /// row — retiring only stops it being offered, which is why the way back is here too.
+        /// </summary>
+        [HttpPost("widgets/{id:int}/active")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Dashboards, ScreenCatalog.Dashboards.Widgets, ActionVerb.Deactivate)]
+        public async Task<IActionResult> SetWidgetActive(int id, bool active)
+        {
+            try
+            {
+                await _dashboards.SetWidgetActiveAsync(id, active, HttpContext.RequestAborted);
+                TempData["Flash"] = active
+                    ? T("Widget reactivated.", "أُعيد تفعيل العنصر.")
+                    : T("Widget retired — the templates already carrying it keep it (BR-GLB-005: never deleted).", "أُوقف العنصر — والقوالب التي تحمله تحتفظ به (BR-GLB-005: لا حذف).");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
             return RedirectToAction(nameof(Widgets));
         }
 
