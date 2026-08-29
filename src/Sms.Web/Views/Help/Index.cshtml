@@ -1,0 +1,113 @@
+@using System.Globalization
+@model PlatformGuideViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var indexTitle = T("Your screens", "فهرس شاشاتك");
+    // One view, two shells. A portal account reading this inside the staff layout would be shown a
+    // sidebar of screens BR-SEC-010 says they must not even learn exist — and the guide is reached
+    // from the portal's own top bar, so it has to come back wearing the portal.
+    Layout = Model.ForPortal ? "_PortalLayout" : "_Layout";
+    @* No _HelpModal on this page, and HelpCoverageTests.Exempt carries the reason: the page is the
+       help. A panel here would open an explanation of an explanation. *@
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title"><i class="bi bi-life-preserver me-2 text-muted" aria-hidden="true"></i>@T("User guide", "دليل الاستخدام")</h1>
+        <p class="text-muted mb-0">
+            @if (Model.ForPortal)
+            {
+                @T("How the portal works, and what it does and does not show you.", "كيف تعمل البوابة، وما الذي تعرضه لك وما الذي لا تعرضه.")
+            }
+            else
+            {
+                @T("How this system's screens are driven — the conventions every one of them assumes you already know. Each screen also carries its own help button, beside its title.", "كيف تُدار شاشات هذا النظام — الأعراف التي تفترض كل شاشة أنك تعرفها سلفاً. ولكل شاشة أيضاً زر مساعدة خاص بها بجانب عنوانها.")
+            }
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        @if (Model.ForPortal)
+        {
+            <a class="btn btn-outline-secondary btn-sm" asp-area="" asp-controller="Portal" asp-action="Index"><i class="bi bi-house me-1" aria-hidden="true"></i>@T("Back to the portal", "العودة إلى البوابة")</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary btn-sm" asp-area="" asp-controller="Home" asp-action="Index"><i class="bi bi-house me-1" aria-hidden="true"></i>@T("Home", "الرئيسية")</a>
+        }
+    </div>
+</div>
+
+@* The chapters are long on purpose, so the reader gets a way in that is not scrolling. *@
+<nav class="d-flex flex-wrap gap-2 mb-4" aria-label="@T("Guide contents", "محتويات الدليل")">
+    @foreach (var chapter in Model.Sections)
+    {
+        <a class="btn btn-sm btn-outline-secondary" href="#@chapter.Key"><i class="bi @chapter.Icon me-1" aria-hidden="true"></i>@chapter.Title</a>
+    }
+    @if (Model.HasIndex)
+    {
+        <a class="btn btn-sm btn-outline-secondary" href="#your-screens"><i class="bi bi-list-check me-1" aria-hidden="true"></i>@indexTitle</a>
+    }
+</nav>
+
+@foreach (var chapter in Model.Sections)
+{
+    <section id="@chapter.Key" class="sms-card p-3 p-lg-4 mb-3">
+        <h2 class="h5 mb-1"><i class="bi @chapter.Icon me-2 text-muted" aria-hidden="true"></i>@chapter.Title</h2>
+        <p class="text-muted small">@chapter.Intro</p>
+        <dl class="row mb-0">
+            @foreach (var item in chapter.Items)
+            {
+                <dt class="col-12 col-lg-4 fw-semibold">@item.Heading</dt>
+                <dd class="col-12 col-lg-8 text-muted small mb-3">@item.Body</dd>
+            }
+        </dl>
+    </section>
+}
+
+@if (Model.HasIndex)
+{
+    <section id="your-screens" class="mt-4">
+        <h2 class="sms-section-title">@indexTitle</h2>
+        <p class="text-muted small">
+            @T("Everything you can open today, in module order, with what your roles let you do on each screen. This list is yours alone — a colleague's is a different length (BR-GLB-070), and a module switched off for this school is not in it at all (BR-SET-006).",
+               "كل ما تستطيع فتحه اليوم، بترتيب الوحدات، ومعه ما تسمح لك أدوارك بفعله في كل شاشة. وهذه القائمة قائمتك أنت — فقائمة زميلك بطول آخر (BR-GLB-070)، والوحدة المطفأة في هذه المدرسة ليست فيها أصلاً (BR-SET-006).")
+        </p>
+        <div class="row g-3">
+            @foreach (var module in Model.Modules)
+            {
+                <div class="col-12 col-lg-6 col-xxl-4">
+                    <div class="sms-card p-3 h-100">
+                        <h3 class="h6 d-flex align-items-center gap-2 mb-2">
+                            <i class="bi @module.Icon text-muted" aria-hidden="true"></i>
+                            @if (module.Controller is { } controller)
+                            {
+                                @* asp-area="" throughout: without it Url.Action inherits the request's
+                                   area, and this page is reachable while an ERP screen is the referrer. *@
+                                <a asp-area="" asp-controller="@controller" asp-action="@module.Action">@module.Title</a>
+                            }
+                            else
+                            {
+                                @module.Title
+                            }
+                            <span class="badge rounded-pill text-bg-light border ms-auto" dir="ltr">@module.Number</span>
+                        </h3>
+                        <ul class="list-unstyled mb-0 small">
+                            @foreach (var screen in module.Screens)
+                            {
+                                <li class="d-flex flex-wrap align-items-baseline gap-1 mb-1">
+                                    <span>@screen.Title</span>
+                                    <span class="text-muted">—</span>
+                                    @foreach (var verb in screen.Verbs)
+                                    {
+                                        <span class="badge rounded-pill text-bg-light border fw-normal">@verb</span>
+                                    }
+                                </li>
+                            }
+                        </ul>
+                    </div>
+                </div>
+            }
+        </div>
+    </section>
+}

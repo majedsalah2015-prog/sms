@@ -120,6 +120,12 @@
                        lands, not bolted on ahead of it. *@
                     <a class="btn btn-sm sms-icon-btn" asp-controller="Approvals" asp-action="Index" title="@(isRtl ? "موافقاتي" : "My approvals")" aria-label="@(isRtl ? "موافقاتي" : "My approvals")"><i class="bi bi-inbox" aria-hidden="true"></i></a>
                     <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="@(isRtl ? "المهام الخلفية" : "Background jobs")" aria-label="@(isRtl ? "المهام الخلفية" : "Background jobs")"><i class="bi bi-activity" aria-hidden="true"></i></a>
+                    @* The guide to the product itself. Every screen already explains itself through
+                       _HelpModal beside its own title; this is the part no single screen can say —
+                       that nothing is deleted, that a missing menu entry is a role, that a refusal is
+                       a sentence. It sits in the shell so it is reachable from a screen that has just
+                       refused someone, which is exactly when it is wanted. *@
+                    <a class="btn btn-sm sms-icon-btn" asp-area="" asp-controller="Help" asp-action="Index" title="@(isRtl ? "دليل الاستخدام" : "User guide")" aria-label="@(isRtl ? "دليل الاستخدام" : "User guide")"><i class="bi bi-question-circle" aria-hidden="true"></i></a>
                     <div class="dropdown">
                         <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@(isRtl ? "حساب المستخدم" : "User menu")">
                             <i class="bi bi-person-circle" aria-hidden="true"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span>

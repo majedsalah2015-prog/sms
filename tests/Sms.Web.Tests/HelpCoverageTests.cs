@@ -47,6 +47,7 @@ namespace Sms.Web.Tests
             ["Shared/Error.cshtml"] = "An error page is itself the explanation; a help panel about how to read a failure is noise on top of a failure.",
             ["Account/AccessDenied.cshtml"] = "Exists to refuse, and says so in one sentence. There is no procedure to document — BR-SEC-010 hides what the user may not open, so reaching this page is already the exception.",
             ["Home/Privacy.cshtml"] = "A prose page. It is help, and a help button on it would open a panel explaining prose.",
+            ["Help/Index.cshtml"] = "The user guide itself — the page every other screen's help button is the specific counterpart to. A panel here would open an explanation of an explanation.",
         };
 
         private static string ViewsRoot

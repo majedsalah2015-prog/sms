@@ -41,6 +41,10 @@ namespace Sms.Web.Security
         private static bool IsPortalReachable(string controller, string action)
             => Eq(controller, "Portal")
                || Eq(controller, "Account")
+               // The user guide, which the portal's own top bar links to. It answers a portal
+               // account with the portal's four chapters and no screen index at all, so nothing
+               // this rule protects is disclosed by reaching it.
+               || Eq(controller, "Help")
                || (Eq(controller, "Home") && (Eq(action, "SetLanguage") || Eq(action, "Privacy") || Eq(action, "Error")));
 
         private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
