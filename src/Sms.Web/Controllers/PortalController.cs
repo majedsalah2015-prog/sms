@@ -39,14 +39,16 @@ namespace Sms.Web.Controllers
         private readonly ICurrentUser _user;
         private readonly IWorkingYearContext _workingYear;
         private readonly Sms.Web.Services.PersonPhotoService _photos;
+        private readonly IPermissionService _permissions;
 
-        public PortalController(IParentPortalQuery portal, AppDbContext db, ICurrentUser user, IWorkingYearContext workingYear, Sms.Web.Services.PersonPhotoService photos)
+        public PortalController(IParentPortalQuery portal, AppDbContext db, ICurrentUser user, IWorkingYearContext workingYear, Sms.Web.Services.PersonPhotoService photos, IPermissionService permissions)
         {
             _portal = portal;
             _db = db;
             _user = user;
             _workingYear = workingYear;
             _photos = photos;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -129,6 +131,11 @@ namespace Sms.Web.Controllers
                 Year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == _workingYear.AcademicYearId),
                 ActiveTab = tab ?? "attendance", Attendance = attendance, RecentDays = recent, Terms = terms, Fees = fees,
                 ResultsHidden = student.Status == StudentStatus.Suspended,
+                // BR-SEC-010: the fees tab links on to the family statement, which a student account
+                // may not open — offering the link anyway hands them a bare not-found, exactly what
+                // the portal bar stopped doing when it started hiding the tab itself.
+                CanOpenStatement = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View, HttpContext.RequestAborted),
                 Results = results.Select(r =>
                 {
                     var o = offerings.FirstOrDefault(x => x.Id == r.CurriculumOfferingId);

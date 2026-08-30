@@ -61,6 +61,14 @@ namespace Sms.Web.Models
 
         /// <summary>BR-STU-002: Suspended blocks portal result visibility per configuration — never fee visibility.</summary>
         public bool ResultsHidden { get; set; }
+
+        /// <summary>
+        /// BR-SEC-010: whether this account may open the family statement, and so whether the fees
+        /// tab offers the link to it. A student holds their own fee breakdown but deliberately not
+        /// the family's money (doc 06 §4.3), and a link that answers not-found is the disclosure the
+        /// rule exists to prevent — the same reason the portal bar hides the tab.
+        /// </summary>
+        public bool CanOpenStatement { get; set; }
     }
 
     public sealed class PortalStatementViewModel
