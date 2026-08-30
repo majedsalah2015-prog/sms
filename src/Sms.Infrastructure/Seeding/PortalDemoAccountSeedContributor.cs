@@ -125,7 +125,49 @@ namespace Sms.Infrastructure.Seeding
                 Link(studentAccount, child?.UserAccountId, child?.Id ?? 0);
             }
 
+            // Restated on every run, like the person link below: a demo database seeded before the
+            // portal role was granted heals itself the next time the seeder runs, instead of keeping
+            // two accounts that sign in successfully and then meet a bare not-found at /portal.
+            await GrantPortalRoleAsync(parentAccount, cancellationToken);
+            await GrantPortalRoleAsync(studentAccount, cancellationToken);
+
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gives a demo portal account the role its account type already implies
+        /// (<see cref="RoleTemplates.ForPortalAccount"/>). The seeded templates and their default
+        /// grants are in place well before this contributor runs (orders 20 and 21), so the role is
+        /// there to be granted; a school that retired it is left alone.
+        /// </summary>
+        private async Task GrantPortalRoleAsync(UserAccount? account, CancellationToken cancellationToken)
+        {
+            if (account == null)
+            {
+                return;
+            }
+
+            var roleCode = RoleTemplates.ForPortalAccount(account.AccountType);
+            if (roleCode == null)
+            {
+                return;
+            }
+
+            var roleId = await _db.Roles
+                .Where(r => r.Code == roleCode)
+                .Select(r => (int?)r.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (roleId == null)
+            {
+                return;
+            }
+
+            var held = await _db.RoleAssignments.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(a => a.UserAccountId == account.Id && a.RoleId == roleId.Value, cancellationToken);
+            if (held == null)
+            {
+                _db.RoleAssignments.Add(new RoleAssignment { UserAccountId = account.Id, RoleId = roleId.Value, IsActive = true });
+            }
         }
 
         /// <summary>

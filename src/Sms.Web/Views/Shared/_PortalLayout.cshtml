@@ -1,5 +1,9 @@
+@using System.Collections.Generic
 @using System.Globalization
+@using Sms.Application.Security
+@using Sms.Domain.Security
 @inject Sms.Web.Services.SchoolBrandMark BrandMark
+@inject Sms.Application.Security.IPermissionService Permissions
 @{
     var culture = CultureInfo.CurrentUICulture;
     var isRtl = culture.TextInfo.IsRightToLeft;
@@ -8,12 +12,25 @@
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
     var isPortalAccount = Sms.Web.Security.PortalAreaFilter.IsPortalAccount(User.FindFirst(Sms.Web.Security.SmsClaimTypes.AccountType)?.Value);
-    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    var tabs = new (string Action, string Screen, string En, string Ar, string Icon)[]
     {
-        ("Index", "My family", "عائلتي", "bi-people"),
-        ("Statement", "My statement", "كشف حسابي", "bi-receipt"),
-        ("Announcements", "Announcements", "الإعلانات", "bi-megaphone"),
+        ("Index", ScreenCatalog.Portal.Home, "My family", "عائلتي", "bi-people"),
+        ("Statement", ScreenCatalog.Portal.Statement, "My statement", "كشف حسابي", "bi-receipt"),
+        ("Announcements", ScreenCatalog.Portal.Announcements, "Announcements", "الإعلانات", "bi-megaphone"),
     };
+
+    // BR-SEC-010: the portal's own bar hides what this account cannot open, exactly as the staff
+    // sidebar does. A student holds the portal home and the announcements but deliberately not the
+    // family's statement, and a tab that answers not-found is the disclosure the rule exists to
+    // prevent. One query answers all three — PermissionService caches per request.
+    var visibleTabs = new List<(string Action, string Screen, string En, string Ar, string Icon)>();
+    foreach (var tab in tabs)
+    {
+        if (await Permissions.HasPermissionAsync(ScreenCatalog.Modules.Portal, tab.Screen, ActionVerb.View))
+        {
+            visibleTabs.Add(tab);
+        }
+    }
 
     // BR-SCH-006: a parent signs in to their child's school, not to a product. The same mark the
     // staff shell wears, with the same generic fallback when nothing is uploaded.
@@ -42,7 +59,7 @@
     <header class="sms-portal-bar">
         <div class="d-flex align-items-center gap-3 px-3 py-2 flex-wrap" style="max-width:1100px;margin:0 auto">
             <a asp-controller="Portal" asp-action="Index" class="sms-brand text-decoration-none d-flex align-items-center gap-2"><span class="sms-brand__mark@(logoVersion.HasValue ? " sms-brand__mark--logo" : "")">@if (logoVersion is int uploaded) {<img src="@Url.Action("BrandLogo", "Home", new { v = uploaded })" alt="" class="sms-brand__logo" />} else {<i class="bi bi-mortarboard-fill" aria-hidden="true"></i>}</span><span class="fw-semibold">@(isRtl ? "بوابة أولياء الأمور والطلاب" : "Parent & student portal")</span></a>
-            <nav aria-label="@(isRtl ? "أقسام البوابة" : "Portal sections")"><ul class="nav sms-portal-nav ms-lg-3">@foreach (var t in tabs) { var active = string.Equals(action, t.Action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Index" && action == "Student"); <li class="nav-item"><a class="nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)" asp-controller="Portal" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li> }</ul></nav>
+            <nav aria-label="@(isRtl ? "أقسام البوابة" : "Portal sections")"><ul class="nav sms-portal-nav ms-lg-3">@foreach (var t in visibleTabs) { var active = string.Equals(action, t.Action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Index" && action == "Student"); <li class="nav-item"><a class="nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)" asp-controller="Portal" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li> }</ul></nav>
             <div class="ms-auto d-flex align-items-center gap-2">
                 @if (!isPortalAccount) { <a class="btn btn-sm btn-outline-secondary" asp-controller="Home" asp-action="Index" title="@(isRtl ? "شاشات الموظفين" : "Staff screens")"><i class="bi bi-arrow-left @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i> @(isRtl ? "الموظفون" : "Staff")</a> }
                 <form asp-controller="Home" asp-action="SetLanguage" method="post" class="d-inline"><input type="hidden" name="returnUrl" value="@returnUrl" /><input type="hidden" name="culture" value="@(isRtl ? "en" : "ar")" /><button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bi bi-translate" aria-hidden="true"></i> <span lang="@(isRtl ? "en" : "ar")" dir="@(isRtl ? "ltr" : "rtl")">@(isRtl ? "English" : "العربية")</span></button></form>

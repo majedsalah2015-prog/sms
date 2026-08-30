@@ -233,6 +233,7 @@ namespace Sms.Infrastructure.Security
             await _db.SaveChangesAsync(cancellationToken);
 
             await LinkPersonAsync(definition, account.Id, cancellationToken);
+            await GrantPortalRoleAsync(account, cancellationToken);
 
             // The password is minted here rather than taken from the caller: an administrator who
             // chooses it chooses the same one for everybody, and BR-SEC-005 wants a value that is
@@ -514,6 +515,45 @@ namespace Sms.Infrastructure.Security
                     throw new ArgumentOutOfRangeException(nameof(definition), definition.AccountType, null);
             }
 
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gives a portal account the one role that opens the portal (doc 06 §1's account types,
+        /// BR-SEC-006). Staff are untouched: which roles a colleague holds is the school's decision,
+        /// the screen says so on the next page, and doc 06 §7 keeps that authority separate from
+        /// this one on purpose.
+        /// <para>
+        /// Without this a provisioned parent signed in successfully and then met a bare not-found at
+        /// <c>/portal</c> — deny-by-default (BR-GLB-070) refusing an account that held no permission
+        /// at all, with nothing on any screen to say why. Nothing is widened by granting it: the
+        /// account type was chosen by the same act that created the account, the portal role reaches
+        /// only portal screens, and <c>PortalAreaFilter</c> confines the account there regardless
+        /// (BR-SEC-010).
+        /// </para>
+        /// </summary>
+        private async Task GrantPortalRoleAsync(UserAccount account, CancellationToken cancellationToken)
+        {
+            var roleCode = RoleTemplates.ForPortalAccount(account.AccountType);
+            if (roleCode == null)
+            {
+                return;
+            }
+
+            // Through the soft-active filter deliberately. A school that retired its parent template
+            // has said something, and reviving it as a side effect of creating an account is not this
+            // method's call — the account is still created, and the assignment screen can still give
+            // it a role by hand.
+            var roleId = await _db.Roles
+                .Where(r => r.Code == roleCode)
+                .Select(r => (int?)r.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (roleId == null)
+            {
+                return;
+            }
+
+            _db.RoleAssignments.Add(new RoleAssignment { UserAccountId = account.Id, RoleId = roleId.Value, IsActive = true });
             await _db.SaveChangesAsync(cancellationToken);
         }
 

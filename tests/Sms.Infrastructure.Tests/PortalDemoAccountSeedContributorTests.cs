@@ -190,5 +190,86 @@ namespace Sms.Infrastructure.Tests
 
             Assert.False(await db.UserAccounts.AnyAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName));
         }
+
+        /// <summary>The parent template as the earlier contributors (orders 20 and 21) leave it.</summary>
+        private async Task<int> AddParentRoleAsync(AppDbContext db)
+        {
+            var permission = new Permission
+            {
+                ModuleCode = ScreenCatalog.Modules.Portal,
+                ScreenCode = ScreenCatalog.Portal.Home,
+                Action = ActionVerb.View,
+            };
+            var role = new Role
+            {
+                Code = RoleTemplates.Parent,
+                Name = new LocalizedName("ولي أمر", "Parent"),
+                IsActive = true,
+            };
+
+            db.Permissions.Add(permission);
+            db.Roles.Add(role);
+            await db.SaveChangesAsync();
+
+            db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            await db.SaveChangesAsync();
+            return role.Id;
+        }
+
+        /// <summary>
+        /// The demo account is only worth having if it can open the thing it was made to demo. It
+        /// signed in and met a bare not-found at /portal until it held the role its account type
+        /// already implies.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public async Task The_demo_parent_holds_the_role_that_opens_the_portal()
+        {
+            using var db = CreateContext();
+            var roleId = await AddParentRoleAsync(db);
+            db.Parents.Add(DemoParent());
+            await db.SaveChangesAsync();
+
+            await CreateContributor(db).SeedAsync();
+
+            var account = await db.UserAccounts.SingleAsync(u => u.UserName == PortalDemoAccountSeedContributor.UserName);
+            Assert.True(await db.RoleAssignments.AnyAsync(a => a.UserAccountId == account.Id && a.RoleId == roleId));
+
+            var permissions = new PermissionService(db, new FixedUser { UserId = account.Id });
+            Assert.True(await permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, ActionVerb.View));
+        }
+
+        /// <summary>
+        /// The same repair the person link gets: a demo database seeded before the role was granted
+        /// heals on the next run rather than staying a login that reaches nothing. The pre-fix state
+        /// is built directly — a role assignment is <c>IActivatable</c>, so there is no deleting one
+        /// to simulate it, and the old contributor never wrote the row in the first place.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public async Task Repairs_an_account_seeded_without_its_portal_role()
+        {
+            using var db = CreateContext();
+            var roleId = await AddParentRoleAsync(db);
+            var parent = DemoParent();
+            db.Parents.Add(parent);
+            await db.SaveChangesAsync();
+
+            var account = new UserAccount
+            {
+                UserName = PortalDemoAccountSeedContributor.UserName,
+                AccountType = AccountType.Parent,
+                PersonId = parent.Id,
+            };
+            db.UserAccounts.Add(account);
+            await db.SaveChangesAsync();
+            parent.UserAccountId = account.Id;
+            await db.SaveChangesAsync();
+
+            await CreateContributor(db).SeedAsync();
+
+            Assert.True(await db.RoleAssignments.AnyAsync(a => a.UserAccountId == account.Id && a.RoleId == roleId));
+        }
     }
 }
