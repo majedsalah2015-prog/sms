@@ -197,6 +197,21 @@ namespace Sms.Infrastructure.Employees
             return qualification;
         }
 
+        public async Task DeleteQualificationAsync(int qualificationId, CancellationToken cancellationToken = default)
+        {
+            // SingleOrDefault, not Single: the tenant filter is what makes another school's
+            // qualification invisible here, and it should read as "no such row" rather than throw
+            // the InvalidOperationException the screen words as a refusal.
+            var qualification = await _db.Qualifications.SingleOrDefaultAsync(q => q.Id == qualificationId, cancellationToken);
+            if (qualification == null)
+            {
+                throw new QualificationNotFoundException(qualificationId);
+            }
+
+            _db.Qualifications.Remove(qualification);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         /// <summary>
         /// BR-EMP-004: an entry has to say what it is. The catalogued qualification satisfies that
         /// on its own — the screen leaves the titles empty when one is picked — and so does a

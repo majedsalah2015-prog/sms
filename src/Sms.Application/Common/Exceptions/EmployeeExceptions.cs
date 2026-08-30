@@ -47,4 +47,18 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// BR-EMP-004: the qualification being removed is not on the file — already deleted, or in
+    /// another school and therefore invisible behind the tenant filter. Its own type rather than a
+    /// bare <see cref="InvalidOperationException"/> so the Web boundary can word it (UserMessage):
+    /// two people on one file will race this the day a school corrects a register together.
+    /// </summary>
+    public class QualificationNotFoundException : InvalidOperationException
+    {
+        public QualificationNotFoundException(int qualificationId)
+            : base($"Qualification {qualificationId} is not on this school's records (BR-EMP-004).")
+        {
+        }
+    }
 }

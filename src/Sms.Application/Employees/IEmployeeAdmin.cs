@@ -52,15 +52,40 @@ namespace Sms.Application.Employees
         /// <summary>
         /// Corrects a qualification in place (T2 — field-level audit, no reason required).
         /// <para>
-        /// Six fields chosen from four dropdowns is six chances to pick the wrong row, and this
-        /// product has no delete to undo it with (BR-GLB-005). Same identification rule as
-        /// <see cref="AddQualificationAsync"/>.
+        /// Six fields chosen from four dropdowns is six chances to pick the wrong row, and a
+        /// correction is the right answer for five of them. Same identification rule as
+        /// <see cref="AddQualificationAsync"/>. See <see cref="DeleteQualificationAsync"/> for the
+        /// sixth — a row that should never have been on the file at all.
         /// </para>
         /// </summary>
         Task<Qualification> UpdateQualificationAsync(
             int qualificationId, string titleAr, string titleEn, DateTime dateAwarded, bool isTeachingRelevant,
             string? institutionName, int? educationLookupId, int? universityLookupId, int? specializationLookupId,
             int? academicGradeLookupId, decimal? gpa, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Removes a qualification from an employee's file (owner request, 2026-08-30).
+        /// <para>
+        /// A real delete, not a deactivation, and BR-GLB-005 permits it: that rule protects master
+        /// data <em>referenced by a transaction</em>, and a qualification is a detail row on one
+        /// person's file that nothing else in the model points at — no entity holds a
+        /// <c>QualificationId</c>, and the row is not <c>IActivatable</c>, so the hard-delete guard
+        /// in <c>SmsDbContext</c> allows it. The precedent is <see cref="DeleteOrgUnitAsync"/> and
+        /// <see cref="DeleteEmployeeAsync"/>, which delete on the same ground.
+        /// </para>
+        /// <para>
+        /// A qualification entered against the wrong person cannot be corrected into the right one
+        /// — <see cref="UpdateQualificationAsync"/> rewrites every field except the employee — so
+        /// without this the only way off the file was a row edited into something it never was.
+        /// </para>
+        /// <para>
+        /// Known gap, and the same one every delete path in this product has: <c>AuditCaptor</c>
+        /// collects <c>Added</c> and <c>Modified</c> only, so the removal leaves no audit entry.
+        /// Closing it means an <c>AuditAction.Delete</c> and a captor case, which is an audit-wide
+        /// change and not this one's to make.
+        /// </para>
+        /// </summary>
+        Task DeleteQualificationAsync(int qualificationId, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Corrects identity/ID fields (T1 — the ambient audit reason is required for name changes, BR-EMP-001).

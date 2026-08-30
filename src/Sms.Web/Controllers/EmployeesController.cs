@@ -512,7 +512,8 @@ namespace Sms.Web.Controllers
 
         /// <summary>
         /// Corrects a qualification already on the file. Six fields picked from four dropdowns is
-        /// six chances to pick the wrong row, and BR-GLB-005 leaves no delete to undo it with.
+        /// six chances to pick the wrong row, and a correction answers five of them — see
+        /// <see cref="DeleteQualification"/> for the sixth.
         /// </summary>
         [HttpPost("{id:int}/qualifications/{qualificationId:int}/edit")]
         [ValidateAntiForgeryToken]
@@ -530,6 +531,43 @@ namespace Sms.Web.Controllers
                 await _employees.UpdateQualificationAsync(qualificationId, (titleAr ?? string.Empty).Trim(), (titleEn ?? string.Empty).Trim(), dateAwarded!.Value, isTeachingRelevant, string.IsNullOrWhiteSpace(institution) ? null : institution.Trim(),
                     educationLookupId, universityLookupId, specializationLookupId, academicGradeLookupId, average);
                 TempData["Flash"] = T("Qualification updated.", "حُدّث المؤهل.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(File), new { id, tab = "qualifications" });
+        }
+
+        /// <summary>
+        /// Takes a qualification off the file (owner request, 2026-08-30). A real delete, on the
+        /// ground BR-GLB-005 leaves open: the rule protects master data a transaction references,
+        /// and nothing in the model holds a QualificationId.
+        /// <para>
+        /// <see cref="ActionVerb.Deactivate"/> rather than <c>Edit</c>, which is what the verb means
+        /// here (ScreenCatalog's header: Deactivate covers delete/void/cancel). Already catalogued
+        /// on this screen for <see cref="VoidDocument"/> and <see cref="Delete"/>, so no new
+        /// permission and no seeder re-run — but a role that may correct the file does not
+        /// automatically get to empty it, which is the split worth having.
+        /// </para>
+        /// </summary>
+        [HttpPost("{id:int}/qualifications/{qualificationId:int}/delete")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Deactivate)]
+        public async Task<IActionResult> DeleteQualification(int id, int qualificationId)
+        {
+            // The route's employee owns the row, as in EditQualification — without the check, one
+            // file's permission would delete any qualification in the school by guessing an id.
+            //
+            // The two ways of failing that are split, unlike in EditQualification, because delete
+            // is the verb people repost: a row belonging to someone else is a guessed id and gets
+            // NotFound, while a row that is simply gone is a stale page or a second click, and its
+            // reader deserves the sentence that tells them to reload rather than an error page.
+            var owner = await _db.Qualifications.Where(q => q.Id == qualificationId)
+                .Select(q => (int?)q.EmployeeId).SingleOrDefaultAsync(HttpContext.RequestAborted);
+            if (owner != null && owner != id) { return NotFound(); }
+
+            try
+            {
+                await _employees.DeleteQualificationAsync(qualificationId, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Qualification deleted.", "حُذف المؤهل.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
             return RedirectToAction(nameof(File), new { id, tab = "qualifications" });

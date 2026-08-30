@@ -337,6 +337,10 @@ namespace Sms.Web.Models
                 ? "الوحدة التنظيمية ما زالت مرتبطة بغيرها — انقل الوحدات التابعة لها وأعد إسناد من شغلوا مناصب فيها أولاً، فسجل المناصب لا يُحذف معها (BR-EMP-002)."
                 : "The org unit is still referenced — move its child units and reassign anyone who has held a position in it first; the position history is not deleted along with it (BR-EMP-002).",
 
+            QualificationNotFoundException => arabic
+                ? "لم يعد هذا المؤهل على الملف — يُرجَّح أنه حُذف من نافذة أخرى. أعِد تحميل الصفحة لترى ما بقي منها."
+                : "That qualification is no longer on the file — most likely it was removed from another window. Reload the page to see what remains.",
+
             EmployeeNotEligibleForTeachingException => arabic
                 ? "لا عقد سارياً لهذا الموظف اليوم، ومن لا عقد له لا يحمل صفة معلم ولا إسناداً تدريسياً — فعّل عقده أولاً (BR-TCH-001)."
                 : "This employee has no contract in force today, and without one they can hold neither a teaching designation nor a teaching assignment — activate a contract first (BR-TCH-001).",

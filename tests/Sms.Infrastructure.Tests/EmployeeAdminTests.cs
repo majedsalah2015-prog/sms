@@ -486,7 +486,7 @@ namespace Sms.Infrastructure.Tests
 
         [Fact]
         [BusinessRule("BR-EMP-004")]
-        public async Task A_qualification_can_be_corrected_in_place_because_there_is_no_delete_to_undo_a_wrong_pick()
+        public async Task A_qualification_can_be_corrected_in_place_rather_than_deleted_and_re_entered()
         {
             using var db = CreateContext();
             var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
@@ -514,6 +514,50 @@ namespace Sms.Infrastructure.Tests
                     qualification.Id, string.Empty, string.Empty, new DateTime(2016, 6, 1), isTeachingRelevant: false,
                     institutionName: null, educationLookupId: null, universityLookupId: null, specializationLookupId: null,
                     academicGradeLookupId: null, gpa: null));
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-004")]
+        public async Task A_qualification_can_be_taken_off_the_file_without_disturbing_the_rest()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            var wrong = await admin.AddQualificationAsync(
+                employee.Id, "بكالوريوس تربية", "B.Ed.", new DateTime(2015, 6, 1), isTeachingRelevant: true);
+            var kept = await admin.AddQualificationAsync(
+                employee.Id, "شهادة السلامة المخبرية", "Laboratory Safety Certificate", new DateTime(2024, 3, 1), isTeachingRelevant: false);
+
+            // A row entered against the wrong person cannot be corrected into the right one —
+            // UpdateQualificationAsync rewrites every field except the employee — so removal is the
+            // only way off the file. Permitted by BR-GLB-005 because nothing references the row.
+            await admin.DeleteQualificationAsync(wrong.Id);
+
+            Assert.False(await db.Qualifications.AnyAsync(q => q.Id == wrong.Id));
+            Assert.Equal(new[] { kept.Id }, await db.Qualifications.Where(q => q.EmployeeId == employee.Id).Select(q => q.Id).ToListAsync());
+
+            // The employee it hung off is untouched: this deletes one row, not the file.
+            Assert.True(await db.Employees.AnyAsync(e => e.Id == employee.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-004")]
+        public async Task Deleting_a_qualification_that_is_no_longer_there_is_refused_rather_than_silently_accepted()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            var qualification = await admin.AddQualificationAsync(
+                employee.Id, "بكالوريوس تربية", "B.Ed.", new DateTime(2015, 6, 1), isTeachingRelevant: true);
+
+            await admin.DeleteQualificationAsync(qualification.Id);
+
+            // Two registrars on one file, or a stale page reposted: the second delete has to say so
+            // rather than report success for work it did not do.
+            await Assert.ThrowsAsync<QualificationNotFoundException>(
+                () => admin.DeleteQualificationAsync(qualification.Id));
         }
 
         // --- E-203 screen support: identity edit, draft-contract edit, org tree ---
