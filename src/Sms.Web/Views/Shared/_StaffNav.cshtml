@@ -1,26 +1,27 @@
 @using System.Globalization
+@using Sms.Web.Navigation
+@inject Sms.Application.Security.IPermissionService Permissions
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "";
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
-    var tabs = new (string Controller, string Action, string En, string Ar, string Icon)[]
-    {
-        ("Employees", "Index", "Employee directory", "دليل الموظفين", "bi-person-badge"),
-        ("Employees", "Org", "Org chart", "الهيكل التنظيمي", "bi-diagram-3"),
-        ("Employees", "Contracts", "Contract manager", "إدارة العقود", "bi-file-earmark-text"),
-        ("Employees", "Reference", "Reference lists", "الثوابت", "bi-card-list"),
-        ("Teachers", "Index", "Teacher directory", "دليل المعلمين", "bi-person-workspace"),
-        ("Teachers", "Matrix", "Assignment matrix", "مصفوفة الإسناد", "bi-grid-3x3"),
-        ("Teachers", "Load", "Load board", "لوحة النصاب", "bi-speedometer2"),
-    };
-    bool Active((string Controller, string Action, string En, string Ar, string Icon) t) => string.Equals(t.Controller, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(t.Action, action, StringComparison.OrdinalIgnoreCase) || (t.Action == "Index" && (action == "File" || action == "Register")));
+
+    // BR-SEC-010 — the bar drops what this user cannot open, rather than offering a tab whose only
+    // answer is 404. The table and the reasoning live in StaffNavCatalog, where a test can hold
+    // each tab to the [RequirePermission] on the action it links to.
+    var tabs = await StaffNavCatalog.VisibleAsync(Permissions);
+
+    bool Active(string tabController, string tabAction) => string.Equals(tabController, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(tabAction, action, StringComparison.OrdinalIgnoreCase) || (tabAction == "Index" && (action == "File" || action == "Register")));
 }
-<nav aria-label="@(isRtl ? "شؤون الموظفين" : "Staff")">
-<ul class="nav nav-pills sms-subnav mb-4">
-    @foreach (var t in tabs)
-    {
-        var isActive = Active(t);
-        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@t.Controller" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)@if (t.Action == "Contracts") { <text> <i class="bi bi-lock" aria-hidden="true"></i><span class="visually-hidden">@(isRtl ? "مقيّد" : "restricted")</span></text> }</a></li>
-    }
-</ul>
-</nav>
+@if (tabs.Count > 0)
+{
+    <nav aria-label="@(isRtl ? "شؤون الموظفين" : "Staff")">
+    <ul class="nav nav-pills sms-subnav mb-4">
+        @foreach (var t in tabs)
+        {
+            var isActive = Active(t.Controller, t.Action);
+            <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@t.Controller" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.TitleAr : t.TitleEn)@if (t.Restricted) { <text> <i class="bi bi-lock" aria-hidden="true"></i><span class="visually-hidden">@(isRtl ? "مقيّد" : "restricted")</span></text> }</a></li>
+        }
+    </ul>
+    </nav>
+}
