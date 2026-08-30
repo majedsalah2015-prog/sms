@@ -487,13 +487,48 @@
     }
 
     window.smsTranslateTerm = translateTerm;
+    window.smsTransliterate = transliterate;
+
+    function renderer(target) {
+        return target.getAttribute('data-translit-mode') === 'term' ? translateTerm : transliterate;
+    }
+
+    // Fill one English field from its Arabic partner right now, whatever it holds.
+    // Only ever called from the helper button below: an explicit click is the one
+    // moment overwriting a spelling already in the box is the thing being asked
+    // for. The dispatched event lets the field's own listener mark itself manual,
+    // so typing in the Arabic afterwards does not quietly undo the result.
+    function fill(target) {
+        var sel = target.getAttribute('data-translit-from');
+        var source = sel ? document.querySelector(sel) : null;
+        if (!source) { return; }
+        target.value = renderer(target)(source.value);
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    // The copy-transliterate helper button of docs/UI/01 §"Bilingual entry pattern":
+    // assist only, never auto-commit. It writes the form's English boxes from the
+    // Arabic ones in one click and stops there — the typist reads the result,
+    // corrects what the dictionary got wrong, and saves. Nothing reaches the
+    // database that a human did not submit.
+    //
+    // Usage: <button type="button" data-translit-fill="#name-block"> where the
+    // selector names the block whose [data-translit-from] fields it fills.
+    function wireFillButton(button) {
+        button.addEventListener('click', function (e) {
+            e.preventDefault();
+            var scope = document.querySelector(button.getAttribute('data-translit-fill'));
+            if (!scope) { return; }
+            scope.querySelectorAll('[data-translit-from]').forEach(fill);
+        });
+    }
 
     function wire(target) {
         var sel = target.getAttribute('data-translit-from');
         var source = sel ? document.querySelector(sel) : null;
         if (!source) { return; }
         var applying = false;
-        var render = target.getAttribute('data-translit-mode') === 'term' ? translateTerm : transliterate;
+        var render = renderer(target);
         source.addEventListener('input', function () {
             if (target.getAttribute('data-translit-manual') === '1') { return; }
             applying = true;
@@ -558,6 +593,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('[data-translit-from]').forEach(wire);
+        document.querySelectorAll('[data-translit-fill]').forEach(wireFillButton);
 
         // Every English half of a bilingual pair, plus anything asking for it by
         // name. The Arabic halves are labelled too, so a screen reader and the
