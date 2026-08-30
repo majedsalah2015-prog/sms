@@ -354,5 +354,130 @@ namespace Sms.Infrastructure.Tests
                 Assert.True(await parent.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, ActionVerb.View));
             }
         }
+
+        /// <summary>
+        /// doc/Modules/37 §5 gives the student "read content" beside "submit homework". Same
+        /// enumeration trap as the row above: the parent's wildcard picks a new portal screen up by
+        /// itself and the student's list does not.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-LRN-003")]
+        public async Task A_student_and_a_parent_both_reach_their_lessons_in_the_portal()
+        {
+            await SeedAsync();
+
+            var (studentDb, student) = await AsAsync("STUDENT");
+            using (studentDb)
+            {
+                Assert.True(await student.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, ActionVerb.View));
+            }
+
+            var (parentDb, parent) = await AsAsync("PARENT");
+            using (parentDb)
+            {
+                Assert.True(await parent.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, ActionVerb.View));
+            }
+        }
+
+        /// <summary>
+        /// The defect that made the two tests above true in a fresh database and false in every
+        /// real one. A portal screen added to the matrix after a school was provisioned reached
+        /// nobody: "already holds a grant" was read as "the school has curated this role", which is
+        /// right for a cashier and wrong for the portal — a portal role is not a decision, it
+        /// follows from the account type (<c>RoleTemplates.ForPortalAccount</c>), and exactly one
+        /// seeded role opens the portal at all. <c>POR|Work</c> was catalogued on the owner's
+        /// databases, granted to nobody, and therefore hidden by the portal's own bar (BR-SEC-010):
+        /// a page that existed, worked, and could not be reached.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public async Task A_portal_screen_added_after_provisioning_still_reaches_the_family()
+        {
+            // A school provisioned before this screen existed: the portal roles hold their old
+            // grants, and the catalogue has since grown.
+            using (var db = CreateContext())
+            {
+                await new RoleTemplateSeedContributor(db).SeedAsync();
+
+                var old = new Permission { ModuleCode = ScreenCatalog.Modules.Portal, ScreenCode = ScreenCatalog.Portal.Home, Action = ActionVerb.View };
+                db.Permissions.Add(old);
+                await db.SaveChangesAsync();
+
+                foreach (var roleCode in new[] { "PARENT", "STUDENT" })
+                {
+                    var role = await db.Roles.SingleAsync(r => r.Code == roleCode);
+                    db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = old.Id });
+                }
+
+                await db.SaveChangesAsync();
+            }
+
+            using (var db = CreateContext())
+            {
+                await new PermissionSeedContributor(db).SeedAsync();
+            }
+
+            foreach (var roleCode in new[] { "PARENT", "STUDENT" })
+            {
+                var (db, service) = await AsAsync(roleCode);
+                using var _ = db;
+                Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, ActionVerb.View),
+                    $"{roleCode} never received POR/Work, so \"my work\" is invisible on every database provisioned before it shipped.");
+                Assert.True(await service.HasPermissionAsync(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, ActionVerb.View),
+                    $"{roleCode} never received POR/Lessons.");
+            }
+
+            // A top-up adds; it never duplicates, and it never reaches outside the portal.
+            using (var db = CreateContext())
+            {
+                var parentRole = await db.Roles.SingleAsync(r => r.Code == "PARENT");
+                var duplicates = await db.RolePermissions
+                    .Where(rp => rp.RoleId == parentRole.Id)
+                    .GroupBy(rp => rp.PermissionId)
+                    .Where(g => g.Count() > 1)
+                    .CountAsync();
+                Assert.Equal(0, duplicates);
+
+                var outsideThePortal = await db.RolePermissions
+                    .Where(rp => rp.RoleId == parentRole.Id)
+                    .Join(db.Permissions, rp => rp.PermissionId, p => p.Id, (rp, p) => p.ModuleCode)
+                    .Where(code => code != ScreenCatalog.Modules.Portal)
+                    .CountAsync();
+                Assert.Equal(0, outsideThePortal);
+            }
+        }
+
+        /// <summary>
+        /// The other half of that trade-off, stated so it stays deliberate: a top-up restores the
+        /// portal role's own defaults, and it is still not a way into anybody else's screens. A
+        /// staff role keeps its curation untouched — revoking from a cashier is a decision.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public async Task A_staff_roles_curation_survives_a_re_run()
+        {
+            using (var db = CreateContext())
+            {
+                await new RoleTemplateSeedContributor(db).SeedAsync();
+                var cashier = await db.Roles.SingleAsync(r => r.Code == "CASHIER");
+                var one = new Permission { ModuleCode = ScreenCatalog.Modules.Payments, ScreenCode = ScreenCatalog.Payments.Cashier, Action = ActionVerb.View };
+                db.Permissions.Add(one);
+                await db.SaveChangesAsync();
+                db.RolePermissions.Add(new RolePermission { RoleId = cashier.Id, PermissionId = one.Id });
+                await db.SaveChangesAsync();
+            }
+
+            using (var db = CreateContext())
+            {
+                await new PermissionSeedContributor(db).SeedAsync();
+            }
+
+            using (var db = CreateContext())
+            {
+                var cashier = await db.Roles.SingleAsync(r => r.Code == "CASHIER");
+                var held = await db.RolePermissions.CountAsync(rp => rp.RoleId == cashier.Id);
+                Assert.Equal(1, held);
+            }
+        }
     }
 }

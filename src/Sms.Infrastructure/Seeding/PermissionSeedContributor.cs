@@ -261,6 +261,10 @@ namespace Sms.Infrastructure.Seeding
             // the student — which is what happened to this one. It is the same page for both
             // audiences (§8.10): a student account's family is itself.
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, null),
+            // §5 gives the student "read content" beside "submit homework". The
+            // parent reads the same page (§8.10's own audience note) and reaches
+            // it through the wildcard above.
+            new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, null),
         };
 
         // ------------------------------------------------------------------ seeding
@@ -325,13 +329,26 @@ namespace Sms.Infrastructure.Seeding
                     continue;
                 }
 
-                // The system administrator is topped up on every run, unlike every other role. It is
+                // The system administrator is topped up on every run, unlike a staff role. It is
                 // the role that grants the others, so a permission it cannot reach is a permission
                 // nobody in the school can ever be given: a screen shipped after first provisioning
-                // would be invisible to the entire product, permanently and silently. Every other
-                // role keeps its curation, because revoking from a cashier is a decision and this is
+                // would be invisible to the entire product, permanently and silently. A staff role
+                // keeps its curation, because revoking from a cashier is a decision and this is
                 // not.
-                var alwaysTopUp = string.Equals(roleCode, SystemAdministrator, StringComparison.OrdinalIgnoreCase);
+                //
+                // The two portal roles are topped up for the same reason, and it is not a widening.
+                // A staff role is a decision - doc 06 §7 keeps "who exists" apart from "what they
+                // may do" precisely so a school can curate one. A portal role is not: it follows
+                // from the account type (RoleTemplates.ForPortalAccount), PortalAreaFilter already
+                // confines the account to the portal (BR-SEC-010), and exactly one seeded role opens
+                // it. So the same permanent-invisibility trap applies with nobody able to notice it,
+                // and it has already been sprung: POR|Work was added to this matrix for the student
+                // after these databases were provisioned, and reached the student on none of them -
+                // "my work" was catalogued, granted to nobody, and therefore hidden by the portal's
+                // own bar. A top-up only ever adds, so a school that granted something extra keeps it.
+                var alwaysTopUp = string.Equals(roleCode, SystemAdministrator, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(roleCode, RoleTemplates.Parent, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(roleCode, RoleTemplates.Student, StringComparison.OrdinalIgnoreCase);
                 if (rolesWithGrants.Contains(roleId) && !alwaysTopUp)
                 {
                     continue;

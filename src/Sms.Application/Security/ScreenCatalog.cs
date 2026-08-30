@@ -476,6 +476,15 @@ namespace Sms.Application.Security
             /// family's grant can never widen into a teacher's (§6).
             /// </summary>
             public const string Work = "Work";
+
+            /// <summary>
+            /// doc/Modules/37 §5 — the student's "read content" half of the
+            /// portal contract: the published lesson plans for the subjects
+            /// their grade studies, and the material filed against them (§8.2).
+            /// A <c>POR</c> permission for the same reason <see cref="Work"/> is
+            /// one — a family reads the lesson, it never edits the planner.
+            /// </summary>
+            public const string Lessons = "Lessons";
         }
 
         // ---------------------------------------------------------------- the table
@@ -772,6 +781,10 @@ namespace Sms.Application.Security
             // write surface (§8.10-11). Cataloguing Submit now would seed a
             // permission that opens nothing.
             S(Modules.Portal, Portal.Work, "My work", "واجباتي", ReadOnly),
+            // The content half of §5. ReadOnly for real and not as a placeholder:
+            // reading a lesson and downloading its material are both View, and
+            // module 37 gives the family no verb over content at all.
+            S(Modules.Portal, Portal.Lessons, "My lessons", "دروسي", ReadOnly),
         };
 
         /// <summary>Every screen in the product, in declaration order.</summary>
