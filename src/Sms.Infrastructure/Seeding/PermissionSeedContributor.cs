@@ -226,11 +226,41 @@ namespace Sms.Infrastructure.Seeding
             new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Cases, Read),
             new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Analytics, Read),
 
+            // E-Learning (doc/Modules/37 §6). The module shipped its screens with no row here at
+            // all, which made it invisible rather than merely ungranted: the sidebar and the
+            // launcher both hide a module the user can open no screen of (BR-SEC-010), so a
+            // teacher was not refused the lesson planner — they were never shown that one exists.
+            //
+            // §6 gives the planner and the resource library to "Teacher, HoD" and the homework desk
+            // to "Teacher"; BR-LRN-002 then extends a head of department's reach across their
+            // department's offerings for content *and* homework, which is why the desk is granted to
+            // both and not only to the teacher the table names. Reach is the engine's business
+            // either way — these open the screen, and BR-LRN-002 decides which (offering, section)
+            // pairs it will list.
+            //
+            // DEVIATION, inherited from ScreenCatalog rather than introduced here: §6's table names
+            // no verb for publishing a lesson or issuing homework, and the catalogue maps both onto
+            // Approve. So the null verb list is deliberate — granting only the four verbs §6 spells
+            // out would leave a teacher able to write a plan and never publish it, with no other
+            // role named to publish it for them.
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Announcements, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, null),
+            // doc/Modules/37 §6 gives "my work" to the student in the POR space. The parent reaches
+            // it through the wildcard above; the student is enumerated screen by screen, so a screen
+            // added to the portal after this list was written reaches the parent and silently misses
+            // the student — which is what happened to this one. It is the same page for both
+            // audiences (§8.10): a student account's family is itself.
+            new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, null),
         };
 
         // ------------------------------------------------------------------ seeding
