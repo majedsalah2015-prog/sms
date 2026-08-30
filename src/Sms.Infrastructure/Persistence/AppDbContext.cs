@@ -277,6 +277,8 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<LessonResource> LessonResources => Set<LessonResource>();
 
+        public DbSet<Homework> Homeworks => Set<Homework>();
+
         public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
 
         public DbSet<FeeStructureLine> FeeStructureLines => Set<FeeStructureLine>();

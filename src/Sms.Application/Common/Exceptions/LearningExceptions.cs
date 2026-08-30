@@ -1,4 +1,5 @@
 using System;
+using Sms.Application.Learning;
 using Sms.Domain.Learning;
 
 namespace Sms.Application.Common.Exceptions
@@ -58,5 +59,54 @@ namespace Sms.Application.Common.Exceptions
         }
 
         public int AttachmentId { get; }
+    }
+
+    /// <summary>BR-LRN-003/012/016 (doc/Modules/37 §4): the homework lifecycle does not offer this move. There is no un-issue, and nothing moves out of Released — that mark is Module 17's from the moment it lands.</summary>
+    public class HomeworkTransitionException : InvalidOperationException
+    {
+        public HomeworkTransitionException(int homeworkId, HomeworkStatus from, HomeworkStatus to)
+            : base($"Homework {homeworkId} cannot move from {from} to {to} (doc/Modules/37 §4).")
+        {
+            From = from;
+            To = to;
+        }
+
+        public HomeworkStatus From { get; }
+
+        public HomeworkStatus To { get; }
+    }
+
+    /// <summary>
+    /// BR-LRN-004: the homework is not in a state to be put in front of a class.
+    /// Carries the specific refusal so the Web boundary can name the actual
+    /// problem — "this needs a component" and "that day is a holiday" are
+    /// different conversations with the teacher.
+    /// </summary>
+    public class HomeworkIssueRefusedException : InvalidOperationException
+    {
+        public HomeworkIssueRefusedException(int homeworkId, HomeworkIssueRefusal reason)
+            : base($"Homework {homeworkId} cannot be issued: {reason} (BR-LRN-004).")
+        {
+            Reason = reason;
+        }
+
+        public HomeworkIssueRefusal Reason { get; }
+    }
+
+    /// <summary>
+    /// doc/Modules/37 §9: withdrawal after the due date is blocked once
+    /// submissions exist. Before the due date it is allowed and the students who
+    /// submitted are told (§12 <c>HomeworkWithdrawn</c>); after it, work already
+    /// handed in cannot be made to have never been asked for.
+    /// </summary>
+    public class HomeworkWithdrawalBlockedException : InvalidOperationException
+    {
+        public HomeworkWithdrawalBlockedException(int homeworkId, int submissionCount)
+            : base($"Homework {homeworkId} is past its due date and has {submissionCount} submission(s); it can no longer be withdrawn (doc/Modules/37 §9).")
+        {
+            SubmissionCount = submissionCount;
+        }
+
+        public int SubmissionCount { get; }
     }
 }

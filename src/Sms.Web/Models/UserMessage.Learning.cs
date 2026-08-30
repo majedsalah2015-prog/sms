@@ -1,6 +1,8 @@
 using System;
 using System.Linq;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Learning;
+using Sms.Domain.Learning;
 
 namespace Sms.Web.Models
 {
@@ -31,6 +33,45 @@ namespace Sms.Web.Models
             LessonSessionMismatchException => arabic
                 ? "الحصة المختارة لا تُدرّس هذا المقرر — اربط الدرس بحصة من حصص المقرر نفسه ليكون سجلّ ما جرى فيها، أو اتركه بلا ربط ليكون خطة أسبوعية (BR-LRN-001)."
                 : "The chosen period does not teach this offering — bind the lesson to a period of the same offering so it records what happened in it, or leave it unbound as a weekly plan (BR-LRN-001).",
+
+            HomeworkIssueRefusedException hi => hi.Reason switch
+            {
+                HomeworkIssueRefusal.GradedWithoutBlueprintComponent => arabic
+                    ? "هذا الواجب عليه درجة ولم يُحدَّد المكوّن الذي تُضاف إليه في نموذج الدرجات — حدِّده قبل التكليف، فالدرجة التي لا مكان لها تُكتشف عند الرصد بعد أن يكون الصف قد أدّى العمل (BR-LRN-004)."
+                    : "This homework carries marks but names no grading component to feed — name it before issuing. A mark with nowhere to land is discovered at release, after the class has already done the work (BR-LRN-004).",
+
+                HomeworkIssueRefusal.UngradedWithBlueprintComponent => arabic
+                    ? "هذا الواجب بلا درجة ومع ذلك يشير إلى مكوّن في نموذج الدرجات — إمّا أن تضع له درجة عظمى أو تزيل المكوّن، فالإشارة إليه تَعِد الوحدة 17 بدرجة لن تصل (BR-LRN-004)."
+                    : "This homework is ungraded yet names a grading component — either give it a maximum mark or clear the component. Naming one promises Module 17 a mark that will never arrive (BR-LRN-004).",
+
+                HomeworkIssueRefusal.DueDateOutsideAcademicYear => arabic
+                    ? "تاريخ التسليم خارج حدود العام الدراسي — اختر تاريخاً داخل العام (BR-GLB-051)."
+                    : "The due date falls outside the academic year — choose a date inside it (BR-GLB-051).",
+
+                HomeworkIssueRefusal.DueDateNotAWorkingDay => arabic
+                    ? "تاريخ التسليم ليس يوم دوام في تقويم المدرسة — عمل يُطلَب تسليمه في يوم عطلة هو عمل لا يجد أحداً يستلمه. اختر يوم دوام (BR-GLB-052)."
+                    : "The due date is not a working day in the school calendar — work due on a holiday is work due on a day nobody is there to receive it. Choose a working day (BR-GLB-052).",
+
+                _ => arabic
+                    ? "لا يمكن تكليف الصف بهذا الواجب في وضعه الحالي (BR-LRN-004)."
+                    : "This homework cannot be issued to the class as it stands (BR-LRN-004).",
+            },
+
+            HomeworkTransitionException ht => arabic
+                ? (ht.From == HomeworkStatus.Released
+                    ? "هذا الواجب رُصدت درجاته في الوحدة 17، ومن تلك اللحظة صارت الدرجة ملكها — أيّ تصحيح يجري هناك بضوابط تغيير الدرجات، لا بإرجاع الواجب هنا (BR-LRN-012)."
+                    : ht.From == HomeworkStatus.Withdrawn
+                        ? "هذا الواجب مسحوب، والمسحوب سجلّ يُقرأ لا مسوّدة تُعدَّل — كلِّف الصف بواجب جديد إن أردت إعادته (BR-LRN-016)."
+                        : "لا تُتاح هذه الحركة من حالة الواجب الحالية. ولا يوجد «إلغاء تكليف»: ما رآه الصف يُسحب بسبب معلن، لا يختفي بصمت (BR-LRN-003/016).")
+                : (ht.From == HomeworkStatus.Released
+                    ? "This homework's marks are in Module 17, and from that moment the mark is theirs — a correction happens there under mark-change control, not by rewinding the homework here (BR-LRN-012)."
+                    : ht.From == HomeworkStatus.Withdrawn
+                        ? "This homework is withdrawn, and withdrawn work is readable history rather than an editable draft — set new work if you want it back (BR-LRN-016)."
+                        : "The homework's current state does not offer this move. There is no un-issue: what the class has seen is withdrawn with a stated reason, never made to vanish quietly (BR-LRN-003/016)."),
+
+            HomeworkWithdrawalBlockedException hw => arabic
+                ? $"مرّ موعد التسليم وسلّم {hw.SubmissionCount} من الطلاب بالفعل — لا يمكن سحب عمل أُنجز وكأنه لم يُطلب قط. عالج الأمر بالتصحيح أو بملاحظة للصف (الوثيقة 37 §9)."
+                : $"The due date has passed and {hw.SubmissionCount} student(s) have already submitted — work that has been done cannot be made to have never been asked for. Handle it in marking, or with a note to the class (doc/Modules/37 §9).",
 
             LessonTransitionException => arabic
                 ? "لا تُتاح هذه الحركة من حالة الدرس الحالية: المسوّدة تُنشر أو تُسحب، والمنشور يُسحب ولا يعود مسوّدة — فالدرس الذي قرأه الطالب أمس لا يختفي اليوم بلا سبب مسجَّل (BR-LRN-003/016)."

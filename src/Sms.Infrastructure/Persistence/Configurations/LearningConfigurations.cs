@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sms.Domain.Attachments;
+using Sms.Domain.Grading;
 using Sms.Domain.Learning;
+using Sms.Domain.Sections;
 using Sms.Domain.Subjects;
 using Sms.Domain.Timetable;
 
@@ -48,6 +50,41 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasOne<Attachment>().WithMany().HasForeignKey(x => x.AttachmentId);
 
             builder.HasIndex(x => new { x.LessonId, x.DisplayOrder });
+        }
+    }
+
+    public class HomeworkConfiguration : IEntityTypeConfiguration<Homework>
+    {
+        public void Configure(EntityTypeBuilder<Homework> builder)
+        {
+            builder.ToTable("Homework", "lrn");
+            builder.Property(x => x.TitleAr).HasMaxLength(200).IsRequired();
+            builder.Property(x => x.TitleEn).HasMaxLength(200).IsRequired();
+            builder.Property(x => x.InstructionsAr).HasMaxLength(4000);
+            builder.Property(x => x.InstructionsEn).HasMaxLength(4000);
+            builder.Property(x => x.WithdrawnReason).HasMaxLength(500);
+
+            // Marks, not money: same precision as Grading's MaxScore/Score so a
+            // homework mark and the component it feeds cannot disagree on shape.
+            builder.Property(x => x.MaxMarks).HasColumnType("decimal(7,2)");
+            builder.Property(x => x.LatePenaltyPercent).HasColumnType("decimal(5,2)");
+
+            // BR-LRN-001: anchored on the offering, never on a raw Subject.
+            builder.HasOne<CurriculumOffering>().WithMany().HasForeignKey(x => x.CurriculumOfferingId);
+
+            // BR-LRN-002: work is set to one named section.
+            builder.HasOne<Section>().WithMany().HasForeignKey(x => x.SectionId);
+
+            // BR-LRN-004/012: the Module 17 component a graded homework feeds.
+            // Optional — ungraded practice names none and never reaches Module 17.
+            builder.HasOne<BlueprintComponent>().WithMany().HasForeignKey(x => x.BlueprintComponentId);
+
+            // The desk lists one section's work in due-date order (§8.3).
+            builder.HasIndex(x => new { x.SectionId, x.DueDate }, "IX_Homework_SectionId_DueDate");
+
+            // The portal asks the opposite question — what is set for this
+            // student's sections, and is it visible yet (BR-LRN-003).
+            builder.HasIndex(x => new { x.SectionId, x.Status }, "IX_Homework_SectionId_Status");
         }
     }
 }

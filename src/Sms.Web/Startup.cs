@@ -582,6 +582,7 @@ namespace Sms.Web
             // question banks, papers, online sittings and the portal write
             // surface are later slices and are not registered yet.
             services.AddScoped<ILessonAdmin, LessonAdmin>();
+            services.AddScoped<IHomeworkAdmin, HomeworkAdmin>();
 
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
