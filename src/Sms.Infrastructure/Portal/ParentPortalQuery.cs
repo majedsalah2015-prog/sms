@@ -8,8 +8,11 @@ using Sms.Application.Attendance;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Fees;
+using Sms.Application.Learning;
 using Sms.Application.Portal;
+using Sms.Domain.Common;
 using Sms.Domain.Fees;
+using Sms.Domain.Learning;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Portal
@@ -119,6 +122,93 @@ namespace Sms.Infrastructure.Portal
                     ScorePercent = r.ScorePercent,
                     BandCode = r.ScaleBandId.HasValue && bandCodes.TryGetValue(r.ScaleBandId.Value, out var code) ? code : null,
                     PublishedAtUtc = r.PublishedAtUtc,
+                })
+                .ToList();
+        }
+
+        /// <summary>
+        /// doc/Modules/37 §8.10. Work set to the section this student currently
+        /// sits in, due date first.
+        ///
+        /// <para>
+        /// The status filter comes from <see cref="HomeworkStatusTransitions.PortalVisibleStatuses"/>
+        /// rather than being spelled here, so BR-LRN-003 has one definition. A
+        /// draft is invisible by that rule, and so is withdrawn work — a family
+        /// that saw a task yesterday finds it gone today only because the
+        /// teacher withdrew it with a reason, never because a draft flickered.
+        /// </para>
+        /// </summary>
+        public async Task<IReadOnlyList<PortalSetWork>> GetSetWorkAsync(int requestingUserAccountId, int studentId, CancellationToken cancellationToken = default)
+        {
+            await EnsureAccessAsync(requestingUserAccountId, studentId, cancellationToken);
+
+            var enrollment = await _db.Enrollments
+                .Where(e => e.StudentId == studentId && e.AcademicYearId == _workingYear.AcademicYearId)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (enrollment == null)
+            {
+                return Array.Empty<PortalSetWork>();
+            }
+
+            // The section the student sits in now — an ended membership sets no
+            // work for them any more.
+            var sectionId = await _db.SectionMemberships
+                .Where(m => m.EnrollmentId == enrollment.Id && m.EffectiveToUtc == null)
+                .Select(m => (int?)m.SectionId)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (sectionId is null)
+            {
+                return Array.Empty<PortalSetWork>();
+            }
+
+            var visible = HomeworkStatusTransitions.PortalVisibleStatuses;
+            var homework = await _db.Homeworks
+                .Where(h => h.SectionId == sectionId && visible.Contains(h.Status))
+                .OrderBy(h => h.DueDate)
+                .ToListAsync(cancellationToken);
+            if (homework.Count == 0)
+            {
+                return Array.Empty<PortalSetWork>();
+            }
+
+            // The subject name is a lookup, not a picker: work set against an
+            // offering whose subject was later retired must still render, so the
+            // soft-active filter is ignored for this read (SoftActiveLookupTests).
+            var offeringIds = homework.Select(h => h.CurriculumOfferingId).Distinct().ToList();
+            var offerings = await _db.CurriculumOfferings.IgnoreQueryFilters()
+                .Where(o => offeringIds.Contains(o.Id))
+                .Select(o => new { o.Id, o.SubjectId })
+                .ToListAsync(cancellationToken);
+            var subjectIds = offerings.Select(o => o.SubjectId).Distinct().ToList();
+            var subjects = await _db.Subjects.IgnoreQueryFilters()
+                .Where(s => subjectIds.Contains(s.Id))
+                .ToDictionaryAsync(s => s.Id, s => s.Name, cancellationToken);
+            var subjectByOffering = offerings.ToDictionary(o => o.Id, o => o.SubjectId);
+
+            return homework
+                .Select(h =>
+                {
+                    LocalizedName? subjectName = null;
+                    if (subjectByOffering.TryGetValue(h.CurriculumOfferingId, out var subjectId)
+                        && subjects.TryGetValue(subjectId, out var found))
+                    {
+                        subjectName = found;
+                    }
+
+                    return new PortalSetWork
+                    {
+                        HomeworkId = h.Id,
+                        TitleAr = h.TitleAr,
+                        TitleEn = h.TitleEn,
+                        InstructionsAr = h.InstructionsAr,
+                        InstructionsEn = h.InstructionsEn,
+                        SubjectNameAr = subjectName?.NameAr ?? string.Empty,
+                        SubjectNameEn = subjectName?.NameEn ?? string.Empty,
+                        DueDate = h.DueDate,
+                        MaxMarks = h.MaxMarks,
+                        LatePenaltyApplies = h.LatenessPolicy == LatenessPolicy.AcceptWithPenalty,
+                        LatePenaltyPercent = h.LatePenaltyPercent,
+                    };
                 })
                 .ToList();
         }

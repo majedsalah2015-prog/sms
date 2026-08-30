@@ -139,6 +139,7 @@ namespace Sms.Web.Navigation
                     // it is reached from a lesson, and a tile that opens a page
                     // asking "which lesson?" is a worse door than no tile.
                     new(Sc.Modules.Learning,  Sc.Learning.Planner,        "Lesson planner",        "مخطط الدروس",      "bi-journal-text",      "Learning",  "Index"),
+                    new(Sc.Modules.Learning,  Sc.Learning.Homework,       "Homework desk",         "مكتب الواجبات",     "bi-journal-check",     "Learning",  "Homework"),
                     new(Sc.Modules.Employees, Sc.Employees.Directory,     "Employees",             "الموظفون",         "bi-person-badge",      "Employees", "Index"),
                     new(Sc.Modules.Employees, Sc.Employees.OrgChart,      "Organization chart",    "الهيكل التنظيمي",  "bi-diagram-3",         "Employees", "Org"),
                     new(Sc.Modules.Employees, Sc.Employees.Contracts,     "Contracts",             "العقود",           "bi-file-earmark-text", "Employees", "Contracts"),

@@ -1,0 +1,234 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model HomeworkDeskViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Homework desk", "مكتب الواجبات");
+    ViewData["Breadcrumb"] = T("E-learning / Homework", "التعليم الإلكتروني / الواجبات");
+    var selected = Model.SelectedKey;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "homework-help",
+        Title = T("Homework desk — help", "مكتب الواجبات — مساعدة"),
+        Intro = T("Set work for one class at a time. A draft affects nothing; issuing it is the moment the class and their families see it (BR-LRN-003).",
+            "كلِّف صفاً واحداً في كل مرة. المسوّدة لا تؤثر في شيء، والتكليف هو اللحظة التي يراها فيها الصف وأسره (BR-LRN-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("You set work for classes you teach", "تُكلِّف الصفوف التي تُدرّسها"),
+                T("The class list holds the subject-and-section pairs you hold in the published timetable, plus your department's if you head one (BR-LRN-002). Teaching a subject in one section does not let you set work for another section of it.",
+                  "تحمل قائمة الصفوف أزواج المادة والشعبة التي تحملها في الجدول المنشور، ومواد قسمك إن كنت رئيسه (BR-LRN-002). وتدريسك مادةً في شعبة لا يخوّلك تكليف شعبة أخرى بها.")),
+            new HelpPanelViewModel.Item(
+                T("Marks are optional — and the choice binds", "الدرجة اختيارية — والاختيار مُلزِم"),
+                T("Leave the mark empty for practice that never reaches the gradebook. Give it a mark and you must name the grading component it feeds, before issuing — a mark with nowhere to land is discovered at release, after the class has done the work (BR-LRN-004).",
+                  "اترك الدرجة فارغة لتدريب لا يصل إلى سجل الدرجات. وإن وضعت درجة فعليك تحديد المكوّن الذي تُضاف إليه قبل التكليف — فالدرجة التي لا مكان لها تُكتشف عند الرصد بعد أن يكون الصف قد أدّى العمل (BR-LRN-004).")),
+            new HelpPanelViewModel.Item(
+                T("The due date must be a school day", "موعد التسليم يوم دوام"),
+                T("It must fall inside the academic year (BR-GLB-051) and on a working day in the school calendar (BR-GLB-052). Work due on a holiday is work due on a day nobody is there to receive it.",
+                  "يجب أن يقع داخل العام الدراسي (BR-GLB-051) وفي يوم دوام في تقويم المدرسة (BR-GLB-052). فالعمل المطلوب تسليمه في عطلة عمل لا يجد من يستلمه.")),
+            new HelpPanelViewModel.Item(
+                T("Late work is always accepted", "العمل المتأخر مقبول دائماً"),
+                T("The lateness policy sets the penalty, never whether the work is taken (BR-LRN-005). There is no option to refuse late work, deliberately — a student who is late still did the work.",
+                  "سياسة التأخير تحدّد الخصم، لا قبول العمل من عدمه (BR-LRN-005). ولا يوجد خيار لرفض المتأخر، قصداً — فالطالب المتأخر أدّى العمل.")),
+            new HelpPanelViewModel.Item(
+                T("There is no un-issue", "لا يوجد إلغاء تكليف"),
+                T("Work the class has seen is withdrawn with a stated reason, which anyone who submitted is told (BR-LRN-016). It is never made to vanish quietly. Past the due date, once submissions exist, it cannot be withdrawn at all.",
+                  "ما رآه الصف يُسحب بسبب معلن يُبلَّغ به كل من سلّم (BR-LRN-016)، ولا يُجعل يختفي بصمت. وبعد الموعد متى وُجدت تسليمات لا يمكن سحبه إطلاقاً.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Work set to one class, due date first.", "الواجبات المكلَّف بها صف واحد، الأقرب موعداً أولاً.")</p>
+    </div>
+    <div class="d-flex align-items-center gap-2"><partial name="_HelpModal" model="help" /></div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (Model.HasNoReach)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("No classes to set work for", "لا صفوف لتكليفها")</h2>
+        <p class="text-muted mb-0">
+            @T("You set work for the subject-and-section pairs you hold in the published timetable, or for your department's subjects if you head one (BR-LRN-002). If you should have a class here, your allocation in the published timetable is where it comes from.",
+               "تُكلِّف أزواج المادة والشعبة التي تحملها في الجدول المنشور، أو مواد قسمك إن كنت رئيسه (BR-LRN-002). فإن كان ينبغي أن يكون لك صف هنا فمصدره إسنادك في الجدول المنشور.")
+        </p>
+    </div>
+}
+else
+{
+    <div class="sms-card p-3 mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label" for="pair">@T("Class", "الصف")</label>
+                <select class="form-select" id="pair" name="pair" onchange="this.form.submit()">
+                    <option value="">@T("Choose a class…", "اختر صفاً…")</option>
+                    @foreach (var s in Model.Sections)
+                    {
+                        <option value="@s.Key" selected="@(s.Key == selected)">@s.Label</option>
+                    }
+                </select>
+            </div>
+        </form>
+    </div>
+
+    @* The picker posts one value; split it so the actions keep their two ids. *@
+    <script>
+        document.getElementById('pair')?.form?.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var v = document.getElementById('pair').value;
+            if (!v) { window.location = '@Url.Action("Homework")'; return; }
+            var p = v.split(':');
+            window.location = '@Url.Action("Homework")' + '?offeringId=' + p[0] + '&sectionId=' + p[1];
+        });
+    </script>
+
+    @if (Model.SelectedOfferingId is int offeringId && Model.SelectedSectionId is int sectionId)
+    {
+        <div class="sms-card mb-3">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Work set to this class", "الواجبات المكلَّف بها هذا الصف")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Work", "الواجب")</th>
+                    <th scope="col">@T("Due", "موعد التسليم")</th>
+                    <th scope="col">@T("Marks", "الدرجة")</th>
+                    <th scope="col">@T("Status", "الحالة")</th>
+                    <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    var h = row.Homework;
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">@row.Title</div>
+                            @if (h.Status == HomeworkStatus.Withdrawn && !string.IsNullOrWhiteSpace(h.WithdrawnReason))
+                            {
+                                <div class="small text-muted">@T("Withdrawn:", "سُحب:") @h.WithdrawnReason</div>
+                            }
+                            @if (h.LatenessPolicy == LatenessPolicy.AcceptWithPenalty)
+                            {
+                                <div class="small text-muted">@T("Late penalty", "خصم التأخير"): @(h.LatePenaltyPercent?.ToString("0.##") ?? "—")%</div>
+                            }
+                        </td>
+                        <td dir="ltr" class="@(row.IsOverdue ? "text-danger" : "")">@h.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(h.MaxMarks.HasValue ? h.MaxMarks.Value.ToString("0.##") : T("Practice", "تدريب"))</td>
+                        <td><span class="badge bg-secondary">@LearningLabels.HomeworkStatus(h.Status, isRtl)</span></td>
+                        <td class="text-end">
+                            @if (h.Status == HomeworkStatus.Draft)
+                            {
+                                <form method="post" asp-action="IssueHomework" asp-route-id="@h.Id" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="offeringId" value="@offeringId" />
+                                    <input type="hidden" name="sectionId" value="@sectionId" />
+                                    <button type="submit" class="btn btn-sm btn-primary">@T("Issue", "تكليف")</button>
+                                </form>
+                            }
+                            @if (h.Status != HomeworkStatus.Withdrawn && h.Status != HomeworkStatus.Released)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#withdraw-@h.Id">@T("Withdraw", "سحب")</button>
+                            }
+                        </td>
+                    </tr>
+                    @if (h.Status != HomeworkStatus.Withdrawn && h.Status != HomeworkStatus.Released)
+                    {
+                        <tr class="collapse" id="withdraw-@h.Id">
+                            <td colspan="5">
+                                <form method="post" asp-action="WithdrawHomework" asp-route-id="@h.Id" class="row g-2 align-items-end">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="offeringId" value="@offeringId" />
+                                    <input type="hidden" name="sectionId" value="@sectionId" />
+                                    <div class="col-md-9">
+                                        <label class="form-label" for="reason-@h.Id">@T("Why is this being withdrawn?", "لماذا يُسحب هذا الواجب؟")</label>
+                                        <input class="form-control" id="reason-@h.Id" name="reason" required />
+                                        <div class="form-text">@T("Anyone who already submitted is told this (BR-LRN-016).", "يُبلَّغ بهذا كل من سلّم بالفعل (BR-LRN-016).")</div>
+                                    </div>
+                                    <div class="col-md-3"><button type="submit" class="btn btn-outline-danger w-100">@T("Withdraw", "سحب")</button></div>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">@T("No work set to this class yet.", "لم يُكلَّف هذا الصف بأي واجب بعد.")</td></tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3">@T("Set new work", "تكليف جديد")</h2>
+            <form method="post" asp-action="CreateHomework" class="row g-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="offeringId" value="@offeringId" />
+                <input type="hidden" name="sectionId" value="@sectionId" />
+
+                <div class="col-md-6">
+                    <label class="form-label" for="titleAr">@T("Title (Arabic)", "العنوان (عربي)")</label>
+                    <input class="form-control" id="titleAr" name="titleAr" dir="rtl" required />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="titleEn">@T("Title (English)", "العنوان (إنجليزي)")</label>
+                    <input class="form-control" id="titleEn" name="titleEn" dir="ltr" required />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="instructionsAr">@T("Instructions (Arabic)", "التعليمات (عربي)")</label>
+                    <textarea class="form-control" id="instructionsAr" name="instructionsAr" rows="2" dir="rtl"></textarea>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="instructionsEn">@T("Instructions (English)", "التعليمات (إنجليزي)")</label>
+                    <textarea class="form-control" id="instructionsEn" name="instructionsEn" rows="2" dir="ltr"></textarea>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="dueDate">@T("Due date", "موعد التسليم")</label>
+                    <input type="date" class="form-control" id="dueDate" name="dueDate" dir="ltr" value="@Model.DefaultDueDate.ToString("yyyy-MM-dd")" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="maxMarks">@T("Maximum marks", "الدرجة العظمى")</label>
+                    <input type="number" step="0.01" min="0" class="form-control" id="maxMarks" name="maxMarks" dir="ltr" />
+                    <div class="form-text">@T("Leave empty for ungraded practice.", "اتركه فارغاً لتدريب بلا درجة.")</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="blueprintComponentId">@T("Grading component", "مكوّن الدرجات")</label>
+                    <select class="form-select" id="blueprintComponentId" name="blueprintComponentId">
+                        <option value="">@T("None — ungraded practice", "بلا — تدريب بلا درجة")</option>
+                        @foreach (var c in Model.Components)
+                        {
+                            <option value="@c.Id">@c.Label (@c.MaxScore.ToString("0.##"))</option>
+                        }
+                    </select>
+                    @if (Model.Components.Count == 0)
+                    {
+                        <div class="form-text text-warning-emphasis">@T("This subject has no grading components yet, so only ungraded practice can be issued (BR-LRN-004).", "لا مكوّنات درجات لهذه المادة بعد، فلا يمكن تكليف غير تدريب بلا درجة (BR-LRN-004).")</div>
+                    }
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label" for="latenessPolicy">@T("Late work", "العمل المتأخر")</label>
+                    <select class="form-select" id="latenessPolicy" name="latenessPolicy">
+                        <option value="@((int)LatenessPolicy.AcceptWithoutPenalty)">@LearningLabels.LatenessPolicy(LatenessPolicy.AcceptWithoutPenalty, isRtl)</option>
+                        <option value="@((int)LatenessPolicy.AcceptWithPenalty)">@LearningLabels.LatenessPolicy(LatenessPolicy.AcceptWithPenalty, isRtl)</option>
+                    </select>
+                    <div class="form-text">@T("Late work is always accepted (BR-LRN-005).", "العمل المتأخر مقبول دائماً (BR-LRN-005).")</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="latePenaltyPercent">@T("Penalty %", "نسبة الخصم %")</label>
+                    <input type="number" step="0.01" min="0" max="100" class="form-control" id="latePenaltyPercent" name="latePenaltyPercent" dir="ltr" />
+                </div>
+
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary">@T("Save draft", "حفظ المسوّدة")</button>
+                    <span class="text-muted small ms-2">@T("A draft is invisible to the class until you issue it.", "المسوّدة غير مرئية للصف حتى تُكلِّفه بها.")</span>
+                </div>
+            </form>
+        </div>
+    }
+}

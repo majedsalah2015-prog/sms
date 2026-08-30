@@ -31,5 +31,14 @@ namespace Sms.Application.Portal
 
         /// <summary>Throws <see cref="Common.Exceptions.PortalAccessDeniedException"/> (BR-SEC-011).</summary>
         Task<PortalFeePosition> GetFeePositionAsync(int requestingUserAccountId, int studentId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// doc/Modules/37 §8.10 — the work set to this student's section, due
+        /// date first. Only issued homework is returned (BR-LRN-003 / BR-SEC-012:
+        /// the portal shows finished work only), so a draft the teacher is still
+        /// writing is invisible here exactly as it is everywhere else.
+        /// Throws <see cref="Common.Exceptions.PortalAccessDeniedException"/> (BR-SEC-011).
+        /// </summary>
+        Task<IReadOnlyList<PortalSetWork>> GetSetWorkAsync(int requestingUserAccountId, int studentId, CancellationToken cancellationToken = default);
     }
 }

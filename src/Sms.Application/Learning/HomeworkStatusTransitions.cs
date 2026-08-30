@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Sms.Domain.Learning;
 
 namespace Sms.Application.Learning
@@ -49,14 +51,26 @@ namespace Sms.Application.Learning
         }
 
         /// <summary>
+        /// BR-LRN-003: the statuses a family may see (BR-GLB-031, BR-SEC-012).
+        /// Exposed as a list as well as a predicate so a database query can
+        /// filter on the same rule the code tests — a portal query that spelled
+        /// its own status list would be a second, silently diverging copy of
+        /// BR-LRN-003.
+        /// </summary>
+        public static readonly IReadOnlyList<HomeworkStatus> PortalVisibleStatuses = new[]
+        {
+            HomeworkStatus.Issued,
+            HomeworkStatus.Collecting,
+            HomeworkStatus.Marking,
+            HomeworkStatus.Released,
+        };
+
+        /// <summary>
         /// BR-LRN-003: only issued work is visible in the portal (BR-GLB-031,
         /// BR-SEC-012). Withdrawn work stops being visible; a draft never was.
         /// </summary>
         public static bool IsVisibleToPortal(HomeworkStatus status)
-            => status is HomeworkStatus.Issued
-                or HomeworkStatus.Collecting
-                or HomeworkStatus.Marking
-                or HomeworkStatus.Released;
+            => PortalVisibleStatuses.Contains(status);
 
         /// <summary>
         /// Whether the row still accepts student work. BR-LRN-005 keeps this

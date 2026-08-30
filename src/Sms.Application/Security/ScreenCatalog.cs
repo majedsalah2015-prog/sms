@@ -457,6 +457,9 @@ namespace Sms.Application.Security
 
             /// <summary>§8.2 — the per-lesson resource library.</summary>
             public const string Resources = "Resources";
+
+            /// <summary>§8.3 — the homework desk.</summary>
+            public const string Homework = "Homework";
         }
 
         public static class Portal
@@ -465,6 +468,14 @@ namespace Sms.Application.Security
             public const string Statement = "Statement";
             public const string Announcements = "Announcements";
             public const string Child = "Child";
+
+            /// <summary>
+            /// doc/Modules/37 §8.10 — "my work". Read-only in this slice: the
+            /// submit half needs the portal's first write surface, which is its
+            /// own slice. Carries a <c>POR</c> permission, never <c>LRN</c>, so a
+            /// family's grant can never widen into a teacher's (§6).
+            /// </summary>
+            public const string Work = "Work";
         }
 
         // ---------------------------------------------------------------- the table
@@ -745,12 +756,22 @@ namespace Sms.Application.Security
             // no action answers is a grant that opens nothing.
             S(Modules.Learning, Learning.Resources, "Resource library", "مكتبة المصادر",
                 ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+            // Approve carries "issue" for the same reason it carries "publish"
+            // above: BR-LRN-003 makes issue the event a section's families see,
+            // and BR-LRN-004's gate runs on it. Deactivate is withdrawal
+            // (BR-LRN-016) — there is no delete here either.
+            S(Modules.Learning, Learning.Homework, "Homework desk", "مكتب الواجبات", CrudApprove),
 
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),
             S(Modules.Portal, Portal.Announcements, "Announcements", "الإعلانات", ReadOnly),
             S(Modules.Portal, Portal.Child, "Child view", "ملف الابن", ReadOnly),
+            // ReadOnly, not View+Submit: doc/Modules/37 §6 gives this screen a
+            // Submit verb, but nothing can be submitted until the portal has a
+            // write surface (§8.10-11). Cataloguing Submit now would seed a
+            // permission that opens nothing.
+            S(Modules.Portal, Portal.Work, "My work", "واجباتي", ReadOnly),
         };
 
         /// <summary>Every screen in the product, in declaration order.</summary>

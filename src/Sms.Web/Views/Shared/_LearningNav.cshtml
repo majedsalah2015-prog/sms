@@ -1,0 +1,20 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+    var tabs = new (string Action, string En, string Ar, string Icon)[]
+    {
+        ("Index", "Lesson planner", "مخطط الدروس", "bi-calendar3-week"),
+        ("Homework", "Homework desk", "مكتب الواجبات", "bi-journal-check"),
+    };
+    // The resource library hangs off one lesson rather than standing beside the
+    // planner, so it keeps the planner tab lit rather than adding a third tab
+    // that would have nothing to show without a lesson chosen first.
+    bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
+        || (a == "Index" && string.Equals(action, "Resources", StringComparison.OrdinalIgnoreCase));
+}
+<nav aria-label="@(isRtl ? "التعليم الإلكتروني" : "E-learning")">
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs) { var isActive = Active(t.Action); <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="Learning" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li> }
+</ul>
+</nav>

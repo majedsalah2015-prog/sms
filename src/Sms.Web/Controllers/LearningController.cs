@@ -39,7 +39,7 @@ namespace Sms.Web.Controllers
     /// </para>
     /// </summary>
     [Route("learning")]
-    public class LearningController : Controller
+    public partial class LearningController : Controller
     {
         /// <summary>
         /// doc 10 files one attachment per (owning entity, document type), so the
@@ -62,17 +62,20 @@ namespace Sms.Web.Controllers
         private const int ResourceMaxBytes = 20 * 1024 * 1024;
 
         private readonly ILessonAdmin _lessons;
+        private readonly IHomeworkAdmin _homework;
         private readonly AppDbContext _db;
         private readonly IPermissionService _permissions;
         private readonly AttachmentIntake _attachments;
 
         public LearningController(
             ILessonAdmin lessons,
+            IHomeworkAdmin homework,
             AppDbContext db,
             IPermissionService permissions,
             AttachmentIntake attachments)
         {
             _lessons = lessons;
+            _homework = homework;
             _db = db;
             _permissions = permissions;
             _attachments = attachments;
