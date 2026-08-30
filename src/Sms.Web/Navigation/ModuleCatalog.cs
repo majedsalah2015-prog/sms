@@ -5,7 +5,8 @@ using System.Linq;
 namespace Sms.Web.Navigation
 {
     /// <summary>
-    /// The 36 product modules (docs/Modules/01..36) as sidebar-facing
+    /// The product modules (docs/Modules/01..36, plus 37 whose scope was opened
+    /// on 2026-08-30 outside approved Analysis v1.0) as sidebar-facing
     /// metadata: bilingual title, icon, the epic that built its engine, and
     /// whether any real screen exists yet. Every module routes to
     /// ModulesController.Index until its own screens land; the landing page
@@ -50,6 +51,13 @@ namespace Sms.Web.Navigation
             M("EXM", "16", "Examinations", "الاختبارات", "bi-pencil-square", "academics", "E-402", "16-Examinations.md"),
             M("GRA", "17", "Grading", "الدرجات والتقييم", "bi-bar-chart-line", "academics", "E-302", "17-Grading.md", "Grading", "Index"),
             M("CRT", "18", "Certificates", "الشهادات", "bi-award", "academics", "E-403", "18-Certificates.md"),
+
+            // Module 37 sits with the academic modules although it is numbered
+            // past 36: scope opened 2026-08-30, outside approved Analysis v1.0
+            // (README Q8, GAP register G2 -> R3). Slice 1 lands the planner;
+            // homework, question banks, papers, online sittings and the portal
+            // surfaces are later slices.
+            M("LRN", "37", "E-Learning", "التعليم الإلكتروني", "bi-mortarboard", "academics", "E-901", "37-E-Learning.md", "Learning", "Index"),
 
             // Finance
             M("FEE", "19", "Fees", "الرسوم الدراسية", "bi-receipt", "finance", "E-303", "19-Fees.md", "Fees", "Index"),

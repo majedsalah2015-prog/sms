@@ -135,6 +135,10 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Teachers,  Sc.Teachers.Teachers_,      "Teachers",              "المعلمون",         "bi-person-workspace",  "Teachers",  "Index"),
                     new(Sc.Modules.Teachers,  Sc.Teachers.Assignments,    "Teaching assignments",  "الإسنادات",        "bi-grid",              "Teachers",  "Matrix"),
                     new(Sc.Modules.Teachers,  Sc.Teachers.Load,           "Teaching load",         "النصاب",           "bi-speedometer",       "Teachers",  "Load"),
+                    // Module 37 §8.1. The resource library has no tile of its own —
+                    // it is reached from a lesson, and a tile that opens a page
+                    // asking "which lesson?" is a worse door than no tile.
+                    new(Sc.Modules.Learning,  Sc.Learning.Planner,        "Lesson planner",        "مخطط الدروس",      "bi-journal-text",      "Learning",  "Index"),
                     new(Sc.Modules.Employees, Sc.Employees.Directory,     "Employees",             "الموظفون",         "bi-person-badge",      "Employees", "Index"),
                     new(Sc.Modules.Employees, Sc.Employees.OrgChart,      "Organization chart",    "الهيكل التنظيمي",  "bi-diagram-3",         "Employees", "Org"),
                     new(Sc.Modules.Employees, Sc.Employees.Contracts,     "Contracts",             "العقود",           "bi-file-earmark-text", "Employees", "Contracts"),

@@ -91,6 +91,16 @@ namespace Sms.Application.Security
             /// <summary>Module 36. The screens that decide what every other screen may be reached by.</summary>
             public const string SystemAdministration = "SYS";
 
+            /// <summary>
+            /// Module 37. E-learning: teaching material, homework and online
+            /// assessment. Scope opened 2026-08-30 and NOT part of approved
+            /// Analysis v1.0 (README Q8 kept LMS out of v1; GAP register G2).
+            /// Portal-facing e-learning screens take <see cref="Portal"/>
+            /// permissions, never these, so a portal grant can never widen into
+            /// a staff one (doc/Modules/37 §6).
+            /// </summary>
+            public const string Learning = "LRN";
+
             /// <summary>The parent/student portal. Not a <c>ModuleCatalog</c> entry — it is an audience, not a module — but it needs its own permission space so a portal grant can never widen into a staff one.</summary>
             public const string Portal = "POR";
         }
@@ -432,6 +442,23 @@ namespace Sms.Application.Security
             public const string Users = "Users";
         }
 
+        /// <summary>
+        /// Module 37 §8. Slice 1 builds screens 1 and 2 only; homework (3-5),
+        /// the question bank and paper builder (6-7), the sitting and integrity
+        /// consoles (8-9), the portal surfaces (10-11) and analytics (12) are
+        /// later slices and are deliberately absent rather than declared and
+        /// unbuilt — a catalogued screen no action answers is a grant that
+        /// opens nothing.
+        /// </summary>
+        public static class Learning
+        {
+            /// <summary>§8.1 — the offering x week planner.</summary>
+            public const string Planner = "Planner";
+
+            /// <summary>§8.2 — the per-lesson resource library.</summary>
+            public const string Resources = "Resources";
+        }
+
         public static class Portal
         {
             public const string Home = "Home";
@@ -702,6 +729,23 @@ namespace Sms.Application.Security
             // someone who may decide who exists in the system.
             S(Modules.SystemAdministration, SystemAdministration.Users, "User accounts", "حسابات المستخدمين",
                 ActionVerb.Create, ActionVerb.Edit),
+            // ---- Learning (module 37, doc/Modules/37 §6)
+            // Publish takes Approve, not Edit. The verb taxonomy above fixes
+            // Approve as "approve, reject, activate, close, publish, lock", and
+            // BR-LRN-003 makes publication the event families see and the event
+            // that raises notifications — a different authority from editing a
+            // draft nobody can read yet. DEVIATION: §6's table lists only
+            // View/Create/Edit/Deactivate for the planner and names no verb for
+            // publishing; gating it behind Edit would leave the publication gate
+            // with no permission of its own.
+            S(Modules.Learning, Learning.Planner, "Lesson planner", "مخطط الدروس", CrudApprove),
+            // No Edit verb: material is added and withdrawn, never edited in
+            // place — the file itself is re-uploaded as a new version through
+            // doc 10, which is Create's business, not Edit's. A catalogued verb
+            // no action answers is a grant that opens nothing.
+            S(Modules.Learning, Learning.Resources, "Resource library", "مكتبة المصادر",
+                ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),
             S(Modules.Portal, Portal.Statement, "Family statement", "كشف حساب الأسرة", ReadOnly),
