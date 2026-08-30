@@ -407,7 +407,7 @@ namespace Sms.Web.Models
             ("Employee", "GrandfatherNameAr") or ("Employee", "GrandfatherNameEn") => arabic ? "اسم جد الموظف" : "the employee's grandfather's name",
             ("Employee", "FamilyNameAr") or ("Employee", "FamilyNameEn") => arabic ? "اسم عائلة الموظف" : "the employee's family name",
             ("Employee", "MaritalStatus") => arabic ? "الحالة الاجتماعية للموظف" : "the employee's marital status",
-            ("Employee", "BankName") => arabic ? "بنك الموظف" : "the employee's bank",
+            ("Employee", "BankLookupId") or ("Employee", "BankName") => arabic ? "بنك الموظف" : "the employee's bank",
             ("Employee", "BankAccountNo") => arabic ? "رقم حساب الموظف البنكي" : "the employee's bank account number",
             ("Employee", "PalPayWalletNo") => arabic ? "رقم محفظة بالي بي للموظف" : "the employee's PalPay wallet number",
             ("Employee", "JawwalPayWalletNo") => arabic ? "رقم محفظة جوال بي للموظف" : "the employee's JawwalPay wallet number",

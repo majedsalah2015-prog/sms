@@ -101,6 +101,14 @@ namespace Sms.Web.Models
 
         public string? IdTypeName { get; set; }
 
+        /// <summary>
+        /// البنك as it should read on screen — the "Bank" catalogue value the employee points at,
+        /// or the free text a register entered before the catalogue was offered. Resolved in the
+        /// controller through an <c>IgnoreQueryFilters</c> read, so retiring a bank does not blank
+        /// it off the files of everyone paid into it.
+        /// </summary>
+        public string? BankName { get; set; }
+
         public IReadOnlyList<AssignmentRow> Assignments { get; set; } = Array.Empty<AssignmentRow>();
 
         public IReadOnlyList<Contract> Contracts { get; set; } = Array.Empty<Contract>();
@@ -132,6 +140,12 @@ namespace Sms.Web.Models
         public IReadOnlyList<(int Id, string Ar, string En)> Universities { get; set; } = Array.Empty<(int, string, string)>();
         public IReadOnlyList<(int Id, string Ar, string En)> Specializations { get; set; } = Array.Empty<(int, string, string)>();
         public IReadOnlyList<(int Id, string Ar, string En)> AcademicGrades { get; set; } = Array.Empty<(int, string, string)>();
+
+        // The personal tab's bank picker (owner request 2026-08-30), closing the gap the staff
+        // reference screen stated: the list was authorable and read nowhere. Active values only,
+        // for the reason the four above are — a retired bank must stop being offered for a new
+        // posting while the employees already paid into it keep its name.
+        public IReadOnlyList<(int Id, string Ar, string En)> Banks { get; set; } = Array.Empty<(int, string, string)>();
 
         /// <summary>doc 10 §5: the entity documents tab, drawn by the same partial the student file uses.</summary>
         public EntityDocumentsViewModel Documents { get; set; } = new();

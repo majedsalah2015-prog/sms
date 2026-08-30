@@ -147,15 +147,49 @@ namespace Sms.Domain.Employees
         public string? OriginTown { get; set; }
 
         /// <summary>
-        /// اسم البنك — where this employee's salary is paid.
+        /// البنك — core.LookupValue, category "Bank": the bank this employee's salary is paid
+        /// into, picked from the catalogue authored on the staff reference screen (الثوابت) rather
+        /// than typed (owner request, 2026-08-30).
+        /// <para>
+        /// Supersedes <see cref="BankName"/>, and for the reason the catalogue exists at all: two
+        /// registrars typing "بنك فلسطين" and "بنك فلسطين المحدود" produce two banks, and the
+        /// payroll transfer list built on the column afterwards groups by neither of them. It also
+        /// makes retiring a bank answerable — <c>LookupUsageQuery</c> finds every <c>*LookupId</c>
+        /// column by walking the model, so the deactivate prompt on the reference screen can say
+        /// how many employees are paid into it (BR-SET-002) instead of "0 usages, safe".
+        /// </para>
+        /// <para>
+        /// A loose int with no configured foreign key, like <c>Qualification</c>'s four catalogue
+        /// ids: a real FK would make retiring a catalogue value a migration rather than a
+        /// deactivation.
+        /// </para>
+        /// <para>
+        /// [RequiresAuditReason] for exactly the reason the two columns below carry it — this is
+        /// where the money goes, and the field being a picker rather than a text box does not make
+        /// changing it quietly acceptable.
+        /// </para>
+        /// </summary>
+        [RequiresAuditReason]
+        public int? BankLookupId { get; set; }
+
+        /// <summary>
+        /// اسم البنك as free text — the column that carried this before <see cref="BankLookupId"/>
+        /// existed, and still the only thing an imported register or a bank no catalogue names can
+        /// be written into.
+        /// <para>
+        /// Kept beside the catalogue id rather than migrated into it, exactly as
+        /// <c>Qualification.InstitutionName</c> was kept beside <c>UniversityLookupId</c>: the
+        /// values already in it were typed by a school and cannot be matched to a list that ships
+        /// empty. Readers resolve the catalogue name and fall back to this; a save that picks a
+        /// bank clears it, so no row ever holds two answers.
+        /// </para>
         /// <para>
         /// A deliberate extension beyond doc/Modules/12 §7, made at the owner's request
         /// (2026-08-23) and worth stating plainly: BR-EMP-007 holds that this system never
         /// computes a net salary and hands payroll to whoever does, as an export. Disbursement
         /// details therefore had no home here. They have one now because the school's own staff
         /// register carries them and the payroll export is the thing that will need them — but
-        /// nothing in this product pays anybody, and adding these two columns does not change
-        /// that.
+        /// nothing in this product pays anybody, and adding these columns does not change that.
         /// </para>
         /// <para>
         /// Audited with a mandatory reason, like <see cref="Contract.SalaryBasic"/>: a silent

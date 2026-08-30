@@ -107,7 +107,7 @@ namespace Sms.Infrastructure.Tests
 
             _audit.Reason = "imported from the staff register";
             await admin.UpdatePersonalDetailsAsync(
-                employee.Id, MaritalStatus.Married, "  بنك فلسطين  ", " 0123456789 ",
+                employee.Id, MaritalStatus.Married, null, "  بنك فلسطين  ", " 0123456789 ",
                 address: "  غزة - حي الرمال  ", originTown: " بيت دراس ", spouseIdTypeLookupId: 3, spouseIdNo: " 900100099 ",
                 palPayWalletNo: " 0599100011 ", jawwalPayWalletNo: " 0567100011 ");
 
@@ -125,7 +125,7 @@ namespace Sms.Infrastructure.Tests
             // A register that left the column out must leave the field unknown. An empty string
             // would read as an answer in every report and picker afterwards.
             await admin.UpdatePersonalDetailsAsync(
-                employee.Id, null, "   ", string.Empty,
+                employee.Id, null, null, "   ", string.Empty,
                 address: "  ", originTown: null, spouseIdTypeLookupId: null, spouseIdNo: string.Empty,
                 palPayWalletNo: " ", jawwalPayWalletNo: null);
 
@@ -156,7 +156,7 @@ namespace Sms.Infrastructure.Tests
 
             await Assert.ThrowsAsync<MissingAuditReasonException>(
                 () => admin.UpdatePersonalDetailsAsync(
-                    employee.Id, null, "بنك آخر", "9999999999",
+                    employee.Id, null, null, "بنك آخر", "9999999999",
                     address: null, originTown: null, spouseIdTypeLookupId: null, spouseIdNo: null,
                     palPayWalletNo: null, jawwalPayWalletNo: null));
         }
@@ -176,7 +176,7 @@ namespace Sms.Infrastructure.Tests
 
             await Assert.ThrowsAsync<MissingAuditReasonException>(
                 () => admin.UpdatePersonalDetailsAsync(
-                    employee.Id, null, null, null,
+                    employee.Id, null, null, null, null,
                     address: null, originTown: null, spouseIdTypeLookupId: null, spouseIdNo: null,
                     palPayWalletNo: "0599000000", jawwalPayWalletNo: null));
         }
@@ -195,7 +195,7 @@ namespace Sms.Infrastructure.Tests
             _audit.Reason = null;
 
             await admin.UpdatePersonalDetailsAsync(
-                employee.Id, null, null, null,
+                employee.Id, null, null, null, null,
                 address: "خان يونس - حي الأمل", originTown: "يبنا", spouseIdTypeLookupId: 3, spouseIdNo: "900100088",
                 palPayWalletNo: null, jawwalPayWalletNo: null);
 
@@ -203,6 +203,61 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal("خان يونس - حي الأمل", saved.Address);
             Assert.Equal("يبنا", saved.OriginTown);
             Assert.Equal("900100088", saved.SpouseIdNo);
+        }
+
+        // --- the bank, since it became a catalogue value ------------------------
+
+        [Fact]
+        [BusinessRule("BR-EMP-001")]
+        public async Task Picking_a_bank_from_the_catalogue_supersedes_the_free_text_rather_than_sitting_beside_it()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            _audit.Reason = "imported from the staff register";
+            await admin.UpdatePersonalDetailsAsync(
+                employee.Id, null, null, "بنك فلسطين", "0123456789",
+                address: null, originTown: null, spouseIdTypeLookupId: null, spouseIdNo: null,
+                palPayWalletNo: null, jawwalPayWalletNo: null);
+
+            var typed = await db.Employees.SingleAsync(e => e.Id == employee.Id);
+            Assert.Null(typed.BankLookupId);
+            Assert.Equal("بنك فلسطين", typed.BankName);
+
+            // The registrar then picks the catalogued row. Both columns surviving is the failure
+            // this asserts against: the employee file reads the lookup and the payroll transfer
+            // list falls back to the text, so a row holding two answers names one bank on screen
+            // and another in the export.
+            _audit.Reason = "catalogued";
+            await admin.UpdatePersonalDetailsAsync(
+                employee.Id, null, 42, "بنك فلسطين", "0123456789",
+                address: null, originTown: null, spouseIdTypeLookupId: null, spouseIdNo: null,
+                palPayWalletNo: null, jawwalPayWalletNo: null);
+
+            var picked = await db.Employees.SingleAsync(e => e.Id == employee.Id);
+            Assert.Equal(42, picked.BankLookupId);
+            Assert.Null(picked.BankName);
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-001")]
+        public async Task Changing_the_bank_the_salary_goes_to_is_refused_without_a_reason_even_though_it_is_now_a_picker()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+
+            // BankLookupId carries [RequiresAuditReason] for the same reason BankName always did.
+            // Asserted separately because the field changed shape: it would be easy to add the
+            // column, wire the picker, and leave the guard behind on the column it replaced.
+            _audit.Reason = null;
+
+            await Assert.ThrowsAsync<MissingAuditReasonException>(
+                () => admin.UpdatePersonalDetailsAsync(
+                    employee.Id, null, 42, null, null,
+                    address: null, originTown: null, spouseIdTypeLookupId: null, spouseIdNo: null,
+                    palPayWalletNo: null, jawwalPayWalletNo: null));
         }
 
         // --- the contact number the directory is built on ----------------------

@@ -103,9 +103,17 @@ namespace Sms.Application.Employees
         /// document are facts being recorded rather than decisions being defended, and are captured
         /// field-level without one.
         /// </para>
+        /// <para>
+        /// The bank arrives twice. <paramref name="bankLookupId"/> is the catalogue value the staff
+        /// reference screen authors and is what a screen should send; <paramref name="bankName"/> is
+        /// the free-text column that carried it before the catalogue was consumed, and is still what
+        /// the Excel import writes. Supplying a catalogue id clears the text, so a row never holds
+        /// two answers for the payroll export to disagree over — a caller that means to keep the
+        /// typed name must send it with a null id.
+        /// </para>
         /// </summary>
         Task<Employee> UpdatePersonalDetailsAsync(
-            int employeeId, MaritalStatus? maritalStatus, string? bankName, string? bankAccountNo,
+            int employeeId, MaritalStatus? maritalStatus, int? bankLookupId, string? bankName, string? bankAccountNo,
             string? address, string? originTown, int? spouseIdTypeLookupId, string? spouseIdNo,
             string? palPayWalletNo, string? jawwalPayWalletNo,
             CancellationToken cancellationToken = default);

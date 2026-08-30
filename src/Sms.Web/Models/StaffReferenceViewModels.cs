@@ -79,12 +79,13 @@ namespace Sms.Web.Models
                 "مجال المؤهل. تُسلَّم فارغة أيضاً — تخصصات كل مدرسة تتبع موادها.",
                 "رياضيات", "Mathematics"),
 
-            // Not consumed by the employee file yet — see EmployeesController.Reference's remarks.
-            // The note says so rather than letting a registrar fill in a list that goes nowhere.
+            // Consumed by the employee file's personal tab since 2026-08-30. The note no longer
+            // warns the list goes nowhere; it says what picking a value does, which is the thing a
+            // registrar authoring the list wants to know.
             new StaffReferenceList(
                 "Bank", "Banks", "البنوك", "Bank", "البنك", "bi-bank",
-                "The banks salaries are paid into. The employee file still records the bank as free text — this list is not yet offered there.",
-                "البنوك التي تُصرف فيها الرواتب. ملف الموظف ما زال يسجل اسم البنك نصاً حراً — وهذه القائمة لا تُعرض فيه بعد.",
+                "The banks salaries are paid into. Offered on the employee file's personal tab, and carried by the payroll transfer list.",
+                "البنوك التي تُصرف فيها الرواتب. تُعرض في تبويب البيانات الشخصية بملف الموظف، ويحملها كشف التحويل البنكي للرواتب.",
                 "بنك فلسطين", "Bank of Palestine"),
         };
 

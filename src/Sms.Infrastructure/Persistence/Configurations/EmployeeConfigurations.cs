@@ -42,6 +42,9 @@ namespace Sms.Infrastructure.Persistence.Configurations
             // an employee who is paid in cash has neither. Lengths are generous rather than
             // country-specific — an IBAN is 34 characters at most, and the bank's own name is
             // written however the school writes it.
+            // BankLookupId needs no configuration and deliberately gets no FK: lookup references
+            // are loose ints throughout this model (see QualificationConfiguration), because a real
+            // FK would make retiring a catalogue value a migration rather than a deactivation.
             builder.Property(x => x.BankName).HasMaxLength(120);
             builder.Property(x => x.BankAccountNo).HasMaxLength(40);
 

@@ -142,7 +142,12 @@ namespace Sms.Infrastructure.Seeding
                 // can be sent to. T1 with a required reason on the money fields, so the ambient
                 // reason set above is doing real work here, not decoration.
                 await _employees.UpdatePersonalDetailsAsync(
-                    employee.Id, person.Marital, person.BankName, person.BankAccountNo,
+                    // bankLookupId null, so the typed name stands: the "Bank" catalogue ships empty
+                    // for a school to author, exactly as University and Specialization do above, and
+                    // a demo that invented five banks would put rows in a list meant to be authored.
+                    // It also leaves the fallback path — a register that predates the catalogue —
+                    // as the one the demo file actually renders.
+                    employee.Id, person.Marital, null, person.BankName, person.BankAccountNo,
                     person.Address, person.OriginTown,
                     person.SpouseIdNo == null || idTypes.Count == 0 ? null : Resolve(idTypes, "NationalId"),
                     person.SpouseIdNo, person.PalPay, person.JawwalPay, cancellationToken);

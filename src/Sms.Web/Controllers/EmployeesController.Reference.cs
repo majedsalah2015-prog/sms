@@ -44,12 +44,13 @@ namespace Sms.Web.Controllers
     /// catalogue ends up with "أخرى" in it forever.
     /// </para>
     /// <para>
-    /// <b>Stated gap.</b> The Banks list is authored here and read nowhere yet:
-    /// <c>Employee.BankName</c> is still free text, so nothing counts as a usage of a bank value and
-    /// the employee file does not offer the list. Making that field point at this catalogue is a
-    /// change to the employee record and its migration, and belongs with that work rather than here.
-    /// The list's own note on screen says so, in both languages, rather than leaving a registrar to
-    /// discover it after typing forty banks.
+    /// The Banks list was authored here and read nowhere for three days: <c>Employee.BankName</c>
+    /// was free text, so nothing counted as a usage of a bank value and the employee file did not
+    /// offer the list. <c>Employee.BankLookupId</c> closed that on 2026-08-30 — the file's personal
+    /// tab now picks from this catalogue, the payroll transfer list carries what it picks, and the
+    /// deactivate prompt below can finally say how many employees are paid into a bank before it is
+    /// retired. The free-text column stays as the fallback for registers entered before the picker
+    /// and for what the Excel import writes, which still matches no catalogue.
     /// </para>
     /// </summary>
     public partial class EmployeesController

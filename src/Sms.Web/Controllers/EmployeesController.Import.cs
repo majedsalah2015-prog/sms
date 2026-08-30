@@ -264,7 +264,12 @@ namespace Sms.Web.Controllers
                             await _employees.UpdatePersonalDetailsAsync(
                                 employee.Id,
                                 candidate.MaritalStatus == null ? null : Enum.Parse<MaritalStatus>(candidate.MaritalStatus),
-                                candidate.BankName, candidate.BankAccountNo,
+
+                                // No catalogue id: the spreadsheet carries a bank as text and nothing
+                                // here matches text to a lookup — for any category, not just this one.
+                                // The name lands in the free-text column the employee file falls back
+                                // to, and a registrar can replace it with a catalogue value later.
+                                null, candidate.BankName, candidate.BankAccountNo,
                                 candidate.Address, candidate.OriginTown,
                                 candidate.SpouseIdNo == null ? null : form.SpouseIdTypeLookupId,
                                 candidate.SpouseIdNo,

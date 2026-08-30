@@ -60,6 +60,12 @@ namespace Sms.Application.Payroll
     /// destination is included because the commonest question a payslip is handed back with is
     /// "which account did this go to".
     /// </summary>
+    /// <param name="BankNameAr">
+    /// The bank, in both languages, because the caller picks the language and this layer must not.
+    /// It resolves <c>Employee.BankLookupId</c> against the "Bank" catalogue and falls back to the
+    /// free-text <c>Employee.BankName</c> for a register entered before the catalogue was offered —
+    /// where the one typed name is returned as both.
+    /// </param>
     public sealed record Payslip(
         int LineId,
         int RunId,
@@ -69,7 +75,8 @@ namespace Sms.Application.Payroll
         DateTime PaymentDate,
         PayrollRunStatus RunStatus,
         PayrollStatementEmployee Employee,
-        string? BankName,
+        string? BankNameAr,
+        string? BankNameEn,
         string? BankAccountNo,
         decimal BasicSalary,
         decimal Allowances,
@@ -83,9 +90,11 @@ namespace Sms.Application.Payroll
         string? Notes);
 
     /// <summary>One line of the file the school hands the bank.</summary>
+    /// <param name="BankNameAr">See <see cref="Payslip.BankNameAr"/> — the same pair, resolved the same way.</param>
     public sealed record BankTransferRow(
         PayrollStatementEmployee Employee,
-        string? BankName,
+        string? BankNameAr,
+        string? BankNameEn,
         string? BankAccountNo,
         string? PalPayWalletNo,
         string? JawwalPayWalletNo,

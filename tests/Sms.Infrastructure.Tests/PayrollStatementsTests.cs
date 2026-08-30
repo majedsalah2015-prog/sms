@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Common;
 using Sms.Domain.Employees;
+using Sms.Domain.Lookups;
 using Sms.Domain.Numbering;
 using Sms.Domain.Payroll;
 using Sms.Infrastructure.Audit;
@@ -274,6 +275,84 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(0, list.RowsWithoutDestination);
             Assert.True(list.Rows.Single().HasDestination);
+        }
+
+        [Fact]
+        public async Task The_bank_transfer_list_names_the_catalogued_bank_in_both_languages_and_falls_back_to_the_typed_one()
+        {
+            var catalogued = SeedEmployee("0001", 3000m, bankAccountNo: "PS00-1111");
+            SeedEmployee("0002", 2000m, bankAccountNo: "PS00-2222");
+
+            using var db = CreateContext();
+
+            // A "Bank" catalogue with one value in it, and one of the two employees pointing at it.
+            // The other keeps the free text SeedEmployee wrote, which is the register-entered-before-
+            // the-picker case the fallback exists for.
+            var category = new LookupCategory { Code = "Bank", Tier = LookupCategoryTier.ProductSeeded, Name = new LocalizedName("البنك", "Bank") };
+            db.LookupCategories.Add(category);
+            await db.SaveChangesAsync();
+
+            var value = new LookupValue { LookupCategoryId = category.Id, Code = "BOP", Name = new LocalizedName("بنك القدس", "Bank of Jerusalem"), SortOrder = 1 };
+            db.LookupValues.Add(value);
+            await db.SaveChangesAsync();
+
+            var employee = await db.Employees.SingleAsync(e => e.Id == catalogued);
+            employee.BankLookupId = value.Id;
+            employee.BankName = null;
+            _audit.Reason = "catalogued";
+            await db.SaveChangesAsync();
+
+            var admin = CreateAdmin(db);
+            var run = await admin.OpenRunAsync(2026, 9, new DateTime(2026, 9, 28));
+            await admin.GenerateLinesAsync(run.Id);
+
+            var list = await new PayrollStatements(db).BuildBankTransferListAsync(run.Id);
+
+            var picked = list.Rows.Single(r => r.BankAccountNo == "PS00-1111");
+            Assert.Equal("بنك القدس", picked.BankNameAr);
+            Assert.Equal("Bank of Jerusalem", picked.BankNameEn);
+
+            // Typed once, so it reads the same in both — the alternative would be inventing a
+            // translation the school never wrote.
+            var typed = list.Rows.Single(r => r.BankAccountNo == "PS00-2222");
+            Assert.Equal("بنك فلسطين", typed.BankNameAr);
+            Assert.Equal("بنك فلسطين", typed.BankNameEn);
+        }
+
+        [Fact]
+        public async Task Retiring_a_bank_does_not_blank_it_off_the_payslips_of_everyone_paid_into_it()
+        {
+            var employeeId = SeedEmployee("0001", 3000m, bankAccountNo: "PS00-1111");
+            using var db = CreateContext();
+
+            var category = new LookupCategory { Code = "Bank", Tier = LookupCategoryTier.ProductSeeded, Name = new LocalizedName("البنك", "Bank") };
+            db.LookupCategories.Add(category);
+            await db.SaveChangesAsync();
+
+            var value = new LookupValue { LookupCategoryId = category.Id, Code = "BOP", Name = new LocalizedName("بنك القدس", "Bank of Jerusalem"), SortOrder = 1 };
+            db.LookupValues.Add(value);
+            await db.SaveChangesAsync();
+
+            var employee = await db.Employees.SingleAsync(e => e.Id == employeeId);
+            employee.BankLookupId = value.Id;
+            _audit.Reason = "catalogued";
+            await db.SaveChangesAsync();
+
+            // BR-SET-002: the bank is retired, never deleted. The statement reads it past the
+            // soft-active filter for exactly this reason — a school tidying its catalogue must not
+            // silently unname the account last month's salary went to.
+            value.IsActive = false;
+            await db.SaveChangesAsync();
+
+            var admin = CreateAdmin(db);
+            var run = await admin.OpenRunAsync(2026, 9, new DateTime(2026, 9, 28));
+            await admin.GenerateLinesAsync(run.Id);
+            var line = await db.PayrollRunLines.SingleAsync(l => l.PayrollRunId == run.Id);
+
+            var payslip = await new PayrollStatements(db).BuildPayslipAsync(line.Id);
+
+            Assert.Equal("بنك القدس", payslip.BankNameAr);
+            Assert.Equal("Bank of Jerusalem", payslip.BankNameEn);
         }
 
         // --- the advances statements ------------------------------------------

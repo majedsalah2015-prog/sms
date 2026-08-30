@@ -98,11 +98,51 @@
 
                 <h2 class="h6 text-muted mb-3">@T("Payment details", "البيانات المالية")</h2>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label small" for="pd-bankName">@T("Bank", "البنك")</label><input name="bankName" id="pd-bankName" class="form-control form-control-sm" maxlength="120" value="@e.BankName" /></div>
+                    <div class="col-md-4">
+                        <label class="form-label small" for="pd-bankLookupId">@T("Bank", "البنك")</label>
+                        <select name="bankLookupId" id="pd-bankLookupId" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            @foreach (var b in Model.Banks)
+                            {
+                                <option value="@b.Id" selected="@(b.Id == e.BankLookupId)">@(isRtl ? b.Ar : b.En)</option>
+                            }
+                            @*  Model.Banks is the picker — active values only, so a retired bank is
+                                not in it. Without this option the select would render "—" for an
+                                employee paid into one and blank the field on the next save of an
+                                unrelated address. It stays offered to the row already holding it and
+                                to nobody else.  *@
+                            @if (e.BankLookupId != null && !Model.Banks.Any(b => b.Id == e.BankLookupId))
+                            {
+                                <option value="@e.BankLookupId" selected="selected">@Model.BankName @T("(retired)", "(ملغى)")</option>
+                            }
+                        </select>
+                        @*  The bank of a register entered before this picker existed is not in the
+                            catalogue and cannot be selected, so it stays editable as text rather
+                            than being dropped: without a field of its own it would be blanked by
+                            the next save of an unrelated address, and there would be no way to
+                            correct or clear it either. Picking from the list supersedes it —
+                            EmployeeAdmin keeps one answer, never both.  *@
+                        @if (e.BankLookupId == null && !string.IsNullOrWhiteSpace(e.BankName))
+                        {
+                            <input name="bankName" class="form-control form-control-sm mt-1" maxlength="120" value="@e.BankName" aria-label="@T("Bank, as typed before the list was offered", "البنك كما كُتب قبل توفّر القائمة")" />
+                            <div class="form-text">@T("Typed before this list was offered. Pick one above to replace it, or clear it here.", "كُتب قبل توفّر هذه القائمة. اختر بنكاً أعلاه ليحلّ محله، أو امسحه من هنا.")</div>
+                        }
+                    </div>
                     <div class="col-md-4"><label class="form-label small" for="pd-bankAccountNo">@T("Account number / IBAN", "رقم الحساب / الآيبان")</label><input name="bankAccountNo" id="pd-bankAccountNo" class="form-control form-control-sm" dir="ltr" maxlength="40" value="@e.BankAccountNo" /></div>
                     <div class="col-md-2"><label class="form-label small" for="pd-palPayWalletNo">@T("PalPay wallet", "محفظة بالي بي")</label><input name="palPayWalletNo" id="pd-palPayWalletNo" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.PalPayWalletNo" /></div>
                     <div class="col-md-2"><label class="form-label small" for="pd-jawwalPayWalletNo">@T("JawwalPay wallet", "محفظة جوال بي")</label><input name="jawwalPayWalletNo" id="pd-jawwalPayWalletNo" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.JawwalPayWalletNo" /></div>
                 </div>
+                @* The catalogue ships empty on purpose (LookupProductSeedContributor): which banks a
+                   school pays through is a local list. Say where to author it rather than leaving a
+                   registrar looking at a picker with one dash in it. *@
+                @if (Model.Banks.Count == 0)
+                {
+                    <div class="alert alert-light border small py-2 mb-3">
+                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                        @T("The bank list ships empty — a school authors its own.", "قائمة البنوك تصل فارغة — كل مدرسة تُدخل قائمتها.")
+                        <a asp-action="Reference" asp-route-list="Bank">@T("Add banks under Staff → Reference data", "أضِف البنوك من الموظفين ← الثوابت")</a>@T(", then they appear here.", "، ثم تظهر هنا.")
+                    </div>
+                }
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="pd-reason">@T("Reason (required when the marital status or a payment destination changes — T1)", "السبب (مطلوب عند تغيير الحالة الاجتماعية أو أي جهة تُصرف إليها الرواتب — T1)")</label><input name="reason" id="pd-reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
                 <div class="form-text mt-2">@T("This system never computes a salary (BR-EMP-007) — these are the destinations the payroll export carries. Nothing here pays anybody.", "هذا النظام لا يحتسب راتباً (BR-EMP-007) — وهذه هي الجهات التي يحملها تصدير الرواتب. ولا شيء هنا يصرف لأحد.")</div>
             </form>

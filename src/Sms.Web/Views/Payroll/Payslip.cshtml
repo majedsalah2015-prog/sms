@@ -86,7 +86,7 @@
             }
             else
             {
-                @p.BankName<text> </text><span dir="ltr"><code>@p.BankAccountNo</code></span>
+                @(isRtl ? p.BankNameAr : p.BankNameEn)<text> </text><span dir="ltr"><code>@p.BankAccountNo</code></span>
             }
         </dd>
     </dl>

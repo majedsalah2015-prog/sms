@@ -33,6 +33,7 @@ namespace Sms.Web.Models
             ["StudentGuardianLink/RelationshipLookupId"] = ("guardian links (relationship)", "روابط أولياء الأمر (صلة القرابة)"),
             ["Employee/NationalityLookupId"] = ("employees (nationality)", "موظفون (الجنسية)"),
             ["Employee/PrimaryIdTypeLookupId"] = ("employees (ID type)", "موظفون (نوع الهوية)"),
+            ["Employee/BankLookupId"] = ("employees (bank)", "موظفون (البنك)"),
             ["EmployeeAssignment/PositionLookupId"] = ("job postings (position)", "تعيينات (المسمى الوظيفي)"),
             ["Application/NationalityLookupId"] = ("admission applications (nationality)", "طلبات التحاق (الجنسية)"),
             ["EmergencyContact/RelationshipLookupId"] = ("emergency contacts (relationship)", "جهات اتصال للطوارئ (صلة القرابة)"),

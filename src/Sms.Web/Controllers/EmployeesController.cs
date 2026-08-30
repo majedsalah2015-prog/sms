@@ -387,16 +387,23 @@ namespace Sms.Web.Controllers
         /// unless the marital status or a payment destination actually moves, and merging them
         /// would put a mandatory-reason box in front of someone correcting a street name.
         /// </para>
+        /// <para>
+        /// <paramref name="bankLookupId"/> is the "Bank" catalogue value the picker offers;
+        /// <paramref name="bankName"/> is the free text the field held before it, still shown as a
+        /// text box on the rows that carry one so that saving an address neither discards the bank
+        /// of an employee nobody has catalogued yet nor makes it uncorrectable. The service keeps
+        /// one or the other, never both.
+        /// </para>
         /// </summary>
         [HttpPost("{id:int}/personal")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
-        public async Task<IActionResult> PersonalDetails(int id, MaritalStatus? maritalStatus, int? spouseIdTypeLookupId, string? spouseIdNo, string? address, string? originTown, string? bankName, string? bankAccountNo, string? palPayWalletNo, string? jawwalPayWalletNo, string? reason)
+        public async Task<IActionResult> PersonalDetails(int id, MaritalStatus? maritalStatus, int? spouseIdTypeLookupId, string? spouseIdNo, string? address, string? originTown, int? bankLookupId, string? bankName, string? bankAccountNo, string? palPayWalletNo, string? jawwalPayWalletNo, string? reason)
         {
             try
             {
                 _audit.Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
-                await _employees.UpdatePersonalDetailsAsync(id, maritalStatus, bankName, bankAccountNo, address, originTown, spouseIdTypeLookupId, spouseIdNo, palPayWalletNo, jawwalPayWalletNo);
+                await _employees.UpdatePersonalDetailsAsync(id, maritalStatus, bankLookupId, bankName, bankAccountNo, address, originTown, spouseIdTypeLookupId, spouseIdNo, palPayWalletNo, jawwalPayWalletNo);
                 TempData["Flash"] = T("Personal details updated.", "تم تحديث البيانات الشخصية.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
@@ -734,7 +741,12 @@ namespace Sms.Web.Controllers
             var universities = await LookupAsync("University");
             var specializations = await LookupAsync("Specialization");
             var academicGrades = await LookupAsync("AcademicGrade");
-            var names = await LookupNamesAsync("EducationLevel", "University", "Specialization", "AcademicGrade");
+
+            // The personal tab's bank joins the same two reads (owner request 2026-08-30). It is on
+            // this list rather than beside the qualifications because it is the same question:
+            // offer the active values, resolve the stored one whatever its state.
+            var banks = await LookupAsync("Bank");
+            var names = await LookupNamesAsync("EducationLevel", "University", "Specialization", "AcademicGrade", "Bank");
             string? Named(int? lookupId) => lookupId != null && names.TryGetValue(lookupId.Value, out var v) ? (IsArabic ? v.Ar : v.En) : null;
 
             var orgUnits = await _db.OrgUnits.AsNoTracking().OrderBy(u => u.NameEn).ToListAsync();
@@ -771,6 +783,12 @@ namespace Sms.Web.Controllers
                 Audit = audit.Select(a => (Action: a.Action.ToString(), Field: a.FieldName, Old: a.OldValue, New: a.NewValue, At: a.OccurredAtUtc, Actor: a.ActorUserId, Reason: a.Reason)).ToList(),
                 Nationalities = nats, IdTypes = idTypes, Positions = positions, OrgUnits = orgUnits,
                 EducationLevels = educationLevels, Universities = universities, Specializations = specializations, AcademicGrades = academicGrades,
+                Banks = banks,
+
+                // The catalogue name if the row points at one, and otherwise the free text a
+                // register entered before the picker existed — never both, and never neither
+                // silently: EmployeeAdmin clears one when the other is set.
+                BankName = Named(e.BankLookupId) ?? e.BankName,
                 Managers = await _db.Employees.AsNoTracking().Where(x => x.Id != id && x.Status == EmployeeStatus.Active).OrderBy(x => x.EmployeeNo).Take(500).ToListAsync(),
             };
         }

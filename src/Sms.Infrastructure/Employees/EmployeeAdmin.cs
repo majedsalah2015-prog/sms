@@ -247,7 +247,7 @@ namespace Sms.Infrastructure.Employees
         }
 
         public async Task<Employee> UpdatePersonalDetailsAsync(
-            int employeeId, MaritalStatus? maritalStatus, string? bankName, string? bankAccountNo,
+            int employeeId, MaritalStatus? maritalStatus, int? bankLookupId, string? bankName, string? bankAccountNo,
             string? address, string? originTown, int? spouseIdTypeLookupId, string? spouseIdNo,
             string? palPayWalletNo, string? jawwalPayWalletNo,
             CancellationToken cancellationToken = default)
@@ -258,7 +258,12 @@ namespace Sms.Infrastructure.Employees
             // out should leave the field null rather than storing an empty string that reads as an
             // answer in every report and picker afterwards.
             employee.MaritalStatus = maritalStatus;
-            employee.BankName = Blank(bankName);
+            employee.BankLookupId = bankLookupId;
+
+            // The catalogue answer wins outright rather than sitting beside the typed one: the
+            // payroll transfer list reads the lookup and falls back to this column, so a row
+            // holding both would name one bank on screen and another in the export.
+            employee.BankName = bankLookupId == null ? Blank(bankName) : null;
             employee.BankAccountNo = Blank(bankAccountNo);
             employee.Address = Blank(address);
             employee.OriginTown = Blank(originTown);

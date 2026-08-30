@@ -31,7 +31,7 @@
     // The destination actually used, in the order the school would reach for it.
     static (string Label, string? Value) Destination(BankTransferRow row, bool arabic)
     {
-        if (!string.IsNullOrWhiteSpace(row.BankAccountNo)) return (row.BankName ?? (arabic ? "حساب بنكي" : "Bank account"), row.BankAccountNo);
+        if (!string.IsNullOrWhiteSpace(row.BankAccountNo)) return ((arabic ? row.BankNameAr : row.BankNameEn) ?? (arabic ? "حساب بنكي" : "Bank account"), row.BankAccountNo);
         if (!string.IsNullOrWhiteSpace(row.PalPayWalletNo)) return (arabic ? "محفظة بالي بي" : "PalPay wallet", row.PalPayWalletNo);
         if (!string.IsNullOrWhiteSpace(row.JawwalPayWalletNo)) return (arabic ? "محفظة جوال بي" : "JawwalPay wallet", row.JawwalPayWalletNo);
         return (arabic ? "نقداً / غير محدد" : "Cash / not on file", null);

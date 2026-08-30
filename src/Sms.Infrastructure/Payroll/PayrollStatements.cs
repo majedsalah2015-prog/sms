@@ -155,6 +155,9 @@ namespace Sms.Infrastructure.Payroll
                         - (row.Run.Status == PayrollRunStatus.Paid ? 0m : i.InstallmentAmount)))
                 .ToList();
 
+            var banks = await BankNamesAsync(new[] { row.Employee }, cancellationToken);
+            var bank = banks[row.Employee.Id];
+
             return new Payslip(
                 row.Line.Id,
                 row.Run.Id,
@@ -164,7 +167,8 @@ namespace Sms.Infrastructure.Payroll
                 row.Run.PaymentDate,
                 row.Run.Status,
                 Describe(row.Employee),
-                row.Employee.BankName,
+                bank.Ar,
+                bank.En,
                 row.Employee.BankAccountNo,
                 row.Line.BasicSalary,
                 row.Line.Allowances,
@@ -189,10 +193,13 @@ namespace Sms.Infrastructure.Payroll
                 select new { Employee = employee, line.NetPay })
                 .ToListAsync(cancellationToken);
 
+            var banks = await BankNamesAsync(rows.Select(r => r.Employee).ToList(), cancellationToken);
+
             var transferRows = rows
                 .Select(r => new BankTransferRow(
                     Describe(r.Employee),
-                    r.Employee.BankName,
+                    banks[r.Employee.Id].Ar,
+                    banks[r.Employee.Id].En,
                     r.Employee.BankAccountNo,
                     r.Employee.PalPayWalletNo,
                     r.Employee.JawwalPayWalletNo,
@@ -397,6 +404,49 @@ namespace Sms.Infrastructure.Payroll
                 .ToListAsync(cancellationToken);
 
             return rows.GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
+        }
+
+        /// <summary>
+        /// The bank each of these employees is paid into, in both languages, keyed by employee id.
+        /// <para>
+        /// <c>Employee.BankLookupId</c> names a row in the "Bank" catalogue; <c>Employee.BankName</c>
+        /// is the free text that carried the answer before the catalogue was offered, and is
+        /// returned as both languages because it was typed once. A row with neither is not an error:
+        /// some staff are paid in cash or into a wallet.
+        /// </para>
+        /// <para>
+        /// <c>IgnoreQueryFilters</c> is the *lookup*, not the picker — a school that retires a bank
+        /// must not blank the name off last month's payslips — so the tenant predicate goes back on
+        /// by hand, because that call drops it along with the soft-active one.
+        /// </para>
+        /// </summary>
+        private async Task<Dictionary<int, (string? Ar, string? En)>> BankNamesAsync(
+            IReadOnlyCollection<Employee> employees, CancellationToken cancellationToken)
+        {
+            var lookupIds = employees
+                .Where(e => e.BankLookupId != null)
+                .Select(e => e.BankLookupId!.Value)
+                .Distinct()
+                .ToList();
+
+            var byLookupId = lookupIds.Count == 0
+                ? new Dictionary<int, (string Ar, string En)>()
+                : (await _db.LookupValues.IgnoreQueryFilters().AsNoTracking()
+                        .Where(v => v.SchoolId == _db.CurrentSchoolId && lookupIds.Contains(v.Id))
+                        .Select(v => new { v.Id, v.Name.NameAr, v.Name.NameEn })
+                        .ToListAsync(cancellationToken))
+                    .ToDictionary(v => v.Id, v => (Ar: v.NameAr, En: v.NameEn));
+
+            // Grouped rather than keyed straight off the list: the caller passes the employees of a
+            // run, and one appearing on two lines would turn a duplicate key into a 500 on a
+            // statement that only wanted to name their bank.
+            return employees
+                .GroupBy(e => e.Id)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.First() is var e && e.BankLookupId != null && byLookupId.TryGetValue(e.BankLookupId.Value, out var name)
+                        ? ((string?)name.Ar, (string?)name.En)
+                        : (e.BankName, e.BankName));
         }
 
         private static PayrollStatementEmployee Describe(Employee employee) =>
