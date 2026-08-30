@@ -24,6 +24,7 @@ using Sms.Domain.Grading;
 using Sms.Domain.Health;
 using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
+using Sms.Domain.Learning;
 using Sms.Domain.Library;
 using Sms.Domain.Lookups;
 using Sms.Domain.Messaging;
@@ -270,6 +271,11 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<MarkEntry> MarkEntries => Set<MarkEntry>();
 
         public DbSet<TermResult> TermResults => Set<TermResult>();
+
+        // Module 37 (doc/Modules/37 §7) — scope opened 2026-08-30, not yet approved.
+        public DbSet<Lesson> Lessons => Set<Lesson>();
+
+        public DbSet<LessonResource> LessonResources => Set<LessonResource>();
 
         public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
 

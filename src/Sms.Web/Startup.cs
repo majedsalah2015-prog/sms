@@ -89,6 +89,7 @@ using Sms.Application.Grading;
 using Sms.Application.Health;
 using Sms.Application.Installments;
 using Sms.Application.Jobs;
+using Sms.Application.Learning;
 using Sms.Application.Library;
 using Sms.Application.Lookups;
 using Sms.Application.Messaging;
@@ -140,6 +141,7 @@ using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
+using Sms.Infrastructure.Learning;
 using Sms.Infrastructure.Library;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Messaging;
@@ -571,6 +573,15 @@ namespace Sms.Web
             // rendering still needs the O6 engine decision (open); transcripts,
             // appeals, and comment banks remain deferred.
             services.AddScoped<IGradingAdmin, GradingAdmin>();
+
+            // Module 37 (doc/Modules/37 §8.1-2, BR-LRN-001/002/003/006/016) —
+            // e-learning slice 1: the lesson planner and its resource library.
+            // Scope opened 2026-08-30 at the owner's instruction and NOT part of
+            // approved Analysis v1.0; the module doc's open question 1
+            // (build-or-partner) was answered "build" by the owner. Homework,
+            // question banks, papers, online sittings and the portal write
+            // surface are later slices and are not registered yet.
+            services.AddScoped<ILessonAdmin, LessonAdmin>();
 
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly

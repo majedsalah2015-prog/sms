@@ -7,8 +7,8 @@ namespace Sms.Web.Models
     /// <summary>
     /// Every refusal the academic modules can raise, in the reader's language.
     /// <para>
-    /// Grading, examinations, attendance, the timetable, certificates, the school calendar, and the
-    /// year rollover. Most of these are met by a teacher rather than an administrator, and a teacher
+    /// Grading, examinations, attendance, the timetable, certificates, the school calendar, the
+    /// year rollover, and module 37 e-learning. Most of these are met by a teacher rather than an administrator, and a teacher
     /// meeting an untranslated refusal has no help desk sitting beside them — the sentence has to
     /// carry the rule and the way out of it on its own.
     /// </para>
@@ -22,6 +22,28 @@ namespace Sms.Web.Models
     {
         private static string? Learning(Exception exception, bool arabic) => exception switch
         {
+            // ---------------------------------------------------------------- M37 e-learning
+
+            TeachingReachException => arabic
+                ? "هذه المادة ليست من نصابك في الجدول المنشور — المعلّم ينشر لما يُدرّسه، ورئيس القسم لمواد قسمه، ولا يوجد طريق «كل الشعب» دون وكيل المدرسة. راجع إسنادك في الجدول المعتمد (BR-LRN-002)."
+                : "This subject is not yours in the published timetable — a teacher publishes to what they teach and a head of department to their department's subjects, and there is no all-sections path below Vice-Principal. Check your allocation in the published timetable (BR-LRN-002).",
+
+            LessonSessionMismatchException => arabic
+                ? "الحصة المختارة لا تُدرّس هذا المقرر — اربط الدرس بحصة من حصص المقرر نفسه ليكون سجلّ ما جرى فيها، أو اتركه بلا ربط ليكون خطة أسبوعية (BR-LRN-001)."
+                : "The chosen period does not teach this offering — bind the lesson to a period of the same offering so it records what happened in it, or leave it unbound as a weekly plan (BR-LRN-001).",
+
+            LessonTransitionException => arabic
+                ? "لا تُتاح هذه الحركة من حالة الدرس الحالية: المسوّدة تُنشر أو تُسحب، والمنشور يُسحب ولا يعود مسوّدة — فالدرس الذي قرأه الطالب أمس لا يختفي اليوم بلا سبب مسجَّل (BR-LRN-003/016)."
+                : "That move is not available from the lesson's current state: a draft is published or retired, and a published lesson is retired rather than returned to draft — content a student read yesterday does not vanish today with no reason recorded (BR-LRN-003/016).",
+
+            LessonRetiredException => arabic
+                ? "هذا الدرس مسحوب، والمسحوب سجلّ يُقرأ لا مسوّدة تُحرَّر — أنشئ درساً جديداً بدلاً من إحيائه (BR-LRN-016)."
+                : "This lesson is retired, and a retired lesson is history to read rather than a draft to edit — create a new lesson instead of reviving it (BR-LRN-016).",
+
+            ResourceNotScanCleanException => arabic
+                ? "لم يكتمل فحص هذا الملف أو تبيّن أنه مصاب، ولا يُعرض ملف غير مفحوص على طالب ولا على معلّم — انتظر انتهاء الفحص أو ارفع نسخة سليمة (BR-LRN-006)."
+                : "This file is not virus-scan clean, and an unscanned file is shown to no one, staff or student — wait for the scan to finish or upload a clean copy (BR-LRN-006).",
+
             // ---------------------------------------------------------------- M16 grading
 
             GradingScaleLockedException => arabic
