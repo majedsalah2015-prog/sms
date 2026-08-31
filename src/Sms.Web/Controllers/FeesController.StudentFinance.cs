@@ -268,6 +268,11 @@ namespace Sms.Web.Controllers
 
             var scheduled = m.Plans.SelectMany(p => p.Installments).Sum(i => i.Installment.Amount);
             m.UnscheduledTotal = Math.Max(0m, m.Gross - m.Discounted - m.Credited - scheduled);
+
+            // Last, deliberately: the basket is built from what the panels above already read —
+            // the unbilled half of the price list, the plans, the grants — so the checklist and
+            // the breakdown beside it are one query's answer rather than two.
+            m.FeeFile = await BuildFeeFilePanelAsync(m, id);
             return View(m);
         }
 

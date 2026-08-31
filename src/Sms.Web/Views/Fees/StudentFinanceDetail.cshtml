@@ -9,6 +9,9 @@
     ViewData["FinanceYear"] = Model.Year?.Id;
     var yid = Model.Year?.Id;
     var s = Model.Student;
+    // Edit and remove are offered only on the working year: both issue a credit note, and a
+    // correction belongs to the year the charge is being corrected in, not to one being browsed.
+    var canEditItems = Model.FeeFile is { CanAdjustItems: true } f && f.Blocker != FeeFileBlocker.NotWorkingYear;
     var help = new HelpPanelViewModel
     {
         Id = "stufin-detail-help", Title = T("Fee breakdown — help", "تفصيل الرسوم — مساعدة"),
@@ -69,6 +72,217 @@ else
         <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value @(Model.Remaining > 0m ? "text-danger" : "text-success")">@Model.Remaining.ToString("N2")</span><span class="sms-tile__label">@T("remaining", "المتبقي")</span></div></div>
     </div>
 
+    @* ==== the basket: items + template + discount, approved as one act (owner request, 2026-08-31) ==== *@
+    @if (Model.FeeFile is { } ff && ff.CanCommit)
+    {
+        <div class="sms-card mb-3 d-print-none" id="feefile">
+            <div class="p-2 border-bottom d-flex justify-content-between align-items-center">
+                <span class="small fw-semibold"><i class="bi bi-check2-square me-1" aria-hidden="true"></i>@T("Approve the student's finances", "اعتماد مالية الطالب")</span>
+                <span class="small text-muted">@T("nothing is billed until you approve", "لا يُفوتَر شيء حتى تعتمد")</span>
+            </div>
+
+            @if (ff.Blocker == FeeFileBlocker.NotWorkingYear)
+            {
+                <div class="p-3 small">
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("You are viewing a year other than the working year, and fees are always approved into the working year. Switch to it to build this student's fee file.", "أنت تستعرض عاماً غير عام العمل، والرسوم تُعتمد دائماً في عام العمل. انتقل إليه لبناء ملف رسوم هذا الطالب.")
+                    <a class="btn btn-sm btn-outline-primary ms-2" asp-action="StudentFinanceDetail" asp-route-id="@s.Id" asp-route-year="@ff.WorkingYearId">@T("Go to the working year", "انتقل إلى عام العمل")</a>
+                </div>
+            }
+            else if (ff.Blocker == FeeFileBlocker.NotEnrolled)
+            {
+                <div class="p-3 small text-muted">@T("This student has no active enrolment in the working year, and a price list belongs to a grade within a year — enrol them first, then approve their finances (BR-FEE-002).", "هذا الطالب غير مسجّل فعلياً في عام العمل، وقائمة الأسعار تخصّ صفاً في عام — سجّله أولاً ثم اعتمد ماليته (BR-FEE-002).")</div>
+            }
+            else if (ff.Blocker == FeeFileBlocker.NoGuardian)
+            {
+                <div class="p-3 small text-muted">@T("No guardian is linked to this student, and an invoice is always addressed to a payer — link a guardian on the student file first (BR-FEE-004).", "لا ولي أمر مرتبط بهذا الطالب، والفاتورة تُوجَّه دائماً إلى دافع — اربط ولي أمر في ملف الطالب أولاً (BR-FEE-004).")</div>
+            }
+            else if (ff.IsExhausted)
+            {
+                <div class="p-3 small text-muted"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Every priced item of this grade is billed, a plan is in place and a discount stands — there is nothing left to add. Use the edit and remove buttons on the billed items below to change what was approved.", "كل بنود هذا الصف المسعَّرة مفوترة، والخطة مُسنَدة والخصم قائم — لم يبقَ ما يُضاف. استخدم أزرار التعديل والحذف على البنود المفوترة أدناه لتغيير ما اعتُمد.")</div>
+            }
+            else
+            {
+                <form method="post" asp-action="CommitStudentFeeFile" asp-route-id="@s.Id" asp-route-year="@yid" id="feefile-form">
+                    <div class="p-3">
+                        <div class="row g-3">
+                            @* ---- 1: the items ---- *@
+                            <div class="col-lg-6">
+                                <div class="small fw-semibold mb-2">@T("Fee items", "بنود الرسوم")</div>
+                                @if (ff.Items.Count == 0)
+                                {
+                                    <p class="small text-muted mb-2">@T("Every priced item of this grade is already billed to this student.", "كل بنود هذا الصف المسعَّرة مفوترة لهذا الطالب بالفعل.")</p>
+                                }
+                                else
+                                {
+                                    <div class="border rounded">
+                                        @foreach (var it in ff.Items)
+                                        {
+                                            <label class="d-flex justify-content-between align-items-center gap-2 px-2 py-1 border-bottom mb-0">
+                                                <span class="d-flex align-items-center gap-2">
+                                                    <input class="form-check-input mt-0 feefile-item" type="checkbox" name="items" value="@it.Category.Id"
+                                                           data-amount="@it.Amount.ToString("0.00", CultureInfo.InvariantCulture)" />
+                                                    <span class="small">@(isRtl ? it.Category.NameAr : it.Category.NameEn)</span>
+                                                </span>
+                                                <span class="small text-nowrap">
+                                                    <bdi dir="ltr">@it.Amount.ToString("N2")</bdi>
+                                                    @if (it.Category.VatRate is decimal vr && vr > 0m)
+                                                    {
+                                                        <span class="text-muted">+ @T("VAT", "ض.ق.م") <bdi dir="ltr">@((vr * 100m).ToString("0.##"))%</bdi></span>
+                                                    }
+                                                </span>
+                                            </label>
+                                        }
+                                    </div>
+                                    <p class="form-text mb-0">@T("Billed at the approved structure price — an approved price is not editable here (BR-FEE-002).", "تُفوتَر بسعر الهيكل المعتمد — والسعر المعتمد غير قابل للتعديل هنا (BR-FEE-002).")</p>
+                                }
+
+                                <details class="mt-2">
+                                    <summary class="small text-primary" style="cursor:pointer">@T("Add an item that is not in the price list", "إضافة بند خارج قائمة الأسعار")</summary>
+                                    <div class="row g-2 mt-1">
+                                        <div class="col-12">
+                                            <label class="form-label small mb-0" for="ff-extra-cat">@T("Fee item", "بند الرسوم")</label>
+                                            <select class="form-select form-select-sm" id="ff-extra-cat" name="extraCategoryId">
+                                                <option value="">@T("— none —", "— بلا —")</option>
+                                                @foreach (var c in ff.AllCategories)
+                                                {
+                                                    <option value="@c.Id">@(isRtl ? c.NameAr : c.NameEn)</option>
+                                                }
+                                            </select>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small mb-0" for="ff-extra-amt">@T("Amount (before VAT)", "المبلغ (قبل الضريبة)")</label>
+                                            <input class="form-control form-control-sm" id="ff-extra-amt" name="extraAmount" type="number" step="0.01" min="0" dir="ltr" />
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small mb-0" for="ff-extra-reason">@T("Reason", "السبب")</label>
+                                            <input class="form-control form-control-sm" id="ff-extra-reason" name="extraReason" maxlength="400" />
+                                            <div class="form-text">@T("Mandatory — a manual amount is the one figure nobody can re-derive from a price list (BR-FEE-003).", "إلزامي — المبلغ اليدوي هو الرقم الوحيد الذي لا يمكن استنتاجه من قائمة أسعار (BR-FEE-003).")</div>
+                                        </div>
+                                    </div>
+                                </details>
+                            </div>
+
+                            @* ---- 2: who pays, the plan, the discount ---- *@
+                            <div class="col-lg-6">
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold mb-1" for="ff-payer">@T("Billed to", "تُوجَّه الفاتورة إلى")</label>
+                                    <select class="form-select form-select-sm" id="ff-payer" name="parentId" required>
+                                        @foreach (var g in ff.Payers)
+                                        {
+                                            <option value="@g.Parent.Id" selected="@(g.Parent.Id == ff.DefaultParentId)">@FinanceLabels.ParentName(g.Parent, isRtl)@(g.IsFinanciallyResponsible ? T(" — financially responsible", " — مسؤول مالياً") : "")</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-semibold mb-1" for="ff-template">@T("Installment template", "قالب التقسيط")</label>
+                                    @if (!ff.CanAssignPlan)
+                                    {
+                                        <p class="small text-muted mb-0">@T("You do not hold the plan-assignment permission, so no template can be chosen here.", "لا تملك صلاحية إسناد الخطط، فلا يمكن اختيار قالب هنا.")</p>
+                                    }
+                                    else if (ff.HasPlan)
+                                    {
+                                        <p class="small text-muted mb-0">@T("This student already has a plan for the year — a second one is not assigned from here (BR-INS-002). Reschedule it from the instalment plans screen.", "لهذا الطالب خطة لهذا العام بالفعل — ولا تُسنَد ثانية من هنا (BR-INS-002). أعد جدولتها من شاشة خطط التقسيط.")</p>
+                                    }
+                                    else if (ff.Templates.Count == 0)
+                                    {
+                                        <p class="small text-muted mb-0">@T("No approved template exists for this year — approve one in the template designer first (BR-INS-001).", "لا يوجد قالب معتمد لهذا العام — اعتمد قالباً في مصمّم القوالب أولاً (BR-INS-001).")</p>
+                                    }
+                                    else
+                                    {
+                                        <select class="form-select form-select-sm" id="ff-template" name="planTemplateId">
+                                            <option value="">@T("— no plan, payable on demand —", "— بلا خطة، مستحق عند الطلب —")</option>
+                                            @foreach (var t in ff.Templates)
+                                            {
+                                                <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn) — @t.Installments.Count @T("installments", "قسطاً")</option>
+                                            }
+                                        </select>
+                                        <div class="form-text">@T("The schedule is generated over the items approved above, net of the discount.", "يُولَّد الجدول على البنود المعتمدة أعلاه، صافياً من الخصم.")</div>
+                                    }
+                                </div>
+
+                                <div>
+                                    <label class="form-label small fw-semibold mb-1" for="ff-discount">@T("Discount", "الخصم")</label>
+                                    @if (!ff.CanGrantDiscount)
+                                    {
+                                        <p class="small text-muted mb-0">@T("You do not hold the discount-approval permission, so no discount can be granted here.", "لا تملك صلاحية اعتماد الخصم، فلا يمكن منح خصم هنا.")</p>
+                                    }
+                                    else if (ff.HasDiscount)
+                                    {
+                                        <p class="small text-muted mb-0">@T("A discount already stands against this student this year — see the discounts panel below.", "يوجد خصم قائم على هذا الطالب في هذا العام — انظر لوحة الخصومات أدناه.")</p>
+                                    }
+                                    else if (ff.DiscountTypes.Count == 0)
+                                    {
+                                        <p class="small text-muted mb-0">@T("No manually-granted discount type is defined — define one in the discount catalogue first.", "لا يوجد نوع خصم يُمنح يدوياً — عرّف نوعاً في كتالوج الخصومات أولاً.")</p>
+                                    }
+                                    else
+                                    {
+                                        <select class="form-select form-select-sm mb-2" id="ff-discount" name="discountTypeId">
+                                            <option value="">@T("— no discount —", "— بلا خصم —")</option>
+                                            @foreach (var d in ff.DiscountTypes)
+                                            {
+                                                <option value="@d.Id">@(isRtl ? d.NameAr : d.NameEn) — @DiscountLabels.Basis(d.Basis, isRtl)</option>
+                                            }
+                                        </select>
+                                        <div class="row g-2">
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="ff-discount-val">@T("Value (percent, or amount by type)", "القيمة (نسبة أو مبلغ حسب النوع)")</label>
+                                                <input class="form-control form-control-sm" id="ff-discount-val" name="discountValue" type="number" step="0.01" min="0" dir="ltr" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="ff-discount-reason">@T("Reason", "السبب")</label>
+                                                <input class="form-control form-control-sm" id="ff-discount-reason" name="discountReason" maxlength="400" />
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="ff-hardship" name="discountHasDocumentation" value="true" />
+                                                    <label class="form-check-label small" for="ff-hardship">@T("Hardship documentation is on file", "مستندات الحالة الاجتماعية موجودة في الملف")</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-text">@T("Approved on the spot, so it reduces the invoices above and the schedule beside them (BR-DIS-005).", "يُعتمد فوراً، فيخفض الفواتير أعلاه والجدول بجانبها (BR-DIS-005).")</div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <span class="small">
+                            @T("Selected", "المحدَّد"):
+                            <span class="fw-semibold"><bdi dir="ltr" id="ff-total">0.00</bdi></span>
+                            <span class="text-muted">@T("before VAT and discount", "قبل الضريبة والخصم")</span>
+                        </span>
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check2-square me-1" aria-hidden="true"></i>@T("Approve the student's finances", "اعتماد مالية الطالب")
+                        </button>
+                    </div>
+                </form>
+
+                @* The running figure is a plain sum of the ticked prices, nothing more. VAT, the
+                   discount and the split are computed by the engines that own those rules when the
+                   basket is approved — a second opinion rendered here would be a number the system
+                   does not stand behind. *@
+                <script>
+                    (function () {
+                        var form = document.getElementById('feefile-form');
+                        if (!form) { return; }
+                        var out = document.getElementById('ff-total');
+                        function retotal() {
+                            var sum = 0;
+                            form.querySelectorAll('.feefile-item:checked').forEach(function (b) {
+                                sum += parseFloat(b.getAttribute('data-amount')) || 0;
+                            });
+                            out.textContent = sum.toFixed(2);
+                        }
+                        form.querySelectorAll('.feefile-item').forEach(function (b) { b.addEventListener('change', retotal); });
+                        retotal();
+                    })();
+                </script>
+            }
+        </div>
+    }
+
     <div class="row g-3">
         <div class="col-lg-7">
             @* ---- how the fee is distributed: the grade's price list against what was actually billed ---- *@
@@ -120,7 +334,7 @@ else
                 {
                     <div class="table-responsive"><table class="table table-sm sms-table mb-0">
                         <caption class="visually-hidden">@T("Posted invoices for this student", "الفواتير المرحّلة لهذا الطالب")</caption>
-                        <thead><tr><th scope="col">@T("Invoice", "الفاتورة")</th><th scope="col">@T("Item", "البند")</th><th scope="col">@T("Source", "المصدر")</th><th scope="col" class="text-end">@T("Gross", "الإجمالي")</th><th scope="col" class="text-end">@T("Discount", "الخصم")</th><th scope="col" class="text-end">@T("Credit", "إشعار دائن")</th><th scope="col" class="text-end">@T("Paid", "المدفوع")</th><th scope="col" class="text-end">@T("Remaining", "المتبقي")</th></tr></thead>
+                        <thead><tr><th scope="col">@T("Invoice", "الفاتورة")</th><th scope="col">@T("Item", "البند")</th><th scope="col">@T("Source", "المصدر")</th><th scope="col" class="text-end">@T("Gross", "الإجمالي")</th><th scope="col" class="text-end">@T("Discount", "الخصم")</th><th scope="col" class="text-end">@T("Credit", "إشعار دائن")</th><th scope="col" class="text-end">@T("Paid", "المدفوع")</th><th scope="col" class="text-end">@T("Remaining", "المتبقي")</th>@if (canEditItems) { <th scope="col" class="d-print-none"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th> }</tr></thead>
                         <tbody>
                         @foreach (var r in Model.Charges)
                         {
@@ -133,10 +347,32 @@ else
                                 <td class="text-end">@if (r.Credited > 0m) { <bdi dir="ltr" class="text-success">−@r.Credited.ToString("N2")</bdi> } else { <span class="text-muted">—</span> }</td>
                                 <td class="text-end text-success">@r.Allocated.ToString("N2")</td>
                                 <td class="text-end fw-semibold @(r.Remaining > 0m ? "text-danger" : "")">@r.Remaining.ToString("N2")</td>
+                                @if (canEditItems)
+                                {
+                                    var standing = r.Charge.GrossAmount - r.Discounted - r.Credited;
+                                    <td class="text-nowrap d-print-none">
+                                        @if (standing > 0m)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1 ff-edit"
+                                                    data-charge="@r.Charge.Id" data-no="@r.Charge.ChargeNo"
+                                                    data-standing="@standing.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                    title="@T("Edit this item", "تعديل هذا البند")" aria-label="@T("Edit this item", "تعديل هذا البند")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1 ff-remove"
+                                                    data-charge="@r.Charge.Id" data-no="@r.Charge.ChargeNo"
+                                                    data-standing="@standing.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                    data-paid="@r.Allocated.ToString("0.00", CultureInfo.InvariantCulture)"
+                                                    title="@T("Remove this item", "حذف هذا البند")" aria-label="@T("Remove this item", "حذف هذا البند")"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+                                        }
+                                        else
+                                        {
+                                            <span class="small text-muted" title="@T("Nothing is left on this item to change.", "لم يبقَ من هذا البند شيء ليُغيَّر.")">—</span>
+                                        }
+                                    </td>
+                                }
                             </tr>
                         }
                         </tbody>
-                        <tfoot><tr class="fw-semibold"><td colspan="3" class="text-end">@T("Total", "المجموع")</td><td class="text-end">@Model.Gross.ToString("N2")</td><td class="text-end">@Model.Discounted.ToString("N2")</td><td class="text-end">@Model.Credited.ToString("N2")</td><td class="text-end">@Model.Allocated.ToString("N2")</td><td class="text-end @(Model.Remaining > 0m ? "text-danger" : "")">@Model.Remaining.ToString("N2")</td></tr></tfoot>
+                        <tfoot><tr class="fw-semibold"><td colspan="3" class="text-end">@T("Total", "المجموع")</td><td class="text-end">@Model.Gross.ToString("N2")</td><td class="text-end">@Model.Discounted.ToString("N2")</td><td class="text-end">@Model.Credited.ToString("N2")</td><td class="text-end">@Model.Allocated.ToString("N2")</td><td class="text-end @(Model.Remaining > 0m ? "text-danger" : "")">@Model.Remaining.ToString("N2")</td>@if (canEditItems) { <td class="d-print-none"></td> }</tr></tfoot>
                     </table></div>
                 }
             </div>
@@ -281,4 +517,102 @@ else
             }
         }
     </div>
+
+    @* ==== edit / remove a billed item ====
+       Both are credit notes, not edits: BR-GLB-005 leaves no delete verb and BR-GLB-062 makes a
+       posted invoice immutable, so the figure changes by a document that says why. One modal per
+       action rather than one per row — the form's action carries the charge id. *@
+    @if (canEditItems)
+    {
+        <div class="modal fade" id="ff-edit-modal" tabindex="-1" aria-labelledby="ff-edit-title" aria-hidden="true">
+            <div class="modal-dialog"><div class="modal-content">
+                <form method="post" id="ff-edit-form">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header">
+                        <h5 class="modal-title h6" id="ff-edit-title">@T("Edit item", "تعديل البند")</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">@T("A posted invoice is never rewritten — bringing this item down issues a credit note for the difference, which stays on the record with your reason (BR-GLB-062).", "الفاتورة المرحّلة لا يُعاد كتابتها — خفض هذا البند يُصدر إشعاراً دائناً بالفرق، يبقى في السجل مع سببك (BR-GLB-062).")</p>
+                        <p class="small mb-2">@T("Item", "البند"): <span class="font-monospace" id="ff-edit-no"></span> · @T("standing at", "قائم بـ") <bdi dir="ltr" class="fw-semibold" id="ff-edit-standing"></bdi></p>
+                        <div class="mb-2">
+                            <label class="form-label small" for="ff-edit-amount">@T("New amount", "المبلغ الجديد")</label>
+                            <input class="form-control form-control-sm" id="ff-edit-amount" name="newAmount" type="number" step="0.01" min="0" dir="ltr" required />
+                            <div class="form-text">@T("Must be lower than the current amount — to bill more, add a new item.", "يجب أن يكون أقل من المبلغ الحالي — ولزيادة المطالبة أضف بنداً جديداً.")</div>
+                        </div>
+                        <div>
+                            <label class="form-label small" for="ff-edit-reason">@T("Reason", "السبب")</label>
+                            <input class="form-control form-control-sm" id="ff-edit-reason" name="reason" maxlength="400" required />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">@T("Cancel", "إلغاء")</button>
+                        <button type="submit" class="btn btn-sm btn-primary">@T("Issue the credit note", "إصدار الإشعار الدائن")</button>
+                    </div>
+                </form>
+            </div></div>
+        </div>
+
+        <div class="modal fade" id="ff-remove-modal" tabindex="-1" aria-labelledby="ff-remove-title" aria-hidden="true">
+            <div class="modal-dialog"><div class="modal-content">
+                <form method="post" id="ff-remove-form">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-header">
+                        <h5 class="modal-title h6" id="ff-remove-title">@T("Remove item", "حذف البند")</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="small text-muted">@T("The item stops being owed and its invoice stays on file with your reason — nothing is deleted in this product (BR-GLB-005).", "يتوقف استحقاق البند وتبقى فاتورته في الملف مع سببك — لا يُحذف شيء في هذا النظام (BR-GLB-005).")</p>
+                        <p class="small mb-2">@T("Item", "البند"): <span class="font-monospace" id="ff-remove-no"></span> · @T("will be credited", "سيُخصَم") <bdi dir="ltr" class="fw-semibold" id="ff-remove-standing"></bdi></p>
+                        <div class="alert alert-warning small py-2 d-none" id="ff-remove-paid">
+                            <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Money has already been received against this item. Removing it does not reverse that payment — it leaves the payer in credit, to be refunded or re-allocated from the payments screen.", "استُلمت مبالغ على هذا البند بالفعل. حذفه لا يعكس الدفعة — بل يترك الدافع دائناً، يُردّ له أو يُعاد تخصيصه من شاشة المدفوعات.")
+                        </div>
+                        <div>
+                            <label class="form-label small" for="ff-remove-reason">@T("Reason", "السبب")</label>
+                            <input class="form-control form-control-sm" id="ff-remove-reason" name="reason" maxlength="400" required />
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">@T("Cancel", "إلغاء")</button>
+                        <button type="submit" class="btn btn-sm btn-danger">@T("Remove the item", "حذف البند")</button>
+                    </div>
+                </form>
+            </div></div>
+        </div>
+
+        <script>
+            (function () {
+                var base = '@Url.Action("StudentFinanceDetail", new { id = s.Id })';
+                var year = '@(yid?.ToString() ?? "")';
+                function wire(buttonClass, formId, modalId, fill) {
+                    var form = document.getElementById(formId);
+                    var modal = document.getElementById(modalId);
+                    if (!form || !modal) { return; }
+                    document.querySelectorAll('.' + buttonClass).forEach(function (b) {
+                        b.addEventListener('click', function () {
+                            var suffix = formId === 'ff-edit-form' ? '/adjust' : '/remove';
+                            form.action = base + '/items/' + b.getAttribute('data-charge') + suffix + (year ? '?year=' + year : '');
+                            fill(b);
+                            new bootstrap.Modal(modal).show();
+                        });
+                    });
+                }
+                wire('ff-edit', 'ff-edit-form', 'ff-edit-modal', function (b) {
+                    document.getElementById('ff-edit-no').textContent = b.getAttribute('data-no');
+                    document.getElementById('ff-edit-standing').textContent = b.getAttribute('data-standing');
+                    var amount = document.getElementById('ff-edit-amount');
+                    amount.max = b.getAttribute('data-standing');
+                    amount.value = '';
+                    document.getElementById('ff-edit-reason').value = '';
+                });
+                wire('ff-remove', 'ff-remove-form', 'ff-remove-modal', function (b) {
+                    document.getElementById('ff-remove-no').textContent = b.getAttribute('data-no');
+                    document.getElementById('ff-remove-standing').textContent = b.getAttribute('data-standing');
+                    document.getElementById('ff-remove-reason').value = '';
+                    var paid = parseFloat(b.getAttribute('data-paid')) || 0;
+                    document.getElementById('ff-remove-paid').classList.toggle('d-none', paid <= 0);
+                });
+            })();
+        </script>
+    }
 }

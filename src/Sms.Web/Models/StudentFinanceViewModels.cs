@@ -167,6 +167,13 @@ namespace Sms.Web.Models
 
         public bool CanPrintStatement { get; set; }
 
+        /// <summary>
+        /// The basket that turns this screen from a report into the place the fee file is
+        /// actually built (owner request, 2026-08-31). Null when the reader may not post
+        /// charges at all — the panel is then not rendered rather than rendered disabled.
+        /// </summary>
+        public StudentFeeFilePanel? FeeFile { get; set; }
+
         public decimal ExpectedTotal => Structure.Sum(r => r.Expected);
 
         public decimal Gross => Charges.Sum(r => r.Charge.GrossAmount);

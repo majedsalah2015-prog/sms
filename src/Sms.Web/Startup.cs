@@ -743,6 +743,12 @@ namespace Sms.Web
             // bank reconciliation, and the online gateway (BR-PAY-007,
             // dormant per doc itself) are all deferred.
             services.AddScoped<IFeeAdmin, FeeAdmin>();
+
+            // doc/Modules/19 §8.7 from the counter's side: the items, the plan and the
+            // discount chosen on one screen and committed together. Registered after the
+            // three admins it composes and owning no rule of its own — see
+            // StudentFeeFileService for why the order and the transaction are the point.
+            services.AddScoped<IStudentFeeFileService, StudentFeeFileService>();
             services.AddScoped<IPaymentAdmin, PaymentAdmin>();
 
             // S3/E-304 (Portal essentials, BR-SEC-010..013). Read-only aggregation

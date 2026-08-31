@@ -27,6 +27,28 @@ namespace Sms.Web.Models
         {
             // ---------------------------------------------------------------- M19 fees and charges
 
+            // ---------------------------------------------------------------- M19 §8.7 student fee file
+
+            EmptyFeeFileCommitException => arabic
+                ? "لم تُحدَّد أي بنود ولا قالب تقسيط ولا خصم — اختر ما تريد اعتماده للطالب أولاً."
+                : "No fee items, installment template or discount were selected — choose what to approve for the student first.",
+
+            StudentNotEnrolledForFeeFileException => arabic
+                ? "الطالب غير مسجّل في العام الحالي، وقائمة الأسعار تخصّ صفاً في عام — سجّله أولاً ثم اعتمد ماليته (BR-FEE-002)."
+                : "The student is not enrolled in the working year, and a price list belongs to a grade within a year — enrol them first, then approve their finances (BR-FEE-002).",
+
+            FeeItemAlreadyBilledException => arabic
+                ? "هذا البند مفوتَر للطالب في هذا العام بالفعل — رُحّل بينما كانت الشاشة مفتوحة؛ حدّث الصفحة لترى وضعه الحالي."
+                : "This item is already billed to the student for this year — it was posted while the screen was open; refresh the page to see where it now stands.",
+
+            FeeItemAdjustmentNotLowerException => arabic
+                ? "الفاتورة المرحّلة لا تُرفَع قيمتها، تُخفَّض فقط بإشعار دائن — أدخل مبلغاً أقل من الحالي، وإن أردت زيادة فأضف بنداً جديداً (BR-GLB-062)."
+                : "A posted invoice is only ever brought down, by credit note — enter an amount lower than the current one; to bill more, add a new item (BR-GLB-062).",
+
+            ChargeAlreadyFullyRelievedException => arabic
+                ? "لم يبقَ من هذا البند شيء — أعفته الإشعارات الدائنة والخصومات بالكامل."
+                : "Nothing is left on this item — credit notes and discounts have already relieved it in full.",
+
             FeeStructureLineNotApprovedException => arabic
                 ? "لا يوجد سعر معتمد لهذا الصف وهذه الفئة، ولا تُحتسَب رسوم بغير سعر معتمد — اعتمد السطر في هيكل الرسوم أولاً (BR-FEE-002)."
                 : "There is no approved price for this grade and fee category, and nothing can be charged without one — approve the line in the fee structure first (BR-FEE-002).",
