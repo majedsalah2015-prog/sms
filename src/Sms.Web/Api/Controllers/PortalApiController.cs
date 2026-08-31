@@ -124,6 +124,11 @@ namespace Sms.Web.Api.Controllers
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
         public async Task<ActionResult<ApiPortalAttendance>> Attendance(int id)
         {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
             var summary = await _portal.GetAttendanceSummaryAsync(_user.UserId, id, Ct);
             return new ApiPortalAttendance
             {
@@ -144,6 +149,11 @@ namespace Sms.Web.Api.Controllers
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
         public async Task<ActionResult<IReadOnlyList<ApiPortalResult>>> Results(int id)
         {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
             var results = await _portal.GetPublishedResultsAsync(_user.UserId, id, Ct);
             if (results.Count == 0)
             {
@@ -188,7 +198,14 @@ namespace Sms.Web.Api.Controllers
         [HttpGet("students/{id:int}/fees")]
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Statement, ActionVerb.View)]
         public async Task<ActionResult<ApiPortalFees>> Fees(int id)
-            => await FeesForAsync(id);
+        {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
+            return await FeesForAsync(id);
+        }
 
         /// <summary>
         /// The whole family in one call — the statement screen's figure. A child
@@ -224,6 +241,11 @@ namespace Sms.Web.Api.Controllers
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, ActionVerb.View)]
         public async Task<ActionResult<IReadOnlyList<ApiPortalHomework>>> Homework(int id)
         {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
             var work = await _portal.GetSetWorkAsync(_user.UserId, id, Ct);
             return work
                 .Select(w => new ApiPortalHomework
@@ -248,6 +270,11 @@ namespace Sms.Web.Api.Controllers
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, ActionVerb.View)]
         public async Task<ActionResult<IReadOnlyList<ApiPortalLesson>>> Lessons(int id)
         {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
             var lessons = await _portal.GetPublishedLessonsAsync(_user.UserId, id, Ct);
             return lessons
                 .Select(l => new ApiPortalLesson
@@ -360,6 +387,11 @@ namespace Sms.Web.Api.Controllers
         [RequirePermission(ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, ActionVerb.View)]
         public async Task<ActionResult<ApiPortalTimetable>> Timetable(int id)
         {
+            if (!await StudentExistsAsync(id))
+            {
+                return NotFoundError();
+            }
+
             // Asked of the gate, not of the URL: the cheapest read that carries the
             // BR-SEC-011 check, so a guessed student id never reaches the timetable.
             await _portal.GetAttendanceSummaryAsync(_user.UserId, id, Ct);
@@ -479,6 +511,35 @@ namespace Sms.Web.Api.Controllers
                     .ToList(),
             };
         }
+
+        /// <summary>
+        /// Whether this student exists at all, asked before the BR-SEC-011 gate is.
+        /// <para>
+        /// <b>Why the gate is not enough.</b> <c>IParentPortalQuery</c> resolves the
+        /// student with <c>SingleAsync</c>, which throws
+        /// <c>InvalidOperationException("Sequence contains no elements")</c> for an id
+        /// that is not there — a fault, not a refusal, and
+        /// <see cref="ApiProblem"/> rightly declines to dress it up as a business rule.
+        /// So an unknown id came back as <b>500</b> while an id belonging to another
+        /// family came back as 404, and the difference told a caller which student ids
+        /// exist. That is precisely the disclosure BR-SEC-011 is written to prevent, so
+        /// the two are made indistinguishable here rather than being left to the shape
+        /// of an exception.
+        /// </para>
+        /// <para>
+        /// The browser portal has always done this — <c>PortalController.Student</c>
+        /// checks the row and returns NotFound before it asks the gate anything. This
+        /// is the same check, not a new rule; found by smoke-testing the API against a
+        /// student id the signed-in parent does not own.
+        /// </para>
+        /// <para>
+        /// Read through the ordinary filters, deliberately: the port sees the same
+        /// filtered set, so a student it could not resolve is one this answers "not
+        /// found" for — which is the truthful answer to give.
+        /// </para>
+        /// </summary>
+        private Task<bool> StudentExistsAsync(int studentId)
+            => _db.Students.AsNoTracking().AnyAsync(s => s.Id == studentId, Ct);
 
         /// <summary>Guardian-visible children (BR-PAR-004 / BR-SEC-011) plus the caller's own student record.</summary>
         private async Task<IReadOnlyList<(Sms.Domain.Students.Student Student, bool IsSelf)>> FamilyAsync()
