@@ -63,6 +63,13 @@ namespace Sms.Erp.Bridge.DependencyInjection
             // says no ledger is attached, rather than reporting expenses of zero (IGlLedgerSummary).
             services.AddScoped<IGlLedgerSummary, ErpLedgerSummary>();
 
+            // The accountant's read of the same ledger — the chart, the trial balance headline,
+            // the entries lately posted and the ones still in draft. Behind a finance permission
+            // and read-only; the mobile API is its only caller today. Not registering it is a
+            // supported way to run: the accounting endpoints say no ledger is attached rather
+            // than reporting an empty set of books (IGlLedgerInsight).
+            services.AddScoped<IGlLedgerInsight, ErpLedgerInsight>();
+
             return services;
         }
 

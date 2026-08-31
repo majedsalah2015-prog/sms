@@ -296,7 +296,28 @@ namespace Sms.Web
             .AddApplicationPart(typeof(PurchasingWebRegistration).Assembly)
             .AddApplicationPart(typeof(SalesWebRegistration).Assembly)
             .AddApplicationPart(typeof(CashWebRegistration).Assembly)
-            .AddApplicationPart(typeof(PartnersWebRegistration).Assembly);
+            .AddApplicationPart(typeof(PartnersWebRegistration).Assembly)
+            // Applies only to controllers marked [ApiController] — which in this
+            // application is exactly the mobile API under Api/ (see
+            // docs/Integration/03-Mobile-API.md). The framework's two default
+            // shapes are both replaced so that a client parses one error format
+            // and never three.
+            .ConfigureApiBehaviorOptions(options =>
+            {
+                // ValidationProblemDetails is RFC 7807 and would be a fine choice if it
+                // were the only one; alongside the hand-written refusals it is a second
+                // format for the same event, told apart only by which one happened to
+                // fire. One envelope, always.
+                options.InvalidModelStateResponseFactory = context =>
+                    Sms.Web.Api.ApiResults.Error(StatusCodes.Status400BadRequest,
+                        Sms.Web.Api.ApiProblem.Validation(context.ModelState));
+
+                // And the third: [ApiController] silently rewrites a bare NotFound()
+                // into ProblemDetails. The permission guard returns exactly that
+                // (BR-SEC-010), so leaving this on would give the one refusal a client
+                // sees most often a shape of its own.
+                options.SuppressMapClientErrors = true;
+            });
 
             // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,
             // re-validated per request by SessionCookieEvents; a second, 5-minute
@@ -320,7 +341,20 @@ namespace Sms.Web
                     options.Cookie.Name = "Sms.TwoFactor";
                     options.Cookie.HttpOnly = true;
                     options.ExpireTimeSpan = System.TimeSpan.FromMinutes(5);
-                });
+                })
+                // The same session, reached by a phone. sec.UserSession.SessionToken is
+                // already an opaque bearer token — the cookie carries nothing else — so
+                // the mobile API validates it through the same IAuthenticationService and
+                // inherits BR-SEC-004 expiry and revocation whole, rather than minting a
+                // second credential that would outlive a revoked session.
+                .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
+                           Sms.Web.Api.Auth.SessionTokenAuthenticationHandler>(
+                    Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                    Sms.Web.Api.Auth.SessionTokenDefaults.DisplayName,
+                    _ => { });
+
+            // Shared by both transports' sign-in — the cookie's and the bearer token's.
+            services.AddScoped<SessionPrincipalFactory>();
 
             // Deny-by-default (doc 06 §1): every endpoint needs an authenticated
             // user unless explicitly [AllowAnonymous] (login, static assets).
@@ -1003,7 +1037,65 @@ namespace Sms.Web
                     .Concat(SalesPermissions.All)
                     .Concat(CashPermissions.All)
                     .Concat(PartnersPermissions.All)));
+
+            // The mobile API's contract, generated rather than written: a hand-kept
+            // endpoint list is stale the first time somebody adds a field, and the
+            // client team finds out from a null. Served only in Development (see
+            // Configure) — the schema of every endpoint is a map of the product's
+            // surface, and a school's public host has no reason to publish one.
+            services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc(MobileApiDoc, new Microsoft.OpenApi.Models.OpenApiInfo
+                {
+                    Title = "SMS Mobile API",
+                    Version = "v1",
+                    Description =
+                        "School Management System — the endpoints behind the school's mobile app: "
+                        + "sign-in, the parent/student portal, e-learning, students, employees, "
+                        + "school finance and read-only accounting summaries. "
+                        + "Send Accept-Language: ar-SA or en-US; every human-readable string and "
+                        + "every refusal comes back in that language.",
+                });
+
+                // Not "JWT". The value is sec.UserSession.SessionToken, returned by
+                // POST /api/v1/auth/login, and it dies when the session does.
+                options.AddSecurityDefinition(Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                    new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        Name = "Authorization",
+                        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+                        Scheme = "Bearer",
+                        Description = "Type: Bearer {sessionToken from /api/v1/auth/login}",
+                    });
+
+                options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+                {
+                    [new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                        {
+                            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                            Id = Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                        },
+                    }] = System.Array.Empty<string>(),
+                });
+
+                // MVC controllers and the ERP's areas are in the same application and would
+                // otherwise be documented as if they were part of the API.
+                options.DocInclusionPredicate((_, description) =>
+                    description.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor controller
+                    && typeof(Sms.Web.Api.ApiControllerBase).IsAssignableFrom(controller.ControllerTypeInfo));
+
+                // Two API controllers may legitimately declare the same action name on
+                // different routes; without this the generator throws at first request
+                // rather than at build, which is the worst place to learn it.
+                options.CustomSchemaIds(type => type.FullName ?? type.Name);
+            });
         }
+
+        /// <summary>The single OpenAPI document name, used by both the generator and the UI below.</summary>
+        private const string MobileApiDoc = "mobile-v1";
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -1011,6 +1103,18 @@ namespace Sms.Web
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+
+                // The mobile API's contract, at /api/docs. Development only, and
+                // deliberately: this document lists every endpoint, field and refusal
+                // code in the product, which is a reconnaissance aid on a school's
+                // public host and a convenience only on a developer's machine.
+                app.UseSwagger(options => options.RouteTemplate = "api/docs/{documentName}.json");
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint($"/api/docs/{MobileApiDoc}.json", "SMS Mobile API v1");
+                    options.RoutePrefix = "api/docs";
+                    options.DocumentTitle = "SMS Mobile API";
+                });
             }
             else
             {
@@ -1083,6 +1187,11 @@ namespace Sms.Web
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+                // The mobile API routes itself with [Route] attributes rather than by
+                // convention: /api/v1/... is a contract a client has hard-coded, and it
+                // must not move because somebody renames a controller class.
+                endpoints.MapControllers();
             });
 
             // E-011: Hangfire's built-in dashboard is the job admin surface (WBS)

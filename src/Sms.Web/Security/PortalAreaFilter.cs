@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -21,6 +22,20 @@ namespace Sms.Web.Security
             {
                 var controller = context.RouteData.Values["controller"] as string ?? "";
                 var action = context.RouteData.Values["action"] as string ?? "";
+
+                // An API endpoint says for itself whether a family may reach it, and
+                // nothing redirects: a phone asking for staff data is refused, never
+                // sent to a different screen.
+                if (context.Controller is Sms.Web.Api.ApiControllerBase)
+                {
+                    if (!DeclaresPortalReach(context))
+                    {
+                        context.Result = new NotFoundResult();
+                    }
+
+                    return context.Result == null ? next() : Task.CompletedTask;
+                }
+
                 if (Eq(controller, "Home") && Eq(action, "Index"))
                 {
                     context.Result = new RedirectToActionResult("Index", "Portal", null);
@@ -37,6 +52,17 @@ namespace Sms.Web.Security
 
         public static bool IsPortalAccount(string? accountTypeClaim)
             => Enum.TryParse<AccountType>(accountTypeClaim, out var t) && (t == AccountType.Parent || t == AccountType.Student);
+
+        /// <summary>
+        /// The API's half of BR-SEC-010. Declared on the endpoint with
+        /// <see cref="Sms.Web.Api.PortalReachableAttribute"/> rather than listed
+        /// by controller name here: a name list is a security decision kept
+        /// somewhere other than the code it governs, and the browser half above
+        /// already shows how quickly it stops being read.
+        /// </summary>
+        private static bool DeclaresPortalReach(ActionExecutingContext context)
+            => context.ActionDescriptor.EndpointMetadata
+                .OfType<Sms.Web.Api.PortalReachableAttribute>().Any();
 
         private static bool IsPortalReachable(string controller, string action)
             => Eq(controller, "Portal")

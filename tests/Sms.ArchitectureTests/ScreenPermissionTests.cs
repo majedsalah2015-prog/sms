@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Sms.Application.Security;
 using Sms.Domain.Security;
 using Sms.Web.Security;
@@ -33,13 +34,36 @@ namespace Sms.ArchitectureTests
     {
         private static readonly Assembly Web = typeof(Sms.Web.Security.RequirePermissionAttribute).Assembly;
 
+        /// <summary>
+        /// <see cref="ControllerBase"/> and not <see cref="Controller"/>.
+        /// <para>
+        /// The mobile API's controllers derive from <c>ControllerBase</c> — they
+        /// render no views — and every one of them would have slipped past this
+        /// test while it looked for the MVC base class. That is the same failure
+        /// this file exists to prevent, arriving through a second transport: an
+        /// unguarded endpoint looks exactly like a guarded one until you read its
+        /// attributes, and "the finance screens were open to anyone" would have
+        /// become "the finance endpoints were open to anyone".
+        /// </para>
+        /// </summary>
         private static IEnumerable<(Type Controller, MethodInfo Action)> Actions()
             => Web.GetTypes()
-                .Where(t => typeof(Controller).IsAssignableFrom(t) && !t.IsAbstract)
+                .Where(t => typeof(ControllerBase).IsAssignableFrom(t) && !t.IsAbstract)
                 .SelectMany(t => t
                     .GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-                    .Where(m => !m.IsSpecialName && typeof(IActionResult).IsAssignableFrom(Unwrap(m.ReturnType)))
+                    .Where(m => !m.IsSpecialName && IsAction(Unwrap(m.ReturnType)))
                     .Select(m => (t, m)));
+
+        /// <summary>
+        /// <c>ActionResult&lt;T&gt;</c> does not implement <see cref="IActionResult"/> — it
+        /// implements <see cref="IConvertToActionResult"/> — so a test that
+        /// looked only for the first would silently skip every endpoint written
+        /// in the typed style the API uses. Both are actions; neither may go
+        /// unguarded.
+        /// </summary>
+        private static bool IsAction(Type returnType)
+            => typeof(IActionResult).IsAssignableFrom(returnType)
+            || typeof(IConvertToActionResult).IsAssignableFrom(returnType);
 
         private static Type Unwrap(Type returnType)
             => returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(System.Threading.Tasks.Task<>)
@@ -157,6 +181,15 @@ namespace Sms.ArchitectureTests
                 "AccountController.AccessDenied",
                 "AccountController.Login",
                 "AccountController.TwoFactor",
+
+                // The mobile API's half of the same sign-in, and the same two steps: a
+                // password, then the second factor. Anonymous for the identical reason —
+                // this is what happens before there is anyone to check permissions for.
+                // Nothing else on the API is anonymous, and pinning them here is what keeps
+                // that true: a third entry appearing in this list is a second transport
+                // quietly opening a door the browser keeps shut.
+                "AuthApiController.Login",
+                "AuthApiController.TwoFactor",
                 // The school's logo, which the sign-in screen wears (BR-SCH-006). Anonymous because
                 // the screen that draws it is: behind the fallback policy the browser's request for
                 // the image is answered with a redirect to the sign-in page, so the one screen every

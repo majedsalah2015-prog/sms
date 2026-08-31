@@ -78,6 +78,12 @@
       provider at all, and ODBC is the one of the two that Linux could also serve one day.
     -->
     <PackageReference Include="System.Data.Odbc" Version="5.0.0" />
+    <!--
+      The mobile API's OpenAPI document (docs/Integration/03-Mobile-API.md). 6.4.0 is the
+      last line that still ships a net5.0 target — 7.x is net6.0 and up, so this pin is the
+      framework's, not a preference. Served in Development only; see Startup.Configure.
+    -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
   </ItemGroup>
 
   <PropertyGroup>
