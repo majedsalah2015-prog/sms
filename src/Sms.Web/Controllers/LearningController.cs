@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
@@ -19,15 +20,27 @@ using Sms.Web.Services;
 namespace Sms.Web.Controllers
 {
     /// <summary>
-    /// doc/Modules/37 §8.1-2: the lesson planner (offering x week) and the
-    /// per-lesson resource library.
+    /// doc/Modules/37 §8.1-3: the lesson planner (offering x week), the resource
+    /// library — per lesson and across an offering — and the homework desk.
     /// <para>
-    /// Slice 1 of module 37. §8.3-5 (homework desk, submission tracker, marking
-    /// queue), §8.6-7 (question bank, paper builder), §8.8-9 (sitting console,
-    /// integrity review), §8.10-11 (the portal surfaces) and §8.12 (analytics)
+    /// §8.4-5 (submission tracker, marking queue), §8.6-7 (question bank, paper
+    /// builder), §8.8-9 (sitting console, integrity review) and §8.12 (analytics)
     /// are deliberately absent — later slices, not silent omissions. Nothing in
     /// this controller writes a mark, so BR-LRN-012's handoff into Module 17 is
     /// not reachable from here yet.
+    /// </para>
+    /// <para>
+    /// <b>The owner's report — "no exams, no worksheets and no enrichment
+    /// material, only homework" — is answered here only in its second and third
+    /// parts.</b> §8.2's library existed but hung off a single lesson, so a
+    /// teacher had no way to ask "what material is filed against this subject?"
+    /// and material of a given kind could not be found without opening every
+    /// week in turn; <see cref="Materials"/> is that missing surface, and
+    /// <c>LRN-ENRICH</c> the missing kind. The first part — <b>exams</b> — is
+    /// §8.6-9 and §8.11, which do not exist in this product at all: there is no
+    /// question bank, no paper, no sitting and no portal write surface. That
+    /// remains an open gap, scheduled as the next slice, and is stated here
+    /// rather than quietly narrowed.
     /// </para>
     /// <para>
     /// DEVIATION from §6: BR-LRN-002 gives Vice-Principal and above school-wide
@@ -45,8 +58,18 @@ namespace Sms.Web.Controllers
         /// doc 10 files one attachment per (owning entity, document type), so the
         /// library's breadth is its type list: a lesson holds one live document of
         /// each kind, and re-uploading one is a new version of it — which is what
-        /// §8.2 means by "versioned". These four are created on first use rather
-        /// than seeded, so the screen works on a database that predates module 37.
+        /// §8.2 means by "versioned". These are created on first use rather than
+        /// seeded, so the screen works on a database that predates module 37.
+        /// <para>
+        /// <c>LRN-ENRICH</c> was added after the owner reported that the module
+        /// offered "no worksheets and no enrichment material, only homework".
+        /// The worksheet half of that was a discoverability problem — the type
+        /// existed but only inside one lesson — while enrichment material had no
+        /// type at all, so material a teacher offers beyond the syllabus had
+        /// nowhere to be filed except under "reading", which says something
+        /// different about it. §8.2 fixes no type list, so extending it is a
+        /// content decision rather than a deviation.
+        /// </para>
         /// </summary>
         private static readonly (string Code, string Ar, string En)[] ResourceTypes =
         {
@@ -54,6 +77,7 @@ namespace Sms.Web.Controllers
             ("LRN-SLIDES", "عرض تقديمي", "Slides"),
             ("LRN-WORKSHEET", "ورقة عمل", "Worksheet"),
             ("LRN-READING", "مادة للقراءة", "Reading"),
+            ("LRN-ENRICH", "مادة إثرائية", "Enrichment material"),
         };
 
         private const DocumentFormat ResourceFormats =
@@ -212,6 +236,38 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Index), new { offeringId });
         }
 
+        // ---------------------------------------------------------------- §8.2 materials library
+
+        /// <summary>
+        /// doc/Modules/37 §8.2, read across a whole offering instead of one
+        /// lesson: every piece of material filed against every lesson of the
+        /// chosen subject, newest week first, filterable by kind.
+        ///
+        /// <para>
+        /// The per-lesson library (<see cref="Resources"/>) answers "what is
+        /// attached to this lesson?"; a teacher preparing a term, or looking for
+        /// the worksheet they filed in week 3, is asking the other question and
+        /// had no screen for it. Same rows, same permission, second reading —
+        /// which is why this takes <c>Learning.Resources</c> rather than a new
+        /// catalogue entry: a second constant over the same data would seed a
+        /// permission that grants nothing new (BR-SEC-010) and would let the two
+        /// surfaces drift apart in who may read them.
+        /// </para>
+        ///
+        /// <para>
+        /// Draft lessons are included and marked. BR-LRN-003 keeps a draft out of
+        /// the <em>portal</em>, not out of its own author's library — the teacher
+        /// who has not published week 7 still has to be able to find what they
+        /// filed against it.
+        /// </para>
+        /// </summary>
+        [HttpGet("materials")]
+        [RequirePermission(ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, ActionVerb.View)]
+        public async Task<IActionResult> Materials(int? offeringId = null, string? typeCode = null)
+        {
+            return View(await BuildMaterialsAsync(offeringId, typeCode));
+        }
+
         // ---------------------------------------------------------------- §8.2 resource library
 
         [HttpGet("{id:int}/resources")]
@@ -286,9 +342,16 @@ namespace Sms.Web.Controllers
         }
 
         /// <summary>
-        /// BR-LRN-006 / BR-ATT-009: the scan gate is a serving concern. An
-        /// unscanned or infected file is refused here, in the reader's language,
-        /// rather than handed over and explained afterwards.
+        /// doc/Modules/37 §8.2. BR-LRN-006 / BR-ATT-009: the scan gate is a
+        /// serving concern. An unscanned or infected file is refused here, in the
+        /// reader's language, rather than handed over and explained afterwards.
+        /// <para>
+        /// The same refusal covers a file the store can no longer produce, which
+        /// is the identical condition the portal already handles
+        /// (<see cref="PortalController.LessonFile"/>): the teacher and the
+        /// parent meet one broken file and get one translated sentence, not an
+        /// unhandled exception page on the staff side and a message on theirs.
+        /// </para>
         /// </summary>
         [HttpGet("resources/{resourceId:int}/file")]
         [RequirePermission(ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, ActionVerb.View)]
@@ -310,9 +373,34 @@ namespace Sms.Web.Controllers
 
                 return File(stored.Content, stored.ContentType, stored.FileName);
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex) when (ex is IOException || ex is InvalidOperationException)
             {
-                TempData["Error"] = UserMessage.For(ex, IsArabic);
+                // The row says there is a file and the store cannot produce it — the bytes are
+                // gone, or the slot's current version row is. Rare, and a raw 500 is the wrong
+                // answer to it here for the reason the portal already gives: an unhandled
+                // exception page is neither translated nor anything the reader can act on.
+                //
+                // The sentence is written out rather than taken from UserMessage.For, which has
+                // no case for either exception and would fall through to exception.Message —
+                // English to an Arabic reader, and the storage path in the IOException's case.
+                // A teacher is inside the school, so unlike the parent's wording this one names
+                // the second cause and the way out of it.
+                TempData["Error"] = T(
+                    "That file could not be opened — either the school's file check has not cleared it yet, or its contents are no longer in the store. Upload the material again if it does not come back.",
+                    "تعذّر فتح هذا الملف — إمّا أنّ فحص الملفات لدى المدرسة لم يكتمل بعد، أو أنّ محتواه لم يعد موجوداً في المخزن. أعد رفع المادة إن لم يعُد الملف.");
+
+                // Two screens reach this action — the per-lesson library and the offering-wide
+                // materials library — so the reader goes back to the one they were on, keeping
+                // its filter, rather than being moved to a lesson page they never opened. The
+                // referrer is honoured only when it is this host's own, and only as a path.
+                var referrer = Request.Headers["Referer"].ToString();
+                if (Uri.TryCreate(referrer, UriKind.Absolute, out var from)
+                    && string.Equals(from.Authority, Request.Host.Value, StringComparison.OrdinalIgnoreCase)
+                    && Url.IsLocalUrl(from.PathAndQuery))
+                {
+                    return LocalRedirect(from.PathAndQuery);
+                }
+
                 return RedirectToAction(nameof(Resources), new { id = lessonId.Value });
             }
         }
@@ -404,6 +492,154 @@ namespace Sms.Web.Controllers
                 CanPublish = await CanAsync(ScreenCatalog.Learning.Planner, ActionVerb.Approve),
                 CanRetire = await CanAsync(ScreenCatalog.Learning.Planner, ActionVerb.Deactivate),
             };
+        }
+
+        /// <summary>
+        /// The offering-wide read of §8.2. Shares the planner's reach rule
+        /// (BR-LRN-002) rather than inventing a second one: material a teacher
+        /// may not author is material they may not browse either.
+        /// </summary>
+        private async Task<MaterialsLibraryViewModel> BuildMaterialsAsync(int? offeringId, string? typeCode)
+        {
+            var reachable = await _lessons.ReachableOfferingIdsAsync(cancellationToken: HttpContext.RequestAborted);
+
+            var offerings = await (
+                from o in _db.CurriculumOfferings.AsNoTracking()
+                join s in _db.Subjects.IgnoreQueryFilters().AsNoTracking() on o.SubjectId equals s.Id
+                where reachable.Contains(o.Id) && s.SchoolId == _db.CurrentSchoolId
+                select new { o.Id, s.Name.NameAr, s.Name.NameEn })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var options = offerings
+                .Select(o => new OfferingOption(o.Id, IsArabic ? o.NameAr : o.NameEn))
+                .OrderBy(o => o.Label, StringComparer.CurrentCulture)
+                .ToList();
+
+            var model = new MaterialsLibraryViewModel
+            {
+                Offerings = options,
+                HasNoReach = options.Count == 0,
+                SelectedTypeCode = ResourceTypes.Any(t => t.Code == typeCode) ? typeCode : null,
+                CanUpload = await CanAsync(ScreenCatalog.Learning.Resources, ActionVerb.Create),
+            };
+
+            if (offeringId is not int wanted || !reachable.Contains(wanted))
+            {
+                model.Types = ResourceTypes
+                    .Select(t => new MaterialTypeFilter(t.Code, IsArabic ? t.Ar : t.En, 0))
+                    .ToList();
+                return model;
+            }
+
+            model.SelectedOfferingId = wanted;
+
+            var lessons = await _db.Lessons.AsNoTracking()
+                .Where(l => l.CurriculumOfferingId == wanted)
+                .Select(l => new { l.Id, l.WeekNumber, l.TitleAr, l.TitleEn, l.Status })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var lessonIds = lessons.Select(l => l.Id).ToList();
+            if (lessonIds.Count == 0)
+            {
+                model.Types = ResourceTypes
+                    .Select(t => new MaterialTypeFilter(t.Code, IsArabic ? t.Ar : t.En, 0))
+                    .ToList();
+                return model;
+            }
+
+            // Withdrawn material is excluded by LessonResource's own soft-active
+            // filter, so IsActive is deliberately not restated.
+            var resources = await _db.LessonResources.AsNoTracking()
+                .Where(r => lessonIds.Contains(r.LessonId))
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var attachmentIds = resources.Select(r => r.AttachmentId).Distinct().ToList();
+
+            // Both of these are lookups, not pickers: retiring a document type
+            // must not make the material already filed under it vanish from the
+            // library that owns it (SoftActiveLookupTests' rule, applied by hand
+            // because DocumentType is not one of the four it inspects).
+            var attachments = await _db.Attachments.IgnoreQueryFilters().AsNoTracking()
+                .Where(a => attachmentIds.Contains(a.Id) && a.SchoolId == _db.CurrentSchoolId)
+                .Select(a => new { a.Id, a.DocumentTypeId, a.CurrentVersionNumber })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var types = await _db.DocumentTypes.IgnoreQueryFilters().AsNoTracking()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId)
+                .Select(t => new { t.Id, t.Code, t.Name.NameAr, t.Name.NameEn })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var versions = await _db.AttachmentVersions.AsNoTracking()
+                .Where(v => attachmentIds.Contains(v.AttachmentId))
+                .Select(v => new { v.AttachmentId, v.VersionNumber, v.ScanStatus })
+                .ToListAsync(HttpContext.RequestAborted);
+
+            var lessonById = lessons.ToDictionary(l => l.Id);
+            var attachmentById = attachments.ToDictionary(a => a.Id);
+            var typeById = types.ToDictionary(t => t.Id);
+            var typeIdByCode = types
+                .GroupBy(t => t.Code)
+                .ToDictionary(g => g.Key, g => g.First().Id, StringComparer.OrdinalIgnoreCase);
+
+            string? CodeOf(int attachmentId)
+                => attachmentById.TryGetValue(attachmentId, out var a) && typeById.TryGetValue(a.DocumentTypeId, out var t)
+                    ? t.Code
+                    : null;
+
+            ScanStatus? ScanOf(int attachmentId)
+            {
+                var current = attachmentById.TryGetValue(attachmentId, out var a) ? a.CurrentVersionNumber : (int?)null;
+                return versions
+                    .Where(v => v.AttachmentId == attachmentId && (current == null || v.VersionNumber == current))
+                    .OrderByDescending(v => v.VersionNumber)
+                    .FirstOrDefault()?.ScanStatus;
+            }
+
+            // Counted before the filter is applied: a chip reading zero is how a
+            // teacher learns nothing of that kind is filed yet, which is the
+            // answer they came for as much as the list itself.
+            model.Types = ResourceTypes
+                .Select(t => new MaterialTypeFilter(
+                    t.Code,
+                    IsArabic ? t.Ar : t.En,
+                    resources.Count(r => string.Equals(CodeOf(r.AttachmentId), t.Code, StringComparison.OrdinalIgnoreCase))))
+                .ToList();
+
+            model.TotalInOffering = resources.Count;
+
+            var filtered = model.SelectedTypeCode is string code
+                ? resources.Where(r => typeIdByCode.TryGetValue(code, out var wantedTypeId)
+                    && attachmentById.TryGetValue(r.AttachmentId, out var a)
+                    && a.DocumentTypeId == wantedTypeId)
+                : resources;
+
+            model.Materials = filtered
+                .Select(r =>
+                {
+                    var lesson = lessonById[r.LessonId];
+                    var attachmentTypeId = attachmentById.TryGetValue(r.AttachmentId, out var a) ? a.DocumentTypeId : (int?)null;
+                    var scan = ScanOf(r.AttachmentId);
+                    return new MaterialRow(
+                        r.Id,
+                        r.LessonId,
+                        lesson.WeekNumber,
+                        IsArabic ? lesson.TitleAr : lesson.TitleEn,
+                        lesson.Status,
+                        IsArabic ? r.TitleAr : r.TitleEn,
+                        attachmentTypeId is int tid && typeById.TryGetValue(tid, out var dt)
+                            ? (IsArabic ? dt.NameAr : dt.NameEn)
+                            : T("Unknown", "غير معروف"),
+                        scan == ScanStatus.Clean,
+                        LearningLabels.ScanStateName(scan, IsArabic),
+                        r.DisplayOrder);
+                })
+                .OrderByDescending(m => m.WeekNumber)
+                .ThenBy(m => m.LessonId)
+                .ThenBy(m => m.DisplayOrder)
+                .ThenBy(m => m.ResourceId)
+                .ToList();
+
+            return model;
         }
 
         private async Task<LessonResourcesViewModel?> BuildResourcesAsync(int lessonId)

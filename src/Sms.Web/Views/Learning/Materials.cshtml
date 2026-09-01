@@ -1,0 +1,198 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model MaterialsLibraryViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Materials", "مكتبة المواد");
+    ViewData["Breadcrumb"] = T("E-Learning / Materials", "التعليم الإلكتروني / مكتبة المواد");
+    var help = new HelpPanelViewModel
+    {
+        Id = "learning-materials-help",
+        Title = T("Materials — help", "مكتبة المواد — مساعدة"),
+        Intro = T("Every piece of teaching material filed against a subject, gathered from all of its lessons and newest week first. The planner asks what a lesson holds; this page asks what a subject holds.",
+            "كل مادة تدريس مرفقة بمقرر، مجموعةً من دروسه جميعاً والأحدث أسبوعاً أولاً. المخطط يسأل عمّا يحمله الدرس، وهذه الصفحة تسأل عمّا يحمله المقرر."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Material is filed on a lesson, not on the subject", "المادة تُرفَع على الدرس لا على المقرر"),
+                T("Every row here belongs to one lesson, and that is where it is added or withdrawn. Use the lesson link to reach its library; this page gathers and finds, it does not file (§8.2).",
+                  "كل سطر هنا يخص درساً بعينه، وعنده تُضاف المادة أو تُسحب. استخدم رابط الدرس للوصول إلى مكتبته؛ فهذه الصفحة تجمع وتبحث ولا ترفع (§8.2).")),
+            new HelpPanelViewModel.Item(
+                T("Kinds of material", "أنواع المواد"),
+                T("A lesson holds one live document of each kind — lesson plan, slides, worksheet, reading, enrichment material — and re-uploading a kind files a new version of it rather than a second file. A kind showing zero has nothing filed under it yet.",
+                  "يحمل الدرس مستنداً حياً واحداً من كل نوع — خطة الدرس، عرض تقديمي، ورقة عمل، مادة للقراءة، مادة إثرائية — وإعادة رفع النوع تُنشئ نسخة جديدة منه لا ملفاً ثانياً. والنوع الذي يظهر صفراً لم يُرفَع تحته شيء بعد.")),
+            new HelpPanelViewModel.Item(
+                T("Drafts are listed here", "المسوّدات مدرجة هنا"),
+                T("Material on an unpublished lesson appears in this list and is marked as such. A draft is invisible to families (BR-LRN-003), not to the teacher who filed it — you still have to be able to find what you put on next week.",
+                  "تظهر مواد الدرس غير المنشور في هذه القائمة ومعلَّمة بذلك. فالمسوّدة محجوبة عن الأسر (BR-LRN-003) لا عن معلّمها — إذ لا بد أن تجد ما وضعته للأسبوع القادم.")),
+            new HelpPanelViewModel.Item(
+                T("The scan gate", "بوابة الفحص"),
+                T("A file is listed as soon as it is uploaded but handed to nobody — staff or student — until the virus scan clears it (BR-LRN-006). A row saying the scan is pending is not an error; wait and refresh.",
+                  "يُدرج الملف فور رفعه لكنه لا يُسلَّم لأحد — موظفاً كان أو طالباً — حتى يجتاز الفحص (BR-LRN-006). وسطر يقول إن الفحص جارٍ ليس خطأ؛ انتظر ثم حدّث الصفحة.")),
+            new HelpPanelViewModel.Item(
+                T("What you can see", "ما الذي تراه"),
+                T("The subject list offers only offerings you hold a placement on in the published timetable, plus every offering of a department you head (BR-LRN-002) — the same reach that governs the planner.",
+                  "قائمة المواد تعرض ما لك عليه إسناد في الجدول المنشور فقط، إضافةً إلى مواد القسم الذي ترأسه (BR-LRN-002) — وهو المدى نفسه الذي يحكم المخطط.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("All the material filed against one subject, across every lesson (BR-LRN-002/006).", "كل المواد المرفقة بمقرر واحد عبر دروسه جميعاً (BR-LRN-002/006).")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (TempData["Flash"] is string flash)
+{
+    <div class="alert alert-success" role="status">@flash</div>
+}
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (Model.HasNoReach)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("Nothing to show yet", "لا يوجد ما يُعرض بعد")</h2>
+        <p class="text-muted mb-0">
+            @T("You hold no placement in the published timetable and head no department, so there is no subject whose material you may read (BR-LRN-002). Ask the timetable officer to place you, or a department head to share the material with you.",
+               "ليس لك إسناد في الجدول المنشور ولا ترأس قسماً، فلا يوجد مقرر تقرأ مواده (BR-LRN-002). اطلب من مسؤول الجدول إسنادك، أو من رئيس القسم مشاركتك المواد.")
+        </p>
+    </div>
+}
+else
+{
+    <div class="sms-card p-3 mb-3">
+        <form method="get" asp-action="Materials" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label" for="offeringId">@T("Subject offering", "المقرر")</label>
+                <select class="form-select" id="offeringId" name="offeringId" onchange="this.form.submit()">
+                    <option value="">@T("Choose a subject…", "اختر مقرراً…")</option>
+                    @foreach (var o in Model.Offerings)
+                    {
+                        <option value="@o.Id" selected="@(Model.SelectedOfferingId == o.Id)">@o.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary" type="submit">@T("Show", "عرض")</button>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.SelectedOfferingId == null)
+    {
+        <div class="sms-card p-4 text-muted">
+            @T("Choose a subject above to see the material filed against it.", "اختر مقرراً أعلاه لعرض المواد المرفقة به.")
+        </div>
+    }
+    else
+    {
+        <nav class="mb-3" aria-label="@T("Filter by kind", "التصفية حسب النوع")">
+            <ul class="nav nav-pills sms-subnav">
+                <li class="nav-item">
+                    <a class="nav-link @(Model.SelectedTypeCode == null ? "active" : "")"
+                       aria-current="@(Model.SelectedTypeCode == null ? "page" : null)"
+                       asp-action="Materials" asp-route-offeringId="@Model.SelectedOfferingId">
+                        @T("All kinds", "كل الأنواع")
+                        <span class="badge bg-secondary ms-1">@Model.TotalInOffering</span>
+                    </a>
+                </li>
+                @foreach (var t in Model.Types)
+                {
+                    var on = string.Equals(t.Code, Model.SelectedTypeCode, StringComparison.OrdinalIgnoreCase);
+                    <li class="nav-item">
+                        <a class="nav-link @(on ? "active" : "")" aria-current="@(on ? "page" : null)"
+                           asp-action="Materials" asp-route-offeringId="@Model.SelectedOfferingId" asp-route-typeCode="@t.Code">
+                            @t.Label
+                            <span class="badge @(t.Count == 0 ? "bg-light text-muted" : "bg-secondary") ms-1">@t.Count</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        </nav>
+
+        <div class="sms-card p-0">
+            <div class="table-responsive">
+                <table class="table sms-table mb-0">
+                    <caption class="visually-hidden">@T("Material filed against this subject", "المواد المرفقة بهذا المقرر")</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">@T("Week", "الأسبوع")</th>
+                            <th scope="col">@T("Lesson", "الدرس")</th>
+                            <th scope="col">@T("Title", "العنوان")</th>
+                            <th scope="col">@T("Kind", "النوع")</th>
+                            <th scope="col">@T("File state", "حالة الملف")</th>
+                            <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Materials.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="6" class="text-muted p-4">
+                                    @if (Model.TotalInOffering == 0)
+                                    {
+                                        @T("No material has been filed against this subject yet. Material is added inside a lesson — open the planner, choose a lesson, and add it there.",
+                                           "لم تُرفَع أي مادة لهذا المقرر بعد. وتُضاف المواد داخل الدرس — افتح المخطط واختر درساً وأضفها عنده.")
+                                    }
+                                    else
+                                    {
+                                        @T("Nothing of this kind is filed against this subject. Other kinds have material — the counts above say which.",
+                                           "لا توجد مواد من هذا النوع لهذا المقرر. وهناك أنواع أخرى فيها مواد — والأعداد أعلاه تبيّن أيّها.")
+                                    }
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var m in Model.Materials)
+                        {
+                            <tr>
+                                <td>@m.WeekNumber</td>
+                                <td>
+                                    <a asp-action="Resources" asp-route-id="@m.LessonId">@m.LessonTitle</a>
+                                    @if (m.LessonStatus != LessonStatus.Published)
+                                    {
+                                        <span class="badge @LearningLabels.LessonStatusChip(m.LessonStatus) ms-1">@LearningLabels.LessonStatusName(m.LessonStatus, isRtl)</span>
+                                    }
+                                </td>
+                                <td class="fw-semibold">@m.Title</td>
+                                <td>@m.TypeLabel</td>
+                                <td>
+                                    @if (m.IsServable)
+                                    {
+                                        <span class="badge bg-success">@m.ScanStateLabel</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning text-dark">@m.ScanStateLabel</span>
+                                    }
+                                </td>
+                                <td class="text-end">
+                                    @if (m.IsServable)
+                                    {
+                                        <a class="btn btn-sm btn-outline-secondary" asp-action="DownloadResource" asp-route-resourceId="@m.ResourceId">
+                                            <i class="bi bi-download me-1" aria-hidden="true"></i>@T("Open", "فتح")
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted small">@T("Not available yet", "غير متاح بعد")</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+}

@@ -5,11 +5,12 @@
     var tabs = new (string Action, string En, string Ar, string Icon)[]
     {
         ("Index", "Lesson planner", "مخطط الدروس", "bi-calendar3-week"),
+        ("Materials", "Materials", "مكتبة المواد", "bi-folder2-open"),
         ("Homework", "Homework desk", "مكتب الواجبات", "bi-journal-check"),
     };
-    // The resource library hangs off one lesson rather than standing beside the
-    // planner, so it keeps the planner tab lit rather than adding a third tab
-    // that would have nothing to show without a lesson chosen first.
+    // The per-lesson library reached from the planner keeps the planner tab lit:
+    // it is the same §8.2 data read from inside one lesson, and lighting the
+    // Materials tab from there would say the teacher had left the planner.
     bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
         || (a == "Index" && string.Equals(action, "Resources", StringComparison.OrdinalIgnoreCase));
 }

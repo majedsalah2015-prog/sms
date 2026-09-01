@@ -1,7 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using Microsoft.AspNetCore.Mvc;
+using Sms.Application.Security;
+using Sms.Domain.Security;
 using Sms.TestSupport;
+using Sms.Web.Controllers;
 using Sms.Web.Navigation;
+using Sms.Web.Security;
 using Xunit;
 
 namespace Sms.Web.Tests
@@ -80,6 +86,47 @@ namespace Sms.Web.Tests
         public void It_goes_for_a_deployment_that_has_the_module_switched_off()
         {
             Assert.DoesNotContain(Academics(Sidebar(visible: false)).Items, i => i.Key == LearningKey);
+        }
+
+        /// <summary>
+        /// The reported defect, second round: "لا توجد امتحانات وأوراق عمل ومواد
+        /// إثرائية فقط واجبات". The worksheet half of it was reachable only by
+        /// opening a lesson, so §8.2's library had no standing surface of its
+        /// own. <c>Materials</c> is it, and this pins the route it answers on —
+        /// a rename would otherwise leave the tab in <c>_LearningNav</c> pointing
+        /// at nothing, which is the failure that put module 37 in the menu with
+        /// no way in to begin with.
+        /// </summary>
+        [Fact]
+        public void The_materials_library_answers_on_its_own_route()
+        {
+            var action = Assert.Single(
+                typeof(LearningController).GetMethods(BindingFlags.Public | BindingFlags.Instance),
+                m => m.Name == "Materials");
+
+            var route = Assert.Single(action.GetCustomAttributes<HttpGetAttribute>());
+            Assert.Equal("materials", route.Template);
+        }
+
+        /// <summary>
+        /// It reads the per-lesson library's own screen rather than a new one.
+        /// Same §8.2 rows read a second way, so a second catalogue entry would
+        /// seed a permission granting nothing new (BR-SEC-010) and would let two
+        /// surfaces over one table drift apart in who may read them.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-010")]
+        public void The_materials_library_is_gated_by_the_resource_library_screen()
+        {
+            var action = Assert.Single(
+                typeof(LearningController).GetMethods(BindingFlags.Public | BindingFlags.Instance),
+                m => m.Name == "Materials");
+
+            var permission = Assert.Single(action.GetCustomAttributes<RequirePermissionAttribute>());
+
+            Assert.Equal(
+                new object[] { ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, ActionVerb.View },
+                permission.Arguments);
         }
     }
 }

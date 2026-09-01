@@ -110,4 +110,56 @@ namespace Sms.Web.Models
         int DisplayOrder,
         bool IsServable,
         string ScanStateLabel);
+
+    /// <summary>
+    /// doc/Modules/37 §8.2 read across an offering rather than one lesson — the
+    /// screen a teacher needs to answer "what material is filed against this
+    /// subject, and where are the worksheets?".
+    /// </summary>
+    public sealed class MaterialsLibraryViewModel
+    {
+        public IReadOnlyList<OfferingOption> Offerings { get; init; } = Array.Empty<OfferingOption>();
+
+        /// <summary>Null until an offering is chosen — a library with no subject is not a shorter list, it is a different question.</summary>
+        public int? SelectedOfferingId { get; set; }
+
+        /// <summary>Null means "every kind". Only a code the type list knows survives binding.</summary>
+        public string? SelectedTypeCode { get; init; }
+
+        /// <summary>
+        /// Every kind with its count in the chosen offering, counted <em>before</em>
+        /// the filter — so a chip reading zero tells the teacher nothing of that
+        /// kind is filed, rather than disappearing and telling them nothing.
+        /// </summary>
+        public IReadOnlyList<MaterialTypeFilter> Types { get; set; } = Array.Empty<MaterialTypeFilter>();
+
+        public IReadOnlyList<MaterialRow> Materials { get; set; } = Array.Empty<MaterialRow>();
+
+        /// <summary>Material in the offering irrespective of the type filter — lets the empty state say which of the two emptinesses this is.</summary>
+        public int TotalInOffering { get; set; }
+
+        /// <summary>BR-LRN-002: the teacher holds no placement and heads no department.</summary>
+        public bool HasNoReach { get; init; }
+
+        public bool CanUpload { get; init; }
+    }
+
+    public sealed record MaterialTypeFilter(string Code, string Label, int Count);
+
+    /// <summary>
+    /// One filed item. Carries its lesson because the library's whole purpose is
+    /// to be read away from the lesson — a row that could not say which week it
+    /// belongs to would send the teacher back to the planner to find out.
+    /// </summary>
+    public sealed record MaterialRow(
+        int ResourceId,
+        int LessonId,
+        int WeekNumber,
+        string LessonTitle,
+        LessonStatus LessonStatus,
+        string Title,
+        string TypeLabel,
+        bool IsServable,
+        string ScanStateLabel,
+        int DisplayOrder);
 }
