@@ -32,7 +32,7 @@ namespace Sms.ArchitectureTests
     public class SoftActiveLookupTests
     {
         /// <summary>The sets whose rows outlive their own deactivation.</summary>
-        private static readonly string[] SoftActiveSets = { "GradeLevels", "Stages", "Subjects", "FeeCategories" };
+        private static readonly string[] SoftActiveSets = { "GradeLevels", "Stages", "Subjects", "FeeCategories", "CollectionAccounts" };
 
         [Fact]
         public void No_controller_looks_a_row_up_by_id_in_a_soft_active_list_it_loaded_through_the_filter()

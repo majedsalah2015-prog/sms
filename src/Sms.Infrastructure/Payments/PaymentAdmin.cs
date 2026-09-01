@@ -123,6 +123,7 @@ namespace Sms.Infrastructure.Payments
 
         public async Task<Receipt> CaptureReceiptAsync(
             int payerId, PaymentMethod method, decimal amount, int? tillSessionId = null, string? methodRefNo = null,
+            int? collectionAccountId = null,
             CancellationToken cancellationToken = default)
         {
             if (tillSessionId.HasValue)
@@ -134,6 +135,8 @@ namespace Sms.Infrastructure.Payments
                 }
             }
 
+            await GuardCollectionAccountAsync(method, collectionAccountId, cancellationToken);
+
             var receiptNo = await _numberIssuer.IssueAsync("RCP", cancellationToken);
             var receipt = new Receipt
             {
@@ -142,6 +145,7 @@ namespace Sms.Infrastructure.Payments
                 ReceiptNo = receiptNo,
                 Method = method,
                 MethodRefNo = methodRefNo,
+                CollectionAccountId = collectionAccountId,
                 Amount = amount,
                 Status = ReceiptStatus.Posted,
                 IssuedAtUtc = _clock.UtcNow,
@@ -151,6 +155,35 @@ namespace Sms.Infrastructure.Payments
 
             await AllocateReceiptAsync(receipt, cancellationToken);
             return receipt;
+        }
+
+        /// <summary>
+        /// BR-PAY-002: a receipt says where the money went, and the destination
+        /// has to be one this school actually collects that way into.
+        /// <para>
+        /// IgnoreQueryFilters, then filter in the engine: a retired account has
+        /// to be <em>found</em> so it can be refused by name. Loading only the
+        /// active ones would make a retired id indistinguishable from a
+        /// nonexistent one, and both indistinguishable from none given.
+        /// </para>
+        /// </summary>
+        private async Task GuardCollectionAccountAsync(PaymentMethod method, int? collectionAccountId, CancellationToken cancellationToken)
+        {
+            var accounts = await _db.CollectionAccounts.IgnoreQueryFilters()
+                .Where(a => a.SchoolId == _db.CurrentSchoolId)
+                .ToListAsync(cancellationToken);
+
+            CollectionAccount? chosen = null;
+            if (collectionAccountId != null)
+            {
+                chosen = accounts.SingleOrDefault(a => a.Id == collectionAccountId.Value);
+                if (chosen == null)
+                {
+                    throw new CollectionAccountNotFoundException(collectionAccountId.Value);
+                }
+            }
+
+            CollectionAccountSelector.Validate(method, chosen, CollectionAccountSelector.Eligible(accounts, method).Count > 0);
         }
 
         private async Task AllocateReceiptAsync(Receipt receipt, CancellationToken cancellationToken)

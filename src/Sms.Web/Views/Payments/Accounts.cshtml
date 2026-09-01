@@ -1,0 +1,211 @@
+@using System.Globalization
+@using Sms.Domain.Payments
+@model CollectionAccountCatalogViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Collection accounts", "حسابات التحصيل");
+    ViewData["Breadcrumb"] = T("Payments / Collection accounts", "المدفوعات / حسابات التحصيل");
+    var hasLedger = Model.GlAccounts.Count > 0;
+    string Kind(CollectionAccountKind k) => CollectionAccountLabels.Kind(k, isRtl);
+    var help = new HelpPanelViewModel
+    {
+        Id = "acct-help", Title = T("Collection accounts — help", "حسابات التحصيل — مساعدة"),
+        Intro = T("The school's own accounts that student money is collected into: the bank accounts a parent transfers to, and the cash boxes the counter takes notes into. The cashier picks one on every receipt, and reads the account number from here when a parent asks where to send a transfer (BR-PAY-002).", "حسابات المدرسة التي تُحصَّل فيها أموال الطلاب: الحسابات البنكية التي يحوّل إليها ولي الأمر، والصناديق النقدية التي يستلم فيها الكاشير. يختار الصندوق حساباً على كل سند، ومنه يُقرأ رقم الحساب حين يسأل ولي الأمر إلى أين يحوّل (BR-PAY-002)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Which one the cashier is offered", "أيّها يظهر للصندوق"), T("Cash offers the cash boxes; transfer, card and cheque offer the bank accounts — all three end up on a bank statement. The default of each kind is pre-selected.", "النقد يعرض الصناديق النقدية؛ والتحويل والبطاقة والشيك تعرض الحسابات البنكية — فثلاثتها تنتهي في كشف البنك. ويُختار الحساب الافتراضي لكل نوع تلقائياً.")),
+            new HelpPanelViewModel.Item(T("Account number / IBAN", "رقم الحساب / الآيبان"), T("A bank account needs one of the two. It is what appears beside the cashier's picker, so it is what gets read out to a parent — check it carefully.", "الحساب البنكي يتطلب أحدهما. وهو ما يظهر بجانب قائمة الصندوق، أي ما يُملى على ولي الأمر — فدقّق فيه.")),
+            new HelpPanelViewModel.Item(T("Retiring an account", "إلغاء تفعيل حساب"), T("Deactivation leaves the cashier's list and keeps every receipt already collected into it (BR-GLB-005). Nothing is ever deleted, and a closed account can be reopened.", "إلغاء التفعيل يُخرج الحساب من قائمة الصندوق ويحتفظ بكل سند حُصِّل فيه (BR-GLB-005). لا شيء يُحذف، ويمكن إعادة تفعيل الحساب المغلق.")),
+            new HelpPanelViewModel.Item(T("GL code", "رمز GL"), hasLedger
+                ? T("Pick the ledger account this pot of money is. Recorded here for the accountant; the journal still posts by payment method until per-account posting is built.", "اختر حساب الأستاذ العام المقابل لهذا الوعاء. يُسجَّل هنا للمحاسب؛ ويظل القيد يُرحَّل حسب طريقة الدفع إلى أن يُبنى الترحيل لكل حساب.")
+                : T("Free text — no ledger is attached to this deployment, so the code is not checked against any chart.", "نص حرّ — لا يوجد أستاذ عام مرتبط بهذا التركيب، فلا يُتحقَّق من الرمز مقابل أي دليل حسابات.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Where the money goes — the destination the cashier names on every receipt.", "إلى أين يذهب المال — الوجهة التي يسميها الصندوق على كل سند.")</p></div><partial name="_HelpModal" model="help" /></div>
+<partial name="_FinanceNav" />
+
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@T("The school's collection accounts", "حسابات التحصيل في المدرسة")</caption>
+                <thead><tr><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Account", "الحساب")</th><th scope="col">@T("Kind", "النوع")</th><th scope="col">@T("Number / IBAN", "رقم الحساب / الآيبان")</th><th scope="col">@T("GL code", "رمز GL")</th><th scope="col" class="text-end">@T("Collected", "المُحصَّل")</th><th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th></tr></thead>
+                <tbody>
+                @foreach (var r in Model.Rows)
+                {
+                    var a = r.Account;
+                    if (Model.EditId == a.Id)
+                    {
+                        var fid = $"edit{a.Id}";
+                        <tr class="table-warning">
+                            <td><input form="@fid" name="code" class="form-control form-control-sm font-monospace" dir="ltr" style="width:7rem" value="@a.Code" maxlength="20" required aria-label="@T("Code", "الرمز")" /></td>
+                            <td>
+                                <div class="sms-bilingual">
+                                    <input id="acc-ar-@a.Id" form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@a.NameAr" required aria-label="@T("Name (Arabic)", "الاسم بالعربية")" />
+                                    <input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@a.NameEn" required aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#acc-ar-@a.Id" data-translit-mode="term" />
+                                </div>
+                                @if (a.Kind == CollectionAccountKind.Bank)
+                                {
+                                    <select form="@fid" name="bankLookupId" class="form-select form-select-sm mt-1" aria-label="@T("Bank", "البنك")">
+                                        <option value="">@T("— bank not from the list —", "— البنك ليس من القائمة —")</option>
+                                        @foreach (var b in Model.Banks)
+                                        {
+                                            <option value="@b.Id" selected="@(a.BankLookupId == b.Id)">@(isRtl ? b.Ar : b.En)</option>
+                                        }
+                                    </select>
+                                    <input form="@fid" name="bankName" class="form-control form-control-sm mt-1" value="@a.BankName" maxlength="120" placeholder="@T("or type the bank's name", "أو اكتب اسم البنك")" aria-label="@T("Bank name", "اسم البنك")" />
+                                }
+                            </td>
+                            <td class="small text-muted">@Kind(a.Kind)</td>
+                            <td>
+                                @if (a.Kind == CollectionAccountKind.Bank)
+                                {
+                                    <input form="@fid" name="accountNo" class="form-control form-control-sm font-monospace" dir="ltr" value="@a.AccountNo" maxlength="40" placeholder="@T("account no.", "رقم الحساب")" aria-label="@T("Account number", "رقم الحساب")" />
+                                    <input form="@fid" name="iban" class="form-control form-control-sm font-monospace mt-1" dir="ltr" value="@a.Iban" maxlength="40" placeholder="IBAN" aria-label="IBAN" />
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            <td><input form="@fid" name="glExportCode" class="form-control form-control-sm font-monospace" dir="ltr" list="@(hasLedger ? "gl-accounts" : null)" value="@a.GlExportCode" maxlength="30" style="width:8rem" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" /></td>
+                            <td class="text-end">
+                                <input form="@fid" name="displayOrder" type="number" class="form-control form-control-sm text-end" style="width:4.5rem" value="@a.DisplayOrder" aria-label="@T("Order", "الترتيب")" />
+                                <label class="small text-nowrap mt-1"><input form="@fid" type="checkbox" name="isDefault" value="true" class="form-check-input" checked="@a.IsDefault" /> @T("default", "افتراضي")</label>
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <form id="@fid" method="post" asp-action="EditAccount" asp-route-id="@a.Id" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Accounts" aria-label="@T("Cancel", "إلغاء")"><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr class="@(a.IsActive ? "" : "text-muted")">
+                            <td><code><bdi dir="ltr">@a.Code</bdi></code></td>
+                            <td>
+                                <span class="fw-semibold">@(isRtl ? a.NameAr : a.NameEn)</span>
+                                @if (a.IsDefault) { <span class="badge text-bg-primary ms-1">@T("default", "افتراضي")</span> }
+                                @if (!a.IsActive) { <span class="badge text-bg-secondary ms-1">@T("retired", "غير مفعّل")</span> }
+                                @{ var bank = isRtl ? r.BankAr : r.BankEn; }
+                                @if (!string.IsNullOrWhiteSpace(bank)) { <div class="small text-muted">@bank</div> }
+                            </td>
+                            <td class="small"><i class="bi @(a.Kind == CollectionAccountKind.Bank ? "bi-bank" : "bi-safe2") me-1" aria-hidden="true"></i>@Kind(a.Kind)</td>
+                            <td class="small">
+                                @if (!string.IsNullOrWhiteSpace(a.Iban)) { <div class="font-monospace"><bdi dir="ltr">@a.Iban</bdi></div> }
+                                @if (!string.IsNullOrWhiteSpace(a.AccountNo)) { <div class="font-monospace text-muted"><bdi dir="ltr">@a.AccountNo</bdi></div> }
+                                @if (string.IsNullOrWhiteSpace(a.Iban) && string.IsNullOrWhiteSpace(a.AccountNo)) { <span class="text-muted">—</span> }
+                            </td>
+                            <td>@if (string.IsNullOrWhiteSpace(a.GlExportCode)) { <span class="text-muted">—</span> } else { <code><bdi dir="ltr">@a.GlExportCode</bdi></code> }</td>
+                            @* The history pointing at the row, said out loud before anyone edits an IBAN on it. *@
+                            <td class="text-end"><span class="fw-semibold">@r.Collected.ToString("N2")</span><div class="small text-muted">@r.ReceiptCount @T("receipts", "سند")</div></td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Accounts" asp-route-edit="@a.Id" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                @if (a.IsActive)
+                                {
+                                    <form method="post" asp-action="DeactivateAccount" asp-route-id="@a.Id" class="d-inline" onsubmit="return confirm('@T("Retire this account? Its receipts stay; the cashier stops being offered it.", "إلغاء تفعيل هذا الحساب؟ تبقى سنداته ويختفي من قائمة الصندوق.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Retire", "إلغاء التفعيل")" aria-label="@T("Retire", "إلغاء التفعيل")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button></form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="ReactivateAccount" asp-route-id="@a.Id" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reopen", "إعادة التفعيل")" aria-label="@T("Reopen", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button></form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">@T("No accounts yet. Until one is added the cashier records a payment without a destination — add the school's bank account and its cash box.", "لا حسابات بعد. وإلى أن يُضاف حساب يسجّل الصندوق الدفعة بلا وجهة — أضف حساب المدرسة البنكي وصندوقها النقدي.")</td></tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="sms-card p-3">
+            <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New account", "حساب جديد")</h2>
+            <form method="post" asp-action="CreateAccount" class="d-grid gap-2" id="new-account">
+                <div>
+                    <label class="form-label small text-muted mb-1" for="acc-new-kind">@T("Kind", "النوع")</label>
+                    <select id="acc-new-kind" name="kind" class="form-select form-select-sm">
+                        <option value="@CollectionAccountKind.Bank">@Kind(CollectionAccountKind.Bank)</option>
+                        <option value="@CollectionAccountKind.CashBox">@Kind(CollectionAccountKind.CashBox)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label small text-muted mb-1" for="acc-new-code">@T("Code", "الرمز")</label>
+                    <input id="acc-new-code" name="code" class="form-control form-control-sm font-monospace" dir="ltr" maxlength="20" required aria-required="true" placeholder="BANK-01" />
+                </div>
+                <div class="sms-bilingual">
+                    <input id="acc-new-ar" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الاسم بالعربية" required aria-required="true" aria-label="@T("Name (Arabic)", "الاسم بالعربية")" />
+                    <input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Name (English)" required aria-required="true" aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#acc-new-ar" data-translit-mode="term" />
+                </div>
+                @* Everything below is a bank's detail. A cash box has no IBAN, and the service drops
+                   whatever is typed here for one — hiding it keeps the form honest rather than
+                   collecting fields it will discard. *@
+                <div id="acc-bank-fields" class="d-grid gap-2">
+                    <div>
+                        <label class="form-label small text-muted mb-1" for="acc-new-bank">@T("Bank", "البنك")</label>
+                        <select id="acc-new-bank" name="bankLookupId" class="form-select form-select-sm">
+                            <option value="">@T("— bank not from the list —", "— البنك ليس من القائمة —")</option>
+                            @foreach (var b in Model.Banks)
+                            {
+                                <option value="@b.Id">@(isRtl ? b.Ar : b.En)</option>
+                            }
+                        </select>
+                        @if (Model.Banks.Count == 0)
+                        {
+                            <div class="form-text">@T("The \"Bank\" catalogue is empty — type the name below instead, or fill the catalogue in Setup.", "قائمة «البنك» فارغة — اكتب الاسم أدناه، أو املأ القائمة من الإعدادات.")</div>
+                        }
+                    </div>
+                    <input name="bankName" class="form-control form-control-sm" maxlength="120" placeholder="@T("or type the bank's name", "أو اكتب اسم البنك")" aria-label="@T("Bank name", "اسم البنك")" />
+                    <input name="accountNo" class="form-control form-control-sm font-monospace" dir="ltr" maxlength="40" placeholder="@T("account no.", "رقم الحساب")" aria-label="@T("Account number", "رقم الحساب")" />
+                    <input name="iban" class="form-control form-control-sm font-monospace" dir="ltr" maxlength="40" placeholder="IBAN" aria-label="IBAN" />
+                    <div class="form-text">@T("One of the two is required — it is what the cashier reads out to a parent.", "أحدهما مطلوب — فهو ما يمليه الصندوق على ولي الأمر.")</div>
+                </div>
+                <div>
+                    <label class="form-label small text-muted mb-1" for="acc-new-gl">@T("GL export code", "رمز التصدير المحاسبي")</label>
+                    <input id="acc-new-gl" name="glExportCode" class="form-control form-control-sm font-monospace" dir="ltr" list="@(hasLedger ? "gl-accounts" : null)" maxlength="30" placeholder="@T("optional", "اختياري")" />
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    <label class="small text-muted mb-0" for="acc-new-order">@T("Order", "الترتيب")</label>
+                    <input id="acc-new-order" name="displayOrder" type="number" class="form-control form-control-sm text-end" style="width:5rem" value="0" />
+                    <label class="small ms-auto"><input type="checkbox" name="isDefault" value="true" class="form-check-input" /> @T("Default for its kind", "افتراضي لنوعه")</label>
+                </div>
+                <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (hasLedger)
+{
+    <datalist id="gl-accounts">
+        @foreach (var g in Model.GlAccounts)
+        {
+            <option value="@g.Code">@g.Name</option>
+        }
+    </datalist>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var kind = document.getElementById('acc-new-kind');
+            var bank = document.getElementById('acc-bank-fields');
+            if (!kind || !bank) { return; }
+            function sync() {
+                var isBank = kind.value === '@CollectionAccountKind.Bank';
+                bank.hidden = !isBank;
+                // Hidden inputs still post. Disabled ones do not, which is what stops a cash box
+                // arriving with an IBAN typed before the kind was switched.
+                bank.querySelectorAll('input, select').forEach(function (el) { el.disabled = !isBank; });
+            }
+            kind.addEventListener('change', sync);
+            sync();
+        })();
+    </script>
+}

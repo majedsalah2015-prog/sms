@@ -29,6 +29,21 @@ namespace Sms.Domain.Payments
         /// <summary>Card ref / transfer ref / cheque no — method-specific detail (BR-PAY-002).</summary>
         public string? MethodRefNo { get; set; }
 
+        /// <summary>
+        /// Which of the school's own accounts the money arrived in — the bank
+        /// account a transfer was addressed to, or the cash box the notes went
+        /// into (<see cref="CollectionAccount"/>, BR-PAY-002 "method-detailed").
+        /// <para>
+        /// Nullable for two reasons, both real. Receipts issued before this
+        /// catalogue existed have no answer and are not going to acquire one;
+        /// and a school that has defined no account of the relevant kind can
+        /// still take money, which is what keeps its first morning working.
+        /// Once an account of that kind exists the capture refuses a blank —
+        /// see <c>CollectionAccountSelector.Validate</c>.
+        /// </para>
+        /// </summary>
+        public int? CollectionAccountId { get; set; }
+
         public decimal Amount { get; set; }
 
         public ReceiptStatus Status { get; set; } = ReceiptStatus.Posted;

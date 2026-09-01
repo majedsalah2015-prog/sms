@@ -24,6 +24,7 @@ using Sms.Domain.Common;
 using Sms.Domain.Employees;
 using Sms.Domain.Fees;
 using Sms.Domain.Grades;
+using Sms.Domain.Payments;
 using Sms.Domain.Schools;
 using Sms.Domain.Students;
 using Sms.Domain.Teachers;
@@ -183,6 +184,23 @@ namespace Sms.Infrastructure.Seeding
             await _db.SaveChangesAsync(cancellationToken);
 
             await _feeAdmin.PostChargeAsync(student.Id, payer.Id, profile.Id, tuition.Id, ChargeSourceType.Registration, cancellationToken);
+
+            // BR-PAY-002: one of each kind, so the cashier screen's destination picker has something
+            // in it on a demo tenant and the IBAN a parent would be told is visible. A real school
+            // replaces both with its own — this is demo data, not a starting position anyone should
+            // collect into, which is why the account number is the published IBAN test value.
+            _db.CollectionAccounts.Add(new CollectionAccount
+            {
+                Code = "SAFE-MAIN", NameAr = "الصندوق الرئيسي", NameEn = "Main cash box",
+                Kind = CollectionAccountKind.CashBox, DisplayOrder = 1, IsDefault = true,
+            });
+            _db.CollectionAccounts.Add(new CollectionAccount
+            {
+                Code = "BANK-MAIN", NameAr = "الحساب الجاري الرئيسي", NameEn = "Main current account",
+                Kind = CollectionAccountKind.Bank, BankName = "مصرف الراجحي", AccountNo = "608010167519",
+                Iban = "SA0380000000608010167519", DisplayOrder = 1, IsDefault = true,
+            });
+            await _db.SaveChangesAsync(cancellationToken);
         }
     }
 }

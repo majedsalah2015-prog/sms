@@ -291,6 +291,9 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<TillSession> TillSessions => Set<TillSession>();
 
+        /// <summary>The school's own bank accounts and cash boxes — where a receipt's money landed.</summary>
+        public DbSet<CollectionAccount> CollectionAccounts => Set<CollectionAccount>();
+
         public DbSet<Receipt> Receipts => Set<Receipt>();
 
         public DbSet<PaymentAllocation> PaymentAllocations => Set<PaymentAllocation>();

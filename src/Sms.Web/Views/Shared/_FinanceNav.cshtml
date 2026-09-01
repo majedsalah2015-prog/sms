@@ -23,6 +23,7 @@
         ("Payments", "Pdc", "PDC registry", "الشيكات الآجلة", "bi-calendar-check", Array.Empty<string>()),
         ("Payments", "Refunds", "Refunds", "الاستردادات", "bi-arrow-counterclockwise", Array.Empty<string>()),
         ("Payments", "Allocations", "Allocations", "التخصيصات", "bi-diagram-2", Array.Empty<string>()),
+        ("Payments", "Accounts", "Collection accounts", "حسابات التحصيل", "bi-bank", Array.Empty<string>()),
     };
     bool Active(string c, string a, string[] also) => string.Equals(c, controller, StringComparison.OrdinalIgnoreCase) && (string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || also.Any(x => string.Equals(x, action, StringComparison.OrdinalIgnoreCase)));
 }

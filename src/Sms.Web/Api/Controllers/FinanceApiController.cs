@@ -367,7 +367,8 @@ namespace Sms.Web.Api.Controllers
             }
 
             var receipt = await _payments.CaptureReceiptAsync(
-                request.PayerId, method, request.Amount, request.TillSessionId, request.MethodRefNo, Ct);
+                request.PayerId, method, request.Amount, request.TillSessionId, request.MethodRefNo,
+                request.CollectionAccountId, Ct);
 
             return new ApiReceipt
             {
@@ -379,8 +380,54 @@ namespace Sms.Web.Api.Controllers
                 Amount = receipt.Amount,
                 Currency = await CurrencyAsync(),
                 Status = receipt.Status.ToString(),
+                CollectionAccountId = receipt.CollectionAccountId,
                 IssuedAtUtc = receipt.IssuedAtUtc,
             };
+        }
+
+        /// <summary>
+        /// The school's own accounts a payment may be collected into — the bank
+        /// accounts a parent transfers to, and the cash boxes the counter takes
+        /// notes into (BR-PAY-002).
+        /// <para>
+        /// Retired accounts are excluded: they are kept so old receipts still
+        /// read back, not so new money can be put in them. The account number
+        /// travels with each one because a client's whole reason for asking is
+        /// to tell a parent where to send the money.
+        /// </para>
+        /// </summary>
+        [HttpGet("collection-accounts")]
+        [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.View)]
+        public async Task<ActionResult<IReadOnlyList<ApiCollectionAccount>>> CollectionAccounts()
+        {
+            var accounts = await _db.CollectionAccounts.AsNoTracking()
+                .OrderByDescending(a => a.IsDefault).ThenBy(a => a.DisplayOrder).ThenBy(a => a.Code)
+                .ToListAsync(Ct);
+
+            // The bank is usually a catalogue value rather than typed text, and a client shown a
+            // blank bank beside an IBAN has been told less than the screen tells. IgnoreQueryFilters
+            // because a retired catalogue value must still be readable on an account that names it.
+            var lookupIds = accounts.Where(a => a.BankLookupId != null).Select(a => a.BankLookupId!.Value).Distinct().ToList();
+            var bankNames = lookupIds.Count == 0
+                ? new Dictionary<int, string>()
+                : (await _db.LookupValues.IgnoreQueryFilters().AsNoTracking()
+                    .Where(v => lookupIds.Contains(v.Id) && v.SchoolId == _db.CurrentSchoolId)
+                    .Select(v => new { v.Id, v.Name.NameAr, v.Name.NameEn })
+                    .ToListAsync(Ct))
+                    .ToDictionary(v => v.Id, v => string.IsNullOrWhiteSpace(v.NameAr) ? v.NameEn : v.NameAr);
+
+            return accounts.Select(a => new ApiCollectionAccount
+            {
+                CollectionAccountId = a.Id,
+                Code = a.Code,
+                NameAr = a.NameAr,
+                NameEn = a.NameEn,
+                Kind = a.Kind.ToString(),
+                BankName = a.BankLookupId != null && bankNames.TryGetValue(a.BankLookupId.Value, out var bank) ? bank : a.BankName,
+                AccountNo = a.AccountNo,
+                Iban = a.Iban,
+                IsDefault = a.IsDefault,
+            }).ToList();
         }
 
         /// <summary>A payer's receipts, newest first.</summary>

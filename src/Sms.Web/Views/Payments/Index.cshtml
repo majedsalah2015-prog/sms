@@ -156,8 +156,39 @@
                     <input type="hidden" name="payerId" value="@sel.Payer.Id" />
                     <div class="col-md-3"><label class="form-label small mb-1" for="cap-amount">@T("Amount", "المبلغ")</label><input id="cap-amount" name="amount" type="number" step="0.01" min="0.01" class="form-control form-control-lg text-end" value="@Model.PreviewAmount?.ToString("0.##", CultureInfo.InvariantCulture)" required onchange="document.getElementById('previewLink').href = '@Url.Action("Index", new { q = Model.Q, payerId = sel.Payer.Id })' + '&amount=' + this.value" /></div>
                     <div class="col-md-3"><label class="form-label small mb-1" for="cap-method">@T("Method", "الطريقة")</label><select id="cap-method" name="method" class="form-select form-select-lg">@foreach (var mth in new[] { PaymentMethod.Cash, PaymentMethod.Card, PaymentMethod.BankTransfer, PaymentMethod.Cheque }) { <option value="@mth">@FinanceLabels.Method(mth, isRtl)</option> }</select></div>
+                    @* Where the money is going (BR-PAY-002). Every account is rendered and the script
+                       below hides the ones that do not suit the chosen method, so switching from cash
+                       to transfer re-points the destination without a round trip. The selected
+                       account's number appears under the row — that is what a cashier reads out to a
+                       parent asking where to send a transfer. *@
+                    <div class="col-md-3">
+                        <label class="form-label small mb-1" for="cap-account"><span id="cap-account-label">@CollectionAccountLabels.Destination(PaymentMethod.Cash, isRtl)</span></label>
+                        <select id="cap-account" name="collectionAccountId" class="form-select form-select-lg">
+                            <option value="" data-kind="">@T("— none —", "— بدون —")</option>
+                            @foreach (var acc in Model.CollectionAccounts)
+                            {
+                                <option value="@acc.Id" data-kind="@acc.Kind" data-default="@(acc.IsDefault ? "1" : "")" data-bank="@acc.Bank(isRtl)" data-no="@acc.AccountNo" data-iban="@acc.Iban">@acc.Name(isRtl) (@acc.Code)</option>
+                            }
+                        </select>
+                    </div>
                     <div class="col-md-3"><label class="form-label small mb-1" for="cap-ref">@T("Reference", "المرجع")</label><input id="cap-ref" name="methodRefNo" class="form-control form-control-lg" placeholder="@T("slip / transfer / cheque no.", "القسيمة / التحويل / رقم الشيك")" /></div>
                     <div class="col-md-3"><label class="form-label small mb-1" for="cap-till">@T("Till session", "جلسة الصندوق")</label><select id="cap-till" name="tillSessionId" class="form-select form-select-lg"><option value="">@T("— none (non-cash) —", "— بدون (غير نقدي) —")</option>@foreach (var s in Model.OpenSessions) { <option value="@s.Id" selected="@(s.Id == Model.MySession?.Id)">@s.TillCode @(s.Id == Model.MySession?.Id ? T("(mine)", "(جلستي)") : "")</option> }</select></div>
+                    <div class="col-12">
+                        @if (Model.CollectionAccounts.Count == 0)
+                        {
+                            <div class="alert alert-warning py-2 px-3 small mb-0" role="alert">
+                                <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("No collection accounts are defined, so this receipt will not say where the money went.", "لا توجد حسابات تحصيل معرَّفة، فلن يذكر هذا السند إلى أين ذهب المال.")
+                                <a asp-action="Accounts">@T("Define them", "عرّفها الآن")</a>
+                            </div>
+                        }
+                        else
+                        {
+                            @* Reading the destination back to the cashier — and through them to the payer.
+                               aria-live, because it changes when the method does and a screen reader user
+                               has otherwise been told nothing about the account they just re-pointed to. *@
+                            <div id="cap-account-detail" class="alert alert-light border py-2 px-3 small mb-0" role="status" aria-live="polite" hidden></div>
+                        }
+                    </div>
                     <div class="col-12 d-flex gap-2 mt-3">
                         <button class="btn btn-success btn-lg px-4" type="submit"><i class="bi bi-receipt-cutoff me-1" aria-hidden="true"></i>@T("Issue receipt", "إصدار سند")</button>
                         <a id="previewLink" class="btn btn-outline-secondary btn-lg" href="@Url.Action("Index", new { q = Model.Q, payerId = sel.Payer.Id, amount = Model.PreviewAmount })"><i class="bi bi-eye me-1" aria-hidden="true"></i>@T("Preview allocation", "معاينة التخصيص")</a>
@@ -168,3 +199,81 @@
         }
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // The destination list, narrowed to the method. Cash collects into a cash box; transfer,
+        // card and cheque all end up on a bank statement, so all three offer the bank accounts —
+        // the same rule CollectionAccountSelector.KindFor enforces on the server, mirrored here so
+        // the cashier never sees a choice the capture would refuse.
+        (function () {
+            var method = document.getElementById('cap-method');
+            var picker = document.getElementById('cap-account');
+            var label = document.getElementById('cap-account-label');
+            var detail = document.getElementById('cap-account-detail');
+            if (!method || !picker) { return; }
+
+            var rtl = document.documentElement.dir === 'rtl';
+            var labels = @Html.Raw(Json.Serialize(new Dictionary<string, string>
+            {
+                ["Cash"] = CollectionAccountLabels.Destination(PaymentMethod.Cash, isRtl),
+                ["Card"] = CollectionAccountLabels.Destination(PaymentMethod.Card, isRtl),
+                ["BankTransfer"] = CollectionAccountLabels.Destination(PaymentMethod.BankTransfer, isRtl),
+                ["Cheque"] = CollectionAccountLabels.Destination(PaymentMethod.Cheque, isRtl),
+            }));
+            var words = {
+                bank: rtl ? 'البنك' : 'Bank',
+                accountNo: rtl ? 'رقم الحساب' : 'Account no.',
+                iban: 'IBAN',
+                none: rtl ? 'لم يُحدَّد حساب لهذه الطريقة.' : 'No account chosen for this method.',
+                cashBox: rtl ? 'يُستلم في هذا الصندوق.' : 'Received into this cash box.'
+            };
+
+            function kindFor(m) { return m === 'Cash' ? 'CashBox' : 'Bank'; }
+
+            function describe() {
+                if (!detail) { return; }
+                var opt = picker.options[picker.selectedIndex];
+                if (!opt || !opt.value) { detail.hidden = true; detail.textContent = ''; return; }
+                var parts = [];
+                if (opt.dataset.kind === 'CashBox') {
+                    parts.push(words.cashBox);
+                } else {
+                    if (opt.dataset.bank) { parts.push(words.bank + ': ' + opt.dataset.bank); }
+                    if (opt.dataset.iban) { parts.push(words.iban + ': ' + opt.dataset.iban); }
+                    if (opt.dataset.no) { parts.push(words.accountNo + ': ' + opt.dataset.no); }
+                }
+                detail.hidden = parts.length === 0;
+                detail.textContent = parts.join('  ·  ');
+            }
+
+            function sync() {
+                var kind = kindFor(method.value);
+                if (label && labels[method.value]) { label.textContent = labels[method.value]; }
+
+                var keep = null, fallback = null;
+                for (var i = 0; i < picker.options.length; i++) {
+                    var opt = picker.options[i];
+                    var suits = !opt.value || opt.dataset.kind === kind;
+                    // Hidden alone is not enough in every browser, and a disabled option can never be
+                    // submitted — which is the point: a cash receipt must not carry a bank account.
+                    opt.hidden = !suits;
+                    opt.disabled = !suits;
+                    if (suits && opt.value) {
+                        if (!fallback) { fallback = opt; }
+                        if (opt.dataset.default) { keep = opt; }
+                    }
+                }
+                var current = picker.options[picker.selectedIndex];
+                if (!current || current.disabled) {
+                    picker.value = (keep || fallback || picker.options[0]).value;
+                }
+                describe();
+            }
+
+            method.addEventListener('change', sync);
+            picker.addEventListener('change', describe);
+            sync();
+        })();
+    </script>
+}

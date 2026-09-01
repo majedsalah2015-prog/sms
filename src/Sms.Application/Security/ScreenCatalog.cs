@@ -341,6 +341,10 @@ namespace Sms.Application.Security
         {
             public const string Cashier = "Cashier";
             public const string Till = "Till";
+
+            /// <summary>The school's own bank accounts and cash boxes — what the cashier picks as the destination of a payment.</summary>
+            public const string Accounts = "Accounts";
+
             public const string Pdc = "Pdc";
             public const string Refunds = "Refunds";
             public const string Allocations = "Allocations";
@@ -663,6 +667,10 @@ namespace Sms.Application.Security
             // ---- Payments
             S(Modules.Payments, Payments.Cashier, "Cashier", "الصندوق", ActionVerb.View, ActionVerb.Create),
             S(Modules.Payments, Payments.Till, "Till sessions", "جلسات الصندوق", ActionVerb.View, ActionVerb.Create, ActionVerb.Post),
+            // Its own screen rather than a verb on the cashier's: whoever may take a payment is not
+            // automatically whoever may say which of the school's accounts it goes into (BR-PAY-008
+            // segregation). Deactivate, never delete — an account keeps its receipts (BR-GLB-005).
+            S(Modules.Payments, Payments.Accounts, "Collection accounts", "حسابات التحصيل", Crud),
             S(Modules.Payments, Payments.Pdc, "PDC registry", "الشيكات الآجلة", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit),
             S(Modules.Payments, Payments.Refunds, "Refunds", "الاستردادات", ActionVerb.View, ActionVerb.Submit, ActionVerb.Approve),
             S(Modules.Payments, Payments.Allocations, "Allocations", "التخصيصات", ReadOnly),

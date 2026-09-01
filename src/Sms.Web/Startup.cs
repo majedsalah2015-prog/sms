@@ -799,6 +799,11 @@ namespace Sms.Web
             services.AddScoped<IStudentFeeFileService, StudentFeeFileService>();
             services.AddScoped<IPaymentAdmin, PaymentAdmin>();
 
+            // doc/Modules/21 §3 BR-PAY-002: the school's own bank accounts and cash boxes, so a
+            // receipt records which one the money arrived in and the cashier can read the IBAN out
+            // to a parent asking where to send a transfer.
+            services.AddScoped<ICollectionAccountAdmin, CollectionAccountAdmin>();
+
             // S3/E-304 (Portal essentials, BR-SEC-010..013). Read-only aggregation
             // over Attendance/Grading/Fees; one requestingUserAccountId covers
             // both "parent views a linked child" and "student views own record".

@@ -39,9 +39,21 @@ namespace Sms.Application.Payments
         /// the payer's open charges (BR-PAY-003); any leftover becomes advance
         /// balance. Throws <see cref="Common.Exceptions.TillSessionNotOpenException"/>
         /// when a till session id is given but that session isn't Open.
+        /// <para>
+        /// <paramref name="collectionAccountId"/> is which of the school's own
+        /// accounts the money arrived in — the bank account a transfer was
+        /// addressed to, or the cash box the notes went into (BR-PAY-002
+        /// "method-detailed"). Refused by <see cref="CollectionAccountSelector"/>
+        /// when it names an account of the wrong kind for the method or a
+        /// retired one, and required as soon as the school has defined an
+        /// account of that kind — see
+        /// <see cref="Common.Exceptions.CollectionAccountRequiredException"/>
+        /// for why that is conditional rather than mandatory.
+        /// </para>
         /// </summary>
         Task<Receipt> CaptureReceiptAsync(
             int payerId, PaymentMethod method, decimal amount, int? tillSessionId = null, string? methodRefNo = null,
+            int? collectionAccountId = null,
             CancellationToken cancellationToken = default);
 
         Task<Pdc> LodgePdcAsync(int payerId, string bankName, string chequeNo, DateTime chequeDate, decimal amount, CancellationToken cancellationToken = default);

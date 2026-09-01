@@ -380,6 +380,15 @@ namespace Sms.Web.Models
         /// <c>STU/File/View</c>, which is correct and would look like a fault here.
         /// </summary>
         public bool CanSeeStudentPhotos { get; set; }
+
+        /// <summary>
+        /// The school's own accounts a payment may be collected into, every
+        /// kind in one list (BR-PAY-002). The screen narrows it to the chosen
+        /// method's kind in the browser, and shows the selected account's IBAN
+        /// beside it — a parent asking where to send a transfer is asking for
+        /// that number, and the cashier had nowhere to read it from.
+        /// </summary>
+        public IReadOnlyList<CollectionAccountOption> CollectionAccounts { get; set; } = Array.Empty<CollectionAccountOption>();
     }
 
     public sealed class ReceiptViewModel
@@ -395,6 +404,9 @@ namespace Sms.Web.Models
         public decimal Unallocated => Receipt.Amount - Allocated;
 
         public TillSession? Session { get; set; }
+
+        /// <summary>Where the money went — null on a receipt issued before the catalogue existed, and read past the soft-active filter so a retired account still prints.</summary>
+        public CollectionAccount? CollectionAccount { get; set; }
 
         public string SchoolNameAr { get; set; } = "";
 

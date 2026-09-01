@@ -80,6 +80,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Payments,     Sc.Payments.Pdc,           "Post-dated cheques", "الشيكات الآجلة",      "bi-calendar-check",      "Payments",     "Pdc"),
                     new(Sc.Modules.Payments,     Sc.Payments.Refunds,       "Refunds",            "الاستردادات",         "bi-arrow-return-left",   "Payments",     "Refunds"),
                     new(Sc.Modules.Payments,     Sc.Payments.Allocations,   "Allocations",        "تخصيص المدفوعات",     "bi-shuffle",             "Payments",     "Allocations"),
+                    new(Sc.Modules.Payments,     Sc.Payments.Accounts,      "Collection accounts", "حسابات التحصيل",     "bi-bank",                "Payments",     "Accounts"),
                     new(Sc.Modules.Installments, Sc.Installments.Templates, "Instalment plans",   "خطط التقسيط",         "bi-calendar-range",      "Installments", "Index"),
                     new(Sc.Modules.Installments, Sc.Installments.Cases,     "Reschedule cases",   "حالات إعادة الجدولة", "bi-exclamation-triangle","Installments", "Cases"),
                     new(Sc.Modules.Installments, Sc.Installments.Dunning,   "Dunning",            "المطالبات",           "bi-envelope-exclamation","Installments", "Dunning"),

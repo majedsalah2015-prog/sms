@@ -32,7 +32,7 @@ namespace Sms.Web.Controllers
     /// receipt void.
     /// </summary>
     [Route("payments")]
-    public class PaymentsController : Controller
+    public partial class PaymentsController : Controller
     {
         private readonly IPaymentAdmin _payments;
         private readonly AppDbContext _db;
@@ -71,6 +71,11 @@ namespace Sms.Web.Controllers
 
             m.OpenSessions = await _db.TillSessions.AsNoTracking().Where(s => s.Status == TillSessionStatus.Open).OrderBy(s => s.OpenedAtUtc).ToListAsync();
             m.MySession = m.OpenSessions.FirstOrDefault(s => s.CashierUserId == _user.UserId);
+
+            // Where the money is going: the bank account a transfer is addressed to, the cash box the
+            // notes go into (BR-PAY-002). Every kind is sent down and the screen narrows the list to
+            // the chosen method, so switching from cash to transfer does not cost a round trip.
+            m.CollectionAccounts = await CollectionAccountOptionsAsync();
             if (!string.IsNullOrWhiteSpace(q))
             {
                 m.Matches = await FinanceQueries.SearchPayersAsync(_db, q, take: 20);
@@ -98,7 +103,7 @@ namespace Sms.Web.Controllers
         [HttpPost("receipts/new")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Cashier, ActionVerb.Create)]
-        public async Task<IActionResult> Capture(int payerId, decimal amount, PaymentMethod method, string? methodRefNo, int? tillSessionId, string? q)
+        public async Task<IActionResult> Capture(int payerId, decimal amount, PaymentMethod method, string? methodRefNo, int? tillSessionId, int? collectionAccountId, string? q)
         {
             try
             {
@@ -106,7 +111,7 @@ namespace Sms.Web.Controllers
                 if (method == PaymentMethod.Pdc) throw new InvalidOperationException(T("Post-dated cheques are lodged in the PDC registry; the receipt is issued on clearance.", "الشيكات الآجلة تُسجَّل في سجل الشيكات؛ يصدر السند عند التحصيل."));
                 if (method != PaymentMethod.Cash && string.IsNullOrWhiteSpace(methodRefNo)) throw new InvalidOperationException(T("A reference (card slip / transfer / cheque no.) is required for non-cash methods.", "المرجع (قسيمة البطاقة / التحويل / رقم الشيك) مطلوب لغير النقد."));
                 if (method == PaymentMethod.Cash && tillSessionId == null) throw new InvalidOperationException(T("Cash needs an open till session — open one in the Till console.", "النقد يتطلب جلسة صندوق مفتوحة — افتح واحدة من وحدة الصندوق."));
-                var receipt = await _payments.CaptureReceiptAsync(payerId, method, amount, tillSessionId, string.IsNullOrWhiteSpace(methodRefNo) ? null : methodRefNo.Trim());
+                var receipt = await _payments.CaptureReceiptAsync(payerId, method, amount, tillSessionId, string.IsNullOrWhiteSpace(methodRefNo) ? null : methodRefNo.Trim(), collectionAccountId);
                 TempData["Flash"] = T($"Receipt {receipt.ReceiptNo} issued for {receipt.Amount:N2} and allocated oldest-first (BR-PAY-003).", $"صدر السند {receipt.ReceiptNo} بمبلغ {receipt.Amount:N2} وخُصّص للأقدم أولاً (BR-PAY-003).");
                 return RedirectToAction(nameof(Receipt), new { id = receipt.Id });
             }
@@ -129,6 +134,10 @@ namespace Sms.Web.Controllers
                 Allocations = await AllocationLinesAsync(new[] { id }),
                 Session = receipt.TillSessionId == null ? null : await _db.TillSessions.AsNoTracking().SingleOrDefaultAsync(s => s.Id == receipt.TillSessionId),
                 SchoolNameAr = school?.NameAr ?? "", SchoolNameEn = school?.NameEn ?? "",
+                // IgnoreQueryFilters: the account the money went into may since have been retired,
+                // and a receipt that stops naming its destination the day a bank account closes is
+                // a receipt that has lost the thing it was printed to prove.
+                CollectionAccount = receipt.CollectionAccountId == null ? null : await _db.CollectionAccounts.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(a => a.Id == receipt.CollectionAccountId),
             };
             m.PositionAfter = (await FinanceQueries.ChargeRowsAsync(_db, payerId: receipt.PayerId)).Sum(r => r.Remaining) - await FinanceQueries.AdvanceBalanceAsync(_db, receipt.PayerId);
             return View(m);

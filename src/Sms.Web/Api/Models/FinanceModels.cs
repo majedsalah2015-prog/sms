@@ -183,7 +183,39 @@ namespace Sms.Web.Api.Models
 
         public string Status { get; set; } = string.Empty;
 
+        /// <summary>Which of the school's accounts the money went into, or null on a receipt issued before the catalogue existed.</summary>
+        public int? CollectionAccountId { get; set; }
+
         public DateTime IssuedAtUtc { get; set; }
+    }
+
+    /// <summary>
+    /// One of the school's own accounts, as the counter offers it — a bank
+    /// account a parent transfers to, or a cash box (BR-PAY-002). The number is
+    /// carried because it is what a cashier reads out to a parent asking where
+    /// to send the money, which is the question the list exists to answer.
+    /// </summary>
+    public sealed class ApiCollectionAccount
+    {
+        public int CollectionAccountId { get; set; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string NameAr { get; set; } = string.Empty;
+
+        public string NameEn { get; set; } = string.Empty;
+
+        /// <summary>Bank / CashBox.</summary>
+        public string Kind { get; set; } = string.Empty;
+
+        public string? BankName { get; set; }
+
+        public string? AccountNo { get; set; }
+
+        public string? Iban { get; set; }
+
+        /// <summary>Pre-select this one for its kind.</summary>
+        public bool IsDefault { get; set; }
     }
 
     /// <summary>
@@ -206,6 +238,15 @@ namespace Sms.Web.Api.Models
 
         /// <summary>Card slip, transfer reference, cheque number — whatever identifies it outside this system.</summary>
         public string? MethodRefNo { get; set; }
+
+        /// <summary>
+        /// Which of the school's own accounts the money arrived in — one of
+        /// <c>GET collection-accounts</c> (BR-PAY-002). Cash names a cash box;
+        /// transfer, card and cheque name a bank account. Required as soon as
+        /// the school has defined an account of that kind, and refused when it
+        /// names one of the wrong kind or a retired one.
+        /// </summary>
+        public int? CollectionAccountId { get; set; }
     }
 
     /// <summary>Post a charge onto a student from an approved fee structure line.</summary>

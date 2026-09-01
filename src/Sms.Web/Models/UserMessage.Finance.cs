@@ -185,6 +185,32 @@ namespace Sms.Web.Models
                 ? "قيمة الاسترداد تتجاوز الرصيد الدائن لدى الدافع — لا يُردّ إلا ما دُفع زائداً عن المستحق؛ راجع كشف حساب الأسرة (BR-PAY-005)."
                 : "The refund is larger than the payer's credit balance — only money paid in excess of what is owed can be refunded; check the family's statement (BR-PAY-005).",
 
+            // ---------------------------------------------------------------- where the money went (BR-PAY-002)
+
+            CollectionAccountRequiredException required => arabic
+                ? $"اختر {CollectionAccountLabels.KindDefinite(required.Kind, true)} الذي وصل إليه المبلغ — لا يُصدر سند لا يذكر أين ذهب المال (BR-PAY-002)."
+                : $"Choose {CollectionAccountLabels.KindDefinite(required.Kind, false)} the money arrived in — a receipt that does not say where the money went is not issued (BR-PAY-002).",
+
+            CollectionAccountMethodMismatchException mismatch => arabic
+                ? $"هذه الطريقة تُحصَّل في {CollectionAccountLabels.Kind(mismatch.Required, true)}، والحساب المختار {CollectionAccountLabels.Kind(mismatch.Actual, true)} — لا يُقيَّد المال في وعاء لم يصل إليه (BR-PAY-002)."
+                : $"This method is collected into a {CollectionAccountLabels.Kind(mismatch.Required, false).ToLowerInvariant()}, and the account chosen is a {CollectionAccountLabels.Kind(mismatch.Actual, false).ToLowerInvariant()} — money is not recorded into a pot it never reached (BR-PAY-002).",
+
+            CollectionAccountInactiveException inactive => arabic
+                ? $"الحساب {inactive.Code} مُلغى التفعيل — تبقى سنداته السابقة عليه، ولا يُحصَّل فيه جديد. اختر حساباً آخر."
+                : $"Account {inactive.Code} has been retired — its earlier receipts stay on it, but nothing new is collected into it. Choose another account.",
+
+            CollectionAccountNotFoundException => arabic
+                ? "الحساب المطلوب ليس من حسابات هذه المدرسة — أعد تحميل الصفحة واختر من القائمة."
+                : "That account is not one of this school's — reload the page and choose from the list.",
+
+            DuplicateCollectionAccountCodeException duplicate => arabic
+                ? $"الرمز {duplicate.Code} مستخدم لحساب آخر — الرمز هو ما يُشار به إلى الحساب، فلا يتكرر."
+                : $"Code {duplicate.Code} already belongs to another account — the code is how an account is referred to, so it is not repeated.",
+
+            BankCollectionAccountNeedsNumberException => arabic
+                ? "الحساب البنكي يحتاج رقم حساب أو آيبان — بغيرهما لا يمكن إخبار ولي الأمر إلى أين يحوّل."
+                : "A bank account needs an account number or an IBAN — without one there is no way to tell a parent where to send the money.",
+
             // ---------------------------------------------------------------- E-503 ledger export
 
             GlMappingMissingException e => arabic
