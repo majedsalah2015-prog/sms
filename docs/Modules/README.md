@@ -1,6 +1,6 @@
 # Modules
 
-One document per module (36 total). Each follows the standard 14-section template: Purpose · Scope · Business Rules · Workflow · User Roles · Permissions · Database Concept · Required Screens · Validation Rules · Reports · Dashboard Widgets · Notifications · Future Enhancements · Open Questions — and builds on the approved frameworks (docs 05–10): workflow patterns P1–P5 / WF catalog, permission verbs + data scopes, audit tiers T0–T3, numbering series registry, notification events, document types.
+One document per module (36 in the approved Analysis v1.0, plus one draft whose scope is being opened — see Phase 9). Each follows the standard 14-section template: Purpose · Scope · Business Rules · Workflow · User Roles · Permissions · Database Concept · Required Screens · Validation Rules · Reports · Dashboard Widgets · Notifications · Future Enhancements · Open Questions — and builds on the approved frameworks (docs 05–10): workflow patterns P1–P5 / WF catalog, permission verbs + data scopes, audit tiers T0–T3, numbering series registry, notification events, document types.
 
 ## Phase 3 — Academic structure (✅ Approved 2026-08-13)
 
@@ -67,3 +67,14 @@ One document per module (36 total). Each follows the standard 14-section templat
 | 34 | [Audit (Admin)](34-Audit.md) | BR-AUM | ✅ Draft for review |
 | 35 | [Backup](35-Backup.md) | BR-BAK | ✅ Draft for review |
 | 36 | [System Administration](36-System-Administration.md) | BR-SYS | ✅ Draft for review |
+
+## Phase 9 — Roadmap R3 (outside Analysis v1.0)
+
+| # | Module | Rule prefix | Status |
+|---|--------|-------------|--------|
+| 37 | [E-Learning](37-E-Learning.md) | BR-LRN | 📝 **Draft — scope opened 2026-08-30, not approved** |
+
+> Module 37 is **not part of the approved Analysis v1.0**. LMS features were excluded from v1 by decision Q8
+> and tracked as gap **G2** for release R3, where the build-or-partner decision is still outstanding. The
+> document exists to open the scope for review; no rules, screens, catalog entries or schema follow from it
+> until it is approved.
