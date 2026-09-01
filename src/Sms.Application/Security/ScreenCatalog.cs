@@ -579,7 +579,11 @@ namespace Sms.Application.Security
             S(Modules.Admissions, Admissions.Waitlist, "Waitlist", "قائمة الانتظار", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
 
             // ---- Students
-            S(Modules.Students, Students.Directory, "Student directory", "دليل الطلاب", ActionVerb.View, ActionVerb.Create),
+            // Print and Export are separate from View on purpose: the directory rendered on screen
+            // is a finding instrument, while the same rows as a sheet or a file are the school's
+            // register — every child, their guardian and a mobile number — and doc/Modules/10 §6
+            // gives that its own right ("Full-file export: Registrar + Export permission").
+            S(Modules.Students, Students.Directory, "Student directory", "دليل الطلاب", ActionVerb.View, ActionVerb.Create, ActionVerb.Print, ActionVerb.Export),
             S(Modules.Students, Students.File, "Student file", "ملف الطالب", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
             S(Modules.Students, Students.SocialProfile, "Social profile", "البيانات الاجتماعية", ActionVerb.View, ActionVerb.Edit),
             S(Modules.Students, Students.Guardians, "Guardians", "أولياء الأمر", ActionVerb.Edit, ActionVerb.Deactivate),

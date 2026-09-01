@@ -31,15 +31,64 @@ namespace Sms.Web.Models
         /// </summary>
         public bool CanPlace { get; set; }
 
+        /// <summary>
+        /// BR-SEC-010 again, for the two buttons above the table: a reader who may not print the
+        /// roster or hand it out of the system is not shown the offer. Both rights are separate
+        /// from View precisely because a register naming every child, their parent and their
+        /// mobile is the sort of thing a school grants deliberately (doc/Modules/10 §6 —
+        /// "Full-file export: Registrar + Export permission").
+        /// </summary>
+        public bool CanPrint { get; set; }
+
+        public bool CanExport { get; set; }
+
         public string? Query { get; set; }
 
         public StudentStatus? Status { get; set; }
 
         public int? GradeId { get; set; }
 
+        /// <summary>The working year's section, when the reader has narrowed to one.</summary>
+        public int? SectionId { get; set; }
+
+        public Gender? Gender { get; set; }
+
         public IReadOnlyList<GradeLevel> Grades { get; set; } = Array.Empty<GradeLevel>();
 
+        /// <summary>
+        /// The working year's sections, each carrying its grade so the picker can group them.
+        /// A school with twelve grades has forty-odd sections and a flat list of "A, B, A, B, A"
+        /// names nothing — the grade is what makes "5/A" a section rather than a letter.
+        /// </summary>
+        public IReadOnlyList<SectionOption> Sections { get; set; } = Array.Empty<SectionOption>();
+
+        public sealed record SectionOption(int Id, string Name, string GradeName, int GradeOrder);
+
         public int Total { get; set; }
+    }
+
+    /// <summary>
+    /// The printable student register (doc/Modules/10 §10 — "Students register by grade/section/
+    /// status"). The same rows the directory shows, on a sheet that carries the school's name, the
+    /// filter it was taken under and the moment it was taken.
+    /// <para>
+    /// The filter description is not decoration. A printed roll of 180 names with nothing saying
+    /// which 180 is a document that will be read as the whole school by whoever finds it on a desk
+    /// next term.
+    /// </para>
+    /// </summary>
+    public sealed class StudentRosterViewModel
+    {
+        public IReadOnlyList<StudentListViewModel.Row> Rows { get; set; } = Array.Empty<StudentListViewModel.Row>();
+
+        public int Total { get; set; }
+
+        public string SchoolName { get; set; } = string.Empty;
+
+        public DateTime PrintedAtUtc { get; set; }
+
+        /// <summary>Already translated at the controller — a view never reads a filter back into words.</summary>
+        public IReadOnlyList<string> Filters { get; set; } = Array.Empty<string>();
     }
 
     public sealed class StudentFormViewModel

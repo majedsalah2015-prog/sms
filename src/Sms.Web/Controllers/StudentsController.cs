@@ -11,6 +11,7 @@ using Sms.Application.Common.Interfaces;
 using Sms.Application.Parents;
 using Sms.Application.Students;
 using Sms.Domain.Common;
+using Sms.Domain.Grades;
 using Sms.Domain.Sections;
 using Sms.Domain.Geography;
 using Sms.Domain.Students;
@@ -86,12 +87,145 @@ namespace Sms.Web.Controllers
 
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
+        /// <summary>
+        /// Rows the on-screen directory draws before it stops. The list is a finding instrument,
+        /// not a register: past a couple of hundred rows nobody is reading, they are filtering.
+        /// The printed sheet and the export are the register, and they are not capped.
+        /// </summary>
+        private const int DirectoryPageSize = 200;
+
         [HttpGet("")]
         [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.View)]
-        public async Task<IActionResult> Index(string? q = null, StudentStatus? status = null, int? grade = null)
+        public async Task<IActionResult> Index(
+            string? q = null, StudentStatus? status = null, int? grade = null, int? section = null, Gender? gender = null)
         {
+            var directory = await BuildDirectoryAsync(q, status, grade, section, gender, DirectoryPageSize);
+
+            return View(new StudentListViewModel
+            {
+                Rows = directory.Rows, Query = q, Status = status, GradeId = grade,
+                SectionId = section, Gender = gender,
+                Grades = directory.Grades, Sections = directory.Sections, Total = directory.Total,
+                CanPlace = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View, HttpContext.RequestAborted),
+                CanPrint = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Print, HttpContext.RequestAborted),
+                CanExport = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Export, HttpContext.RequestAborted),
+            });
+        }
+
+        // ================================================================== the register, out of the screen
+
+        /// <summary>
+        /// The students register as a sheet somebody signs or files (doc/Modules/10 §10 —
+        /// "Students register by grade/section/status").
+        /// <para>
+        /// It takes the directory's own filters verbatim rather than offering a second set: what a
+        /// registrar prints is what they were just looking at, and a print screen that asks the
+        /// question again is a place for the two answers to disagree. Uncapped, unlike the screen —
+        /// a register that silently stops at row 200 is worse than a slow one, because nothing on
+        /// the paper says it stopped.
+        /// </para>
+        /// <para>
+        /// <b>Not a PDF.</b> There is no PDF engine in this build (a pending owner decision), so
+        /// this is the browser's own print of an HTML sheet, as every other printable document here
+        /// is. The layout hides the application chrome and keeps the school's name, the filter and
+        /// the moment it was taken on the page.
+        /// </para>
+        /// </summary>
+        [HttpGet("print")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Print)]
+        public async Task<IActionResult> Print(
+            string? q = null, StudentStatus? status = null, int? grade = null, int? section = null, Gender? gender = null)
+        {
+            var directory = await BuildDirectoryAsync(q, status, grade, section, gender, take: null);
+            var school = await _db.Schools.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.Id == _db.CurrentSchoolId)
+                .Select(s => new { s.NameAr, s.NameEn })
+                .SingleOrDefaultAsync(HttpContext.RequestAborted);
+
+            return View(new StudentRosterViewModel
+            {
+                Rows = directory.Rows,
+                Total = directory.Total,
+                SchoolName = school == null ? string.Empty : (IsArabic ? school.NameAr : school.NameEn),
+                PrintedAtUtc = _clock.UtcNow,
+                Filters = DescribeFilters(directory, q, status, grade, section, gender),
+            });
+        }
+
+        /// <summary>
+        /// The same register as a file (doc/Modules/10 §8 — the list is "export-gated", and §6 puts
+        /// the export behind its own right rather than behind View).
+        /// <para>
+        /// CSV rather than a spreadsheet format because the destination is always another system —
+        /// a ministry return, a bus company's list, a mail merge — and every one of them reads CSV.
+        /// The byte-order mark and the quoting are <see cref="StudentDirectoryExport"/>'s business
+        /// and are pinned by tests there.
+        /// </para>
+        /// </summary>
+        [HttpGet("export.csv")]
+        [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Export)]
+        public async Task<IActionResult> ExportCsv(
+            string? q = null, StudentStatus? status = null, int? grade = null, int? section = null, Gender? gender = null)
+        {
+            var directory = await BuildDirectoryAsync(q, status, grade, section, gender, take: null);
+            var arabic = IsArabic;
+
+            var records = new List<IEnumerable<string?>> { StudentDirectoryExport.Headings(arabic) };
+            records.AddRange(directory.Rows.Select(r => new[]
+            {
+                r.Student.StudentNo,
+                arabic
+                    ? $"{r.Student.FirstNameAr} {r.Student.FatherNameAr} {r.Student.FamilyNameAr}"
+                    : $"{r.Student.FirstNameEn} {r.Student.FatherNameEn} {r.Student.FamilyNameEn}",
+                Labels.Gender(r.Student.Gender, arabic),
+                r.Student.DateOfBirth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                r.GradeName ?? string.Empty,
+                r.SectionName ?? string.Empty,
+                r.PrimaryParent ?? string.Empty,
+                r.Student.Mobile ?? string.Empty,
+                Labels.StudentStatus(r.Student.Status, arabic),
+            }.AsEnumerable()));
+
+            return File(
+                StudentDirectoryExport.Bytes(records),
+                "text/csv",
+                StudentDirectoryExport.FileName(_clock.UtcNow));
+        }
+
+        // ------------------------------------------------------------------ one query, three readings
+
+        /// <summary>
+        /// Which students match, and what to call their grade and section — asked once for the
+        /// screen, the printed register and the export alike.
+        /// <para>
+        /// Three surfaces answering "which students" by three copies of the same joins is how a
+        /// printed roll comes to hold a child the screen did not show. The filters therefore live
+        /// here and nowhere else.
+        /// </para>
+        /// <para>
+        /// Grade and section are filtered <b>in the database</b>, through the child's live
+        /// enrollment. They used to be applied in memory to the page of 200 the screen had already
+        /// taken, which meant picking a grade searched the first 200 students by number rather than
+        /// the school, and the count above the table ignored the choice entirely.
+        /// </para>
+        /// <para>
+        /// The two id sets are read out first rather than left as correlated subqueries, because
+        /// the students query runs under <c>IgnoreQueryFilters</c> — it carries its own explicit
+        /// <c>SchoolId</c> test — and a subquery inside it would lose the tenant filter with it.
+        /// Read separately, <c>Enrollments</c> and <c>SectionMemberships</c> keep theirs. Both sets
+        /// are bounded by one grade or one section of one school.
+        /// </para>
+        /// </summary>
+        private async Task<DirectoryPage> BuildDirectoryAsync(
+            string? q, StudentStatus? status, int? grade, int? section, Gender? gender, int? take)
+        {
+            var ct = HttpContext.RequestAborted;
             var query = _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => s.SchoolId == _db.CurrentSchoolId);
             if (status != null) query = query.Where(s => s.Status == status);
+            if (gender != null) query = query.Where(s => s.Gender == gender);
             if (!string.IsNullOrWhiteSpace(q))
             {
                 // The mobile is searched as well as shown. A number is what a caller gives when
@@ -101,16 +235,46 @@ namespace Sms.Web.Controllers
                 query = query.Where(s => s.StudentNo.Contains(t) || s.FirstNameAr.Contains(t) || s.FamilyNameAr.Contains(t) || s.FirstNameEn.Contains(t) || s.FamilyNameEn.Contains(t) || (s.PrimaryIdNo != null && s.PrimaryIdNo.Contains(t)) || (s.Mobile != null && s.Mobile.Contains(t)));
             }
 
-            var total = await query.CountAsync();
-            var students = await query.OrderBy(s => s.StudentNo).Take(200).ToListAsync();
+            if (grade != null || section != null)
+            {
+                var live = _db.Enrollments.AsNoTracking().Where(e => e.ExitDate == null);
+
+                if (grade != null)
+                {
+                    var profileIds = await _db.GradeYearProfiles.AsNoTracking()
+                        .Where(p => p.GradeLevelId == grade).Select(p => p.Id).ToListAsync(ct);
+                    live = live.Where(e => profileIds.Contains(e.GradeYearProfileId));
+                }
+
+                if (section != null)
+                {
+                    var seated = await _db.SectionMemberships.AsNoTracking()
+                        .Where(m => m.SectionId == section && m.EffectiveToUtc == null)
+                        .Select(m => m.EnrollmentId).ToListAsync(ct);
+                    live = live.Where(e => seated.Contains(e.Id));
+                }
+
+                var matched = await live.Select(e => e.StudentId).Distinct().ToListAsync(ct);
+                query = query.Where(s => matched.Contains(s.Id));
+            }
+
+            var total = await query.CountAsync(ct);
+            var ordered = query.OrderBy(s => s.StudentNo);
+            var students = take == null
+                ? await ordered.ToListAsync(ct)
+                : await ordered.Take(take.Value).ToListAsync(ct);
+
             var ids = students.Select(s => s.Id).ToList();
-            var enrollments = await _db.Enrollments.AsNoTracking().Where(e => ids.Contains(e.StudentId) && e.ExitDate == null).ToListAsync();
-            var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => enrollments.Select(e => e.GradeYearProfileId).Contains(p.Id)).ToListAsync();
-            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
-            var memberships = await _db.SectionMemberships.AsNoTracking().Where(m => enrollments.Select(e => e.Id).Contains(m.EnrollmentId) && m.EffectiveToUtc == null).ToListAsync();
-            var sections = await _db.Sections.AsNoTracking().Where(s => memberships.Select(m => m.SectionId).Contains(s.Id)).ToListAsync();
-            var links = await _db.StudentGuardianLinks.AsNoTracking().Where(l => ids.Contains(l.StudentId) && l.EffectiveToUtc == null && l.IsPrimaryContact).ToListAsync();
-            var parents = await _db.Parents.AsNoTracking().Where(p => links.Select(l => l.ParentId).Contains(p.Id)).ToListAsync();
+            var enrollments = await _db.Enrollments.AsNoTracking().Where(e => ids.Contains(e.StudentId) && e.ExitDate == null).ToListAsync(ct);
+            var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => enrollments.Select(e => e.GradeYearProfileId).Contains(p.Id)).ToListAsync(ct);
+
+            // Past the soft-active filter: a retired grade still names the year a child is already
+            // sitting in, and the row must say so. The picker below is built from the active ones.
+            var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking().Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync(ct);
+            var memberships = await _db.SectionMemberships.AsNoTracking().Where(m => enrollments.Select(e => e.Id).Contains(m.EnrollmentId) && m.EffectiveToUtc == null).ToListAsync(ct);
+            var sections = await _db.Sections.AsNoTracking().Where(s => memberships.Select(m => m.SectionId).Contains(s.Id)).ToListAsync(ct);
+            var links = await _db.StudentGuardianLinks.AsNoTracking().Where(l => ids.Contains(l.StudentId) && l.EffectiveToUtc == null && l.IsPrimaryContact).ToListAsync(ct);
+            var parents = await _db.Parents.AsNoTracking().Where(p => links.Select(l => l.ParentId).Contains(p.Id)).ToListAsync(ct);
 
             var rows = students.Select(s =>
             {
@@ -122,16 +286,70 @@ namespace Sms.Web.Controllers
                 var pl = links.FirstOrDefault(l => l.StudentId == s.Id);
                 var par = pl == null ? null : parents.FirstOrDefault(x => x.Id == pl.ParentId);
                 return new StudentListViewModel.Row(s, g == null ? null : (IsArabic ? g.Name.NameAr : g.Name.NameEn), sec == null ? null : (IsArabic ? sec.NameAr : sec.NameEn), par == null ? null : (IsArabic ? par.NameAr : par.NameEn));
-            }).Where(r => grade == null || (r.GradeName != null && grades.Any(g => g.Id == grade && (IsArabic ? g.Name.NameAr : g.Name.NameEn) == r.GradeName))).ToList();
+            }).ToList();
 
-            return View(new StudentListViewModel
-            {
-                Rows = rows, Query = q, Status = status, GradeId = grade,
-                Grades = grades.OrderBy(g => g.SequenceOrder).ToList(), Total = total,
-                CanPlace = await _permissions.HasPermissionAsync(
-                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.View, HttpContext.RequestAborted),
-            });
+            return new DirectoryPage(rows, total, grades.OrderBy(g => g.SequenceOrder).ToList(), await SectionOptionsAsync(grades, ct));
         }
+
+        /// <summary>
+        /// The working year's sections, for the filter. Closed ones are left out of the picker
+        /// (BR-SCN-007 keeps them in history, which is a different question from what a registrar
+        /// filters by today), and a grade's own name comes from the unfiltered list so a section of
+        /// a retired grade still reads as that grade rather than as a bare letter.
+        /// </summary>
+        private async Task<IReadOnlyList<StudentListViewModel.SectionOption>> SectionOptionsAsync(
+            IReadOnlyList<GradeLevel> grades, System.Threading.CancellationToken ct)
+        {
+            var year = _workingYear.AcademicYearId;
+            var sections = await _db.Sections.AsNoTracking()
+                .Where(s => s.AcademicYearId == year && s.Status == SectionStatus.Active)
+                .ToListAsync(ct);
+            if (sections.Count == 0) return Array.Empty<StudentListViewModel.SectionOption>();
+
+            // Read through the filters, not past them. GradeYearProfile carries an IsActive column
+            // but is not ISoftActiveFiltered, so there is no soft-active filter here to escape —
+            // IgnoreQueryFilters would drop only the tenant filter, which is the one that has to
+            // hold. The profile a section names is this school's by construction anyway.
+            var profileIds = sections.Select(s => s.GradeYearProfileId).Distinct().ToList();
+            var profiles = await _db.GradeYearProfiles.AsNoTracking()
+                .Where(p => profileIds.Contains(p.Id)).ToListAsync(ct);
+
+            return sections.Select(s =>
+            {
+                var g = profiles.FirstOrDefault(p => p.Id == s.GradeYearProfileId) is { } p
+                    ? grades.FirstOrDefault(x => x.Id == p.GradeLevelId)
+                    : null;
+                return new StudentListViewModel.SectionOption(
+                    s.Id,
+                    IsArabic ? s.NameAr : s.NameEn,
+                    g == null ? T("Ungraded", "بلا صف") : (IsArabic ? g.Name.NameAr : g.Name.NameEn),
+                    g?.SequenceOrder ?? int.MaxValue);
+            })
+            .OrderBy(o => o.GradeOrder).ThenBy(o => o.Name, StringComparer.CurrentCulture)
+            .ToList();
+        }
+
+        /// <summary>What the sheet and the file were taken under, in the reader's language.</summary>
+        private IReadOnlyList<string> DescribeFilters(
+            DirectoryPage directory, string? q, StudentStatus? status, int? grade, int? section, Gender? gender)
+            => StudentDirectoryExport.Describe(
+                IsArabic,
+                q,
+                status == null ? null : Labels.StudentStatus(status.Value, IsArabic),
+                grade == null
+                    ? null
+                    : directory.Grades.FirstOrDefault(g => g.Id == grade) is { } g ? (IsArabic ? g.Name.NameAr : g.Name.NameEn) : null,
+                section == null
+                    ? null
+                    : directory.Sections.FirstOrDefault(s => s.Id == section) is { } s ? $"{s.GradeName} / {s.Name}" : null,
+                gender == null ? null : Labels.Gender(gender.Value, IsArabic));
+
+        /// <summary>The directory's answer: the rows, how many matched in all, and the two pickers.</summary>
+        private sealed record DirectoryPage(
+            IReadOnlyList<StudentListViewModel.Row> Rows,
+            int Total,
+            IReadOnlyList<GradeLevel> Grades,
+            IReadOnlyList<StudentListViewModel.SectionOption> Sections);
 
         [HttpGet("new")]
         [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.Directory, ActionVerb.Create)]
@@ -548,7 +766,7 @@ namespace Sms.Web.Controllers
         [HttpPost("{id:int}/delete")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Students, ScreenCatalog.Students.File, ActionVerb.Deactivate)]
-        public async Task<IActionResult> Delete(int id, string? q, StudentStatus? status, int? grade)
+        public async Task<IActionResult> Delete(int id, string? q, StudentStatus? status, int? grade, int? section, Gender? gender)
         {
             var s = await _db.Students.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.SchoolId == _db.CurrentSchoolId);
             if (s == null) return NotFound();
@@ -558,7 +776,7 @@ namespace Sms.Web.Controllers
                 TempData["Flash"] = T($"Student {s.StudentNo} deleted.", $"تم حذف الطالب {s.StudentNo}.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
-            return RedirectToAction(nameof(Index), new { q, status, grade });
+            return RedirectToAction(nameof(Index), new { q, status, grade, section, gender });
         }
 
         // ------------------------------------------------------------------

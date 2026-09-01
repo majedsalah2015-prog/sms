@@ -1,0 +1,107 @@
+@using System.Globalization
+@using Sms.Domain.Students
+@model StudentRosterViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Students register", "سجل الطلاب");
+    ViewData["Breadcrumb"] = T("Students / Register", "الطلاب / السجل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "stu-print-help",
+        Title = T("The students register — help", "سجل الطلاب — مساعدة"),
+        Intro = T("The same students the directory was showing, on a sheet to print or file (doc/Modules/10 §10). The filter it was taken under is printed under the school's name, so a copy found later still says which students these are.", "الطلاب أنفسهم الذين كان يعرضهم الدليل، في ورقة للطباعة أو الحفظ (وثيقة الوحدة 10 §10). ويُطبع أسفل اسم المدرسة الفلتر الذي أُخذت به، حتى تظل النسخة تقول لاحقاً أيّ طلاب هؤلاء."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("It is not capped", "غير مقطوع"),
+                T("The screen stops at 200 rows because past that nobody reads, they filter. This sheet does not — a register that stopped silently would be read as the whole school.", "تتوقف الشاشة عند 200 سطر لأن ما بعدها لا يُقرأ بل يُفلتر. أما هذه الورقة فلا تتوقف — لأن سجلاً ينقطع بصمت سيُقرأ على أنه المدرسة كلها.")),
+            new HelpPanelViewModel.Item(
+                T("Print, not PDF", "طباعة لا PDF"),
+                T("This build has no PDF engine, so the sheet is printed by the browser. Choose A4 landscape for the full width, and the application's menus are hidden from the printed page automatically.", "لا يوجد في هذه النسخة محرك PDF، فتُطبع الورقة عبر المتصفح. اختر A4 أفقياً لتظهر بكامل عرضها، وتُخفى قوائم النظام من الصفحة المطبوعة تلقائياً.")),
+            new HelpPanelViewModel.Item(
+                T("Its own permission", "صلاحية مستقلة"),
+                T("Printing and exporting the register are rights of their own, apart from reading the directory: the sheet names every child, their guardian and a mobile number (doc/Modules/10 §6).", "طباعة السجل وتصديره صلاحيتان مستقلتان عن قراءة الدليل، لأن الورقة تذكر كل طفل وولي أمره ورقم جواله (وثيقة الوحدة 10 §6).")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@T("Students register", "سجل الطلاب")</h1>
+        <p class="text-muted mb-0">@Model.Total @T("students", "طالب")</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Index">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to the list", "عودة إلى القائمة")
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="sms-card">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@Model.SchoolName</h2>
+        <p class="h6 mb-1">@T("Students register", "سجل الطلاب")</p>
+        <p class="text-muted small mb-0">
+            @if (Model.Filters.Count == 0)
+            {
+                <span>@T("All students", "جميع الطلاب")</span>
+            }
+            else
+            {
+                <span>@string.Join(" · ", Model.Filters)</span>
+            }
+            &middot; @Model.Total @T("students", "طالب")
+            &middot; @T("printed", "طُبع"): <span dir="ltr">@Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</span>
+        </p>
+    </header>
+
+    @if (Model.Rows.Count == 0)
+    {
+        <p class="text-muted mb-0">@T("No students match this filter.", "لا طلاب مطابقون لهذا الفلتر.")</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table sms-table table-sm align-middle">
+                <caption class="visually-hidden">@T("The students matching the filter, with grade, section, guardian and status", "الطلاب المطابقون للفلتر مع الصف والشعبة وولي الأمر والحالة")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col">@T("Gender", "الجنس")</th>
+                        <th scope="col">@T("DOB", "الميلاد")</th>
+                        <th scope="col">@T("Grade / section", "الصف / الشعبة")</th>
+                        <th scope="col">@T("Primary parent", "ولي الأمر")</th>
+                        <th scope="col">@T("Mobile", "الجوال")</th>
+                        <th scope="col">@T("Status", "الحالة")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var n = 0; }
+                    @foreach (var r in Model.Rows)
+                    {
+                        n++;
+                        var s = r.Student;
+                        <tr>
+                            <td>@n</td>
+                            <td class="text-nowrap"><code>@s.StudentNo</code></td>
+                            <td>@(isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}")</td>
+                            <td>@Labels.Gender(s.Gender, isRtl)</td>
+                            <td dir="ltr" class="text-nowrap">@s.DateOfBirth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                            <td>@(r.GradeName ?? "—")@(r.SectionName == null ? "" : " / " + r.SectionName)</td>
+                            <td>@(r.PrimaryParent ?? "—")</td>
+                            <td dir="ltr" class="text-nowrap">@(string.IsNullOrWhiteSpace(s.Mobile) ? "—" : s.Mobile)</td>
+                            <td>@Labels.StudentStatus(s.Status, isRtl)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
