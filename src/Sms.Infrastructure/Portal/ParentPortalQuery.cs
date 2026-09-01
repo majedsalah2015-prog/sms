@@ -296,6 +296,26 @@ namespace Sms.Infrastructure.Portal
                 .ToDictionaryAsync(s => s.Id, s => s.Name, cancellationToken);
             var subjectByOffering = offerings.ToDictionary(o => o.Id, o => o.SubjectId);
 
+            // §8.2's kind, so a student can tell this week's worksheet from the
+            // lesson plan without opening both. A lookup past both soft-active
+            // filters for the same reason the subject name is: material filed
+            // under a document type that was later retired still has a kind, and
+            // blanking it would tell the family something untrue about the file.
+            var typeIdByAttachment = await _db.Attachments.IgnoreQueryFilters()
+                .Where(a => resources.Select(r => r.AttachmentId).Contains(a.Id) && a.SchoolId == _db.CurrentSchoolId)
+                .Select(a => new { a.Id, a.DocumentTypeId })
+                .ToDictionaryAsync(a => a.Id, a => a.DocumentTypeId, cancellationToken);
+
+            var typeNames = await _db.DocumentTypes.IgnoreQueryFilters()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId && typeIdByAttachment.Values.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken);
+
+            LocalizedName? KindOf(int attachmentId)
+                => typeIdByAttachment.TryGetValue(attachmentId, out var typeId)
+                    && typeNames.TryGetValue(typeId, out var name)
+                    ? name
+                    : null;
+
             return lessons
                 .Select(l =>
                 {
@@ -324,6 +344,8 @@ namespace Sms.Infrastructure.Portal
                                 ResourceId = r.Id,
                                 TitleAr = r.TitleAr,
                                 TitleEn = r.TitleEn,
+                                TypeAr = KindOf(r.AttachmentId)?.NameAr ?? string.Empty,
+                                TypeEn = KindOf(r.AttachmentId)?.NameEn ?? string.Empty,
                                 DisplayOrder = r.DisplayOrder,
                             })
                             .ToList(),

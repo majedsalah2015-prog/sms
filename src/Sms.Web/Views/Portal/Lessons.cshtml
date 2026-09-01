@@ -100,8 +100,17 @@ else
                                         @foreach (var resource in lesson.Resources)
                                         {
                                             var resourceTitle = isRtl ? resource.TitleAr : resource.TitleEn;
+                                            @* The kind leads the label: a student hunting for this week's
+                                               worksheet is searching by kind, not by the title the teacher
+                                               happened to give the file. Titles vary; "ورقة عمل" does not. *@
+                                            var kind = isRtl ? resource.TypeAr : resource.TypeEn;
                                             <a class="btn btn-sm btn-outline-secondary" asp-action="LessonFile" asp-route-resourceId="@resource.ResourceId">
-                                                <i class="bi bi-paperclip me-1" aria-hidden="true"></i>@(string.IsNullOrWhiteSpace(resourceTitle) ? T("Material", "مادة") : resourceTitle)
+                                                <i class="bi bi-paperclip me-1" aria-hidden="true"></i>
+                                                @if (!string.IsNullOrWhiteSpace(kind))
+                                                {
+                                                    <span class="badge bg-secondary-subtle text-body border me-1">@kind</span>
+                                                }
+                                                @(string.IsNullOrWhiteSpace(resourceTitle) ? T("Material", "مادة") : resourceTitle)
                                             </a>
                                         }
                                     </div>

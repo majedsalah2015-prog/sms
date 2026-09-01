@@ -495,6 +495,57 @@ namespace Sms.Infrastructure.Tests
             Assert.Empty(lesson.Resources);
         }
 
+        /// <summary>
+        /// The owner's report — "no worksheets and no enrichment material, only
+        /// homework". On the portal's side that was not a missing file but a
+        /// missing word: the material reached the family as a bare title, so a
+        /// student hunting for this week's worksheet could not tell it from the
+        /// lesson plan without opening both. §8.2's kind now travels with it, in
+        /// both languages, because the portal renders whichever the reader is in.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-LRN-006")]
+        public async Task Material_reaches_the_family_saying_what_kind_it_is()
+        {
+            SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lesson = Assert.Single(await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId));
+            var resource = Assert.Single(lesson.Resources);
+
+            Assert.Equal("Teaching material", resource.TypeEn);
+            Assert.Equal("مادة تعليمية", resource.TypeAr);
+        }
+
+        /// <summary>
+        /// The soft-active lookup trap, on the type rather than the subject: a
+        /// school that retires a document type must not have last term's
+        /// worksheets go nameless in every family's portal. The kind is read as a
+        /// lookup (<c>IgnoreQueryFilters</c>), not as a picker.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-006")]
+        public async Task A_retired_document_type_still_names_the_material_it_filed()
+        {
+            SeedLesson(LessonStatus.Published);
+            using (var write = CreateContext())
+            {
+                var type = write.DocumentTypes.Single(t => t.Code == "LRN-RESOURCE");
+                type.IsActive = false;
+                write.SaveChanges();
+            }
+
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lesson = Assert.Single(await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId));
+            var resource = Assert.Single(lesson.Resources);
+
+            Assert.Equal("Teaching material", resource.TypeEn);
+            Assert.Equal("مادة تعليمية", resource.TypeAr);
+        }
+
         [Fact]
         [BusinessRule("BR-SEC-011")]
         public async Task A_stranger_is_refused_the_lessons_of_a_student_they_may_not_see()

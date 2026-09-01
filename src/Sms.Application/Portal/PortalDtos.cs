@@ -157,6 +157,30 @@ namespace Sms.Application.Portal
 
         public string TitleEn { get; set; } = string.Empty;
 
+        /// <summary>
+        /// What kind of material this is — the document type's own name (worksheet,
+        /// reading, enrichment material, slides, lesson plan).
+        ///
+        /// <para>
+        /// Added after the owner reported the portal offering "no worksheets and
+        /// no enrichment material": both were in fact reaching families, as an
+        /// undifferentiated list of titles under each lesson. A student looking
+        /// for this week's worksheet could not tell it from the lesson plan
+        /// without opening both, which from their side is indistinguishable from
+        /// the school not having set one.
+        /// </para>
+        ///
+        /// <para>
+        /// Empty when the type cannot be resolved — a retired document type still
+        /// names itself, so this is genuinely "unknown" rather than "retired",
+        /// and the view falls back to showing no kind rather than a wrong one.
+        /// </para>
+        /// </summary>
+        public string TypeAr { get; set; } = string.Empty;
+
+        /// <summary>The English half of <see cref="TypeAr"/>.</summary>
+        public string TypeEn { get; set; } = string.Empty;
+
         /// <summary>Teacher-controlled order — material is read in a sequence, not alphabetically.</summary>
         public int DisplayOrder { get; set; }
     }
