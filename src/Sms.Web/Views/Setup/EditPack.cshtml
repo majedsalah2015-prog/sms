@@ -77,7 +77,10 @@
 
             <div class="col-md-3">
                 <label class="form-label small" asp-for="VatPercent">@T("Standard VAT %", "نسبة الضريبة %")</label>
-                <input asp-for="VatPercent" class="form-control form-control-sm" type="number" step="0.01" min="0" max="100" dir="ltr" />
+                @* An explicit value, because asp-for formats through CurrentCulture: in Arabic the
+                   tag helper writes 15٫00 into a number box, HTML calls that not-a-number, and the
+                   box renders empty. The attribute written here wins over the generated one. *@
+                <input asp-for="VatPercent" value="@Model.VatPercent.ToString(CultureInfo.InvariantCulture)" class="form-control form-control-sm" type="number" step="0.01" min="0" max="100" dir="ltr" />
             </div>
             <div class="col-md-3">
                 <label class="form-label small" asp-for="AuditRetentionYearsMinimum">@T("Audit retention (years)", "الاحتفاظ بالتدقيق (سنوات)")</label>

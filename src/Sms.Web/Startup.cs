@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using System.Net.Http;
+using Sms.Web.Binding;
 using Sms.Web.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -288,6 +289,17 @@ namespace Sms.Web
                 messages.SetNonPropertyValueMustBeANumberAccessor(() => Ar()
                     ? "يجب أن تكون القيمة رقماً."
                     : "The field must be a number.");
+
+                // And the half no message could have covered. The messages above translate a
+                // refusal; this stops one being invented. `ar-SA` reads `905٫00` and cannot read
+                // `905.00`, which is the only thing an <input type="number"> is allowed to submit —
+                // so in Arabic every fractional amount in the product bound to null and its screen
+                // refused with "… is required", a sentence about a field the person had filled in.
+                // Read both separators instead; the display keeps the reader's (BR-NUM-007 is
+                // display-only). At the head of the list, in front of the framework's own
+                // floating-point provider — the provider declines the bindings that must reach the
+                // four providers it now precedes.
+                options.ModelBinderProviders.Insert(0, new CultureTolerantNumberModelBinderProvider());
             })
             // The embedded ERP modules ship their controllers and compiled views in Razor class
             // libraries; MVC finds neither without being told the assemblies are part of this
