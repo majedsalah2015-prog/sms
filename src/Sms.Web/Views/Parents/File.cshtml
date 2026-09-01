@@ -5,6 +5,10 @@
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
     var p = Model.Parent;
+    // A refused save comes back to this page rather than redirecting away from it, so the identity
+    // inputs draw from what was submitted when there is a submission, and from the stored row
+    // otherwise. Without that, the refusal would silently erase every correction being made.
+    var f = Model.Submitted ?? ParentFormViewModel.Of(p);
     ViewData["Title"] = p.ParentFileNo;
     ViewData["Breadcrumb"] = T("Parents / ", "أولياء الأمور / ") + p.ParentFileNo;
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
@@ -44,43 +48,47 @@
     <div class="tab-content p-4">
         <div class="tab-pane fade @Show("identity")" id="tab-identity">
             <form method="post" asp-action="Edit" asp-route-id="@p.Id">
-                <div class="sms-bilingual mb-3">
-                    <div><label class="form-label small" for="par-NameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input name="NameAr" id="par-NameAr" class="form-control form-control-sm" dir="rtl" value="@p.NameAr" /></div>
-                    <div><label class="form-label small" for="par-NameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><input name="NameEn" id="par-NameEn" class="form-control form-control-sm" dir="ltr" value="@p.NameEn" /></div>
+                @* The English name is filled from the Arabic one by the helper button of
+                   docs/UI/01 §"Bilingual entry pattern" — assist only, same as the student and
+                   employee files. A guardian entered during admission or carried in by an import
+                   often has the Arabic text sitting in both columns; this is where that is fixed. *@
+                <div class="sms-bilingual mb-3" id="par-name-block">
+                    <div><label class="form-label small" for="par-NameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><input name="NameAr" id="par-NameAr" class="form-control form-control-sm" dir="rtl" value="@f.NameAr" /></div>
+                    <div><div class="d-flex align-items-center justify-content-between gap-2"><label class="form-label small mb-1" for="par-NameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><button type="button" class="btn btn-link btn-sm p-0 mb-1 text-decoration-none" data-translit-fill="#par-name-block" title="@T("Transliterate the Arabic name into the English box. Check the result before saving — it is a starting point, not an authority.", "نقحرة الاسم العربي إلى الخانة الإنجليزية. راجع الناتج قبل الحفظ — فهو نقطة بداية لا مرجع.")">@T("Fill from Arabic", "تعبئة من العربي")</button></div><input name="NameEn" id="par-NameEn" class="form-control form-control-sm" dir="ltr" value="@f.NameEn" data-translit-from="#par-NameAr" /></div>
                 </div>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-3"><label class="form-label small" for="par-PrimaryMobile">@T("Primary mobile", "الجوال الأساسي")</label><input name="PrimaryMobile" id="par-PrimaryMobile" class="form-control form-control-sm" dir="ltr" value="@p.PrimaryMobile" /></div>
-                    <div class="col-md-4"><label class="form-label small" for="par-Email">@T("Email", "البريد")</label><input name="Email" id="par-Email" type="email" class="form-control form-control-sm" dir="ltr" value="@p.Email" /></div>
-                    <div class="col-md-3"><label class="form-label small" for="par-OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input name="OccupationEmployer" id="par-OccupationEmployer" class="form-control form-control-sm" value="@p.OccupationEmployer" /></div>
+                    <div class="col-md-3"><label class="form-label small" for="par-PrimaryMobile">@T("Primary mobile", "الجوال الأساسي")</label><input name="PrimaryMobile" id="par-PrimaryMobile" class="form-control form-control-sm" dir="ltr" value="@f.PrimaryMobile" /></div>
+                    <div class="col-md-4"><label class="form-label small" for="par-Email">@T("Email", "البريد")</label><input name="Email" id="par-Email" type="email" class="form-control form-control-sm" dir="ltr" value="@f.Email" /></div>
+                    <div class="col-md-3"><label class="form-label small" for="par-OccupationEmployer">@T("Occupation / employer", "المهنة / جهة العمل")</label><input name="OccupationEmployer" id="par-OccupationEmployer" class="form-control form-control-sm" value="@f.OccupationEmployer" /></div>
                     <div class="col-md-3"><label class="form-label small" for="par-EducationLookupId">@T("Education level", "المؤهل العلمي")</label>
                         <select name="EducationLookupId" id="par-EducationLookupId" class="form-select form-select-sm">
                             <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
-                            @foreach (var e in Model.EducationLevels) { <option value="@e.Id" selected="@(p.EducationLookupId == e.Id)">@(isRtl ? e.Ar : e.En)</option> }
+                            @foreach (var e in Model.EducationLevels) { <option value="@e.Id" selected="@(f.EducationLookupId == e.Id)">@(isRtl ? e.Ar : e.En)</option> }
                         </select>
                     </div>
-                    <div class="col-md-2"><label class="form-label small" for="par-PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select name="PreferredLanguage" id="par-PreferredLanguage" class="form-select form-select-sm"><option value="ar" selected="@(p.PreferredLanguage == "ar")">العربية</option><option value="en" selected="@(p.PreferredLanguage == "en")">English</option></select></div>
-                    <div class="col-md-8"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@p.Address" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="par-PreferredLanguage">@T("Preferred language", "لغة التواصل")</label><select name="PreferredLanguage" id="par-PreferredLanguage" class="form-select form-select-sm"><option value="ar" selected="@(f.PreferredLanguage == "ar")">العربية</option><option value="en" selected="@(f.PreferredLanguage == "en")">English</option></select></div>
+                    <div class="col-md-8"><label class="form-label small" for="par-Address">@T("Address", "العنوان")</label><input name="Address" id="par-Address" class="form-control form-control-sm" value="@f.Address" /></div>
 
                     <div class="col-md-3"><label class="form-label small" for="par-IdType">@T("ID type", "نوع الهوية")</label>
                         <select name="PrimaryIdTypeLookupId" id="par-IdType" class="form-select form-select-sm">
                             <option value="">—</option>
-                            @foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(p.PrimaryIdTypeLookupId == t.Id)">@(isRtl ? t.Ar : t.En)</option> }
+                            @foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(f.PrimaryIdTypeLookupId == t.Id)">@(isRtl ? t.Ar : t.En)</option> }
                         </select>
                     </div>
                     <div class="col-md-3"><label class="form-label small" for="par-IdNo">@T("ID number", "رقم الهوية")</label>
-                        <input name="PrimaryIdNo" id="par-IdNo" class="form-control form-control-sm" dir="ltr" maxlength="30" value="@p.PrimaryIdNo" />
+                        <input name="PrimaryIdNo" id="par-IdNo" class="form-control form-control-sm" dir="ltr" maxlength="30" value="@f.PrimaryIdNo" />
                         <div class="form-text">@T("Identity field — changing it needs the reason below (BR-PAR-009).", "حقل هوية — تغييره يحتاج السبب أدناه (BR-PAR-009).")</div>
                     </div>
                     <div class="col-md-3"><label class="form-label small" for="par-LifeStatus">@T("Status", "الحالة")</label>
                         <select name="LifeStatus" id="par-LifeStatus" class="form-select form-select-sm">
                             @foreach (ParentLifeStatus s in Enum.GetValues(typeof(ParentLifeStatus)))
                             {
-                                <option value="@s" selected="@(p.LifeStatus == s)">@SocialProfileLabels.ParentStatus(s, isRtl)</option>
+                                <option value="@s" selected="@(f.LifeStatus == s)">@SocialProfileLabels.ParentStatus(s, isRtl)</option>
                             }
                         </select>
                     </div>
                     <div class="col-md-3" id="par-note-wrap"><label class="form-label small" for="par-LifeStatusNote">@T("Note", "بيان الحالة")</label>
-                        <input name="LifeStatusNote" id="par-LifeStatusNote" class="form-control form-control-sm" maxlength="200" value="@p.LifeStatusNote" />
+                        <input name="LifeStatusNote" id="par-LifeStatusNote" class="form-control form-control-sm" maxlength="200" value="@f.LifeStatusNote" />
                     </div>
                     @* The hierarchy is edited on its own page — three dependent pickers do not belong
                        inside a form whose Save means something else. *@
@@ -91,7 +99,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="par-Reason">@T("Reason (required when the name changes — T1)", "السبب (مطلوب عند تغيير الاسم — T1)")</label><input name="Reason" id="par-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
+                <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="par-Reason">@T("Reason (required when the name changes — T1)", "السبب (مطلوب عند تغيير الاسم — T1)")</label><input name="Reason" id="par-Reason" class="form-control form-control-sm" value="@f.Reason" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
             </form>
             <div class="form-text mt-2">@T("Mobile uniqueness is enforced (BR-PAR-002); contact changes need no reason, the name does.", "تفرد الجوال مفروض (BR-PAR-002)؛ تغيير التواصل لا يحتاج سبباً، الاسم يحتاج.")</div>
         </div>

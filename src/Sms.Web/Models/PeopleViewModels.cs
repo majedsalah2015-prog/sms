@@ -364,6 +364,30 @@ namespace Sms.Web.Models
         public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
 
         public string? Reason { get; set; }
+
+        /// <summary>
+        /// Projects a stored parent into the shape the identity tab's inputs bind to, so the tab
+        /// can draw the stored row and a rejected submission through one and the same model —
+        /// see <see cref="ParentFileViewModel.Submitted"/>.
+        /// </summary>
+        public static ParentFormViewModel Of(Parent parent) => new ParentFormViewModel
+        {
+            Id = parent.Id,
+            NameAr = parent.NameAr,
+            NameEn = parent.NameEn,
+            PrimaryMobile = parent.PrimaryMobile,
+            PrimaryIdTypeLookupId = parent.PrimaryIdTypeLookupId,
+            PrimaryIdNo = parent.PrimaryIdNo,
+            LifeStatus = parent.LifeStatus,
+            LifeStatusNote = parent.LifeStatusNote,
+            Email = parent.Email,
+            Address = parent.Address,
+            OccupationEmployer = parent.OccupationEmployer,
+            EducationLookupId = parent.EducationLookupId,
+            PreferredLanguage = parent.PreferredLanguage,
+            ResidenceAreaId = parent.ResidenceAreaId,
+            NeighbourhoodId = parent.NeighbourhoodId,
+        };
     }
 
     public sealed class ParentFileViewModel
@@ -394,6 +418,13 @@ namespace Sms.Web.Models
 
         /// <summary>Governorate · locality · quarter, joined for reading; null when nothing is recorded.</summary>
         public string? ResidencePath { get; set; }
+
+        /// <summary>
+        /// What the user had typed on the identity tab when a save was refused. The tab redraws
+        /// from this instead of from <see cref="Parent"/>, so a refusal costs the correction that
+        /// caused it and nothing else. Null on every ordinary load of the file.
+        /// </summary>
+        public ParentFormViewModel? Submitted { get; set; }
     }
 
     public sealed class DedupWorkbenchViewModel
@@ -455,6 +486,13 @@ namespace Sms.Web.Models
         public string? CurrentPath { get; set; }
 
         public string? ReturnUrl { get; set; }
+
+        /// <summary>
+        /// The reason typed on the attempt a refusal turned back, redrawn with the selection that
+        /// caused it. Null on an ordinary open of the picker — the same idea as
+        /// <see cref="ParentFileViewModel.Submitted"/> on the identity tab.
+        /// </summary>
+        public string? SubmittedReason { get; set; }
 
         public bool CanEdit { get; set; }
     }

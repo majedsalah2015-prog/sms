@@ -96,7 +96,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(form.NameAr, "Name (Arabic)"); Require(form.NameEn, "Name (English)"); Require(form.PrimaryMobile, "Primary mobile");
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)"); Require(form.PrimaryMobile, "Primary mobile", "الجوال الأساسي");
                 var mobile = form.PrimaryMobile!.Trim();
                 var dup = await _db.Parents.AsNoTracking().FirstOrDefaultAsync(p => p.PrimaryMobile == mobile);
                 if (dup != null) throw new InvalidOperationException(T($"A parent with this mobile already exists ({dup.ParentFileNo}) — open that file instead (BR-PAR-002).", $"يوجد ولي أمر بهذا الجوال ({dup.ParentFileNo}) — افتح ملفه بدلاً من الإنشاء (BR-PAR-002)."));
@@ -136,8 +136,19 @@ namespace Sms.Web.Controllers
         [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
         public async Task<IActionResult> File(int id, string? tab = null)
         {
+            var vm = await BuildFileAsync(id, tab);
+            return vm == null ? NotFound() : View(vm);
+        }
+
+        /// <summary>
+        /// Everything the parent file draws, gathered in one place so that a refused save can
+        /// redraw the page it was posted from rather than redirect back to a freshly loaded copy
+        /// of the stored row. Null when this school has no such parent.
+        /// </summary>
+        private async Task<ParentFileViewModel?> BuildFileAsync(int id, string? tab)
+        {
             var p = await _db.Parents.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(x => x.Id == id && x.SchoolId == _db.CurrentSchoolId);
-            if (p == null) return NotFound();
+            if (p == null) return null;
             var links = await _db.StudentGuardianLinks.AsNoTracking().Where(l => l.ParentId == id).OrderByDescending(l => l.EffectiveFromUtc).ToListAsync();
             var students = await _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => links.Select(l => l.StudentId).Contains(s.Id)).ToListAsync();
             var rels = await LookupAsync("RelationshipType");
@@ -169,7 +180,7 @@ namespace Sms.Web.Controllers
                 statement.Add(new FamilyStatementLine(s, gross, notes, disc, paid, Sms.Application.Fees.StudentFinancialPositionCalculator.Calculate(gross, notes, disc, paid), charges.Count));
             }
 
-            return View(new ParentFileViewModel
+            return new ParentFileViewModel
             {
                 Parent = p, ActiveTab = tab ?? "identity", FamilyStatement = statement,
                 ResidencePath = (await ResidencePathAsync(p)).Path,
@@ -178,7 +189,7 @@ namespace Sms.Web.Controllers
                 PossibleDuplicates = dups, PortalUserName = portal, IdTypes = await IdTypesAsync(),
                 EducationLevels = await LookupAsync("EducationLevel"),
                 Audit = audit.Select(a => (a.Action.ToString(), a.FieldName, a.OldValue, a.NewValue, a.OccurredAtUtc, a.ActorUserId, a.Reason)).ToList(),
-            });
+            };
         }
 
         [HttpPost("{id:int}/edit")]
@@ -188,7 +199,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                Require(form.NameAr, "Name (Arabic)"); Require(form.NameEn, "Name (English)"); Require(form.PrimaryMobile, "Primary mobile");
+                Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)"); Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)"); Require(form.PrimaryMobile, "Primary mobile", "الجوال الأساسي");
                 var mobile = form.PrimaryMobile!.Trim();
                 if (await _db.Parents.AsNoTracking().AnyAsync(x => x.Id != id && x.PrimaryMobile == mobile)) throw new InvalidOperationException(T("Another parent already uses this mobile (BR-PAR-002).", "ولي أمر آخر يستخدم هذا الجوال (BR-PAR-002)."));
                 _audit.Reason = string.IsNullOrWhiteSpace(form.Reason) ? null : form.Reason;
@@ -203,7 +214,18 @@ namespace Sms.Web.Controllers
                     form.PrimaryIdTypeLookupId, idNo, form.LifeStatus, form.LifeStatusNote, form.EducationLookupId);
                 TempData["Flash"] = T("Parent file updated.", "تم تحديث ملف ولي الأمر.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            catch (InvalidOperationException ex)
+            {
+                // A refusal must not cost the user the correction it is refusing. Redirecting back
+                // to the file would redraw the stored row and silently discard everything just
+                // typed, so the tab is re-rendered here with the submitted values still in it.
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+                var vm = await BuildFileAsync(id, "identity");
+                if (vm == null) return NotFound();
+                vm.Submitted = form;
+                return View(nameof(File), vm);
+            }
+
             return RedirectToAction(nameof(File), new { id, tab = "identity" });
         }
 
@@ -270,15 +292,26 @@ namespace Sms.Web.Controllers
         [RequirePermission(ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.View)]
         public async Task<IActionResult> Residence(int id, string? returnUrl = null)
         {
+            var vm = await BuildResidenceAsync(id, returnUrl);
+            return vm == null ? NotFound() : View(vm);
+        }
+
+        /// <summary>
+        /// The picker as it opens on what is stored, built apart from the action so that a refused
+        /// save can redraw this page with the selection that was refused still on it. Null when
+        /// this school has no such parent.
+        /// </summary>
+        private async Task<ParentResidenceViewModel?> BuildResidenceAsync(int id, string? returnUrl)
+        {
             var parent = await _db.Parents.IgnoreQueryFilters().AsNoTracking()
                 .SingleOrDefaultAsync(p => p.Id == id && p.SchoolId == _db.CurrentSchoolId);
-            if (parent == null) return NotFound();
+            if (parent == null) return null;
 
             // The governorate is not stored — it is walked up to, which is the whole point of keeping a
             // hierarchy rather than three loose fields that can drift apart.
             var (governorateId, path) = await ResidencePathAsync(parent);
 
-            return View(new ParentResidenceViewModel
+            return new ParentResidenceViewModel
             {
                 Parent = parent,
                 Governorates = await _db.Governorates.AsNoTracking().OrderBy(g => g.SortOrder).ToListAsync(),
@@ -289,7 +322,26 @@ namespace Sms.Web.Controllers
                 ReturnUrl = Url.IsLocalUrl(returnUrl) ? returnUrl : null,
                 CanEdit = await _permissions.HasPermissionAsync(
                     ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File, ActionVerb.Edit, HttpContext.RequestAborted),
-            });
+            };
+        }
+
+        /// <summary>
+        /// The governorate a submitted selection sits under, so a refused save can reopen the picker
+        /// where the user left it. The locality answers it whenever there is one; a quarter chosen
+        /// without its locality — the very selection <c>SetResidenceAsync</c> refuses — is walked up
+        /// from instead, because reopening on a blank picker is the loss this exists to prevent.
+        /// </summary>
+        private async Task<int?> GovernorateOfAsync(int? residenceAreaId, int? neighbourhoodId)
+        {
+            if (residenceAreaId == null && neighbourhoodId is int hoodId)
+            {
+                residenceAreaId = await _db.Neighbourhoods.AsNoTracking()
+                    .Where(n => n.Id == hoodId).Select(n => (int?)n.ResidenceAreaId).SingleOrDefaultAsync();
+            }
+
+            return residenceAreaId is int areaId
+                ? await _db.ResidenceAreas.AsNoTracking().Where(a => a.Id == areaId).Select(a => (int?)a.GovernorateId).SingleOrDefaultAsync()
+                : null;
         }
 
         [HttpPost("{id:int}/residence")]
@@ -303,7 +355,20 @@ namespace Sms.Web.Controllers
                 await _parents.SetResidenceAsync(id, residenceAreaId, neighbourhoodId);
                 TempData["Flash"] = T("Residence updated.", "تم تحديث السكن.");
             }
-            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            catch (InvalidOperationException ex)
+            {
+                // The same loss as the identity tab, one screen along: redirecting away from a refusal
+                // takes the three-level selection and the reason with it, and drops the message on
+                // whichever page the picker was opened from. The page is redrawn on what was chosen.
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+                var vm = await BuildResidenceAsync(id, returnUrl);
+                if (vm == null) return NotFound();
+                vm.CurrentGovernorateId = await GovernorateOfAsync(residenceAreaId, neighbourhoodId);
+                vm.CurrentAreaId = residenceAreaId;
+                vm.CurrentNeighbourhoodId = neighbourhoodId;
+                vm.SubmittedReason = reason;
+                return View(nameof(Residence), vm);
+            }
 
             // Back where the editing started: the picker lives on four other screens, and being
             // returned to the parent file from a half-finished admission form is its own small loss.
@@ -348,9 +413,13 @@ namespace Sms.Web.Controllers
             return View(new DedupWorkbenchViewModel { Pairs = pairs });
         }
 
-        private static void Require(string? v, string f)
+        /// <summary>
+        /// The field name travels in both languages: an Arabic refusal naming an English field is
+        /// half a message, and this is the refusal the identity tab produces most often.
+        /// </summary>
+        private static void Require(string? v, string en, string ar)
         {
-            if (string.IsNullOrWhiteSpace(v)) throw new InvalidOperationException(T($"{f} is required.", $"الحقل {f} مطلوب."));
+            if (string.IsNullOrWhiteSpace(v)) throw new InvalidOperationException(T($"{en} is required.", $"الحقل {ar} مطلوب."));
         }
 
         private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
