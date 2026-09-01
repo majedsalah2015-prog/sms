@@ -156,12 +156,20 @@ namespace Sms.Web.Controllers
                 LedgerAttached = _posting != null,
             };
 
+            // Grouped in memory, not in the query. Two journal keys legitimately map to one account
+            // code — every fee category pointing at a single revenue account is the normal starting
+            // configuration — so the group is needed; but `g.First()` inside a projection is not
+            // something EF can translate, and this screen answered 500 on SQL Server for every batch
+            // it was ever opened on. Nothing caught it because no test drives this action against a
+            // database, which is the same blind spot the whole Sqlite-vs-SQL-Server rule is about.
             var codes = m.Lines.Select(l => l.AccountCode).Distinct().ToList();
-            m.AccountNames = await _db.GlAccountMappings.AsNoTracking()
+            var mappings = await _db.GlAccountMappings.AsNoTracking()
                 .Where(x => codes.Contains(x.AccountCode))
+                .Select(x => new { x.AccountCode, x.AccountNameAr, x.AccountNameEn })
+                .ToListAsync(HttpContext.RequestAborted);
+            m.AccountNames = mappings
                 .GroupBy(x => x.AccountCode)
-                .Select(g => new { g.Key, Ar = g.First().AccountNameAr, En = g.First().AccountNameEn })
-                .ToDictionaryAsync(x => x.Key, x => IsArabic ? x.Ar : x.En, HttpContext.RequestAborted);
+                .ToDictionary(g => g.Key, g => IsArabic ? g.First().AccountNameAr : g.First().AccountNameEn);
 
             return View(m);
         }
