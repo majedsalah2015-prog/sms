@@ -83,6 +83,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Installments, Sc.Installments.Templates, "Instalment plans",   "خطط التقسيط",         "bi-calendar-range",      "Installments", "Index"),
                     new(Sc.Modules.Installments, Sc.Installments.Cases,     "Reschedule cases",   "حالات إعادة الجدولة", "bi-exclamation-triangle","Installments", "Cases"),
                     new(Sc.Modules.Installments, Sc.Installments.Dunning,   "Dunning",            "المطالبات",           "bi-envelope-exclamation","Installments", "Dunning"),
+                    new(Sc.Modules.Installments, Sc.Installments.Collection,"Collection follow-up","متابعة التحصيل",     "bi-cash-stack",          "Installments", "Collection"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Grants,       "Discounts",          "الخصومات",            "bi-percent",             "Discounts",    "Index"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Scholarships, "Scholarships",       "المنح الدراسية",      "bi-award",               "Discounts",    "Scholarships"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Types,        "Discount types",     "أنواع الخصم",         "bi-tag",                 "Discounts",    "Types"),

@@ -59,6 +59,12 @@ namespace Sms.Application.Notifications
                 ["InstallmentDueSoon"] = new[] { "InstallmentNo", "DueDate", "Amount", "Step" },
                 ["InstallmentOverdue"] = new[] { "InstallmentNo", "DueDate", "Amount", "Step" },
 
+                // CollectionFollowUp — a notice covers a window, not one installment, so it has no
+                // InstallmentNo to offer. That is why it publishes under its own event code rather
+                // than borrowing the ladder's: a template written for {InstallmentNo} would render
+                // the word itself into a parent's inbox.
+                ["DunningLetterIssued"] = new[] { "NoticeNo", "StudentNo", "Amount", "DueItems", "DueDate", "WindowFrom", "WindowTo" },
+
                 // HealthAdmin
                 ["ClinicStudentSentHome"] = new[] { "VisitNo", "Outcome" },
                 ["SchoolEmergencyProtocol"] = new[] { "VisitNo", "Outcome" },

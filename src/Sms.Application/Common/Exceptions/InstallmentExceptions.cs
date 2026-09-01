@@ -168,4 +168,33 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// doc/Modules/20 §8.5: the collection window runs backwards.
+    /// <para>
+    /// Refused rather than tolerated because of what tolerating it looks like. An
+    /// inverted range matches no installment, so the arrears roll comes back empty
+    /// — and an empty arrears screen does not read as "your dates are the wrong way
+    /// round", it reads as "nobody owes the school anything". That is the one wrong
+    /// answer this module must never give quietly.
+    /// </para>
+    /// <para>
+    /// The dates travel as values, not inside an English clause, so the Web boundary
+    /// can say the whole sentence in the reader's language (see
+    /// <c>Sms.Web/Models/UserMessage.Finance.cs</c>).
+    /// </para>
+    /// </summary>
+    public class InvalidCollectionWindowException : InvalidOperationException
+    {
+        public InvalidCollectionWindowException(DateTime from, DateTime to)
+            : base($"Collection window starts {from:yyyy-MM-dd} and ends {to:yyyy-MM-dd}, which is before it starts.")
+        {
+            From = from;
+            To = to;
+        }
+
+        public DateTime From { get; }
+
+        public DateTime To { get; }
+    }
 }

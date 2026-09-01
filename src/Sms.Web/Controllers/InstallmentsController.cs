@@ -44,7 +44,7 @@ namespace Sms.Web.Controllers
     /// </para>
     /// </summary>
     [Route("installments")]
-    public class InstallmentsController : Controller
+    public partial class InstallmentsController : Controller
     {
         private readonly IInstallmentAdmin _installments;
         private readonly AppDbContext _db;
@@ -52,8 +52,11 @@ namespace Sms.Web.Controllers
         private readonly ICurrentUser _user;
         private readonly ISystemSetupAdmin _setup;
         private readonly IUsageInspector<PlanTemplate> _templateUsage;
+        private readonly ICollectionFollowUp _collection;
+        private readonly IClock _clock;
+        private readonly IPermissionService _permissions;
 
-        public InstallmentsController(IInstallmentAdmin installments, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, ISystemSetupAdmin setup, IUsageInspector<PlanTemplate> templateUsage)
+        public InstallmentsController(IInstallmentAdmin installments, AppDbContext db, IWorkingYearContext workingYear, ICurrentUser user, ISystemSetupAdmin setup, IUsageInspector<PlanTemplate> templateUsage, ICollectionFollowUp collection, IClock clock, IPermissionService permissions)
         {
             _installments = installments;
             _db = db;
@@ -61,6 +64,9 @@ namespace Sms.Web.Controllers
             _user = user;
             _setup = setup;
             _templateUsage = templateUsage;
+            _collection = collection;
+            _clock = clock;
+            _permissions = permissions;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;

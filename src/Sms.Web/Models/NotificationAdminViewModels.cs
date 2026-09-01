@@ -16,6 +16,16 @@ namespace Sms.Web.Models
         public bool IncludeRead { get; set; }
 
         public int UnreadCount { get; set; }
+
+        /// <summary>
+        /// Render inside the portal shell rather than the staff one. This is the
+        /// single screen both audiences open — every InApp delivery is written to
+        /// it, and most of them are addressed to families — so it picks its layout
+        /// the way <c>Help/Index</c> does. A parent must never be shown the staff
+        /// sidebar (BR-SEC-010): the point of that rule is that unreachable surface
+        /// is invisible, not merely refused when clicked.
+        /// </summary>
+        public bool ForPortal { get; set; }
     }
 
     /// <summary>doc/Modules/33 §8.2 — the studio's list, plus what a new template may be written for.</summary>

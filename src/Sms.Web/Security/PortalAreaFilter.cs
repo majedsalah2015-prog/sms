@@ -71,6 +71,22 @@ namespace Sms.Web.Security
                // account with the portal's four chapters and no screen index at all, so nothing
                // this rule protects is disclosed by reaching it.
                || Eq(controller, "Help")
+               // A person's own in-app inbox, and only that — three actions of Notifications, never
+               // the controller. doc 09 §5's bell/list/mark-read is the surface every InApp delivery
+               // is written for, and a family's deliveries are the ones this product sends most:
+               // fees due, absence, the clinic. Without this the engine queued them, marked them
+               // Delivered, and the parent's own inbox answered not-found.
+               //
+               // Listed by action rather than by controller because the same controller holds the
+               // notification administration screens — templates, gateways, the delivery log, the
+               // budget — and those are staff screens over every family's messages. Each of them
+               // does carry an NTF permission a portal account could never hold, but a
+               // security boundary that depends on a second check being right somewhere else is one
+               // rename away from opening. These three are safe on their own terms: all are
+               // [NoPermissionRequired] and every one is scoped to the caller's own user id, with
+               // INotificationOpsAdmin refusing any delivery row that is not theirs.
+               || (Eq(controller, "Notifications")
+                   && (Eq(action, "Index") || Eq(action, "MarkRead") || Eq(action, "MarkAllRead")))
                || (Eq(controller, "Home") && (Eq(action, "SetLanguage") || Eq(action, "Privacy") || Eq(action, "Error")));
 
         private static bool Eq(string a, string b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);

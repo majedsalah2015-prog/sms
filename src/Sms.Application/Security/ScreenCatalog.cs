@@ -314,6 +314,20 @@ namespace Sms.Application.Security
             public const string Schedule = "Schedule";
             public const string Cases = "Cases";
             public const string Dunning = "Dunning";
+
+            /// <summary>
+            /// doc/Modules/20 §8.5's other half and §10's "Overdue installments by
+            /// payer/grade/bucket": who owes money in a date window, and the
+            /// notices a human decides to send about it.
+            /// <para>
+            /// Separately grantable from <see cref="Dunning"/> on purpose. That
+            /// screen shows what the automatic ladder already did; this one opens
+            /// the whole school's arrears and writes to families. A clerk who may
+            /// read the ladder's log is not therefore someone who may address a
+            /// letter to every parent in the school (BR-GLB-102, BR-SEC-010).
+            /// </para>
+            /// </summary>
+            public const string Collection = "Collection";
         }
 
         public static class Payments
@@ -626,6 +640,17 @@ namespace Sms.Application.Security
             S(Modules.Installments, Installments.Schedule, "Family schedule", "جدول الأسرة", ActionVerb.View, ActionVerb.Edit, ActionVerb.Submit, ActionVerb.Approve),
             S(Modules.Installments, Installments.Cases, "Reschedule cases", "حالات الجدولة", ActionVerb.View, ActionVerb.Approve),
             S(Modules.Installments, Installments.Dunning, "Dunning console", "لوحة التحصيل", ActionVerb.View, ActionVerb.Post),
+
+            // Four verbs, and each one is a different act on a different audience.
+            //
+            // View reads the roll. Export hands the school's whole arrears list out as a file, which
+            // is the one thing on this screen that leaves the building — doc/UI/02 P-LIST gates it
+            // separately (BR-SEC-021) and so does this. Print produces the numbered letters a family
+            // is handed. Post sends to the portal, and is the dedicated bulk-messaging grant
+            // BR-GLB-102 requires: a school can staff a clerk who reads arrears and prints letters
+            // without also authorising them to message every parent at once.
+            S(Modules.Installments, Installments.Collection, "Collection follow-up", "متابعة التحصيل",
+                ActionVerb.View, ActionVerb.Export, ActionVerb.Print, ActionVerb.Post),
 
             // ---- Payments
             S(Modules.Payments, Payments.Cashier, "Cashier", "الصندوق", ActionVerb.View, ActionVerb.Create),

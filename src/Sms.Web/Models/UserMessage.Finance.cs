@@ -153,6 +153,12 @@ namespace Sms.Web.Models
                 ? "هذا القسط لم يعد مفتوحاً — فقد سُدِّد أو استُبدل بجدولة أخرى أو أُعدِم، والمسدَّد لا يُعدَّل (BR-INS-003)."
                 : "This instalment is no longer open — it has been paid, superseded by a reschedule, or written off, and none of those are edited afterwards (BR-INS-003).",
 
+            // The dates are read back to the officer rather than described, because the mistake is
+            // almost always one typed digit and seeing the pair is what makes it visible.
+            InvalidCollectionWindowException window => arabic
+                ? $"فترة التحصيل تبدأ في {Day(window.From)} وتنتهي في {Day(window.To)} — أي أنها تنتهي قبل أن تبدأ؛ صحّح التاريخين، فالمدى المقلوب لا يطابق شيئاً ويبدو كأن لا أحد مدين."
+                : $"The collection window starts {Day(window.From)} and ends {Day(window.To)} — it ends before it begins; correct the two dates, because a backwards range matches nothing and reads as though nobody owes anything.",
+
             // ---------------------------------------------------------------- M22 payments and refunds
 
             TillSessionNotOpenException => arabic

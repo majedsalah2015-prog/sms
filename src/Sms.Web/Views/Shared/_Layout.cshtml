@@ -44,6 +44,11 @@
     // reading the student directory is not the right to enrol a whole year group.
     var canSeeBulkPlacement = await Visibility.CanSeeScreenAsync(
         Sms.Application.Security.ScreenCatalog.Modules.Students, Sms.Application.Security.ScreenCatalog.Students.Enrollment);
+    // The outstanding-fees roll gets its own entry under Finance, so it needs its own screen right
+    // asked for — reading the instalment templates is not the right to open the whole school's
+    // arrears, nor to write a notice to every family on it (BR-SEC-010, BR-GLB-102).
+    var canSeeCollection = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Installments, Sms.Application.Security.ScreenCatalog.Installments.Collection);
     // The embedded ERP's own sidebar, one group per module, nested inside the accounting section.
     // Filtered by the ERP against the erp.permission claims this principal carries, so a user
     // granted nothing accounting-related sees no accounting section at all.
@@ -57,7 +62,8 @@
         canSeeRoles,
         canSeeUserRoles,
         canSeeStudentFinance,
-        canSeeBulkPlacement);
+        canSeeBulkPlacement,
+        canSeeCollection);
     // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
     var erpUrl = Configuration["ExternalApps:ErpUrl"];
     var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";

@@ -151,6 +151,43 @@ namespace Sms.Web.Tests
             Assert.IsType<NotFoundResult>(context.Result);
         }
 
+        [Theory]
+        [InlineData("Index")]
+        [InlineData("MarkRead")]
+        [InlineData("MarkAllRead")]
+        [BusinessRule("BR-SEC-010")]
+        public async Task A_portal_account_may_reach_its_own_notification_inbox(string action)
+        {
+            // doc 09 §5's bell/list/mark-read. Every InApp delivery this product sends is written to
+            // this inbox and most of them are addressed to families — fees due, an absence, a clinic
+            // visit. Before this the engine queued them, marked them Delivered, and the parent's own
+            // inbox answered not-found, which reads as a lost message rather than a closed door.
+            var context = PortalRequestTo("Notifications", action);
+
+            await new PortalAreaFilter().OnActionExecutionAsync(context, Next);
+
+            Assert.Null(context.Result);
+        }
+
+        [Theory]
+        [InlineData("Templates")]
+        [InlineData("Providers")]
+        [InlineData("Deliveries")]
+        [InlineData("Budget")]
+        [InlineData("Subscriptions")]
+        [BusinessRule("BR-SEC-010")]
+        public async Task The_notification_administration_screens_stay_shut_to_a_portal_account(string action)
+        {
+            // The guard on the three above. They are allowed by *action*, not by controller, because
+            // the same controller holds the studio, the gateways, the delivery log and the budget —
+            // screens over every family's messages. Widening to the controller would open all of them.
+            var context = PortalRequestTo("Notifications", action);
+
+            await new PortalAreaFilter().OnActionExecutionAsync(context, Next);
+
+            Assert.IsType<NotFoundResult>(context.Result);
+        }
+
         private static Task<ActionExecutedContext> Next() => Task.FromResult<ActionExecutedContext>(null!);
 
         private static ActionExecutingContext PortalRequestTo(string controller, string action)

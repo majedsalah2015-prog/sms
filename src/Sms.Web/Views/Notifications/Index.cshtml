@@ -7,6 +7,9 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("My notifications", "إشعاراتي");
     ViewData["Breadcrumb"] = T("Notifications / My notifications", "الإشعارات / إشعاراتي");
+    // Both audiences open this one; a parent must not be shown the staff shell (BR-SEC-010).
+    // Same shape Help/Index uses, and for the same reason.
+    Layout = Model.ForPortal ? "_PortalLayout" : "_Layout";
 
     string EventName(string code)
         => NotificationEventCatalog.TryGet(code, out var e) ? (isRtl ? e.TitleAr : e.TitleEn)
@@ -45,7 +48,13 @@
     <partial name="_HelpModal" model="help" />
 </div>
 
-<partial name="_NotificationsNav" />
+@* Staff tabs only. Every other tab in that partial is a notification-administration screen over
+   every family's messages, and a portal account may reach none of them — offering the tabs would
+   put four not-found links in front of a parent and name four screens BR-SEC-010 hides. *@
+@if (!Model.ForPortal)
+{
+    <partial name="_NotificationsNav" />
+}
 
 <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
     <a class="btn btn-sm @(Model.IncludeRead ? "btn-outline-secondary" : "btn-secondary")"

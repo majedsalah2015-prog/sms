@@ -197,6 +197,15 @@ namespace Sms.Application.Notifications
                 "Parent", "ولي الأمر", InAppEmail, NotificationTiming.Digest, hasPublisher: true),
             E("InstallmentOverdue", M.Installments, "Installment overdue", "تأخر سداد قسط",
                 "Parent, finance", "ولي الأمر والشؤون المالية", InAppEmailSms, NotificationTiming.Digest, hasPublisher: true),
+
+            // doc/Modules/20 §12 names this event and nothing catalogued it, so the collection
+            // follow-up screen had nowhere to publish from. Immediate, not Digest, and that is the
+            // difference from InstallmentOverdue above: the ladder's overdue notices are automatic
+            // and repetitive, which is exactly what a daily digest is for, while this one is a
+            // formal letter a named officer decided to send — holding it back until tomorrow's
+            // digest would put the paper copy in the family's hands before the portal copy.
+            E("DunningLetterIssued", M.Installments, "Arrears notice issued", "إصدار إشعار متأخرات",
+                "Parent", "ولي الأمر", InAppEmail, NotificationTiming.Immediate, hasPublisher: true),
             E("PaymentReceived", M.Payments, "Payment received (receipt)", "استلام دفعة (إيصال)",
                 "Parent", "ولي الأمر", InAppEmail),
             E("PaymentRefundProcessed", M.Payments, "Refund processed", "تنفيذ استرداد",

@@ -1,0 +1,232 @@
+@using System.Globalization
+@using Sms.Application.ReadModels
+@model CollectionRollViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Collection follow-up", "متابعة التحصيل");
+    ViewData["Breadcrumb"] = T("Installment plans / Collection follow-up", "خطط التقسيط / متابعة التحصيل");
+    var f = Model.Filter;
+    var yid = Model.Year?.Id;
+    // Dates go into the boxes invariant: an <input type="date"> only ever accepts yyyy-MM-dd, and a
+    // culture-formatted value renders the field empty in Arabic without saying why.
+    string D(DateTime? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+    var canAct = Model.CanPrint || Model.CanSend;
+    var help = new HelpPanelViewModel
+    {
+        Id = "collection-help",
+        Title = T("Collection follow-up — help", "متابعة التحصيل — مساعدة"),
+        Intro = T("Who owes the school money that fell due between two dates, oldest arrears first. Print a notice for the family, or send one to their portal — every notice is numbered and logged.", "من عليه مبالغ للمدرسة استُحقّت بين تاريخين، الأقدم تأخّراً أولاً. اطبع إشعاراً للأسرة أو أرسله إلى بوابتها — وكل إشعار مرقّم ومسجَّل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("From / to", "من / إلى"), T("The window is on the due date and includes both ends: 1–31 March includes an installment due on the 31st. Leave a box empty for an open end — no 'from' means everything up to the 'to' date, which is the usual way to ask 'who is behind'.", "الفترة على تاريخ الاستحقاق وتشمل الطرفين: 1–31 مارس تشمل قسطاً يستحق في 31. اترك أحد الحقلين فارغاً لطرف مفتوح — وترك «من» فارغاً يعني كل ما قبل تاريخ «إلى»، وهو السؤال المعتاد: من المتأخر.")),
+            new HelpPanelViewModel.Item(T("Two kinds of due", "نوعا الاستحقاق"), T("A family on an installment plan is read from its schedule's due dates. A family with no plan is read from its posted invoices, aged by their posting date — the same reference the finance dashboard ages receivables by. Both appear here, so a school that never adopted plans is not shown an empty screen.", "الأسرة صاحبة خطة تقسيط تُقرأ من تواريخ استحقاق جدولها. والأسرة بلا خطة تُقرأ من فواتيرها المرحّلة بتاريخ ترحيلها — وهو المرجع نفسه الذي تُعمّر به لوحة المالية الذمم. وكلاهما يظهر هنا، حتى لا تُعرض شاشة فارغة على مدرسة لا تستخدم التقسيط.")),
+            new HelpPanelViewModel.Item(T("Chaseable", "القابل للمطالبة"), T("What may actually be asked for. BR-INS-009 suppresses a notice over an amount already covered by a post-dated cheque the school is holding — the balance is still shown, but no letter goes out for it.", "ما يجوز فعلاً المطالبة به. يمنع BR-INS-009 الإشعار عن مبلغ يغطّيه شيك آجل بيد المدرسة — يظل الرصيد ظاهراً، لكن لا يصدر عنه خطاب.")),
+            new HelpPanelViewModel.Item(T("Paper notice", "إشعار ورقي"), T("Prints one numbered sheet per family and records that it was issued. It is a browser print, not a sealed PDF — the document engine is still an open decision — but the number and the log entry are real.", "يطبع ورقة مرقّمة لكل أسرة ويسجّل صدورها. وهي طباعة من المتصفح لا ملف PDF مختوم — إذ لم يُحسم محرّك المستندات بعد — لكن الرقم والسجل حقيقيان.")),
+            new HelpPanelViewModel.Item(T("Portal notification", "إشعار البوابة"), T("Queues an in-app notice to every guardian who has a portal sign-in, through the school's own notification rules. A family with no portal account is skipped and counted, never silently dropped.", "يضع إشعاراً داخل البوابة لكل ولي أمر له حساب دخول، وفق قواعد الإشعارات المعتمدة في المدرسة. والأسرة بلا حساب تُستثنى ويُصرَّح بعددها، ولا تُسقَط بصمت.")),
+            new HelpPanelViewModel.Item(T("Does not replace the ladder", "لا يحلّ محل السلّم الآلي"), T("The automatic dunning ladder (BR-INS-008) keeps running on its own schedule. A notice sent from here is logged separately and never advances or cancels a ladder step.", "يواصل سلّم المطالبات الآلي (BR-INS-008) عمله وفق مواعيده. والإشعار المُرسل من هنا يُسجَّل على حدة ولا يقدّم خطوة من خطوات السلّم ولا يلغيها.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Students with fees outstanding in a date window — print a notice, send one to the portal, or take the list away as a file.", "الطلبة الذين عليهم رسوم مستحقة خلال فترة — اطبع إشعاراً أو أرسله إلى البوابة أو صدّر القائمة ملفاً.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </form>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_InstallmentsNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first — the roll is read per year.", "عرّف عاماً دراسياً أولاً — القائمة تُقرأ لكل عام على حدة.")</div>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-people" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.MatchCount</span><span class="sms-tile__label">@T("students owing", "طالباً مديناً")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-danger"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><span class="sms-tile__value"><bdi dir="ltr">@Model.TotalOutstanding.ToString("N2")</bdi></span><span class="sms-tile__label">@T("outstanding in window", "المتبقي في الفترة")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-megaphone" aria-hidden="true"></i></span><span class="sms-tile__value"><bdi dir="ltr">@Model.TotalNotifiable.ToString("N2")</bdi></span><span class="sms-tile__label">@T("chaseable now", "القابل للمطالبة الآن")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-calendar-range" aria-hidden="true"></i></span><span class="sms-tile__value small"><bdi dir="ltr">@(D(f.From) is "" ? T("any", "الكل") : D(f.From)) → @(D(f.To) is "" ? T("any", "الكل") : D(f.To))</bdi></span><span class="sms-tile__label">@T("due-date window", "فترة الاستحقاق")</span></div></div>
+    </div>
+
+    <div class="sms-card mb-3 p-3">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="year" value="@yid" />
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-from">@T("Due from", "مستحق من")</label><input id="f-from" type="date" name="from" value="@D(f.From)" class="form-control form-control-sm" /></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-to">@T("Due to", "مستحق إلى")</label><input id="f-to" type="date" name="to" value="@D(f.To)" class="form-control form-control-sm" /></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-q">@T("Student name or number", "اسم الطالب أو رقمه")</label><input id="f-q" name="q" value="@f.Query" class="form-control form-control-sm" placeholder="@T("name / student no.", "الاسم / رقم الطالب")" /></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-grade">@T("Grade", "الصف")</label><select id="f-grade" name="grade" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">@T("All grades", "كل الصفوف")</option>@foreach (var g in Model.Grades) { <option value="@g.Id" selected="@(g.Id == f.GradeLevelId)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-section">@T("Section", "الشعبة")</label>
+                <select id="f-section" name="section" class="form-select form-select-sm" disabled="@(f.GradeLevelId == null)">
+                    <option value="">@T("All sections", "كل الشعب")</option>
+                    @foreach (var s in Model.Sections) { <option value="@s.Id" selected="@(s.Id == f.SectionId)">@(isRtl ? s.NameAr : s.NameEn)</option> }
+                </select>
+                @if (f.GradeLevelId == null) { <div class="form-text small">@T("Pick a grade first.", "اختر الصف أولاً.")</div> }
+            </div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-bucket">@T("Aging", "التقادم")</label>
+                <select id="f-bucket" name="bucket" class="form-select form-select-sm">
+                    <option value="">@T("All ages", "كل الفئات")</option>
+                    @foreach (AgingBucket b in Enum.GetValues(typeof(AgingBucket))) { <option value="@b" selected="@(f.Bucket == b)">@FinanceLabels.Aging(b, isRtl)</option> }
+                </select>
+            </div>
+            <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="notifiable" value="true" id="f-notifiable" checked="@f.NotifiableOnly" /><label class="form-check-label small" for="f-notifiable">@T("Only what can be chased (hide cheque-covered)", "القابل للمطالبة فقط (إخفاء المغطّى بشيكات)")</label></div></div>
+            <div class="col-md-3 d-flex gap-1">
+                <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>@T("Apply", "تطبيق")</button>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Collection" asp-route-year="@yid">@T("Clear", "مسح")</a>
+                @if (Model.CanExport)
+                {
+                    <a class="btn btn-outline-success btn-sm" asp-action="CollectionCsv" asp-route-year="@yid" asp-route-from="@D(f.From)" asp-route-to="@D(f.To)" asp-route-q="@f.Query" asp-route-grade="@f.GradeLevelId" asp-route-section="@f.SectionId" asp-route-bucket="@f.Bucket" asp-route-notifiable="@f.NotifiableOnly"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>@T("Export", "تصدير")</a>
+                }
+                <button type="button" class="btn btn-outline-secondary btn-sm d-print-none" onclick="window.print()" aria-label="@T("Print the list", "طباعة القائمة")"><i class="bi bi-printer" aria-hidden="true"></i></button>
+            </div>
+        </form>
+        @if (Model.WindowError != null)
+        {
+            <div class="alert alert-danger py-2 small mt-2 mb-0"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@Model.WindowError</div>
+        }
+    </div>
+
+    @if (Model.IsTruncated)
+    {
+        <div class="alert alert-warning py-2 small d-print-none"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T($"Showing the first {Model.Rows.Count} of {Model.MatchCount} students who owe — narrow the window, the grade or the section to see the rest. The export carries all of them.", $"يُعرض أول {Model.Rows.Count} من {Model.MatchCount} طالباً مديناً — ضيّق الفترة أو الصف أو الشعبة لرؤية الباقي. والتصدير يحملهم جميعاً.")</div>
+    }
+
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="sms-card p-4 text-center text-muted">
+            <p class="mb-1"><i class="bi bi-check2-circle fs-3" aria-hidden="true"></i></p>
+            <p class="mb-0">@(Model.WindowError != null
+                ? T("Correct the dates above to run the inquiry.", "صحّح التاريخين أعلاه لتشغيل الاستعلام.")
+                : T("Nobody owes anything in this window. Widen the dates, or clear the filters, to look further back.", "لا أحد مدين في هذه الفترة. وسّع التاريخين أو امسح التصفية للبحث أبعد."))</p>
+        </div>
+    }
+    else
+    {
+        <form method="post" id="notice-form">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="year" value="@yid" />
+            <input type="hidden" name="from" value="@D(f.From)" />
+            <input type="hidden" name="to" value="@D(f.To)" />
+            <input type="hidden" name="q" value="@f.Query" />
+            <input type="hidden" name="grade" value="@f.GradeLevelId" />
+            <input type="hidden" name="section" value="@f.SectionId" />
+            <input type="hidden" name="bucket" value="@f.Bucket" />
+            <input type="hidden" name="notifiable" value="@f.NotifiableOnly.ToString().ToLowerInvariant()" />
+
+            @if (canAct)
+            {
+                <div class="sms-card p-2 mb-2 d-flex flex-wrap gap-2 align-items-center d-print-none">
+                    <span class="small text-muted me-2">@T("With the selected students:", "بالطلبة المحددين:")</span>
+                    @if (Model.CanPrint)
+                    {
+                        <button class="btn btn-primary btn-sm" type="submit" formaction="@Url.Action("CollectionNotices")" formmethod="post"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print paper notices", "طباعة إشعارات ورقية")</button>
+                    }
+                    @if (Model.CanSend)
+                    {
+                        <button class="btn btn-outline-primary btn-sm" type="submit" formaction="@Url.Action("CollectionPortalNotices")" formmethod="post"><i class="bi bi-bell me-1" aria-hidden="true"></i>@T("Send portal notifications", "إرسال إشعارات البوابة")</button>
+                    }
+                    <span class="small text-muted">@T("Each issues a numbered notice and records it.", "كلاهما يصدر إشعاراً مرقّماً ويسجّله.")</span>
+                </div>
+            }
+
+            <div class="sms-card">
+                <table class="table sms-table align-middle mb-0">
+                    <caption class="visually-hidden">@T("Students with fees outstanding in the selected due-date window", "الطلبة الذين عليهم رسوم مستحقة في فترة الاستحقاق المحددة")</caption>
+                    <thead>
+                        <tr>
+                            @if (canAct)
+                            {
+                                <th scope="col" class="d-print-none"><input type="checkbox" class="form-check-input" id="pick-all" aria-label="@T("Select all", "تحديد الكل")" /></th>
+                            }
+                            <th scope="col">@T("Student", "الطالب")</th>
+                            <th scope="col">@T("Grade / section", "الصف / الشعبة")</th>
+                            <th scope="col">@T("Guardian", "ولي الأمر")</th>
+                            <th scope="col">@T("Oldest due", "أقدم استحقاق")</th>
+                            <th scope="col">@T("Aging", "التقادم")</th>
+                            <th scope="col" class="text-end">@T("Items", "البنود")</th>
+                            <th scope="col" class="text-end">@T("Outstanding", "المتبقي")</th>
+                            <th scope="col" class="text-end">@T("Chaseable", "القابل للمطالبة")</th>
+                            <th scope="col">@T("Last notice", "آخر إشعار")</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in Model.Rows)
+                        {
+                            <tr>
+                                @if (canAct)
+                                {
+                                    <td class="d-print-none"><input type="checkbox" class="form-check-input pick" name="studentIds" value="@r.StudentId" aria-label="@T("Select", "تحديد") @(isRtl ? r.StudentNameAr : r.StudentNameEn)" /></td>
+                                }
+                                <td>
+                                    <a asp-controller="Fees" asp-action="StudentFinanceDetail" asp-route-id="@r.StudentId">@(isRtl ? r.StudentNameAr : r.StudentNameEn)</a>
+                                    <div class="small text-muted"><bdi dir="ltr">@r.StudentNo</bdi></div>
+                                </td>
+                                <td class="small">@((isRtl ? r.GradeNameAr : r.GradeNameEn) ?? "—")<div class="text-muted">@((isRtl ? r.SectionNameAr : r.SectionNameEn) ?? "—")</div></td>
+                                <td class="small">
+                                    @((isRtl ? r.GuardianNameAr : r.GuardianNameEn) ?? T("none on file", "لا أحد مسجَّل"))
+                                    @if (!r.GuardianIsResponsible)
+                                    {
+                                        <span class="badge bg-warning text-dark ms-1" title="@T("Nobody has been made financially responsible for this student (BR-PAR-005) — the notice is addressed to the primary contact.", "لم يُسنَد لأحد مسؤولية مالية عن هذا الطالب (BR-PAR-005) — يُوجَّه الإشعار إلى جهة الاتصال الأساسية.")">@T("not responsible", "غير مسؤول مالياً")</span>
+                                    }
+                                    <div class="text-muted"><bdi dir="ltr">@(r.GuardianMobile ?? "—")</bdi>@if (!r.GuardianHasPortalAccount) { <span class="ms-1" title="@T("No portal sign-in — a portal notification cannot reach this family.", "لا حساب على البوابة — لا يصل إشعار البوابة إلى هذه الأسرة.")"><i class="bi bi-slash-circle" aria-hidden="true"></i></span> }</div>
+                                </td>
+                                <td class="text-nowrap small"><bdi dir="ltr">@(r.Position.OldestDueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</bdi></td>
+                                <td><span class="badge @CollectionLabels.BucketBadge(r.Bucket)">@FinanceLabels.Aging(r.Bucket, isRtl)</span></td>
+                                <td class="text-end">@r.Position.ItemCount</td>
+                                <td class="text-end fw-semibold text-danger"><bdi dir="ltr">@r.Position.Outstanding.ToString("N2")</bdi></td>
+                                <td class="text-end">
+                                    <bdi dir="ltr">@r.Position.Notifiable.ToString("N2")</bdi>
+                                    @if (r.Position.HasPdcCoveredItems)
+                                    {
+                                        <div class="small text-muted" title="@T("Part of this balance is covered by a post-dated cheque the school holds, and BR-INS-009 suppresses a notice over it.", "جزء من هذا الرصيد يغطّيه شيك آجل بيد المدرسة، ويمنع BR-INS-009 المطالبة به.")"><i class="bi bi-shield-check me-1" aria-hidden="true"></i>@T("cheque held", "شيك محفوظ")</div>
+                                    }
+                                </td>
+                                <td class="small text-nowrap">
+                                    @if (r.LastNoticeAtUtc == null)
+                                    {
+                                        <span class="text-muted">@T("never", "لم يُرسَل")</span>
+                                    }
+                                    else
+                                    {
+                                        <bdi dir="ltr">@r.LastNoticeAtUtc.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi>
+                                        <div class="text-muted">@CollectionLabels.Channel(r.LastNoticeChannel!.Value, isRtl)</div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="fw-semibold">
+                            <td colspan="@(canAct ? 7 : 6)" class="text-end">@T("Listed total", "مجموع المعروض")</td>
+                            <td class="text-end text-danger"><bdi dir="ltr">@Model.Rows.Sum(r => r.Position.Outstanding).ToString("N2")</bdi></td>
+                            <td class="text-end"><bdi dir="ltr">@Model.Rows.Sum(r => r.Position.Notifiable).ToString("N2")</bdi></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </form>
+
+        <script>
+            // Select-all over the rendered page only. The bulk action posts ids, never "everything
+            // that matched" — a filter that quietly widened between render and submit would
+            // otherwise address letters to families the officer never saw.
+            (function () {
+                var all = document.getElementById('pick-all');
+                if (!all) { return; }
+                all.addEventListener('change', function () {
+                    document.querySelectorAll('#notice-form .pick').forEach(function (b) { b.checked = all.checked; });
+                });
+            })();
+        </script>
+    }
+}

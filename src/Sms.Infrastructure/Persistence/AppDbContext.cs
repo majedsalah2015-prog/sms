@@ -355,6 +355,8 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<DunningEvent> DunningEvents => Set<DunningEvent>();
 
+        public DbSet<CollectionNotice> CollectionNotices => Set<CollectionNotice>();
+
         public DbSet<DiscountType> DiscountTypes => Set<DiscountType>();
 
         public DbSet<EligibilityRule> EligibilityRules => Set<EligibilityRule>();

@@ -109,6 +109,14 @@ namespace Sms.Infrastructure.Seeding
                 "لم يُسدَّد القسط رقم {InstallmentNo} بمبلغ {Amount} المستحق في {DueDate}. نرجو مراجعة الإدارة المالية.",
                 "Installment {InstallmentNo} of {Amount}, due on {DueDate}, is unpaid. Please contact the finance office."),
 
+            // The portal copy of the arrears notice a collection officer issues (doc/Modules/20
+            // §8.5/§12). It names the notice number so a family ringing the finance office can quote
+            // the same reference that is printed on the paper version.
+            ("DunningLetterIssued",
+                "إشعار برسوم مستحقة", "Notice of outstanding fees",
+                "صدر إشعار رقم {NoticeNo} بمبلغ {Amount} عن {DueItems} من بنود الرسوم المستحقة على الطالب {StudentNo} اعتباراً من {DueDate}. نرجو السداد أو مراجعة الإدارة المالية.",
+                "Notice {NoticeNo} has been issued for {Amount}, covering {DueItems} unpaid fee item(s) for student {StudentNo} from {DueDate}. Please settle it or contact the finance office."),
+
             ("ClinicStudentSentHome",
                 "إرسال الطالب إلى المنزل من العيادة", "Sent home from the clinic",
                 "زار ابنكم العيادة المدرسية (زيارة رقم {VisitNo}) وتقرر إرساله إلى المنزل. نرجو التواصل مع المدرسة.",

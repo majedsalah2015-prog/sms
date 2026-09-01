@@ -87,6 +87,11 @@ namespace Sms.Web.Controllers
                 Items = includeRead ? await MineAsync(includeRead: true) : unread,
                 IncludeRead = includeRead,
                 UnreadCount = unread.Count,
+
+                // The one screen of this controller a family reaches (BR-SEC-010's portal
+                // allow-list names these three actions and nothing else here), so it wears the
+                // portal's shell for them and the staff shell for everyone else.
+                ForPortal = PortalAreaFilter.IsPortalAccount(User.FindFirst(SmsClaimTypes.AccountType)?.Value),
             });
         }
 

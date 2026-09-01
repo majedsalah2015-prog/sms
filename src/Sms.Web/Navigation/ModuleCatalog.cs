@@ -126,7 +126,8 @@ namespace Sms.Web.Navigation
             bool canSeeRoles = true,
             bool canSeeUserRoles = true,
             bool canSeeStudentFinance = true,
-            bool canSeeBulkPlacement = true)
+            bool canSeeBulkPlacement = true,
+            bool canSeeCollection = true)
         {
             var items = new List<NavItem>
             {
@@ -146,6 +147,7 @@ namespace Sms.Web.Navigation
                 AddBulkPlacement(key, group, isVisible, canSeeBulkPlacement);
                 AddSectionBoard(key, group, isVisible, canSeeSectionBoard);
                 AddStudentFinance(key, group, isVisible, canSeeStudentFinance);
+                AddCollection(key, group, isVisible, canSeeCollection);
 
                 if (group.Items.Count > 0)
                 {
@@ -286,6 +288,47 @@ namespace Sms.Web.Navigation
             // by a filter this entry does not share, so it never silently disappears with a neighbour.
             var feesIndex = group.Items.FindIndex(i => i.Key == "FEE");
             group.Items.Insert(feesIndex < 0 ? group.Items.Count : feesIndex + 1, entry);
+        }
+
+        /// <summary>
+        /// doc/Modules/20 §8.5 / §10 — the outstanding-fees inquiry, given its own
+        /// entry under Finance for the same reason student finance has one.
+        /// <para>
+        /// It is a screen of Instalment Plans, and nobody looking for it thinks of
+        /// it that way: the question is "who owes us money that fell due between
+        /// these dates", and the sidebar's instalments entry opens the template
+        /// designer. Two clicks deeper into a module named after plan shapes is
+        /// where the one screen a finance office opens every month should not be.
+        /// </para>
+        /// <para>
+        /// Gated by its own right (BR-SEC-010): being able to read the instalment
+        /// templates is not the right to open the whole school's arrears, still
+        /// less to write to every family on it (BR-GLB-102). The instalments
+        /// feature toggle still governs it through <paramref name="isVisible"/>
+        /// (BR-SET-006) — a school running no plans at all should not be offered
+        /// the module's screens by a side door.
+        /// </para>
+        /// </summary>
+        private static void AddCollection(
+            string groupKey, NavItem group, Func<ModuleInfo, bool>? isVisible, bool canSeeCollection)
+        {
+            var installments = All.First(m => m.Code == "INS");
+            if (groupKey != "finance" || !canSeeCollection || (isVisible != null && !isVisible(installments)))
+            {
+                return;
+            }
+
+            var entry = new NavItem(
+                "INS-COLLECTION", "Outstanding fees", "الرسوم المستحقة", "bi-cash-stack",
+                "Installments", "Collection",
+                // The printed notice batch is a drill-down of this entry, not a screen of its own —
+                // without this the highlight would jump away the moment an officer pressed Print.
+                siblingActions: new[] { "CollectionNotices" });
+
+            // Under the instalments module it belongs to, and after student finance when both are
+            // present: the two roll screens read as a pair, one per child and one per due date.
+            var insIndex = group.Items.FindIndex(i => i.Key == "INS");
+            group.Items.Insert(insIndex < 0 ? group.Items.Count : insIndex + 1, entry);
         }
 
         /// <summary>

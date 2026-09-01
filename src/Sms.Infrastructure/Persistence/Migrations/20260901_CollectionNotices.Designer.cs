@@ -3,15 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260901_CollectionNotices")]
+    partial class CollectionNotices
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -12420,6 +12422,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<int>("NationalityLookupId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("NeighbourhoodId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("PhotoAttachmentId")
                         .HasColumnType("int");
 
@@ -12444,6 +12449,9 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.Property<short?>("Religion")
                         .HasColumnType("smallint");
 
+                    b.Property<int?>("ResidenceAreaId")
+                        .HasColumnType("int");
+
                     b.Property<short?>("ResidencyStatus")
                         .HasColumnType("smallint");
 
@@ -12465,6 +12473,10 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ResidenceAreaId")
+                        .HasDatabaseName("IX_Student_ResidenceArea")
+                        .HasFilter("[ResidenceAreaId] IS NOT NULL");
 
                     b.HasIndex("SchoolId", "StudentNo")
                         .IsUnique();
@@ -15353,6 +15365,19 @@ namespace Sms.Infrastructure.Persistence.Migrations
                     b.HasOne("Sms.Domain.Health.VaccinationCampaign", null)
                         .WithMany()
                         .HasForeignKey("VaccinationCampaignId");
+                });
+
+            modelBuilder.Entity("Sms.Domain.Installments.CollectionNotice", b =>
+                {
+                    b.HasOne("Sms.Domain.Fees.Payer", null)
+                        .WithMany()
+                        .HasForeignKey("PayerId");
+
+                    b.HasOne("Sms.Domain.Students.Student", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Sms.Domain.Installments.DunningEvent", b =>

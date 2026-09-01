@@ -243,8 +243,9 @@ namespace Sms.Infrastructure.Tests
             await contributor.SeedAsync();
 
             // 20 from doc 08 §4, plus PAY and ADV — payroll and staff advances, the owner's
-            // 2026-08-28 addition to a module the docs scope payroll out of.
-            Assert.Equal(22, db.NumberingSeries.Count(s => s.IsActive));
+            // 2026-08-28 addition to a module the docs scope payroll out of — plus DUN, the arrears
+            // notice BR-INS-008 calls a numbered formal document.
+            Assert.Equal(23, db.NumberingSeries.Count(s => s.IsActive));
             Assert.Equal(firstVersionCount, db.NumberingSeries.Count()); // no spurious cutover on re-seed
             var student = db.NumberingSeries.Single(s => s.Code == "STU");
             Assert.Equal(ResetPolicy.Never, student.ResetPolicy);
@@ -260,6 +261,13 @@ namespace Sms.Infrastructure.Tests
             // An advance is not: a withdrawn request should not oblige anyone to explain a gap.
             var advance = db.NumberingSeries.Single(s => s.Code == "ADV");
             Assert.Equal(GapPolicy.Normal, advance.GapPolicy);
+
+            // Nor is an arrears notice — no money moves when one is issued, and an officer who
+            // abandons a batch half-way should not leave a hole somebody has to account for. It
+            // resets per academic year because arrears are chased within a school year.
+            var notice = db.NumberingSeries.Single(s => s.Code == "DUN");
+            Assert.Equal(GapPolicy.Normal, notice.GapPolicy);
+            Assert.Equal(ResetPolicy.PerAcademicYear, notice.ResetPolicy);
         }
 
         private sealed class RecordingContributor : ISeedContributor

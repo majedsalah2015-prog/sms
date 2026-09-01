@@ -1,0 +1,145 @@
+@using System.Globalization
+@model CollectionNoticesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Arrears notices", "إشعارات المتأخرات");
+    ViewData["Breadcrumb"] = T("Installment plans / Collection follow-up / Notices", "خطط التقسيط / متابعة التحصيل / الإشعارات");
+    string D(DateTime? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—";
+    var school = isRtl ? Model.SchoolNameAr : Model.SchoolNameEn;
+    var help = new HelpPanelViewModel
+    {
+        Id = "notices-help",
+        Title = T("Arrears notices — help", "إشعارات المتأخرات — مساعدة"),
+        Intro = T("One numbered sheet per family, already issued and logged. Print them and hand them over.", "ورقة مرقّمة لكل أسرة، صدرت وسُجّلت بالفعل. اطبعها وسلّمها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Already issued", "صدرت بالفعل"), T("The numbers were minted and the notices recorded when this page was produced. Closing without printing does not undo that — the log says a notice was issued, so reprint from a fresh selection rather than expecting this page to come back.", "مُنحت الأرقام وسُجّلت الإشعارات لحظة إنشاء هذه الصفحة. وإغلاقها دون طباعة لا يلغي ذلك — فالسجل يقول إن إشعاراً صدر؛ فأعد الإصدار من تحديد جديد بدل انتظار عودة هذه الصفحة.")),
+            new HelpPanelViewModel.Item(T("Not a sealed document", "ليست مستنداً مختوماً"), T("BR-INS-008 specifies a server-rendered PDF for the letter stage. That engine is still an open decision, so this is a browser print of a bilingual layout — the same substitution the statement and the receipt make today. The notice number and the log entry are real.", "يحدد BR-INS-008 مستند PDF مُولَّداً على الخادم لمرحلة الخطاب. ولم يُحسم ذلك المحرّك بعد، فهذه طباعة من المتصفح لتنسيق ثنائي اللغة — البديل نفسه المستخدم اليوم في كشف الحساب والسند. أما رقم الإشعار وقيد السجل فحقيقيان.")),
+            new HelpPanelViewModel.Item(T("Amount shown", "المبلغ المعروض"), T("What was outstanding and chaseable in the window at the moment of issue, snapshotted onto the notice. It stays as printed after the family pays, so the sheet in their hand keeps matching the system that sent it.", "ما كان متبقياً وقابلاً للمطالبة في الفترة لحظة الإصدار، مثبتاً على الإشعار. ويبقى كما طُبع بعد سداد الأسرة، فتظل الورقة التي بيدها مطابقة للنظام الذي أصدرها.")),
+        },
+    };
+}
+
+@* The layout renders no Styles section, so the print rule lives inline — the same shape StudentStatement.cshtml uses. *@
+<style>
+        @@media print {
+            body * { visibility: hidden; }
+            .dn-print, .dn-print * { visibility: visible; }
+            .dn-print { position: absolute; left: 0; top: 0; width: 100%; }
+            .dn-sheet { border: 0; page-break-after: always; }
+            .dn-sheet:last-child { page-break-after: auto; }
+    }
+</style>
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T($"{Model.Notices.Count} notice(s) issued and logged. One page each.", $"صدر وسُجّل {Model.Notices.Count} إشعاراً. صفحة لكل منها.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="Collection">@T("Back to the roll", "العودة إلى القائمة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.SkippedNothingOutstanding > 0 || Model.SkippedPdcCovered > 0)
+{
+    <div class="alert alert-warning py-2 small d-print-none">
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        @if (Model.SkippedNothingOutstanding > 0)
+        {
+            <span>@T($"{Model.SkippedNothingOutstanding} selected student(s) had nothing outstanding in this window and got no notice. ", $"{Model.SkippedNothingOutstanding} من الطلبة المحددين لا شيء عليهم في هذه الفترة فلم يصدر لهم إشعار. ")</span>
+        }
+        @if (Model.SkippedPdcCovered > 0)
+        {
+            <span>@T($"{Model.SkippedPdcCovered} were skipped because the school already holds a post-dated cheque covering the balance (BR-INS-009).", $"استُثني {Model.SkippedPdcCovered} لأن بيد المدرسة شيكاً آجلاً يغطي الرصيد (BR-INS-009).")</span>
+        }
+    </div>
+}
+
+<div class="dn-print">
+    @foreach (var n in Model.Notices)
+    {
+        var row = n.Row;
+        <div class="sms-card dn-sheet p-4 mb-3">
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-3">
+                <div>
+                    <div class="fw-bold fs-5">@school</div>
+                    <div class="text-muted small">@T("Notice of outstanding fees", "إشعار برسوم مستحقة")</div>
+                </div>
+                <div class="text-end small">
+                    <div><span class="text-muted">@T("Notice no.", "رقم الإشعار")</span> <bdi dir="ltr" class="fw-semibold">@n.Notice.NoticeNo</bdi></div>
+                    <div><span class="text-muted">@T("Issued", "تاريخ الإصدار")</span> <bdi dir="ltr">@n.Notice.IssuedAtUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi></div>
+                </div>
+            </div>
+
+            <dl class="row mb-3 small">
+                <dt class="col-sm-3">@T("To", "إلى")</dt>
+                <dd class="col-sm-9">@((isRtl ? row.GuardianNameAr : row.GuardianNameEn) ?? T("The guardian on file", "ولي الأمر المسجَّل"))@if (!string.IsNullOrEmpty(row.GuardianMobile)) { <span class="text-muted"> — <bdi dir="ltr">@row.GuardianMobile</bdi></span> }</dd>
+
+                <dt class="col-sm-3">@T("Student", "الطالب")</dt>
+                <dd class="col-sm-9">@(isRtl ? row.StudentNameAr : row.StudentNameEn) <span class="text-muted">(<bdi dir="ltr">@row.StudentNo</bdi>)</span></dd>
+
+                <dt class="col-sm-3">@T("Grade / section", "الصف / الشعبة")</dt>
+                <dd class="col-sm-9">@((isRtl ? row.GradeNameAr : row.GradeNameEn) ?? "—") / @((isRtl ? row.SectionNameAr : row.SectionNameEn) ?? "—")</dd>
+
+                <dt class="col-sm-3">@T("Period covered", "الفترة المشمولة")</dt>
+                <dd class="col-sm-9"><bdi dir="ltr">@D(n.Notice.WindowFrom) → @D(n.Notice.WindowTo)</bdi></dd>
+            </dl>
+
+            <p class="mb-3">
+                @T($"Our records show {row.Position.ItemCount} fee item(s) falling due in this period that remain unpaid. The amount outstanding is set out below. We would be grateful if you would settle it, or contact the school's finance office to arrange a schedule.",
+                   $"تُظهر سجلاتنا {row.Position.ItemCount} من بنود الرسوم استُحقّت في هذه الفترة ولم تُسدَّد بعد. والمبلغ المتبقي مبيَّن أدناه. نرجو التكرّم بسداده أو مراجعة الشؤون المالية بالمدرسة لترتيب جدولة.")
+            </p>
+
+            <table class="table sms-table table-sm mb-3">
+                <caption class="visually-hidden">@T("What is outstanding for this student in the period", "المتبقي على هذا الطالب في الفترة")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">@T("Description", "البيان")</th>
+                        <th scope="col">@T("Oldest due date", "أقدم تاريخ استحقاق")</th>
+                        <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@T($"Fees due in the period ({row.Position.ItemCount} item(s))", $"رسوم مستحقة في الفترة ({row.Position.ItemCount} بند)")</td>
+                        <td><bdi dir="ltr">@(row.Position.OldestDueDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</bdi></td>
+                        <td class="text-end"><bdi dir="ltr">@row.Position.Due.ToString("N2")</bdi></td>
+                    </tr>
+                    @if (row.Position.Due != row.Position.Outstanding)
+                    {
+                        <tr>
+                            <td colspan="2">@T("Less: paid to date", "يُخصم: المسدَّد حتى تاريخه")</td>
+                            <td class="text-end"><bdi dir="ltr">−@((row.Position.Due - row.Position.Outstanding).ToString("N2"))</bdi></td>
+                        </tr>
+                    }
+                    @if (row.Position.HasPdcCoveredItems)
+                    {
+                        <tr>
+                            <td colspan="2">@T("Less: covered by a post-dated cheque held by the school", "يُخصم: المغطّى بشيك آجل بحوزة المدرسة")</td>
+                            <td class="text-end"><bdi dir="ltr">−@((row.Position.Outstanding - row.Position.Notifiable).ToString("N2"))</bdi></td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="2" class="text-end">@T("Amount now payable", "المبلغ المستحق الآن")</td>
+                        <td class="text-end"><bdi dir="ltr">@n.Notice.AmountDue.ToString("N2")</bdi></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <p class="small text-muted mb-0">
+                @T("If payment has been made since this notice was produced, please disregard it and accept our thanks.",
+                   "إن كان السداد قد تم بعد إصدار هذا الإشعار، فيرجى إهماله مع الشكر.")
+            </p>
+            <div class="d-flex justify-content-between small text-muted mt-4 pt-3 border-top">
+                <span>@school</span>
+                <span><bdi dir="ltr">@Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC</bdi></span>
+            </div>
+        </div>
+    }
+</div>

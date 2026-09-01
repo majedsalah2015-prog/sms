@@ -658,6 +658,12 @@ namespace Sms.Web
             // fees (Module 19 policy), service-suspension list (Q2, legal),
             // Hangfire scheduling of RunDunningAsync, portal screens.
             services.AddScoped<IInstallmentAdmin, InstallmentAdmin>();
+            // doc/Modules/20 §8.5's other half — the collection roll and the human-issued notice
+            // batches the ladder deliberately does not fire. Separate from the admin because it
+            // reads across every family's schedule at once, and across families with no schedule at
+            // all, whose posted charges are aged by posting date exactly as the receivables snapshot
+            // ages them.
+            services.AddScoped<ICollectionFollowUp, CollectionFollowUp>();
             // The usage guard for a plan template: what would break if it went away. Registered beside the
             // admin it guards, and asked by the screen before a destructive action is offered, not after.
             services.AddScoped<IUsageInspector<Sms.Domain.Installments.PlanTemplate>, PlanTemplateUsageInspector>();

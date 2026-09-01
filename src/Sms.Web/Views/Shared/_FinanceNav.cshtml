@@ -10,6 +10,13 @@
         ("Fees", "Structure", "Fee structure", "هيكل الرسوم", "bi-grid-3x3", Array.Empty<string>()),
         ("Fees", "Categories", "Categories", "الفئات", "bi-tags", Array.Empty<string>()),
         ("Fees", "StudentFinance", "Student finance", "مالية الطلاب", "bi-person-vcard", new[] { "StudentFinanceDetail", "StudentStatement" }),
+
+        // The roll's other question. "Student finance" answers "what is left on this child's fees";
+        // this one answers "who owes us money that fell due between these dates" — the one a finance
+        // office asks on the first of the month. It lives in Module 20 because only an installment
+        // carries a due date, but a clerk looking for it is standing on a fees screen, so it is
+        // reachable from here as well as from the instalment sub-nav.
+        ("Installments", "Collection", "Outstanding fees", "الرسوم المستحقة", "bi-cash-stack", new[] { "CollectionNotices" }),
         ("Fees", "Position", "Statement", "كشف الحساب", "bi-journal-text", Array.Empty<string>()),
         ("Payments", "Index", "Cashier", "الصندوق", "bi-cash-coin", new[] { "Receipt" }),
         ("Payments", "Till", "Till sessions", "جلسات الصندوق", "bi-safe2", Array.Empty<string>()),
@@ -24,7 +31,7 @@
     @foreach (var t in tabs)
     {
         var isActive = Active(t.Controller, t.Action, t.Also);
-        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@t.Controller" asp-action="@t.Action" asp-route-year="@(t.Controller == "Fees" && t.Action != "Position" && t.Action != "Categories" ? year : null)"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
+        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@t.Controller" asp-action="@t.Action" asp-route-year="@((t.Controller == "Fees" && t.Action != "Position" && t.Action != "Categories") || t.Action == "Collection" ? year : null)"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
     }
 </ul>
 </nav>
