@@ -37,8 +37,15 @@ namespace Sms.Application.GlExport
         /// The batch number is the natural key for that, since a batch's period
         /// may not overlap another's.
         /// </para>
+        /// <para>
+        /// <paramref name="payer"/> is context for the entry's description and
+        /// nothing else — see <see cref="GlBatchPayer"/>. It is a parameter rather
+        /// than a field on the batch because it is not a fact the batch keeps: it
+        /// is derived, at this moment, from the documents the batch already
+        /// summarises.
+        /// </para>
         /// </summary>
-        Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, CancellationToken cancellationToken = default);
+        Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, GlBatchPayer payer, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Reverses a posted batch, so its period can be regenerated after
@@ -50,6 +57,37 @@ namespace Sms.Application.GlExport
         /// </para>
         /// </summary>
         Task<GlPostingOutcome> ReverseBatchAsync(GlExportBatch batch, string reason, CancellationToken cancellationToken = default);
+    }
+
+    /// <summary>
+    /// Whose money a period's fee payments were, so the ledger entry can say so
+    /// in the sentence an accountant reads.
+    /// <para>
+    /// The <b>lines</b> of a summary entry stay anonymous and always will —
+    /// docs/Integration/01-Embedded-Accounting-Plan.md §8.2 rule 9 leaves
+    /// <c>PartyType</c>/<c>PartyCode</c> empty, because a control-account total
+    /// belongs to no one family and the school's own receivable subledger is the
+    /// place that answers per student (§7.2). This is the other thing: prose on
+    /// the entry header, which is how an accountant recognises "the Al-Ahmad
+    /// payment" without opening the batch behind it.
+    /// </para>
+    /// <para>
+    /// One student is named; several are only counted. Naming one family out of
+    /// twelve would read as a statement about the entry, and it would be false.
+    /// </para>
+    /// </summary>
+    /// <param name="StudentCount">Distinct students the period's fee payments were applied to — receipt → allocation → charge → student.</param>
+    /// <param name="StudentNameAr">That student's Arabic name when <paramref name="StudentCount"/> is exactly one; null otherwise.</param>
+    /// <param name="StudentNameEn">
+    /// The English half. The embedded ERP's adapter uses only the Arabic one, because that ledger's
+    /// own chart of accounts is Arabic — but this is the port, not that adapter, and a ledger
+    /// attached to an English-speaking deployment would need the other half. Carrying both is also
+    /// what BR-GLB-001 asks of any name this system hands out.
+    /// </param>
+    public sealed record GlBatchPayer(int StudentCount, string? StudentNameAr, string? StudentNameEn)
+    {
+        /// <summary>A period that collected nothing — or collected money nobody has applied to a charge yet, which is the same silence as far as a description goes.</summary>
+        public static readonly GlBatchPayer None = new(0, null, null);
     }
 
     /// <summary>

@@ -7,6 +7,7 @@ using ERP2028.Common.Results;
 using ERP2028.Modules.Accounting.Contracts.FiscalCalendar;
 using ERP2028.Modules.Accounting.Contracts.Posting;
 using ERP2028.Modules.Accounting.Domain.Exceptions;
+using Sms.Application.GlExport;
 using Sms.Domain.GlExport;
 using Sms.Erp.Bridge.GlPosting;
 using Sms.TestSupport;
@@ -107,6 +108,9 @@ namespace Sms.Web.Tests
             },
         };
 
+        /// <summary>The family behind <see cref="PaidTuitionSeptember"/> — one student, named, which is the ordinary case for a small period.</summary>
+        private static readonly GlBatchPayer OneFamily = new(1, "أحمد محمد علي الأحمد", "Ahmad Mohammed Ali Al-Ahmad");
+
         private static PostingLine Account(PostingRequest request, string code)
             => request.Lines.Single(l => l.AccountCode == code);
 
@@ -121,7 +125,7 @@ namespace Sms.Web.Tests
         [BusinessRule("BR-FEE-008")]
         public async Task A_paid_tuition_period_reaches_the_ledger_as_one_balanced_keyed_entry()
         {
-            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             var request = Assert.Single(_engine.Requests);
             Assert.Equal("SMS", request.SourceModule);
@@ -166,7 +170,7 @@ namespace Sms.Web.Tests
                 },
             };
 
-            await Adapter().PostBatchAsync(batch);
+            await Adapter().PostBatchAsync(batch, GlBatchPayer.None);
 
             var request = Assert.Single(_engine.Requests);
             Assert.Equal(2, request.Lines.Count);
@@ -228,7 +232,7 @@ namespace Sms.Web.Tests
         {
             _calendar.Year = new FiscalYearStatusInfo("FY2026", "2026", new DateTime(2026, 1, 1), new DateTime(2026, 12, 31), IsClosed: true);
 
-            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             Assert.False(outcome.Success);
             Assert.Equal("Sms.Gl.FiscalYearClosed", outcome.ErrorCode);
@@ -243,7 +247,7 @@ namespace Sms.Web.Tests
         {
             _calendar.Year = null;
 
-            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             Assert.False(outcome.Success);
             Assert.Equal("Sms.Gl.NoFiscalYear", outcome.ErrorCode);
@@ -261,7 +265,7 @@ namespace Sms.Web.Tests
         {
             _engine.Answer = PostingResult.Fail(new Error("Accounting.Account.NotPostable", "Account 4100 is a header."));
 
-            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             Assert.False(outcome.Success);
             Assert.Equal("Accounting.Account.NotPostable", outcome.ErrorCode);
@@ -280,7 +284,7 @@ namespace Sms.Web.Tests
         {
             _engine.Throws = new AccountingDomainException("Entry date 2026-09-30 is outside period 2026-08.");
 
-            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            var outcome = await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             Assert.False(outcome.Success);
             Assert.Equal("Sms.Gl.LedgerRefused", outcome.ErrorCode);
@@ -298,7 +302,7 @@ namespace Sms.Web.Tests
         {
             _engine.Throws = new InvalidOperationException("the connection was closed");
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => Adapter().PostBatchAsync(PaidTuitionSeptember()));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily));
         }
 
         /// <summary>
@@ -310,7 +314,7 @@ namespace Sms.Web.Tests
         [BusinessRule("BR-FEE-008")]
         public async Task An_empty_batch_never_reaches_the_engine()
         {
-            var outcome = await Adapter().PostBatchAsync(new GlExportBatch { BatchNo = "GLX-0003", PeriodToUtc = new DateTime(2026, 9, 30) });
+            var outcome = await Adapter().PostBatchAsync(new GlExportBatch { BatchNo = "GLX-0003", PeriodToUtc = new DateTime(2026, 9, 30) }, GlBatchPayer.None);
 
             Assert.False(outcome.Success);
             Assert.Equal("Sms.Gl.EmptyBatch", outcome.ErrorCode);
@@ -334,12 +338,82 @@ namespace Sms.Web.Tests
         [BusinessRule("BR-FEE-008")]
         public async Task No_branch_dimension_is_sent_which_is_a_stated_deviation_from_rule_10()
         {
-            await Adapter().PostBatchAsync(PaidTuitionSeptember());
+            await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
 
             var request = Assert.Single(_engine.Requests);
             Assert.All(request.Lines, l => Assert.Null(l.BranchCode));
             Assert.All(request.Lines, l => Assert.Null(l.CostCentreCode));
             Assert.All(request.Lines, l => Assert.Null(l.ProjectCode));
+        }
+
+        /// <summary>
+        /// The sentence an accountant actually reads. It used to say
+        /// <c>School fee journal GLX-0001</c> — English, in a ledger whose entire chart of accounts
+        /// is Arabic (<c>النقدية بالصندوق</c>, <c>أوراق القبض</c>, and everything
+        /// <c>ErpGlAccountProvisioner</c> creates beside them), and anonymous, in a period one
+        /// family paid into. Both halves are fixed here: the language of the book it is written in,
+        /// and whose payment it is.
+        /// <para>
+        /// The reference is left alone. It is the batch number, it is what the idempotency guard
+        /// keys on, and it is not prose.
+        /// </para>
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-FEE-008")]
+        public async Task A_single_familys_period_is_described_in_arabic_and_names_the_student()
+        {
+            await Adapter().PostBatchAsync(PaidTuitionSeptember(), OneFamily);
+
+            var request = Assert.Single(_engine.Requests);
+            Assert.Equal("قيد رسوم مدرسية GLX-0001 — دفعة من الطالب أحمد محمد علي الأحمد", request.Description);
+            Assert.Equal("GLX-0001", request.Reference);
+        }
+
+        /// <summary>
+        /// A month the whole school paid into. Naming one of the twelve would read as a fact about
+        /// the entry and would be false, so the entry counts them instead — and counts them the way
+        /// Arabic counts, which is differently at two, at three-to-ten, and above.
+        /// </summary>
+        [Theory]
+        [InlineData(2, "قيد رسوم مدرسية GLX-0001 — دفعات من طالبين")]
+        [InlineData(7, "قيد رسوم مدرسية GLX-0001 — دفعات من 7 طلاب")]
+        [InlineData(12, "قيد رسوم مدرسية GLX-0001 — دفعات من 12 طالباً")]
+        [BusinessRule("BR-FEE-008")]
+        public async Task Several_families_are_counted_rather_than_named(int students, string expected)
+        {
+            await Adapter().PostBatchAsync(PaidTuitionSeptember(), new GlBatchPayer(students, null, null));
+
+            Assert.Equal(expected, Assert.Single(_engine.Requests).Description);
+        }
+
+        /// <summary>
+        /// A period of charges and no collection — or of money nobody has applied to a charge yet.
+        /// There is no payment to attribute, so the entry says only what it is. Silence is the
+        /// honest answer; inventing "0 students" would not be.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-FEE-008")]
+        public async Task A_period_nobody_paid_into_keeps_the_plain_description()
+        {
+            await Adapter().PostBatchAsync(PaidTuitionSeptember(), GlBatchPayer.None);
+
+            Assert.Equal("قيد رسوم مدرسية GLX-0001", Assert.Single(_engine.Requests).Description);
+        }
+
+        /// <summary>
+        /// The correction is written in the same language as the thing it corrects, and carries the
+        /// reason somebody typed. It names no student: it is composed from a batch loaded back out
+        /// of the database, and re-deriving the payer there could name someone the original entry
+        /// never mentioned (gap G-10).
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-FEE-008")]
+        public async Task A_reversal_is_described_in_arabic_and_carries_the_reason()
+        {
+            await Adapter().ReverseBatchAsync(PaidTuitionSeptember(), "أعيد ترحيل سبتمبر بعد التصحيحات");
+
+            var request = Assert.Single(_engine.Requests);
+            Assert.Equal("عكس قيد رسوم مدرسية GLX-0001: أعيد ترحيل سبتمبر بعد التصحيحات", request.Description);
         }
     }
 }

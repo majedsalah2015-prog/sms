@@ -15,6 +15,7 @@ using Sms.Domain.Fees;
 using Sms.Domain.GlExport;
 using Sms.Domain.Payments;
 using Sms.Infrastructure.Persistence;
+using Sms.Infrastructure.Security;
 
 namespace Sms.Infrastructure.GlExport
 {
@@ -113,9 +114,6 @@ namespace Sms.Infrastructure.GlExport
                 .Select(a => a.AllocatedAmount)
                 .ToListAsync(cancellationToken);
 
-            var receiptIds = receipts.Select(r => r.Id).ToList();
-            var allocatedByReceipt = (await _db.PaymentAllocations.Where(a => receiptIds.Contains(a.ReceiptId)).Select(a => new { a.ReceiptId, a.AllocatedAmount }).ToListAsync(cancellationToken))
-                .GroupBy(a => a.ReceiptId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
             var refunds = await _db.RefundVouchers
                 .Where(v => v.Status == RefundVoucherStatus.Paid && (v.ModifiedAtUtc ?? v.CreatedAtUtc) >= periodFromUtc && (v.ModifiedAtUtc ?? v.CreatedAtUtc) <= periodToUtc)
                 .Where(v => !_db.WalletLedgerEntries.Any(e => e.RefundVoucherId == v.Id))   // wallet refunds journal against WalletLiability, below
@@ -257,7 +255,10 @@ namespace Sms.Infrastructure.GlExport
             // outcome that cannot be reconciled afterwards.
             if (_posting != null)
             {
-                var outcome = await _posting.PostBatchAsync(batch, cancellationToken);
+                // Derived here rather than above, because a deployment with no ledger attached has
+                // nothing to describe and should not pay for the query (the O3 fallback).
+                var payer = await DescribePayerAsync(periodFromUtc, periodToUtc, cancellationToken);
+                var outcome = await _posting.PostBatchAsync(batch, payer, cancellationToken);
                 if (!outcome.Success)
                 {
                     throw new GlPostingRejectedException(batch.BatchNo, outcome.ErrorCode!, outcome.ErrorMessage!);
@@ -268,6 +269,65 @@ namespace Sms.Infrastructure.GlExport
             }
 
             return batch;
+        }
+
+        /// <summary>
+        /// Names whose payment the period's ledger entry describes, following the
+        /// only thread that ties money to a student: receipt → allocation → charge
+        /// → student. The receipt itself is addressed to a <c>Payer</c>, and a
+        /// payer is a parent who may be paying for three children at once
+        /// (BR-FEE-004), so the receipt on its own cannot answer the question.
+        /// <para>
+        /// Allocations of <b>these</b> receipts, whenever they were made, rather
+        /// than the period's own allocations: the question is whose charges this
+        /// period's money went to, not what happened to be applied inside the
+        /// period. The two differ exactly in the case gap G-10 exists for.
+        /// </para>
+        /// <para>
+        /// The receipt predicate is restated here rather than the ids being
+        /// passed in from the caller's list. A month at a full school is
+        /// thousands of receipts, and SQL Server refuses a request carrying more
+        /// than 2,100 parameters — an <c>IN</c> list of that size is a query that
+        /// works on the test school and throws on the real one.
+        /// </para>
+        /// </summary>
+        private async Task<GlBatchPayer> DescribePayerAsync(DateTime periodFromUtc, DateTime periodToUtc, CancellationToken cancellationToken)
+        {
+            var studentIds = await (
+                from a in _db.PaymentAllocations
+                join r in _db.Receipts on a.ReceiptId equals r.Id
+                join c in _db.Charges on a.ChargeId equals c.Id
+                where r.Status == ReceiptStatus.Posted && r.Purpose == ReceiptPurpose.FeePayment
+                      && r.IssuedAtUtc >= periodFromUtc && r.IssuedAtUtc <= periodToUtc
+                      && a.AllocatedAmount != 0m
+                select c.StudentId).Distinct().ToListAsync(cancellationToken);
+
+            // Zero falls out here as GlBatchPayer.None — a record, so it compares equal to it.
+            if (studentIds.Count != 1)
+            {
+                return new GlBatchPayer(studentIds.Count, null, null);
+            }
+
+            // Read past the soft-active filter with the school scope restated by hand, because
+            // IgnoreQueryFilters lifts every filter and not only the one meant (ADR-2, BR-GLB-010).
+            // A student who paid in September and withdrew in October is exactly the row this has to
+            // name, and an entry that went anonymous the day a family left would be worse than the
+            // English sentence it replaced.
+            var student = await _db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId && s.Id == studentIds[0])
+                .Select(s => new
+                {
+                    s.FirstNameAr, s.FatherNameAr, s.GrandfatherNameAr, s.FamilyNameAr,
+                    s.FirstNameEn, s.FatherNameEn, s.GrandfatherNameEn, s.FamilyNameEn,
+                })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return student == null
+                ? new GlBatchPayer(1, null, null)
+                : new GlBatchPayer(
+                    1,
+                    AccountPeople.Join(student.FirstNameAr, student.FatherNameAr, student.GrandfatherNameAr, student.FamilyNameAr),
+                    AccountPeople.Join(student.FirstNameEn, student.FatherNameEn, student.GrandfatherNameEn, student.FamilyNameEn));
         }
 
         public async Task<string> RenderCsvAsync(int glExportBatchId, CancellationToken cancellationToken = default)

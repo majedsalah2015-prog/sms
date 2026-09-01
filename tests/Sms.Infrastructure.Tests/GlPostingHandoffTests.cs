@@ -79,11 +79,15 @@ namespace Sms.Infrastructure.Tests
 
             public List<IReadOnlyList<GlJournalLine>> Posted { get; } = new();
 
+            /// <summary>Who each posting said the money came from — the description context, kept separately because it is not on the batch.</summary>
+            public List<GlBatchPayer> PostedPayers { get; } = new();
+
             public List<(string BatchNo, string Reason, IReadOnlyList<GlJournalLine> Lines)> Reversed { get; } = new();
 
-            public Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, CancellationToken cancellationToken = default)
+            public Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, GlBatchPayer payer, CancellationToken cancellationToken = default)
             {
                 Posted.Add(batch.Lines.ToList());
+                PostedPayers.Add(payer);
                 return Task.FromResult(PostAnswer);
             }
 
@@ -387,6 +391,132 @@ namespace Sms.Infrastructure.Tests
             Assert.Null(batch.PostedJournalNo);
             Assert.Equal(batch.TotalDebit, batch.TotalCredit);
             Assert.Equal(1150m, db.GlJournalLines.Single(l => l.GlExportBatchId == batch.Id && l.AccountKey == GlAccountKeys.Cash("Cash")).Debit);
+        }
+
+        /// <summary>
+        /// The ledger is told whose payment it is, so its entry can say so. The receipt itself
+        /// cannot answer that: it is addressed to a <c>Payer</c>, and a payer is a parent who may be
+        /// paying for three children at once (BR-FEE-004). The answer comes from the thread the
+        /// allocation makes — receipt → allocation → charge → student.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public async Task The_ledger_is_told_which_student_the_periods_payment_was_for()
+        {
+            using var db = CreateContext();
+            var service = WithLedger(db);
+            await SeedAPaidTuitionChargeAsync(db);
+            await SeedMappingsAsync(service);
+
+            await service.GenerateAsync(SeptemberFrom, SeptemberTo, generatedByUserId: 1);
+
+            var payer = Assert.Single(_ledger.PostedPayers);
+            Assert.Equal(1, payer.StudentCount);
+            Assert.Equal("S F G Fam", payer.StudentNameAr);
+            Assert.Equal("S F G Fam", payer.StudentNameEn);
+        }
+
+        /// <summary>
+        /// Two families in one period, so there is no "the student" to name. The count is what the
+        /// entry can honestly say; picking one of the two would read as a statement about the entry
+        /// and would be wrong about the other.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-PAY-003")]
+        public async Task Two_families_paying_into_one_period_are_counted_rather_than_named()
+        {
+            using var db = CreateContext();
+            var service = WithLedger(db);
+            await SeedAPaidTuitionChargeAsync(db);
+            await SeedASecondPaidTuitionChargeAsync(db);
+            await SeedMappingsAsync(service);
+
+            await service.GenerateAsync(SeptemberFrom, SeptemberTo, generatedByUserId: 1);
+
+            var payer = Assert.Single(_ledger.PostedPayers);
+            Assert.Equal(2, payer.StudentCount);
+            Assert.Null(payer.StudentNameAr);
+            Assert.Null(payer.StudentNameEn);
+        }
+
+        /// <summary>
+        /// The soft-active trap, in the one place it would be least noticed. <c>Student</c> is
+        /// <c>ISoftActiveFiltered</c>, so a family that paid in September and left in October drops
+        /// out of the ordinary query — and the September entry, posted months later or reposted
+        /// after a correction, would go anonymous exactly when somebody is trying to work out what
+        /// it was. Deactivation stops new enrolment; it never un-names a payment already taken.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-006")]
+        public async Task A_student_who_left_the_school_is_still_named_on_the_period_they_paid_for()
+        {
+            using var db = CreateContext();
+            var service = WithLedger(db);
+            await SeedAPaidTuitionChargeAsync(db);
+            await SeedMappingsAsync(service);
+
+            // Withdrawing is a T1 change with a mandatory reason — the same audit gate the real screen
+            // passes through, so the fixture has to pass it too.
+            _audit.Reason = "انتقلت الأسرة إلى مدينة أخرى";
+            var student = db.Students.Single(s => s.Id == _studentId);
+            student.IsActive = false;
+            student.Status = StudentStatus.Withdrawn;
+            await db.SaveChangesAsync();
+            _audit.Reason = null;
+
+            await service.GenerateAsync(SeptemberFrom, SeptemberTo, generatedByUserId: 1);
+
+            var payer = Assert.Single(_ledger.PostedPayers);
+            Assert.Equal(1, payer.StudentCount);
+            Assert.Equal("S F G Fam", payer.StudentNameAr);
+        }
+
+        /// <summary>
+        /// A period that charged and collected nothing has no payment to attribute, and says so by
+        /// saying nothing. Reporting a payer here would put a family's name on an entry they had no
+        /// part in.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-FEE-008")]
+        public async Task A_period_that_collected_nothing_tells_the_ledger_of_no_payer()
+        {
+            using var db = CreateContext();
+            var service = WithLedger(db);
+            await new FeeAdmin(db, Issuer(db), _clock).PostManualChargeAsync(_studentId, _payerId, _tuitionId, 1000m);
+            await SeedMappingsAsync(service);
+
+            await service.GenerateAsync(SeptemberFrom, SeptemberTo, generatedByUserId: 1);
+
+            Assert.Equal(GlBatchPayer.None, Assert.Single(_ledger.PostedPayers));
+        }
+
+        /// <summary>A second family, charged and paying in the same period as the first.</summary>
+        private async Task SeedASecondPaidTuitionChargeAsync(AppDbContext db)
+        {
+            var sibling = new Student
+            {
+                StudentNo = "STU-2", FirstNameAr = "T", FatherNameAr = "F2", GrandfatherNameAr = "G2", FamilyNameAr = "Fam2",
+                FirstNameEn = "T", FatherNameEn = "F2", GrandfatherNameEn = "G2", FamilyNameEn = "Fam2",
+                Gender = Gender.Female, DateOfBirth = new DateTime(2017, 1, 1), NationalityLookupId = 1,
+            };
+            db.Students.Add(sibling);
+            var otherPayer = new Payer { Type = PayerType.Parent };
+            db.Payers.Add(otherPayer);
+            await db.SaveChangesAsync();
+
+            // A manual charge reads the student's academic year off their enrolment, so an unenrolled
+            // student cannot be charged at all.
+            db.Enrollments.Add(new Enrollment
+            {
+                AcademicYearId = _tenant.AcademicYearId, StudentId = sibling.Id,
+                GradeYearProfileId = db.GradeYearProfiles.First().Id,
+                EnrollmentDate = new DateTime(2026, 9, 1), SourceType = EnrollmentSourceType.Admission,
+            });
+            await db.SaveChangesAsync();
+
+            var fees = new FeeAdmin(db, Issuer(db), _clock);
+            await fees.PostManualChargeAsync(sibling.Id, otherPayer.Id, _tuitionId, 500m);
+            await new PaymentAdmin(db, Issuer(db), _clock).CaptureReceiptAsync(otherPayer.Id, PaymentMethod.Cash, 575m);
         }
     }
 }
