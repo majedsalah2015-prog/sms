@@ -16,6 +16,7 @@
             new HelpPanelViewModel.Item(T("Expiring", "قيد الانتهاء"), T("Active contracts ending within the window (default 90 days) without a later contract already drafted/active — draft the renewal from the Employee file.", "عقود سارية تنتهي ضمن النافذة (90 يوماً افتراضياً) بلا عقد لاحق — أنشئ مسودة التجديد من ملف الموظف.")),
             new HelpPanelViewModel.Item(T("Expired", "منتهية المدة"), T("Active contracts whose end date has passed: terminate them, or leave them if the renewal is pending.", "عقود سارية تجاوز تاريخ نهايتها: أنهِها أو اتركها إن كان التجديد معلّقاً.")),
             new HelpPanelViewModel.Item(T("Drafts", "المسودات"), T("Activate once approved (Principal, P2 not enforced here).", "فعّلها بعد الاعتماد (المدير، P2 غير مفعّل هنا).")),
+            new HelpPanelViewModel.Item(T("Edit", "تعديل"), T("Only a draft can be edited — an activated contract is a document, not a form (BR-EMP-003). To change an active one, terminate it and draft a replacement. Changing a salary field needs a reason (T1).", "المسودة وحدها قابلة للتعديل — العقد بعد تفعيله وثيقة لا استمارة (BR-EMP-003). لتغيير عقد ساري أنهِه واكتب عقداً بديلاً. تغيير حقل الراتب يحتاج سبباً (الفئة الأولى).")),
         },
     };
     async Task Table(IReadOnlyList<ContractManagerViewModel.Row> rows, string empty)
@@ -24,12 +25,38 @@
             <tbody>@foreach (var r in rows)
             {
                 var c = r.Contract;
+                var eid = $"ctedit{c.Id}";
                 <tr><td><a asp-action="File" asp-route-id="@r.Employee.Id" asp-route-tab="contracts"><code>@r.Employee.EmployeeNo</code> @Name(r.Employee)</a></td><td>@StaffLabels.ContractType(c.Type, isRtl)</td><td>@c.StartDate.ToString("yyyy-MM-dd")</td><td>@c.EndDate.ToString("yyyy-MM-dd")</td><td class="@(r.IsExpired ? "text-danger fw-semibold" : r.DaysToEnd <= 30 ? "text-warning-emphasis fw-semibold" : "")">@if (r.IsExpired) { if (isRtl) { <text>منذ <bdi>@(-r.DaysToEnd)</bdi></text> } else { <text>@(-r.DaysToEnd) ago</text> } } else { @r.DaysToEnd.ToString() }</td><td>@c.SalaryBasic.ToString("N2")</td><td>@(r.HasSuccessor ? "✓ " + T("drafted", "موجود") : "—")</td>
                     <td class="text-end text-nowrap">
-                        @if (c.Status == ContractStatus.Draft) { <form method="post" asp-action="ContractStatusChange" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="d-inline"><input type="hidden" name="target" value="Active" /><input type="hidden" name="returnTo" value="manager" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Activate", "تفعيل")</button></form> }
+                        @if (c.Status == ContractStatus.Draft) { <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#@eid" aria-expanded="false" aria-controls="@eid" aria-label="@T($"Edit contract {c.Id} — {r.Employee.EmployeeNo}", $"تعديل العقد {c.Id} — {r.Employee.EmployeeNo}")"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Edit", "تعديل")</button> <form method="post" asp-action="ContractStatusChange" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="d-inline"><input type="hidden" name="target" value="Active" /><input type="hidden" name="returnTo" value="manager" /><button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Activate", "تفعيل")</button></form> }
                         else if (c.Status == ContractStatus.Active) { <form method="post" asp-action="ContractStatusChange" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="d-inline-flex gap-1" onsubmit="return confirm('@T("Terminate this contract?", "إنهاء هذا العقد؟")');"><input type="hidden" name="target" value="Terminated" /><input type="hidden" name="returnTo" value="manager" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:8rem" aria-label="@T($"Reason for terminating contract {c.Id} — {r.Employee.EmployeeNo}", $"سبب إنهاء العقد {c.Id} — {r.Employee.EmployeeNo}")" /><button class="btn btn-sm btn-outline-danger" type="submit" aria-label="@T("Terminate contract", "إنهاء العقد")"><i class="bi bi-x-circle" aria-hidden="true"></i></button></form> }
                         <a class="btn btn-sm btn-outline-secondary" asp-action="File" asp-route-id="@r.Employee.Id" asp-route-tab="contracts" title="@T("Open file", "فتح الملف")" aria-label="@T("Open file", "فتح الملف")"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>
                     </td></tr>
+                @*
+                    The edit row, drawn only for drafts: BR-EMP-003 makes an activated contract a
+                    document rather than a form, and EmployeeAdmin.UpdateContractAsync refuses
+                    anything past Draft. An always-visible Edit button on the three Active
+                    sections would be a button that only ever produces a refusal.
+                *@
+                if (c.Status == ContractStatus.Draft)
+                {
+                    <tr class="collapse" id="@eid"><td colspan="8" class="bg-body-tertiary">
+                        <form method="post" asp-action="EditContract" asp-route-id="@r.Employee.Id" asp-route-contractId="@c.Id" class="row g-2 align-items-end">
+                            <input type="hidden" name="returnTo" value="manager" />
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-type">@T("Type", "النوع")</label><select name="type" id="@(eid)-type" class="form-select form-select-sm">@foreach (ContractType ct in Enum.GetValues(typeof(ContractType))) { <option value="@ct" selected="@(ct == c.Type)">@StaffLabels.ContractType(ct, isRtl)</option> }</select></div>
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-start">@T("Start", "البداية")</label><input name="startDate" id="@(eid)-start" type="date" class="form-control form-control-sm" value="@c.StartDate.ToString("yyyy-MM-dd")" /></div>
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-end">@T("End", "النهاية")</label><input name="endDate" id="@(eid)-end" type="date" class="form-control form-control-sm" value="@c.EndDate.ToString("yyyy-MM-dd")" /></div>
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-basic">@T("Basic 🔒", "الأساسي 🔒")</label><input name="salaryBasic" id="@(eid)-basic" type="number" step="0.01" class="form-control form-control-sm" value="@c.SalaryBasic.ToString(CultureInfo.InvariantCulture)" /></div>
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-allow">@T("Allowances 🔒", "البدلات 🔒")</label><input name="salaryAllowances" id="@(eid)-allow" type="number" step="0.01" class="form-control form-control-sm" value="@(c.SalaryAllowances?.ToString(CultureInfo.InvariantCulture))" /></div>
+                            <div class="col-md-2"><label class="form-label small" for="@(eid)-reason">@T("Reason", "السبب")</label><input name="reason" id="@(eid)-reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" /></div>
+                            <div class="col-12 d-flex gap-2 align-items-center">
+                                <span class="form-text m-0">@T("Changing a salary field needs a reason (T1). Dates must not overlap another non-terminated contract (BR-EMP-003).", "تغيير حقل الراتب يحتاج سبباً (الفئة الأولى). لا تتداخل التواريخ مع عقد آخر غير منتهٍ (BR-EMP-003).")</span>
+                                <button class="btn btn-sm btn-outline-secondary ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#@eid">@T("Cancel", "إلغاء")</button>
+                                <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                            </div>
+                        </form>
+                    </td></tr>
+                }
             }
             @if (rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-3">@empty</td></tr> }</tbody></table></div>
     }
