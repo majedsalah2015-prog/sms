@@ -3,22 +3,24 @@
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
-    ViewData["Title"] = T("Import staff from Access", "استيراد الموظفين من أكسس");
+    ViewData["Title"] = T("Import staff from Excel", "استيراد الموظفين من إكسل");
     ViewData["Breadcrumb"] = T("Employees / Import", "الموظفون / استيراد");
     var haveFile = !string.IsNullOrWhiteSpace(Model.Token);
     var haveColumns = Model.Columns.Count > 0;
     var help = new HelpPanelViewModel
     {
         Id = "emp-import-help", Title = T("Import — help", "الاستيراد — مساعدة"),
-        Intro = T("Fifteen columns are read, and one row becomes up to four records: the employee, a contract, a job assignment and a qualification. Only the employee is required — a row whose salary cell is unreadable still becomes an employee, without a contract.", "تُقرأ خمسة عشر عموداً، ويصبح الصف الواحد أربعة سجلات كحدّ أقصى: الموظف وعقده وتعيينه ومؤهله. والموظف وحده مطلوب — فالصف الذي لا يُقرأ راتبه يصبح موظفاً بلا عقد."),
+        Intro = T("An Excel workbook (.xlsx) or an Access database. Every column below is optional, and one row becomes up to four records: the employee, a contract, a job assignment and a qualification. Only the employee is required — a row whose salary cell is unreadable still becomes an employee, without a contract.", "مصنّف إكسل (xlsx.) أو قاعدة بيانات أكسس. كل عمود أدناه اختياري، ويصبح الصف الواحد أربعة سجلات كحدّ أقصى: الموظف وعقده وتعيينه ومؤهله. والموظف وحده مطلوب — فالصف الذي لا يُقرأ راتبه يصبح موظفاً بلا عقد."),
         Items = new[]
         {
+            new HelpPanelViewModel.Item(T("A name in one column becomes four", "الاسم في عمود واحد يصير أربعة"), T("Map the column that holds the whole name to “Whole name in one column” and it is split into first, father, grandfather and family. The family name is taken from the last word, not the fourth: a three-word name becomes first, father and family, and a five-word one puts the extra ancestor in the grandfather's place. “عبد الله” and “أبو زيد” count as one part, not two. Every split is shown in the preview before anything is written.", "اربط العمود الذي يحمل الاسم كاملاً بحقل «الاسم كاملاً في عمود واحد» فيُقسَّم إلى أول وأب وجد وعائلة. واسم العائلة يُؤخذ من الكلمة الأخيرة لا من الرابعة: فالاسم الثلاثي يصير أولاً وأباً وعائلةً، والخماسي يضع الجد الزائد في خانة الجد. و«عبد الله» و«أبو زيد» مقطع واحد لا مقطعان. وكل تقسيم يظهر في المعاينة قبل أن يُكتب شيء.")),
+            new HelpPanelViewModel.Item(T("What Excel does to a number", "ما يفعله إكسل بالأرقام"), T("A mobile number typed into a plain cell loses its leading zero, because Excel stored it as a number and not as text — 0599… becomes 599…. Format those columns as text in the file before uploading, or check them in the preview. Dates written as dates are read as dates; dates written as text are read the way an Arabic register writes them, day first.", "رقم الجوال المكتوب في خلية عادية يفقد الصفر في أوله، لأن إكسل خزّنه رقماً لا نصاً — فيصير ٠٥٩٩… هكذا ٥٩٩…. نسّق تلك الأعمدة كنص في الملف قبل الرفع، أو تحقّق منها في المعاينة. والتواريخ المكتوبة تواريخَ تُقرأ تواريخ، والمكتوبة نصاً تُقرأ كما يكتبها السجل العربي: اليوم أولاً.")),
             new HelpPanelViewModel.Item(T("Nothing is written until the last step", "لا يُكتَب شيء حتى الخطوة الأخيرة"), T("Uploading and previewing only read. The preview is produced by the very same code the import runs, so a row that looks right in it is a row that will go in — and one marked with a problem is one that will be skipped, counted and left behind in the old file.", "الرفع والمعاينة قراءة فقط. والمعاينة تنتجها الشيفرة ذاتها التي تنفّذ الاستيراد، فالسطر الذي يبدو صحيحاً فيها هو ما سيُكتَب — والمعلَّم بمشكلة يُتخطّى ويُحصى ويبقى في الملف القديم.")),
-            new HelpPanelViewModel.Item(T("Three things are chosen once, not per row", "ثلاثة أمور تُختار مرة لا لكل صف"), T("Nationality, the organisation unit an assignment belongs to, and the contract end date. A staff register never carries an end date, and one this system invented would be indistinguishable from a date the school agreed to — it is the date the expiry alerts fire on (BR-EMP-003).", "الجنسية، والوحدة التنظيمية التي يتبعها التعيين، وتاريخ نهاية العقد. فسجل الموظفين لا يحمل تاريخ نهاية قطّ، وتاريخٌ يخترعه النظام لا يُميَّز عن تاريخ وافقت عليه المدرسة — وهو التاريخ الذي تنطلق عنده تنبيهات انتهاء العقد (BR-EMP-003).")),
+            new HelpPanelViewModel.Item(T("Some things are chosen once, not per row", "بعض الأمور تُختار مرة لا لكل صف"), T("Nationality, the organisation unit an assignment belongs to, and the contract end date. A staff register never carries an end date, and one this system invented would be indistinguishable from a date the school agreed to — it is the date the expiry alerts fire on (BR-EMP-003). Gender and date of birth join them only when the file has no such column: both are required on a record and have no “unknown”, so either you say what a row without one gets — and every such row is marked in the preview — or those rows are skipped, which is what happens if you leave the two empty.", "الجنسية، والوحدة التنظيمية التي يتبعها التعيين، وتاريخ نهاية العقد. فسجل الموظفين لا يحمل تاريخ نهاية قطّ، وتاريخٌ يخترعه النظام لا يُميَّز عن تاريخ وافقت عليه المدرسة — وهو التاريخ الذي تنطلق عنده تنبيهات انتهاء العقد (BR-EMP-003). ويلحق بها الجنس وتاريخ الميلاد حين لا يحمل الملف عموداً لهما: فكلاهما مطلوب في السجل وليس فيه «غير معروف»، فإمّا أن تقول ما يأخذه الصف الذي لا يحملهما — ويُعلَّم كل صف كهذا في المعاينة — وإمّا أن تُتخطّى تلك الصفوف، وهو ما يحدث إن تركتهما فارغين.")),
             new HelpPanelViewModel.Item(T("Job titles must already exist", "المسميات الوظيفية يجب أن تكون موجودة"), T("A job title from the register is matched against the school's own JobTitle list in either language. No match means the assignment is dropped and the employee still imported — inventing a lookup value from a spreadsheet cell would fill the list with every spelling the old register used.", "يُطابَق المسمى الوظيفي من السجل مع قائمة المسميات لدى المدرسة بأي اللغتين. وعدم التطابق يعني إسقاط التعيين مع بقاء الموظف مستورداً — فاختراع قيمة مرجعية من خلية جدول يملأ القائمة بكل هجاء استعمله السجل القديم.")),
             new HelpPanelViewModel.Item(T("Bank details are audited with a reason", "بيانات البنك مدقَّقة بسبب"), T("The bank name and the account number are tier-1 audited and require a stated reason, exactly like the salary. The import states one for you: the name of the file the values came from.", "اسم البنك ورقم الحساب مدقَّقان من الفئة الأولى ويتطلبان سبباً مكتوباً، تماماً كالراتب. والاستيراد يذكر لك سبباً: اسم الملف الذي جاءت منه القيم.")),
             new HelpPanelViewModel.Item(T("Names go in twice", "الاسم يُخزَّن مرتين"), T("The model requires an English name as well as an Arabic one. The import stores the register's own text in both rather than transliterating: an invented spelling is harder to notice and harder to correct than an obviously untranslated one.", "يتطلب النموذج اسماً إنجليزياً كما يتطلب عربياً. والاستيراد يخزّن نص السجل نفسه في الاثنين بدل النقحرة: فالهجاء المخترَع أصعب ملاحظةً وأصعب تصحيحاً من نصٍّ ظاهر أنه لم يُترجَم.")),
-            new HelpPanelViewModel.Item(T("If the server has no Access driver", "إن لم يكن على الخادم مشغّل أكسس"), T("Reading an .accdb needs Microsoft's Access Database Engine installed on the server, in the same bitness as the application. Without it the upload step says so plainly instead of failing silently.", "قراءة ملف accdb. تتطلب تثبيت Microsoft Access Database Engine على الخادم بالمعمارية نفسها للتطبيق. وبدونه تقول خطوة الرفع ذلك صراحةً بدل أن تفشل بصمت.")),
+            new HelpPanelViewModel.Item(T("Excel needs nothing installed; Access does", "إكسل لا يتطلب تثبيت شيء، وأكسس يتطلب"), T("An .xlsx is read out of the file itself, so it works on any server. Reading an .accdb needs Microsoft's Access Database Engine installed on the server, in the same bitness as the application; without it the upload step says so plainly instead of failing silently. The old .xls format is not read at all — open it in Excel and save it as .xlsx.", "ملف xlsx. يُقرأ من الملف نفسه، فيعمل على أي خادم. أما قراءة ملف accdb. فتتطلب تثبيت Microsoft Access Database Engine على الخادم بالمعمارية نفسها للتطبيق، وبدونه تقول خطوة الرفع ذلك صراحةً بدل أن تفشل بصمت. وصيغة xls. القديمة لا تُقرأ أصلاً — افتحها في إكسل واحفظها بصيغة xlsx.")),
         },
     };
 }
@@ -26,7 +28,7 @@
 <div class="sms-page-head">
     <div>
         <h1 class="sms-page-title">@ViewData["Title"]</h1>
-        <p class="text-muted mb-0">@T("Name · hire date · ID number · contract type · job · active · date of birth · gender · marital status · qualification · university · graduation date · salary · bank · account number.", "الاسم · تاريخ التعيين · رقم الهوية · نوع العقد · الوظيفة · فعال · تاريخ الميلاد · الجنس · الحالة الاجتماعية · المؤهل العلمي · الجامعة · تاريخ التخرج · الراتب · البنك · رقم الحساب.")</p>
+        <p class="text-muted mb-0">@T("Name · hire date · ID number · contract type · job · active · date of birth · gender · mobile · WhatsApp · marital status · address · town of origin · spouse ID · qualification · university · graduation date · salary · bank · account number · wallets.", "الاسم · تاريخ التعيين · رقم الهوية · نوع العقد · الوظيفة · فعال · تاريخ الميلاد · الجنس · الجوال · الواتس اب · الحالة الاجتماعية · العنوان · البلدة الأصلية · هوية الزوج/الزوجة · المؤهل العلمي · الجامعة · تاريخ التخرج · الراتب · البنك · رقم الحساب · المحافظ.")</p>
     </div>
     <div class="d-flex gap-2 align-items-center">
         <partial name="_HelpModal" model="help" />
@@ -41,8 +43,8 @@
     <h2 class="h6">@T("1 · The file", "١ · الملف")</h2>
     <form method="post" asp-action="ImportUpload" enctype="multipart/form-data" class="row g-2 align-items-end">
         <div class="col-md-6">
-            <label class="form-label small" for="register">@T("Access database (.mdb or .accdb)", "قاعدة بيانات أكسس (mdb. أو accdb.)")</label>
-            <input id="register" type="file" name="register" accept=".mdb,.accdb" class="form-control form-control-sm" required />
+            <label class="form-label small" for="register">@T("Excel workbook (.xlsx) or Access database (.mdb, .accdb)", "مصنّف إكسل (xlsx.) أو قاعدة بيانات أكسس (mdb. و accdb.)")</label>
+            <input id="register" type="file" name="register" accept=".xlsx,.xlsm,.mdb,.accdb" class="form-control form-control-sm" required />
         </div>
         <div class="col-md-3">
             <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-upload me-1" aria-hidden="true"></i>@T("Read it", "اقرأه")</button>
@@ -58,13 +60,13 @@
 {
     <!-- step 2 -->
     <div class="sms-card p-4 mb-3">
-        <h2 class="h6">@T("2 · The table and its columns", "٢ · الجدول وأعمدته")</h2>
+        <h2 class="h6">@T("2 · The sheet and its columns", "٢ · الورقة وأعمدتها")</h2>
         <form method="post" asp-action="ImportPreview">
             <input type="hidden" asp-for="Token" />
             <input type="hidden" asp-for="OriginalFileName" />
             <div class="row g-2 align-items-end mb-3">
                 <div class="col-md-5">
-                    <label class="form-label small" asp-for="Table">@T("Table", "الجدول")</label>
+                    <label class="form-label small" asp-for="Table">@T("Sheet / table", "الورقة / الجدول")</label>
                     <select asp-for="Table" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">@T("— choose —", "— اختر —")</option>
                         @foreach (var t in Model.Tables)
@@ -74,12 +76,15 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Read the table", "اقرأ الجدول")</button>
+                    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Read it", "اقرأها")</button>
                 </div>
             </div>
 
             @if (haveColumns)
             {
+                <!-- Says the mapping below was answered, not merely guessed — so a field set back
+                     to "none" stays there instead of being re-guessed on the next post. -->
+                <input type="hidden" name="MappingChosen" value="true" />
                 <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong. A field left at “none” is simply not imported.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها. والحقل المتروك على «بلا» لا يُستورَد ببساطة.")</p>
 
                 // Grouped by the record each column ends up in, because that is the thing an
@@ -89,7 +94,7 @@
                 {
                         ("The employee", "الموظف", new[]
                         {
-                            ("FullNameColumn", "Whole name in one column", "اسم الموظف كاملاً في عمود واحد", Model.FullNameColumn),
+                            ("FullNameColumn", "Whole name in one column — split into four", "الاسم كاملاً في عمود واحد — يُقسَّم إلى أربعة", Model.FullNameColumn),
                             ("FirstNameColumn", "First name", "الاسم الأول", Model.FirstNameColumn),
                             ("FatherNameColumn", "Father's name", "اسم الأب", Model.FatherNameColumn),
                             ("GrandfatherNameColumn", "Grandfather's name", "اسم الجد", Model.GrandfatherNameColumn),
@@ -97,10 +102,17 @@
                             ("IdNumberColumn", "Identity number", "رقم الهوية", Model.IdNumberColumn),
                             ("DateOfBirthColumn", "Date of birth", "تاريخ الميلاد", Model.DateOfBirthColumn),
                             ("GenderColumn", "Gender", "الجنس", Model.GenderColumn),
+                            ("MobileColumn", "Mobile", "الجوال", Model.MobileColumn),
+                            ("WhatsAppColumn", "WhatsApp", "الواتس اب", Model.WhatsAppColumn),
                             ("ActiveColumn", "Active", "فعال", Model.ActiveColumn),
                             ("MaritalStatusColumn", "Marital status", "الحالة الاجتماعية", Model.MaritalStatusColumn),
+                            ("AddressColumn", "Address", "العنوان", Model.AddressColumn),
+                            ("OriginTownColumn", "Town of origin", "البلدة الأصلية", Model.OriginTownColumn),
+                            ("SpouseIdNoColumn", "Spouse ID number", "رقم هوية الزوج/الزوجة", Model.SpouseIdNoColumn),
                             ("BankNameColumn", "Bank", "البنك", Model.BankNameColumn),
                             ("BankAccountColumn", "Account number", "رقم الحساب", Model.BankAccountColumn),
+                            ("PalPayWalletColumn", "PalPay wallet", "محفظة بالي بي", Model.PalPayWalletColumn),
+                            ("JawwalPayWalletColumn", "JawwalPay wallet", "محفظة جوال بي", Model.JawwalPayWalletColumn),
                         }),
                         ("The contract", "العقد", new[]
                         {
@@ -165,6 +177,17 @@
                             </select>
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label small" asp-for="SpouseIdTypeLookupId">@T("Spouse ID document type", "نوع وثيقة هوية الزوج/الزوجة")</label>
+                            <select asp-for="SpouseIdTypeLookupId" class="form-select form-select-sm">
+                                <option value="">@T("— none —", "— بلا —")</option>
+                                @foreach (var t in Model.IdTypes)
+                                {
+                                    <option value="@t.Id" selected="@(t.Id == Model.SpouseIdTypeLookupId)">@(isRtl ? t.Ar : t.En)</option>
+                                }
+                            </select>
+                            <div class="form-text">@T("Required if a spouse ID number is mapped.", "مطلوب إن رُبط رقم هوية الزوج/الزوجة.")</div>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label small" asp-for="OrgUnitId">@T("Organisation unit", "الوحدة التنظيمية")</label>
                             <select asp-for="OrgUnitId" class="form-select form-select-sm">
                                 <option value="">@T("— none —", "— بلا —")</option>
@@ -188,6 +211,21 @@
                                     <option value="@t" selected="@(t == Model.DefaultContractType)">@StaffLabels.ContractType(t, isRtl)</option>
                                 }
                             </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small" asp-for="DefaultGender">@T("Gender when the file does not say", "الجنس حين لا يذكره الملف")</label>
+                            <select asp-for="DefaultGender" class="form-select form-select-sm">
+                                <option value="">@T("— skip those rows —", "— تُتخطّى تلك الصفوف —")</option>
+                                @foreach (Sms.Domain.Common.Gender g in Enum.GetValues(typeof(Sms.Domain.Common.Gender)))
+                                {
+                                    <option value="@g" selected="@(g == Model.DefaultGender)">@Labels.Gender(g, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small" asp-for="DefaultDateOfBirth">@T("Date of birth when the file does not say", "تاريخ الميلاد حين لا يذكره الملف")</label>
+                            <input asp-for="DefaultDateOfBirth" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control form-control-sm" />
+                            <div class="form-text">@T("Left empty, a row without one is skipped — which is the safer answer.", "إن تُرك فارغاً تُتخطّى الصفوف التي لا تحمله — وهو الجواب الأسلم.")</div>
                         </div>
                         <div class="col-md-3 align-self-end">
                             <button type="submit" class="btn btn-sm btn-outline-primary w-100">@T("Preview", "معاينة")</button>
@@ -219,6 +257,7 @@
                     <th scope="col">@T("Born", "الميلاد")</th>
                     <th scope="col">@T("Gender", "الجنس")</th>
                     <th scope="col">@T("ID", "الهوية")</th>
+                    <th scope="col">@T("Mobile", "الجوال")</th>
                     <th scope="col">@T("Active", "فعال")</th>
                     <th scope="col">@T("Marital", "الاجتماعية")</th>
                     <th scope="col">@T("Hired", "التعيين")</th>
@@ -227,6 +266,7 @@
                     <th scope="col">@T("Job", "الوظيفة")</th>
                     <th scope="col">@T("Qualification", "المؤهل")</th>
                     <th scope="col">@T("Bank", "البنك")</th>
+                    <th scope="col">@T("Address / more", "العنوان / إضافي")</th>
                     <th scope="col">@T("Problem / notes", "المشكلة / ملاحظات")</th>
                 </tr></thead>
                 <tbody>
@@ -238,6 +278,7 @@
                         <td class="small"><bdi dir="ltr">@r.DateOfBirth</bdi></td>
                         <td class="small">@(r.Gender == "F" ? T("Female", "أنثى") : r.Gender == "M" ? T("Male", "ذكر") : "—")</td>
                         <td class="small"><bdi dir="ltr">@r.IdNumber</bdi></td>
+                        <td class="small"><bdi dir="ltr">@(r.Mobile ?? "—")</bdi>@if (r.WhatsApp != null) { <span class="text-muted"> · <i class="bi bi-whatsapp" aria-hidden="true"></i> <bdi dir="ltr">@r.WhatsApp</bdi></span> }</td>
                         <td class="small"><span aria-hidden="true">@(r.IsActive ? "✓" : "—")</span><span class="visually-hidden">@(r.IsActive ? T("active", "فعال") : T("not active", "غير فعال"))</span></td>
                         <td class="small">@(r.MaritalStatus == null ? "—" : StaffLabels.MaritalStatus(Enum.Parse<Sms.Domain.Employees.MaritalStatus>(r.MaritalStatus), isRtl))</td>
                         <td class="small"><bdi dir="ltr">@r.HireDate</bdi></td>
@@ -246,6 +287,17 @@
                         <td class="small">@(r.Position ?? "—")</td>
                         <td class="small">@(r.Qualification ?? "—")@if (r.University != null) { <span class="text-muted"> · @r.University</span> }</td>
                         <td class="small">@(r.BankName ?? "—")@if (r.BankAccountNo != null) { <span class="text-muted"> · <bdi dir="ltr">@r.BankAccountNo</bdi></span> }</td>
+                        <td class="small">
+                            @if (r.Address == null && r.OriginTown == null && r.SpouseIdNo == null && r.PalPayWalletNo == null && r.JawwalPayWalletNo == null)
+                            {
+                                <span>—</span>
+                            }
+                            @if (r.Address != null) { <span class="d-block">@r.Address</span> }
+                            @if (r.OriginTown != null) { <span class="d-block text-muted">@T("from", "من") @r.OriginTown</span> }
+                            @if (r.SpouseIdNo != null) { <span class="d-block text-muted">@T("spouse", "الزوج/الزوجة"): <bdi dir="ltr">@r.SpouseIdNo</bdi></span> }
+                            @if (r.PalPayWalletNo != null) { <span class="d-block text-muted">@T("PalPay", "بالي بي"): <bdi dir="ltr">@r.PalPayWalletNo</bdi></span> }
+                            @if (r.JawwalPayWalletNo != null) { <span class="d-block text-muted">@T("JawwalPay", "جوال بي"): <bdi dir="ltr">@r.JawwalPayWalletNo</bdi></span> }
+                        </td>
                         <td class="small">
                             @if (r.Problem != null) { <span class="text-danger d-block">@r.Problem</span> }
                             @foreach (var n in r.Notes) { <span class="text-warning-emphasis d-block">@n</span> }
@@ -272,10 +324,18 @@
             <input type="hidden" asp-for="IdNumberColumn" />
             <input type="hidden" asp-for="DateOfBirthColumn" />
             <input type="hidden" asp-for="GenderColumn" />
+            <input type="hidden" asp-for="MobileColumn" />
+            <input type="hidden" asp-for="WhatsAppColumn" />
             <input type="hidden" asp-for="ActiveColumn" />
             <input type="hidden" asp-for="MaritalStatusColumn" />
+            <input type="hidden" asp-for="AddressColumn" />
+            <input type="hidden" asp-for="OriginTownColumn" />
+            <input type="hidden" asp-for="SpouseIdNoColumn" />
+            <input type="hidden" asp-for="SpouseIdTypeLookupId" />
             <input type="hidden" asp-for="BankNameColumn" />
             <input type="hidden" asp-for="BankAccountColumn" />
+            <input type="hidden" asp-for="PalPayWalletColumn" />
+            <input type="hidden" asp-for="JawwalPayWalletColumn" />
             <input type="hidden" asp-for="HireDateColumn" />
             <input type="hidden" asp-for="ContractTypeColumn" />
             <input type="hidden" asp-for="SalaryColumn" />
@@ -288,6 +348,8 @@
             <input type="hidden" asp-for="OrgUnitId" />
             <input type="hidden" asp-for="ContractEndDate" />
             <input type="hidden" asp-for="DefaultContractType" />
+            <input type="hidden" asp-for="DefaultGender" />
+            <input type="hidden" asp-for="DefaultDateOfBirth" />
             <button type="submit" class="btn btn-primary" @(Model.ReadyRows == 0 ? "disabled" : "")>
                 <i class="bi bi-database-add me-1" aria-hidden="true"></i>@T("Import", "استيراد") @Model.ReadyRows
             </button>

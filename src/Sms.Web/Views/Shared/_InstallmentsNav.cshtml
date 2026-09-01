@@ -9,11 +9,14 @@
         ("Family", "Family schedule", "جدول الأسرة", "bi-people"),
         ("Cases", "Reschedule cases", "طلبات إعادة الجدولة", "bi-arrow-repeat"),
         ("Dunning", "Dunning console", "لوحة المطالبات", "bi-megaphone"),
+        ("Collection", "Collection follow-up", "متابعة التحصيل", "bi-cash-stack"),
     };
     // Schedule and Reschedule are drill-downs of the family screen; keeping that tab lit stops the
-    // subnav from going blank the moment an officer opens one.
+    // subnav from going blank the moment an officer opens one. The notice batch is the same for
+    // Collection: it is reached from that screen and returns to it.
     bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
-        || (a == "Family" && (action is "Schedule" or "Reschedule"));
+        || (a == "Family" && (action is "Schedule" or "Reschedule"))
+        || (a == "Collection" && action is "CollectionNotices");
 }
 <nav aria-label="@(isRtl ? "خطط التقسيط" : "Installment plans")">
 <ul class="nav nav-pills sms-subnav mb-4">

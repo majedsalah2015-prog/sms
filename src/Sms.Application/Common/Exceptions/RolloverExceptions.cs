@@ -13,16 +13,56 @@ namespace Sms.Application.Common.Exceptions
         public RolloverYearStatusException(int academicYearId, AcademicYearStatus actual, AcademicYearStatus expected)
             : base($"Academic year {academicYearId} is {actual}; the rollover requires it to be {expected} (BR-AYR-008).")
         {
+            Actual = actual;
+            Expected = expected;
         }
+
+        /// <summary>Where the year actually stands.</summary>
+        public AcademicYearStatus Actual { get; }
+
+        /// <summary>Where the rollover needs it to stand.</summary>
+        public AcademicYearStatus Expected { get; }
+    }
+
+    /// <summary>A step was invoked while the batch is in a status that doesn't allow it.</summary>
+    /// <summary>Why a rollover step refused — the batch is at the wrong stage, or the student has moved on without it.</summary>
+    public enum RolloverStepBlocker
+    {
+        /// <summary>The batch is not at a stage this step runs from.</summary>
+        BatchStage = 1,
+
+        /// <summary>The student already holds a seat in the target year, so the rollover has nothing left to give them.</summary>
+        AlreadyEnrolledInTargetYear = 2,
+
+        /// <summary>The student is already enrolled, and moving them now is a transfer rather than a rollover.</summary>
+        AlreadyEnrolled = 3,
     }
 
     /// <summary>A step was invoked while the batch is in a status that doesn't allow it.</summary>
     public class RolloverBatchStatusException : InvalidOperationException
     {
-        public RolloverBatchStatusException(int batchId, RolloverBatchStatus actual, string requirement)
-            : base($"Rollover batch {batchId} is {actual}; this step requires {requirement}.")
+        public RolloverBatchStatusException(int batchId, RolloverBatchStatus actual, RolloverStepBlocker blocker, params RolloverBatchStatus[] allowed)
+            : base($"Rollover batch {batchId} is {actual}; this step requires {Describe(blocker, allowed)}.")
         {
+            Actual = actual;
+            Blocker = blocker;
+            Allowed = allowed;
         }
+
+        /// <summary>Where the batch actually stands.</summary>
+        public RolloverBatchStatus Actual { get; }
+
+        public RolloverStepBlocker Blocker { get; }
+
+        /// <summary>The stages this step does run from — empty when the batch's stage was not the problem.</summary>
+        public IReadOnlyList<RolloverBatchStatus> Allowed { get; }
+
+        private static string Describe(RolloverStepBlocker blocker, RolloverBatchStatus[] allowed) => blocker switch
+        {
+            RolloverStepBlocker.AlreadyEnrolledInTargetYear => "the student is already enrolled in the target year — use WF-03 withdrawal",
+            RolloverStepBlocker.AlreadyEnrolled => "the student is already enrolled — transfer via Module 06 instead",
+            _ => string.Join(" or ", allowed),
+        };
     }
 
     /// <summary>BR-GRD-002/009: a grade with enrolled students has no promotion target and isn't graduating (or the path cycles).</summary>
@@ -52,12 +92,44 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>A manual decision that the student's grade doesn't allow (e.g. Graduate on a non-graduating grade, or Undecided).</summary>
+    /// <summary>Why a promotion decision does not fit the student it was made for.</summary>
+    public enum PromotionDecisionFault
+    {
+        /// <summary>"Undecided" is not a decision — a manual entry has to actually decide.</summary>
+        MustDecide = 1,
+
+        /// <summary>Graduation was chosen on a grade that is not the last one.</summary>
+        GradeDoesNotGraduate = 2,
+
+        /// <summary>Promotion was chosen on a grade whose promotion path names no next grade.</summary>
+        NoPromotionTarget = 3,
+
+        /// <summary>A leaver was sent to re-registration; graduates do not re-register.</summary>
+        GraduatesDoNotReRegister = 4,
+    }
+
+    /// <summary>A manual decision that the student's grade doesn't allow (e.g. Graduate on a non-graduating grade, or Undecided).</summary>
     public class InvalidPromotionDecisionException : InvalidOperationException
     {
-        public InvalidPromotionDecisionException(int studentId, PromotionDecision decision, string why)
-            : base($"Decision '{decision}' is not valid for student {studentId}: {why}.")
+        public InvalidPromotionDecisionException(int studentId, PromotionDecision decision, PromotionDecisionFault fault)
+            : base($"Decision '{decision}' is not valid for student {studentId}: {Describe(fault)}.")
         {
+            Decision = decision;
+            Fault = fault;
         }
+
+        public PromotionDecision Decision { get; }
+
+        public PromotionDecisionFault Fault { get; }
+
+        private static string Describe(PromotionDecisionFault fault) => fault switch
+        {
+            PromotionDecisionFault.MustDecide => "a manual decision must decide",
+            PromotionDecisionFault.GradeDoesNotGraduate => "the student's grade is not a graduating grade",
+            PromotionDecisionFault.NoPromotionTarget => "the student's grade has no promotion target (BR-GRD-002)",
+            PromotionDecisionFault.GraduatesDoNotReRegister => "graduating students do not re-register",
+            _ => fault.ToString(),
+        };
     }
 
     /// <summary>Step 3 approval (P3) refused while any student is still Undecided (doc §9).</summary>
@@ -66,7 +138,11 @@ namespace Sms.Application.Common.Exceptions
         public PromotionsUndecidedException(int undecidedCount)
             : base($"{undecidedCount} student(s) still have no promotion decision; the batch can't be approved (BR-AYR-008 step 3).")
         {
+            UndecidedCount = undecidedCount;
         }
+
+        /// <summary>How many students are still waiting on a decision.</summary>
+        public int UndecidedCount { get; }
     }
 
     /// <summary>Step 4: seat reservation against the target grade's planned capacity failed.</summary>
@@ -120,8 +196,12 @@ namespace Sms.Application.Common.Exceptions
         public ChecklistNotGreenException(string checklistName, IReadOnlyList<ChecklistItem> items)
             : base($"{checklistName} checklist not green: " + string.Join("; ", items.Where(i => !i.IsSatisfied).Select(i => $"{i.Code} ({i.Detail})")))
         {
+            ChecklistName = checklistName;
             Items = items;
         }
+
+        /// <summary>Which checklist refused — opening or closing, as the year screens name them.</summary>
+        public string ChecklistName { get; }
 
         public IReadOnlyList<ChecklistItem> Items { get; }
     }
@@ -132,6 +212,14 @@ namespace Sms.Application.Common.Exceptions
         public CarryForwardReconciliationException(decimal closingReceivables, decimal openingBalances)
             : base($"Carry-forward does not reconcile: closing receivables {closingReceivables} ≠ opening balances posted {openingBalances} (BR-AYR-009).")
         {
+            ClosingReceivables = closingReceivables;
+            OpeningBalances = openingBalances;
         }
+
+        /// <summary>What the closing year says is still owed.</summary>
+        public decimal ClosingReceivables { get; }
+
+        /// <summary>What was actually carried into the new year as opening balances.</summary>
+        public decimal OpeningBalances { get; }
     }
 }

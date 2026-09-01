@@ -1,0 +1,120 @@
+@using System.Globalization
+@model PortalLessonsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My lessons", "دروسي");
+    var subjects = Model.BySubject(isRtl).ToList();
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-lessons-help",
+        Title = T("My lessons — help", "دروسي — مساعدة"),
+        Intro = T("The lesson plans your school has published for the subjects you study, newest week first, with the material filed against each one. One page for the whole family: a lesson belongs to the subject, so two children in the same grade read the same plan.",
+            "خطط الدروس التي نشرتها مدرستك للمواد التي تدرسها، الأحدث أسبوعاً أولاً، ومعها المادة المرفقة بكل درس. صفحة واحدة للأسرة كلها: فالدرس يخص المادة، فيقرأ ابنان في الصف نفسه الخطة ذاتها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Only published lessons appear", "لا تظهر إلا الدروس المنشورة"),
+                T("A teacher plans a lesson before publishing it, and a draft is invisible here (BR-LRN-003). A lesson you have not seen yet is not a lesson being hidden from you — it is a lesson not yet published.",
+                  "يخطط المعلّم الدرس قبل نشره، والمسوّدة غير مرئية هنا (BR-LRN-003). فما لم ترَه بعد ليس درساً مخفياً عنك، بل درساً لم يُنشَر بعد.")),
+            new HelpPanelViewModel.Item(
+                T("A retired lesson disappears, and that is deliberate", "الدرس المسحوب يختفي، وذلك مقصود"),
+                T("A teacher can take a published lesson back off the week, and must state why (BR-LRN-016). There is no un-publish that would make a lesson quietly vanish — if something you read last week is gone, it was retired.",
+                  "يستطيع المعلّم سحب درس منشور من الأسبوع، وعليه بيان السبب (BR-LRN-016). ولا يوجد إلغاء نشر يجعل الدرس يختفي بهدوء — فإن غاب ما قرأته الأسبوع الماضي فقد سُحب.")),
+            new HelpPanelViewModel.Item(
+                T("Material appears once its file has been checked", "تظهر المادة بعد فحص ملفها"),
+                T("Every file the school uploads is virus-scanned before anyone can open it, here or on a teacher's screen (BR-LRN-006). Material still being checked is not listed at all, rather than shown as a link that would refuse you — it appears on its own once the check clears.",
+                  "يُفحص كل ملف ترفعه المدرسة ضد الفيروسات قبل أن يفتحه أحد، هنا أو على شاشة المعلّم (BR-LRN-006). والمادة قيد الفحص لا تُدرج أصلاً، بدل أن تُعرض رابطاً يرفضك — وتظهر وحدها بعد اجتياز الفحص.")),
+            new HelpPanelViewModel.Item(
+                T("Marks are not shown here", "الدرجات لا تظهر هنا"),
+                T("This page is the syllabus, not the record. What has been set to you and when it is due is on “my work”; marks reach you through results once the school publishes them (BR-SEC-012).",
+                  "هذه الصفحة هي المنهج لا السجل. فما كُلِّفت به وموعده في «واجباتي»؛ أما الدرجات فتصلك في النتائج بعد أن تعلنها المدرسة (BR-SEC-012).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("The lessons your school has published, and the material for them. Published lessons only (BR-LRN-003).", "الدروس التي نشرتها مدرستك، والمواد الخاصة بها. الدروس المنشورة فقط (BR-LRN-003).")</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 d-print-none">
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.Students.Count == 0)
+{
+    <div class="sms-card p-4 text-center text-muted">@T("No students are linked to this account.", "لا طلاب مرتبطون بهذا الحساب.")</div>
+}
+else if (Model.HasStudentsButNoLessons)
+{
+    <div class="sms-card p-4 text-center text-muted">
+        @T("No lessons have been published yet.", "لم يُنشر أي درس بعد.")
+        <div class="small mt-1">@T("A lesson appears here the moment a teacher publishes it — nothing is waiting behind this page.", "يظهر الدرس هنا لحظة نشر المعلّم له — ولا شيء ينتظر خلف هذه الصفحة.")</div>
+    </div>
+}
+else
+{
+    @* Whose syllabus this is. Named once at the top rather than repeated over every
+       lesson: the grouping below is by subject because content follows the offering,
+       and a parent of two in the same grade is reading one list, not two. *@
+    <div class="sms-card p-3 mb-3">
+        <div class="small text-muted mb-1">@T("Showing the syllabus for", "يعرض منهج")</div>
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var s in Model.Students)
+            {
+                var name = isRtl ? $"{s.Student.FirstNameAr} {s.Student.FamilyNameAr}" : $"{s.Student.FirstNameEn} {s.Student.FamilyNameEn}";
+                <span class="badge bg-secondary-subtle text-body border">
+                    <i class="bi bi-person me-1" aria-hidden="true"></i>@name
+                    @if (s.Grade != null) { <span class="text-muted">· @s.Grade.Code</span> }
+                    @if (s.Lessons.Count == 0) { <span class="text-muted">· @T("no lessons yet", "لا دروس بعد")</span> }
+                </span>
+            }
+        </div>
+    </div>
+
+    foreach (var subject in subjects)
+    {
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex align-items-center gap-2">
+                <h2 class="h6 mb-0">@subject.Key</h2>
+                <span class="badge bg-secondary">@subject.Count()</span>
+            </div>
+            <ul class="list-group list-group-flush">
+                @foreach (var lesson in subject)
+                {
+                    var title = isRtl ? lesson.TitleAr : lesson.TitleEn;
+                    var objectives = isRtl ? lesson.ObjectivesAr : lesson.ObjectivesEn;
+                    <li class="list-group-item">
+                        <div class="d-flex align-items-start gap-2 flex-wrap">
+                            <span class="badge bg-primary-subtle text-body border" dir="ltr">@string.Format(T("Week {0}", "الأسبوع {0}"), lesson.WeekNumber)</span>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold">@title</div>
+                                @if (!string.IsNullOrWhiteSpace(objectives)) { <div class="small text-muted">@objectives</div> }
+                                @if (lesson.Resources.Count > 0)
+                                {
+                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                        @foreach (var resource in lesson.Resources)
+                                        {
+                                            var resourceTitle = isRtl ? resource.TitleAr : resource.TitleEn;
+                                            <a class="btn btn-sm btn-outline-secondary" asp-action="LessonFile" asp-route-resourceId="@resource.ResourceId">
+                                                <i class="bi bi-paperclip me-1" aria-hidden="true"></i>@(string.IsNullOrWhiteSpace(resourceTitle) ? T("Material", "مادة") : resourceTitle)
+                                            </a>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            @if (lesson.PublishedAtUtc is DateTime published)
+                            {
+                                <span class="small text-muted" dir="ltr">@published.ToString("yyyy-MM-dd")</span>
+                            }
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+}

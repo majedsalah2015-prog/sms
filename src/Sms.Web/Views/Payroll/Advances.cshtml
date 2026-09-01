@@ -1,0 +1,191 @@
+@using System.Globalization
+@using Sms.Domain.Payroll
+@model AdvancesIndexViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Salary advances", "سلف الموظفين");
+    ViewData["Breadcrumb"] = T("Staff / Advances", "شؤون الموظفين / السلف");
+
+    var now = DateTime.UtcNow;
+    var nextMonth = now.Month == 12 ? (now.Year + 1, 1) : (now.Year, now.Month + 1);
+
+    var filters = new (SalaryAdvanceStatus? Status, string En, string Ar)[]
+    {
+        (null, "All", "الكل"),
+        (SalaryAdvanceStatus.Requested, "Awaiting decision", "بانتظار القرار"),
+        (SalaryAdvanceStatus.Approved, "Approved, not disbursed", "موافق عليها ولم تُصرف"),
+        (SalaryAdvanceStatus.Disbursed, "Being repaid", "قيد السداد"),
+        (SalaryAdvanceStatus.Settled, "Settled", "مسدَّدة"),
+    };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "advances-help",
+        Title = T("Advances — help", "السلف — مساعدة"),
+        Intro = T("An advance is money lent against future salary and recovered by instalments from the payroll. It is requested, decided, disbursed, and then repaid a month at a time until it is settled.", "السلفة مبلغ يُقرَض على حساب الراتب ويُستردّ بأقساط من المسير. تُطلب، ثم يُبتّ فيها، ثم تُصرف، ثم تُسدَّد شهراً بعد شهر حتى تُغلق."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("One running advance per employee", "سلفة واحدة قائمة لكل موظف"),
+                T("An employee with an advance still open cannot be given another. Settle or close the first one — they are kept out of the picker below while it runs.", "لا تُمنح سلفة جديدة لموظف لديه سلفة لم تُغلق. تُسدَّد الأولى أو تُغلق — وهو مستبعَد من القائمة أدناه ما دامت قائمة.")),
+            new HelpPanelViewModel.Item(
+                T("The schedule is built on disbursement", "الجدول يُبنى عند الصرف"),
+                T("Approving does not move money and creates no instalments. The repayment schedule is cut when the money is actually handed over, so the employee leaves knowing every instalment.", "الموافقة لا تحرّك مالاً ولا تُنشئ أقساطاً. ويُقطع جدول السداد عند تسليم المال فعلاً، ليعرف الموظف كل أقساطه عند خروجه.")),
+            new HelpPanelViewModel.Item(
+                T("Repayment is by payroll deduction only", "السداد بالخصم من الراتب فقط"),
+                T("Each month's payroll picks up the instalment due and deducts it. There is no cash-repayment path: to close an advance early, waive the remaining instalments.", "يلتقط مسير كل شهر القسط المستحق ويخصمه. ولا يوجد مسار سداد نقدي: ولإغلاق سلفة مبكراً تُعفى الأقساط المتبقية.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T($"{Model.OutstandingCount} advance(s) being repaid, ", $"{Model.OutstandingCount} سلفة قيد السداد، ")
+            <span dir="ltr">@PayrollLabels.Money(Model.TotalOutstanding)</span>
+            @T(" still owed.", " ما زالت مستحقة.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_PayrollNav" />
+
+<div asp-validation-summary="ModelOnly" class="alert alert-danger py-2" role="alert"></div>
+
+<div class="row g-3">
+    <div class="col-lg-4">
+        <div class="sms-card">
+            <h2 class="h6 mb-3">@T("Record an advance request", "تسجيل طلب سلفة")</h2>
+
+            @if (Model.Candidates.Count == 0)
+            {
+                <p class="text-muted mb-0">
+                    @T("Every active employee already has an advance running, so there is nobody to lend to right now.", "كل الموظفين النشطين لديهم سلف قائمة، فلا يوجد من يُقرَض الآن.")
+                </p>
+            }
+            else
+            {
+                <form method="post" asp-action="RequestAdvance">
+                    @Html.AntiForgeryToken()
+                    <div class="mb-2">
+                        <label for="adv-employee" class="form-label small text-muted">@T("Employee", "الموظف")</label>
+                        <select id="adv-employee" name="EmployeeId" class="form-select form-select-sm" required>
+                            @foreach (var c in Model.Candidates)
+                            {
+                                <option value="@c.EmployeeId">@c.EmployeeNo — @c.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-7">
+                            <label for="adv-amount" class="form-label small text-muted">@T("Amount", "المبلغ")</label>
+                            <input type="number" id="adv-amount" name="Amount" step="0.01" min="0.01" required class="form-control form-control-sm" dir="ltr" />
+                        </div>
+                        <div class="col-5">
+                            <label for="adv-count" class="form-label small text-muted">@T("Instalments", "عدد الأقساط")</label>
+                            <input type="number" id="adv-count" name="InstallmentCount" min="1" max="60" value="1" required class="form-control form-control-sm" dir="ltr" />
+                        </div>
+                    </div>
+                    <div class="mb-2 mt-2">
+                        <label for="adv-date" class="form-label small text-muted">@T("Request date", "تاريخ الطلب")</label>
+                        <input type="date" id="adv-date" name="RequestDate" class="form-control form-control-sm" required
+                               value="@now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)" />
+                    </div>
+                    <fieldset class="row g-2">
+                        <legend class="form-label small text-muted col-12 mb-1">@T("First deduction from", "أول استقطاع من شهر")</legend>
+                        <div class="col-7">
+                            <label for="adv-month" class="visually-hidden">@T("Month", "الشهر")</label>
+                            <select id="adv-month" name="FirstDeductionMonth" class="form-select form-select-sm" required>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    <option value="@m" selected="@(m == nextMonth.Item2)">@PayrollLabels.MonthName(m, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-5">
+                            <label for="adv-year" class="visually-hidden">@T("Year", "السنة")</label>
+                            <input type="number" id="adv-year" name="FirstDeductionYear" min="2000" max="2200" required
+                                   class="form-control form-control-sm" value="@nextMonth.Item1" />
+                        </div>
+                    </fieldset>
+                    <div class="mt-2">
+                        <label for="adv-reason" class="form-label small text-muted">@T("Reason (optional)", "السبب (اختياري)")</label>
+                        <textarea id="adv-reason" name="Reason" rows="2" maxlength="500" class="form-control form-control-sm"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm mt-3">
+                        <i class="bi bi-file-earmark-plus me-1" aria-hidden="true"></i>@T("Record request", "تسجيل الطلب")
+                    </button>
+                    <p class="small text-muted mt-2 mb-0">
+                        @T("Nothing is disbursed here — the request still has to be approved and then paid out.", "لا يُصرف شيء هنا — فالطلب يحتاج موافقة ثم صرفاً.")
+                    </p>
+                </form>
+            }
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <ul class="nav nav-tabs mb-3">
+                @foreach (var f in filters)
+                {
+                    var active = Model.StatusFilter == f.Status;
+                    <li class="nav-item">
+                        <a class="nav-link @(active ? "active" : "")" aria-current="@(active ? "page" : null)"
+                           asp-action="Advances" asp-route-status="@f.Status">@(isRtl ? f.Ar : f.En)</a>
+                    </li>
+                }
+            </ul>
+
+            @if (Model.Advances.Count == 0)
+            {
+                <p class="text-muted mb-0">
+                    @T("No advances here. Record one on the left when a member of staff asks for money against their salary.", "لا توجد سلف هنا. سجّل واحدة من النموذج المجاور حين يطلب موظف مبلغاً على حساب راتبه.")
+                </p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table sms-table align-middle">
+                        <caption class="visually-hidden">@T("Salary advances with their status and outstanding balance", "سلف الموظفين مع حالاتها وأرصدتها المتبقية")</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col">@T("Number", "الرقم")</th>
+                                <th scope="col">@T("Employee", "الموظف")</th>
+                                <th scope="col">@T("Requested", "تاريخ الطلب")</th>
+                                <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+                                <th scope="col" class="text-end">@T("Instalments", "الأقساط")</th>
+                                <th scope="col">@T("Status", "الحالة")</th>
+                                <th scope="col" class="text-end">@T("Outstanding", "المتبقي")</th>
+                                <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var a in Model.Advances)
+                            {
+                                <tr>
+                                    <td class="text-nowrap"><code>@a.AdvanceNo</code></td>
+                                    <td>
+                                        <div>@a.Name</div>
+                                        <div class="small text-muted"><code>@a.EmployeeNo</code></div>
+                                    </td>
+                                    <td class="text-nowrap">@a.RequestDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                                    <td class="text-end" dir="ltr">@PayrollLabels.Money(a.Amount)</td>
+                                    <td class="text-end">@a.InstallmentCount</td>
+                                    <td><span class="badge @PayrollLabels.AdvanceStatusBadge(a.Status)">@PayrollLabels.AdvanceStatus(a.Status, isRtl)</span></td>
+                                    <td class="text-end fw-semibold" dir="ltr">
+                                        @(a.Outstanding == 0m ? "—" : PayrollLabels.Money(a.Outstanding))
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary" asp-action="Advance" asp-route-id="@a.Id">@T("Open", "فتح")</a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>

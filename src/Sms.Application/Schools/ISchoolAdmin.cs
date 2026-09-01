@@ -28,6 +28,19 @@ namespace Sms.Application.Schools
         /// <summary>Throws <see cref="Common.Exceptions.InvalidSchoolStatusTransitionException"/> on an illegal move (BR-SCH-005).</summary>
         Task ChangeStatusAsync(int schoolId, SchoolStatus newStatus, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// BR-SCH-006: points a branding slot at a stored attachment, or clears it when
+        /// <paramref name="attachmentId"/> is null. Clearing drops the pointer only — the file
+        /// itself stays, because doc 10 does not delete documents while the record that owned them
+        /// exists (BR-ATT-007), and a certificate issued under the old mark still has to be
+        /// explicable afterwards.
+        /// <para>
+        /// The bytes are stored before this is called; deciding what an acceptable file is belongs
+        /// to the attachment intake, not to the school.
+        /// </para>
+        /// </summary>
+        Task SetBrandingAsync(int schoolId, SchoolBrandingAsset asset, int? attachmentId, CancellationToken cancellationToken = default);
+
         /// <summary>BR-SCH-004: closes out the previous current signatory for the document class (if any) and opens a new one.</summary>
         Task<Signatory> DefineSignatoryAsync(
             string documentClassCode,

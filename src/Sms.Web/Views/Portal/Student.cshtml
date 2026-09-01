@@ -92,7 +92,7 @@
             </div>
             <table class="table table-sm sms-table mb-2"><caption class="visually-hidden">@T("Posted invoices", "الفواتير المرحّلة")</caption><thead><tr><th scope="col">@T("Invoice", "الفاتورة")</th><th scope="col">@T("Posted", "التاريخ")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th></tr></thead>
                 <tbody>@foreach (var c in Model.Fees.Charges.OrderByDescending(c => c.PostedAtUtc)) { <tr><td><code>@c.ChargeNo</code></td><td>@c.PostedAtUtc.ToString("yyyy-MM-dd")</td><td class="text-end">@c.GrossAmount.ToString("N2")</td></tr> }@if (Model.Fees.Charges.Count == 0) { <tr><td colspan="3" class="text-center text-muted py-3">@T("No posted invoices.", "لا فواتير مرحّلة.")</td></tr> }</tbody></table>
-            <div class="form-text">@T("Posted invoices only (BR-SEC-012). Online payment (BR-PAY-007) is not enabled; pay at the school cashier.", "الفواتير المرحّلة فقط (BR-SEC-012). الدفع الإلكتروني (BR-PAY-007) غير مفعّل؛ السداد لدى أمين الصندوق.") <a asp-action="Statement">@T("Family statement →", "كشف حساب العائلة →")</a></div>
+            <div class="form-text">@T("Posted invoices only (BR-SEC-012). Online payment (BR-PAY-007) is not enabled; pay at the school cashier.", "الفواتير المرحّلة فقط (BR-SEC-012). الدفع الإلكتروني (BR-PAY-007) غير مفعّل؛ السداد لدى أمين الصندوق.") @* BR-SEC-010: only for an account that may actually open it — a student holds this breakdown but not the family's statement. *@@if (Model.CanOpenStatement) { <a asp-action="Statement">@T("Family statement →", "كشف حساب العائلة →")</a> }</div>
         </div>
     </div>
 </div>

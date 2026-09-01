@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Subjects;
 using Sms.Domain.Common;
 using Sms.Domain.Subjects;
@@ -75,7 +76,7 @@ namespace Sms.Infrastructure.Subjects
             var current = await _db.CurriculumOfferings.CountAsync(o => o.SubjectId == subjectId && o.EffectiveToUtc == null, cancellationToken);
             if (current > 0)
             {
-                throw new SubjectInUseException($"subject '{subject.Code}' is in {current} current curriculum plan(s) — end-date those offerings first (BR-SUB-004)");
+                throw new SubjectInUseException(UsageReport.From(new UsageReference("current curriculum plan(s) — end-date those offerings first (BR-SUB-004)", "خطة دراسية سارية — أنهِ تلك المقررات بتاريخ أولاً (BR-SUB-004)", current)));
             }
 
             subject.IsActive = false;
@@ -97,7 +98,7 @@ namespace Sms.Infrastructure.Subjects
             var subjects = await _db.Subjects.CountAsync(s => s.DepartmentId == departmentId, cancellationToken);
             if (subjects > 0)
             {
-                throw new SubjectInUseException($"{subjects} active subject(s) are assigned to this department — move them first");
+                throw new SubjectInUseException(UsageReport.From(new UsageReference("active subject(s) in this department — move them first", "مادة فعّالة في هذا القسم — انقلها أولاً", subjects)));
             }
 
             department.IsActive = false;

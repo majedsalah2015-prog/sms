@@ -1,0 +1,198 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model DeliveryOperationsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Delivery log", "سجل التسليم");
+    ViewData["Breadcrumb"] = T("Notifications / Delivery log", "الإشعارات / سجل التسليم");
+
+    string Channel(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("In-app", "داخل النظام"),
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        _ => "WhatsApp",
+    };
+
+    string Status(DeliveryStatus s) => s switch
+    {
+        DeliveryStatus.Queued => T("Queued", "في الطابور"),
+        DeliveryStatus.Sent => T("Sent", "أُرسلت"),
+        DeliveryStatus.Delivered => T("Delivered", "سُلِّمت"),
+        _ => T("Failed", "فشلت"),
+    };
+
+    string Badge(DeliveryStatus s) => s switch
+    {
+        DeliveryStatus.Queued => "bg-secondary",
+        DeliveryStatus.Sent => "bg-info text-dark",
+        DeliveryStatus.Delivered => "bg-success",
+        _ => "bg-danger",
+    };
+
+    string EventName(string code)
+        => NotificationEventCatalog.TryGet(code, out var e) ? (isRtl ? e.TitleAr : e.TitleEn)
+            : code == "MessagingAnnouncement" ? T("Announcement", "إعلان")
+            : code;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "dlv-help",
+        Title = T("Delivery log — help", "سجل التسليم — مساعدة"),
+        Intro = T("One row per person per channel per event — what was sent, where it went, and what the gateway said. Kept for at least two years, because it is the evidence behind \"we notified you\" (BR-NTF-006).",
+                  "سطر لكل شخص على كل قناة لكل حدث — ما أُرسل، وإلى أين ذهب، وماذا قالت البوابة. ويُحفظ سنتين على الأقل، لأنه الدليل خلف قول: «قد أبلغناك» (BR-NTF-006)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Three attempts, then it stops", "ثلاث محاولات ثم يتوقف"),
+                T("BR-NOT-006 retries a failed delivery twice more and then leaves it failed rather than hammering a gateway that is refusing. Retrying from here resets the count, so fix the cause first — a wrong number, a rejected token — or the same three attempts fail the same way.",
+                  "تعيد القاعدة BR-NOT-006 محاولة التسليم الفاشل مرتين ثم تتركه فاشلاً بدل مواصلة الطرق على بوابة ترفض. وإعادة المحاولة من هنا تصفّر العدّاد، فعالج السبب أولاً — رقم خاطئ أو رمز مرفوض — وإلا فشلت المحاولات الثلاث بالطريقة نفسها.")),
+            new HelpPanelViewModel.Item(
+                T("\"No address on file\" is a registrar's job, not a retry", "«لا عنوان مسجَّل» شأن أمين السجل لا إعادة محاولة"),
+                T("That failure means the parent has no usable mobile or mailbox on their record, or that the number cannot be read as a phone number at all. Retrying changes nothing until somebody edits the parent's file (BR-NTF-005).",
+                  "يعني هذا الفشل أن ولي الأمر لا جوال صالح له ولا بريد في ملفه، أو أن الرقم لا يُقرأ رقم هاتف أصلاً. وإعادة المحاولة لا تغيّر شيئاً حتى يعدّل أحدهم ملف ولي الأمر (BR-NTF-005).")),
+            new HelpPanelViewModel.Item(
+                T("Numbers are shown masked", "الأرقام معروضة مُقنَّعة"),
+                T("Only the last four digits appear. Whoever may check that a message went out is not thereby somebody who may copy every family's mobile number off one screen.",
+                  "لا تظهر إلا الخانات الأربع الأخيرة. فمن يجوز له التحقق من خروج رسالة ليس بذلك من يجوز له نسخ أرقام جوالات كل الأسر من شاشة واحدة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T($"{Model.Totals.Queued} queued · {Model.Totals.Sent} sent · {Model.Totals.Delivered} delivered · {Model.Totals.Failed} failed",
+               $"{Model.Totals.Queued} في الطابور · {Model.Totals.Sent} أُرسلت · {Model.Totals.Delivered} سُلِّمت · {Model.Totals.Failed} فشلت")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_NotificationsNav" />
+
+<form asp-action="Deliveries" method="get" class="row g-2 align-items-end mb-3">
+    <div class="col-auto">
+        <label class="form-label small" for="f-status">@T("State", "الحالة")</label>
+        <select class="form-select form-select-sm" id="f-status" name="status">
+            <option value="">@T("any", "الكل")</option>
+            @foreach (DeliveryStatus s in Enum.GetValues(typeof(DeliveryStatus)))
+            {
+                <option value="@((int)s)" selected="@(Model.Status == s)">@Status(s)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small" for="f-channel">@T("Channel", "القناة")</label>
+        <select class="form-select form-select-sm" id="f-channel" name="channel">
+            <option value="">@T("any", "الكل")</option>
+            @foreach (var c in NotificationEventCatalog.Channels)
+            {
+                <option value="@((int)c)" selected="@(Model.Channel == c)">@Channel(c)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label small" for="f-event">@T("Event code", "رمز الحدث")</label>
+        <input class="form-control form-control-sm" id="f-event" name="eventCode" dir="ltr" value="@Model.EventCode" />
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Filter", "تصفية")</button>
+        <a class="btn btn-sm btn-link" asp-action="Deliveries">@T("Clear", "مسح")</a>
+    </div>
+</form>
+
+@if (Model.Totals.Queued > 0)
+{
+    <form asp-action="Dispatch" method="post" class="mb-3"
+          asp-route-status="@((int?)Model.Status)" asp-route-channel="@((int?)Model.Channel)" asp-route-eventCode="@Model.EventCode">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-play me-1" aria-hidden="true"></i>@T($"Send the {Model.Totals.Queued} queued now", $"إرسال الـ {Model.Totals.Queued} المنتظرة الآن")
+        </button>
+        <span class="form-text ms-2">
+            @T("The scheduled job does this on its own; this is for when you do not want to wait.",
+               "المهمة المجدولة تفعل هذا من تلقائها؛ وهذا لمن لا يريد الانتظار.")
+        </span>
+    </form>
+}
+
+<form asp-action="Retry" method="post"
+      asp-route-status="@((int?)Model.Status)" asp-route-channel="@((int?)Model.Channel)" asp-route-eventCode="@Model.EventCode">
+    @Html.AntiForgeryToken()
+
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@ViewData["Title"]</caption>
+            <thead><tr>
+                <th scope="col" style="width: 2rem;"><span class="visually-hidden">@T("Select", "تحديد")</span></th>
+                <th scope="col">@T("Event", "الحدث")</th>
+                <th scope="col">@T("Channel", "القناة")</th>
+                <th scope="col">@T("Recipient", "المستلِم")</th>
+                <th scope="col">@T("Address", "العنوان")</th>
+                <th scope="col">@T("State", "الحالة")</th>
+                <th scope="col">@T("Attempts", "المحاولات")</th>
+                <th scope="col">@T("Queued", "دخلت الطابور")</th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Rows.Count == 0)
+            {
+                <tr><td colspan="8" class="p-3 text-muted">
+                    @T("Nothing matches. An empty log with subscriptions switched on usually means no template is published behind them.",
+                       "لا شيء يطابق. والسجل الفارغ مع اشتراكات مفعّلة يعني غالباً أن لا قالب منشوراً خلفها.")
+                </td></tr>
+            }
+            else
+            {
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td>
+                            @if (row.Status == DeliveryStatus.Failed)
+                            {
+                                <input class="form-check-input" type="checkbox" name="deliveryIds" value="@row.DeliveryId"
+                                       aria-label="@T("Retry this one", "أعد محاولة هذه")" />
+                            }
+                        </td>
+                        <td>
+                            @EventName(row.EventCode)
+                            <small class="d-block text-muted"><code>@row.EventCode</code></small>
+                        </td>
+                        <td>@Channel(row.Channel)</td>
+                        <td>@row.RecipientUserName</td>
+                        <td dir="ltr">@(row.AddressMasked ?? "—")</td>
+                        <td>
+                            <span class="badge @Badge(row.Status)">@Status(row.Status)</span>
+                            @if (!string.IsNullOrWhiteSpace(row.FailureReason))
+                            {
+                                <small class="d-block text-danger" dir="ltr" style="word-break: break-word; max-width: 24rem;">@row.FailureReason</small>
+                            }
+                        </td>
+                        <td>@row.AttemptCount</td>
+                        <td dir="ltr">@row.QueuedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table></div>
+    </div>
+
+    @if (Model.Totals.Failed > 0)
+    {
+        <button type="submit" class="btn btn-primary mt-3">
+            <i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i>@T("Retry the ticked", "أعد محاولة المحدَّد")
+        </button>
+    }
+</form>
+
+@if (Model.IsCapped)
+{
+    <p class="text-muted small mt-2">
+        @T("Showing the newest 200. Narrow the filters to see further back.",
+           "تُعرض أحدث 200. ضيّق التصفية للرجوع أبعد.")
+    </p>
+}

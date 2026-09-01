@@ -87,6 +87,10 @@ StyleCopReport.xml
 *.vspscc
 *.vssscc
 .builds
+# Private build output. Sessions here build to their own -p:BaseOutputPath rather than
+# src/Sms.Web/bin, because another session may be running the app from it; ".builds" above
+# is VS boilerplate and does not cover that directory.
+.build/
 *.pidb
 *.svclog
 *.scc

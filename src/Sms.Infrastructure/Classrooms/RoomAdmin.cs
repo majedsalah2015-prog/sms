@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Classrooms;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Common;
 using Sms.Domain.Grades;
@@ -49,8 +51,7 @@ namespace Sms.Infrastructure.Classrooms
                 throw new InvalidRoomCapacityException();
             }
 
-            var codeTaken = await _db.Rooms.AnyAsync(r => r.Code == code, cancellationToken);
-            if (codeTaken)
+            if (await IsCodeTakenAsync(code, null, cancellationToken))
             {
                 throw new DuplicateRoomCodeException(code);
             }
@@ -69,6 +70,46 @@ namespace Sms.Infrastructure.Classrooms
 
             await _db.SaveChangesAsync(cancellationToken);
             return room;
+        }
+
+        public async Task<IReadOnlyDictionary<int, string>> SuggestRoomCodesAsync(CancellationToken cancellationToken = default)
+        {
+            var schoolId = _db.CurrentSchoolId;
+
+            // Lookups, not pickers: read through IgnoreQueryFilters (with SchoolId
+            // restated, since ignoring the filters drops tenant scoping with them) so
+            // a floor under a retired building still gets a code, the building letters
+            // do not shift under the existing rooms the day one is deactivated, and a
+            // deactivated room's code — which the unique index still holds — is not
+            // handed out a second time.
+            var buildingIds = await _db.Buildings.IgnoreQueryFilters().AsNoTracking()
+                .Where(b => b.SchoolId == schoolId).OrderBy(b => b.Id).Select(b => b.Id)
+                .ToListAsync(cancellationToken);
+
+            var floors = await _db.Floors.IgnoreQueryFilters().AsNoTracking()
+                .Where(f => f.SchoolId == schoolId).Select(f => new { f.Id, f.BuildingId, f.SequenceOrder })
+                .ToListAsync(cancellationToken);
+
+            var takenCodes = await _db.Rooms.IgnoreQueryFilters().AsNoTracking()
+                .Where(r => r.SchoolId == schoolId).Select(r => r.Code)
+                .ToListAsync(cancellationToken);
+
+            return floors.ToDictionary(
+                f => f.Id,
+                f => RoomCodeGenerator.Next(buildingIds.IndexOf(f.BuildingId) + 1, f.SequenceOrder, takenCodes));
+        }
+
+        /// <summary>
+        /// BR-ROM-001 across the whole school. Deliberately ignores the soft-active
+        /// filter: a deactivated room keeps its row and the unique index keeps its
+        /// code, so reading through the filter would report a code free and then let
+        /// SaveChanges fail on the index instead of raising the translated refusal.
+        /// </summary>
+        private async Task<bool> IsCodeTakenAsync(string code, int? exceptRoomId, CancellationToken cancellationToken)
+        {
+            var schoolId = _db.CurrentSchoolId;
+            return await _db.Rooms.IgnoreQueryFilters()
+                .AnyAsync(r => r.SchoolId == schoolId && r.Code == code && (exceptRoomId == null || r.Id != exceptRoomId), cancellationToken);
         }
 
         public async Task<RoomFeature> AddFeatureAsync(int roomId, int featureLookupId, CancellationToken cancellationToken = default)
@@ -94,7 +135,7 @@ namespace Sms.Infrastructure.Classrooms
             var floors = await _db.Floors.CountAsync(f => f.BuildingId == buildingId, cancellationToken);
             if (floors > 0)
             {
-                throw new RoomInUseException($"building still has {floors} active floor(s)");
+                throw new RoomInUseException(UsageReport.From(new UsageReference("active floor(s) in this building", "طابق فعّال في هذا المبنى", floors)));
             }
 
             building.IsActive = false;
@@ -117,7 +158,7 @@ namespace Sms.Infrastructure.Classrooms
             var rooms = await _db.Rooms.CountAsync(r => r.FloorId == floorId, cancellationToken);
             if (rooms > 0)
             {
-                throw new RoomInUseException($"floor still has {rooms} active room(s)");
+                throw new RoomInUseException(UsageReport.From(new UsageReference("active room(s) on this floor", "قاعة فعّالة في هذا الطابق", rooms)));
             }
 
             floor.IsActive = false;
@@ -134,7 +175,7 @@ namespace Sms.Infrastructure.Classrooms
                 throw new InvalidRoomCapacityException();
             }
 
-            if (await _db.Rooms.AnyAsync(r => r.Code == code && r.Id != roomId, cancellationToken))
+            if (await IsCodeTakenAsync(code, roomId, cancellationToken))
             {
                 throw new DuplicateRoomCodeException(code);
             }
@@ -156,7 +197,7 @@ namespace Sms.Infrastructure.Classrooms
             var sections = await _db.Sections.CountAsync(s => s.DefaultClassroomId == roomId && s.Status == Sms.Domain.Sections.SectionStatus.Active, cancellationToken);
             if (sections > 0)
             {
-                throw new RoomInUseException($"{sections} active section(s) use room '{room.Code}' as their default classroom — reassign them first");
+                throw new RoomInUseException(UsageReport.From(new UsageReference("active section(s) using this room as their classroom — reassign them first", "شعبة فعّالة تتخذ هذه القاعة صفاً لها — أعد إسنادها أولاً", sections)));
             }
 
             room.IsActive = false;

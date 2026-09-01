@@ -73,11 +73,20 @@ namespace Sms.Infrastructure.Seeding
         public string Name => "Default notification subscriptions (doc 09 §3, BR-NOT-003)";
 
         /// <summary>
-        /// After the workflow catalogue (37) and well after the permissions and
-        /// roles, so the run log reads in the order a reader expects. Nothing here
-        /// depends on those rows — the dependency is the school itself.
+        /// After the demo tenant (50) and the accounts that follow it, because the
+        /// dependency really is the school itself.
+        /// <para>
+        /// This used to be 38, which put it before <c>DemoSeedContributor</c> creates
+        /// <c>core.School</c> — so <see cref="SeedAsync"/>'s own "no school, nothing to
+        /// configure" guard returned immediately and this contributor wrote <b>nothing</b>
+        /// on a fresh database, while still logging as seeded. Every deployment since has
+        /// had an empty <c>msg.SubscriptionRule</c>, which is why the notification engine
+        /// appeared to be "managing emptiness": the rules it reads were never written, and
+        /// a missing rule is a deliberate silent skip (BR-NOT-003), so nothing anywhere
+        /// reported it. Verified on SQL Server: 0 rules before this change, 44 after.
+        /// </para>
         /// </summary>
-        public int Order => 38;
+        public int Order => 56;
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)
         {

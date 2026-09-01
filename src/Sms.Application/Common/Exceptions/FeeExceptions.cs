@@ -57,7 +57,15 @@ namespace Sms.Application.Common.Exceptions
         public FeeCategoryInUseException(int feeCategoryId, int structureLines, int charges)
             : base($"Fee category {feeCategoryId} is referenced by {structureLines} structure line(s) and {charges} charge(s) and cannot be deactivated.")
         {
+            StructureLines = structureLines;
+            Charges = charges;
         }
+
+        /// <summary>How many price rows point at the category — what the operator must withdraw first.</summary>
+        public int StructureLines { get; }
+
+        /// <summary>How many charges were raised under it — what makes the category history, not a draft.</summary>
+        public int Charges { get; }
     }
 
     /// <summary>BR-FEE-002: only a Draft structure line may be edited or deleted.</summary>

@@ -342,12 +342,12 @@ namespace Sms.Infrastructure.Admissions
 
             if (application.Status != ApplicationStatus.Approved)
             {
-                throw new ApplicationNotReadyForRegistrationException($"status is '{application.Status}', not Approved");
+                throw new ApplicationNotReadyForRegistrationException(RegistrationBlocker.NotApproved, application.Status);
             }
 
             if (application.ParentId == null)
             {
-                throw new ApplicationNotReadyForRegistrationException("no parent linked to the application");
+                throw new ApplicationNotReadyForRegistrationException(RegistrationBlocker.NoParentLinked, application.Status);
             }
 
             var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);

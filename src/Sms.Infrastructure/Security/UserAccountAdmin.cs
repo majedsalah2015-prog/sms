@@ -72,10 +72,10 @@ namespace Sms.Infrastructure.Security
                 // for by the name on their door, and "emp-1042" is not it.
                 var term = filter.Search.Trim();
                 rows = rows.Where(r =>
-                        Contains(r.UserName, term)
-                        || Contains(r.PersonNameAr, term)
-                        || Contains(r.PersonNameEn, term)
-                        || Contains(r.PersonReference, term))
+                        AccountPeople.Contains(r.UserName, term)
+                        || AccountPeople.Contains(r.PersonNameAr, term)
+                        || AccountPeople.Contains(r.PersonNameEn, term)
+                        || AccountPeople.Contains(r.PersonReference, term))
                     .ToList();
             }
 
@@ -159,8 +159,8 @@ namespace Sms.Infrastructure.Security
                     return employees
                         .Select(e => new PersonWithoutAccount(
                             e.Id,
-                            Join(e.FirstNameAr, e.FatherNameAr, e.FamilyNameAr),
-                            Join(e.FirstNameEn, e.FatherNameEn, e.FamilyNameEn),
+                            AccountPeople.Join(e.FirstNameAr, e.FatherNameAr, e.FamilyNameAr),
+                            AccountPeople.Join(e.FirstNameEn, e.FatherNameEn, e.FamilyNameEn),
                             e.EmployeeNo,
                             UserNameRules.Propose(accountType, e.EmployeeNo)))
                         .Pick(term);
@@ -188,8 +188,8 @@ namespace Sms.Infrastructure.Security
                     return students
                         .Select(s => new PersonWithoutAccount(
                             s.Id,
-                            Join(s.FirstNameAr, s.FatherNameAr, s.FamilyNameAr),
-                            Join(s.FirstNameEn, s.FatherNameEn, s.FamilyNameEn),
+                            AccountPeople.Join(s.FirstNameAr, s.FatherNameAr, s.FamilyNameAr),
+                            AccountPeople.Join(s.FirstNameEn, s.FatherNameEn, s.FamilyNameEn),
                             s.StudentNo,
                             UserNameRules.Propose(accountType, s.StudentNo)))
                         .Pick(term);
@@ -233,6 +233,7 @@ namespace Sms.Infrastructure.Security
             await _db.SaveChangesAsync(cancellationToken);
 
             await LinkPersonAsync(definition, account.Id, cancellationToken);
+            await GrantPortalRoleAsync(account, cancellationToken);
 
             // The password is minted here rather than taken from the caller: an administrator who
             // chooses it chooses the same one for everybody, and BR-SEC-005 wants a value that is
@@ -395,14 +396,11 @@ namespace Sms.Infrastructure.Security
                 .GroupBy(a => a.UserAccountId)
                 .ToDictionary(g => g.Key, g => g.Max(a => a.CreatedAtUtc));
 
-            var people = await LoadPeopleAsync(accounts, cancellationToken);
+            var people = await AccountPeople.LoadAsync(_db, accounts, cancellationToken);
 
             return accounts.Select(account =>
             {
-                var person = account.PersonId is { } personId
-                             && people.TryGetValue((account.AccountType, personId), out var found)
-                    ? found
-                    : default;
+                var person = people.Of(account);
 
                 var signedInAt = lastSignIn.TryGetValue(account.Id, out var at) ? at : (DateTime?)null;
 
@@ -426,84 +424,6 @@ namespace Sms.Infrastructure.Security
                     sessionCounts.TryGetValue(account.Id, out var sessions) ? sessions : 0);
             }).ToList();
         }
-
-        /// <summary>
-        /// The person behind each account, read <b>past</b> the soft-active filter. A withdrawn
-        /// student's account is exactly the row an administrator has come here to deactivate, and a
-        /// directory that could not name them would go blank at the least useful moment.
-        /// </summary>
-        private async Task<Dictionary<(AccountType Type, int PersonId), PersonName>> LoadPeopleAsync(
-            IReadOnlyCollection<UserAccount> accounts, CancellationToken cancellationToken)
-        {
-            var people = new Dictionary<(AccountType, int), PersonName>();
-
-            var staffIds = PersonIds(accounts, AccountType.Staff);
-            if (staffIds.Count > 0)
-            {
-                var employees = await _db.Employees.IgnoreQueryFilters().AsNoTracking()
-                    .Where(e => e.SchoolId == _db.CurrentSchoolId && staffIds.Contains(e.Id))
-                    .ToListAsync(cancellationToken);
-                foreach (var employee in employees)
-                {
-                    people[(AccountType.Staff, employee.Id)] = new PersonName(
-                        Join(employee.FirstNameAr, employee.FatherNameAr, employee.FamilyNameAr),
-                        Join(employee.FirstNameEn, employee.FatherNameEn, employee.FamilyNameEn),
-                        employee.EmployeeNo);
-                }
-            }
-
-            var parentIds = PersonIds(accounts, AccountType.Parent);
-            if (parentIds.Count > 0)
-            {
-                var parents = await _db.Parents.IgnoreQueryFilters().AsNoTracking()
-                    .Where(p => p.SchoolId == _db.CurrentSchoolId && parentIds.Contains(p.Id))
-                    .ToListAsync(cancellationToken);
-                foreach (var parent in parents)
-                {
-                    people[(AccountType.Parent, parent.Id)] = new PersonName(parent.NameAr, parent.NameEn, parent.ParentFileNo);
-                }
-            }
-
-            var studentIds = PersonIds(accounts, AccountType.Student);
-            if (studentIds.Count > 0)
-            {
-                var students = await _db.Students.IgnoreQueryFilters().AsNoTracking()
-                    .Where(s => s.SchoolId == _db.CurrentSchoolId && studentIds.Contains(s.Id))
-                    .ToListAsync(cancellationToken);
-                foreach (var student in students)
-                {
-                    people[(AccountType.Student, student.Id)] = new PersonName(
-                        Join(student.FirstNameAr, student.FatherNameAr, student.FamilyNameAr),
-                        Join(student.FirstNameEn, student.FatherNameEn, student.FamilyNameEn),
-                        student.StudentNo);
-                }
-            }
-
-            return people;
-        }
-
-        private readonly struct PersonName
-        {
-            public PersonName(string nameAr, string nameEn, string reference)
-            {
-                NameAr = nameAr;
-                NameEn = nameEn;
-                Reference = reference;
-            }
-
-            public string? NameAr { get; }
-
-            public string? NameEn { get; }
-
-            public string? Reference { get; }
-        }
-
-        private static List<int> PersonIds(IEnumerable<UserAccount> accounts, AccountType type)
-            => accounts
-                .Where(a => a.AccountType == type && a.PersonId != null)
-                .Select(a => a.PersonId!.Value)
-                .Distinct()
-                .ToList();
 
         /// <summary>
         /// BR-GLB-002 / BR-SYS-001. Both directions are checked: the person's own link, and an
@@ -599,6 +519,45 @@ namespace Sms.Infrastructure.Security
         }
 
         /// <summary>
+        /// Gives a portal account the one role that opens the portal (doc 06 §1's account types,
+        /// BR-SEC-006). Staff are untouched: which roles a colleague holds is the school's decision,
+        /// the screen says so on the next page, and doc 06 §7 keeps that authority separate from
+        /// this one on purpose.
+        /// <para>
+        /// Without this a provisioned parent signed in successfully and then met a bare not-found at
+        /// <c>/portal</c> — deny-by-default (BR-GLB-070) refusing an account that held no permission
+        /// at all, with nothing on any screen to say why. Nothing is widened by granting it: the
+        /// account type was chosen by the same act that created the account, the portal role reaches
+        /// only portal screens, and <c>PortalAreaFilter</c> confines the account there regardless
+        /// (BR-SEC-010).
+        /// </para>
+        /// </summary>
+        private async Task GrantPortalRoleAsync(UserAccount account, CancellationToken cancellationToken)
+        {
+            var roleCode = RoleTemplates.ForPortalAccount(account.AccountType);
+            if (roleCode == null)
+            {
+                return;
+            }
+
+            // Through the soft-active filter deliberately. A school that retired its parent template
+            // has said something, and reviving it as a side effect of creating an account is not this
+            // method's call — the account is still created, and the assignment screen can still give
+            // it a role by hand.
+            var roleId = await _db.Roles
+                .Where(r => r.Code == roleCode)
+                .Select(r => (int?)r.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (roleId == null)
+            {
+                return;
+            }
+
+            _db.RoleAssignments.Add(new RoleAssignment { UserAccountId = account.Id, RoleId = roleId.Value, IsActive = true });
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// <see cref="ISecurityAdmin"/>'s refusal arriving from the other direction: a role can be
         /// narrowed until nobody administers permissions, and so can the set of accounts holding it.
         /// The rule is "do not remove the last one", not "there must always be one" — a school where
@@ -654,12 +613,6 @@ namespace Sms.Infrastructure.Security
             ProvisionableAccountType.Student => AccountType.Student,
             _ => throw new ArgumentOutOfRangeException(nameof(accountType), accountType, null),
         };
-
-        private static bool Contains(string? value, string term)
-            => value != null && value.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0;
-
-        private static string Join(params string?[] parts)
-            => string.Join(" ", parts.Where(p => !string.IsNullOrWhiteSpace(p))).Trim();
     }
 
     internal static class ProvisionablePeople

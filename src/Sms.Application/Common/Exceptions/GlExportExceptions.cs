@@ -21,7 +21,11 @@ namespace Sms.Application.Common.Exceptions
         public GlPeriodOverlapException(string existingBatchNo)
             : base($"Period overlaps existing GL export batch {existingBatchNo}; void it first.")
         {
+            ExistingBatchNo = existingBatchNo;
         }
+
+        /// <summary>The batch already covering the period — the one the operator has to find and void.</summary>
+        public string ExistingBatchNo { get; }
     }
 
     /// <summary>E-503: only a Generated batch can be voided.</summary>

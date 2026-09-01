@@ -33,12 +33,36 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
-    /// <summary>BR-ADM-007: registration requires an Approved application with a linked parent.</summary>
+    /// <summary>What an application still lacks before a seat can be registered against it.</summary>
+    public enum RegistrationBlocker
+    {
+        /// <summary>The application has not been approved — a decision comes before a seat.</summary>
+        NotApproved = 1,
+
+        /// <summary>No parent is linked, so the seat would have nobody to bill or to contact.</summary>
+        NoParentLinked = 2,
+    }
+
+    /// <summary>
+    /// BR-ADM-007: registration requires an Approved application with a linked parent.
+    /// <para>
+    /// The blocker is carried as a value and the application's own status alongside it, so the
+    /// screen can say which of the two rules stopped it — and say it in the reader's language,
+    /// which an English clause built inside the engine could never do.
+    /// </para>
+    /// </summary>
     public class ApplicationNotReadyForRegistrationException : InvalidOperationException
     {
-        public ApplicationNotReadyForRegistrationException(string reason)
-            : base($"Application is not ready for registration: {reason} (BR-ADM-007).")
+        public ApplicationNotReadyForRegistrationException(RegistrationBlocker blocker, ApplicationStatus status)
+            : base($"Application is not ready for registration: {(blocker == RegistrationBlocker.NotApproved ? $"status is '{status}', not Approved" : "no parent linked to the application")} (BR-ADM-007).")
         {
+            Blocker = blocker;
+            Status = status;
         }
+
+        public RegistrationBlocker Blocker { get; }
+
+        /// <summary>Where the application actually stands, so the refusal can name it rather than only deny.</summary>
+        public ApplicationStatus Status { get; }
     }
 }

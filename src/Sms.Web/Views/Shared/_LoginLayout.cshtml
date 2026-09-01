@@ -1,4 +1,5 @@
 @using System.Globalization
+@inject Sms.Web.Services.SchoolBrandMark BrandMark
 @{
     var culture = CultureInfo.CurrentUICulture;
     var isRtl = culture.TextInfo.IsRightToLeft;
@@ -6,6 +7,14 @@
     var bootstrapCss = isRtl ? "~/lib/bootstrap/css/bootstrap.rtl.min.css" : "~/lib/bootstrap/css/bootstrap.min.css";
     var returnUrl = Context.Request.Path + Context.Request.QueryString;
     var version = typeof(Sms.Web.Program).Assembly.GetName().Version?.ToString(3) ?? "1.0.0";
+
+    // BR-SCH-006: the gate wears the same mark as every screen behind it — a school recognises its
+    // own sign-in page by its logo long before it reads the field labels. Until one is uploaded it
+    // wears the product's generic mark, exactly as the sidebar does. Deliberately not a school's
+    // logo shipped as a file in wwwroot: this product is one deployment per school, so a file
+    // committed here is worn by every other school's sign-in screen too, and the slot that answers
+    // this properly already exists on the school profile.
+    var logoVersion = await BrandMark.VersionAsync();
 }
 <!DOCTYPE html>
 <html lang="@lang" dir="@(isRtl ? "rtl" : "ltr")">
@@ -30,7 +39,18 @@
         </div>
         <main class="sms-auth__card">
             <div class="sms-auth__brand">
-                <span class="sms-auth__mark"><i class="bi bi-mortarboard-fill"></i></span>
+                @* Decorative: the product name is the next line, and nothing is gained by hearing
+                   the file described after it. *@
+                <span class="sms-auth__mark@(logoVersion.HasValue ? " sms-auth__mark--logo" : "")">
+                    @if (logoVersion is int uploaded)
+                    {
+                        <img src="@Url.Action("BrandLogo", "Home", new { v = uploaded })" alt="" class="sms-auth__logo" />
+                    }
+                    else
+                    {
+                        <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+                    }
+                </span>
                 <h1 class="sms-auth__name">SMS</h1>
                 <p class="sms-auth__sub">@(isRtl ? "نظام إدارة المدارس" : "School Management System")</p>
             </div>

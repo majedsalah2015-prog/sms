@@ -1,0 +1,105 @@
+@using System.Globalization
+@using Sms.Application.Dashboards
+@model TrendChartViewModel
+@*
+    Two series across the months of the academic year, on one ceiling.
+
+    The plot runs left to right in both languages — see ChartGeometry.Polyline for
+    why time is the one axis that does not mirror. Everything around it (the key,
+    the table, the card) follows the page direction as usual.
+
+    A visually-hidden table carries every figure, because a line chart is the one
+    shape on this screen a screen reader can make nothing of.
+*@
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+
+    const decimal PlotWidth = 690m;
+    const decimal PlotHeight = 168m;
+    const decimal PlotLeft = 60m;
+    const decimal PlotTop = 8m;
+
+    var firsts = Model.Points.Select(p => p.First).ToList();
+    var seconds = Model.Points.Select(p => p.Second).ToList();
+    var ceiling = ChartGeometry.NiceCeiling(
+        Math.Max(firsts.DefaultIfEmpty(0m).Max(), seconds.DefaultIfEmpty(0m).Max()));
+    var ticks = ChartGeometry.AxisTicks(ceiling);
+
+    // Twelve labels fit; eighteen overlap into mush. Past twelve, every other
+    // month is labelled and the gridlines still show the missing ones.
+    var labelEvery = Model.Points.Count > 12 ? 2 : 1;
+
+    var titleId = "trend-" + Guid.NewGuid().ToString("N").Substring(0, 8);
+    string Coord(decimal v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+}
+
+@if (!Model.HasData)
+{
+    <p class="text-muted small mb-0">@Model.EmptyText</p>
+}
+else
+{
+    <div class="sms-trend-key mb-2">
+        <span><i style="background:var(--sms-chart-1)" aria-hidden="true"></i>@Model.FirstLabel</span>
+        <span><i style="background:var(--sms-chart-2)" aria-hidden="true"></i>@Model.SecondLabel</span>
+    </div>
+
+    <svg class="sms-trend" viewBox="0 0 760 220" role="img" aria-labelledby="@titleId" preserveAspectRatio="xMidYMid meet">
+        <title id="@titleId">@Model.Title</title>
+
+        @foreach (var tick in ticks)
+        {
+            var y = PlotTop + PlotHeight - (PlotHeight * tick / ceiling);
+            <line class="sms-trend__grid" x1="@Coord(PlotLeft)" y1="@Coord(y)" x2="@Coord(PlotLeft + PlotWidth)" y2="@Coord(y)"></line>
+            <g><text class="sms-trend__axis" x="@Coord(PlotLeft - 6m)" y="@Coord(y + 3m)" text-anchor="end">@tick.ToString("N0", CultureInfo.InvariantCulture)</text></g>
+        }
+
+        <g transform="translate(@Coord(PlotLeft),@Coord(PlotTop))">
+            <path class="sms-trend__area" fill="var(--sms-chart-1)" d="@ChartGeometry.AreaPath(firsts, PlotWidth, PlotHeight, ceiling)"></path>
+            <path class="sms-trend__area" fill="var(--sms-chart-2)" d="@ChartGeometry.AreaPath(seconds, PlotWidth, PlotHeight, ceiling)"></path>
+            <polyline class="sms-trend__line" stroke="var(--sms-chart-1)" points="@ChartGeometry.Polyline(firsts, PlotWidth, PlotHeight, ceiling)"></polyline>
+            <polyline class="sms-trend__line" stroke="var(--sms-chart-2)" points="@ChartGeometry.Polyline(seconds, PlotWidth, PlotHeight, ceiling)"></polyline>
+        </g>
+
+        @for (var i = 0; i < Model.Points.Count; i++)
+        {
+            if (i % labelEvery != 0)
+            {
+                continue;
+            }
+
+            var point = Model.Points[i];
+            var x = Model.Points.Count == 1
+                ? PlotLeft
+                : PlotLeft + (PlotWidth * i / (Model.Points.Count - 1));
+            @*
+                The first and last labels are anchored inward so they do not hang
+                off the viewBox and get clipped on a narrow screen.
+            *@
+            var anchor = i == 0 ? "start" : i == Model.Points.Count - 1 ? "end" : "middle";
+            <g><text class="sms-trend__axis" x="@Coord(x)" y="@Coord(PlotTop + PlotHeight + 18m)" text-anchor="@anchor">@StatisticsLabels.Month(point.Month, isRtl)</text></g>
+        }
+    </svg>
+
+    <table class="visually-hidden">
+        <caption>@Model.Title</caption>
+        <thead>
+            <tr>
+                <th scope="col">@T("Month", "الشهر")</th>
+                <th scope="col">@Model.FirstLabel</th>
+                <th scope="col">@Model.SecondLabel</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var point in Model.Points)
+            {
+                <tr>
+                    <th scope="row">@StatisticsLabels.MonthYear(point.Year, point.Month, isRtl)</th>
+                    <td>@point.First.ToString("N2", CultureInfo.InvariantCulture)</td>
+                    <td>@point.Second.ToString("N2", CultureInfo.InvariantCulture)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

@@ -1,0 +1,70 @@
+@using System.Globalization
+@using Sms.Domain.Attachments
+@model FileUploadFieldViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+
+    var formats = Labels.FormatList(Model.AllowedFormats);
+    var accept = Labels.AcceptAttribute(Model.AllowedFormats);
+    var limit = Labels.FileSize(Model.MaxBytes, isRtl);
+    var imagesOnly = (Model.AllowedFormats & ~(DocumentFormat.Jpg | DocumentFormat.Png)) == 0;
+    var shape = Model.Shape == FileUploadShape.Portrait ? "is-portrait" : "is-strip";
+}
+
+@* doc 10 §5: one upload widget, embedded wherever a file is filed. Drag or click, the chosen
+   file named and measured back, and an image drawn before anything is sent — the commonest
+   upload mistake is not a bad file but the wrong one, and only the person choosing it can see
+   that. The limits below are the document type's own, so the box and the server agree; the
+   client warns early and AttachmentIntake still decides. *@
+<div class="sms-upload @shape" data-sms-upload
+     data-max-bytes="@Model.MaxBytes"
+     data-accept="@accept"
+     data-rules-from="@Model.RulesFrom"
+     @* Templates rather than finished sentences: when the document type changes beside the box,
+        the limits change with it, and a message naming yesterday's ceiling is worse than none. *@
+     data-error-too-large="@T("The file must be {size} or smaller.", "يجب ألا يتجاوز حجم الملف {size}.")"
+     data-error-format="@T("The formats accepted here are: {formats}.", "الصيغ المقبولة هنا: {formats}.")"
+     data-hint-template="@T("{formats} · up to {size}", "{formats} · حتى {size}")"
+     @* The units travel with the templates. Script that re-writes a size after the type changes
+        would otherwise print "5 MB" onto an Arabic page the server had written "5 م.ب" on. *@
+     data-unit-mb="@T("MB", "م.ب")" data-unit-kb="@T("KB", "ك.ب")">
+
+    @if (!string.IsNullOrWhiteSpace(Model.Label))
+    {
+        <label class="form-label small" for="@Model.Id">@Model.Label</label>
+    }
+
+    <label class="sms-upload__drop" for="@Model.Id" data-sms-upload-drop>
+        @* One frame, not two: what is on file now and what is about to replace it are the same
+           question, and answering it in two places is how somebody uploads a photograph twice. *@
+        <span class="sms-upload__frame">
+            <img data-sms-upload-image alt="@T("Chosen file", "الملف المختار")"
+                 src="@(string.IsNullOrWhiteSpace(Model.CurrentImageUrl) ? null : Model.CurrentImageUrl)"
+                 hidden="@string.IsNullOrWhiteSpace(Model.CurrentImageUrl)" />
+            <span class="sms-upload__glyph" data-sms-upload-glyph aria-hidden="true"
+                  hidden="@(!string.IsNullOrWhiteSpace(Model.CurrentImageUrl))">
+                <i class="bi @(imagesOnly ? "bi-image" : "bi-cloud-arrow-up")"></i>
+            </span>
+        </span>
+        <span class="sms-upload__body">
+            <span class="sms-upload__prompt">@T("Drag a file here, or click to choose", "اسحب الملف هنا، أو اضغط للاختيار")</span>
+            <span class="sms-upload__chosen" data-sms-upload-name hidden></span>
+            <span class="sms-upload__hint" data-sms-upload-hint>@formats · @T($"up to {limit}", $"حتى {limit}")</span>
+            @if (!string.IsNullOrWhiteSpace(Model.Hint))
+            {
+                <span class="sms-upload__hint">@Model.Hint</span>
+            }
+        </span>
+        <button type="button" class="btn-close sms-upload__clear" data-sms-upload-clear hidden
+                aria-label="@T("Clear the chosen file", "إزالة الملف المختار")"></button>
+    </label>
+
+    @* The box itself stays in the page rather than being replaced by script: it is what posts, it
+       is what a screen reader announces, and it is what keeps the keyboard working if the script
+       never loads. *@
+    <input id="@Model.Id" name="@Model.Name" type="file" class="visually-hidden" data-sms-upload-input
+           accept="@accept" required="@Model.Required" form="@Model.FormId" />
+
+    <div class="sms-upload__error small text-danger mt-1" data-sms-upload-error hidden role="alert"></div>
+</div>

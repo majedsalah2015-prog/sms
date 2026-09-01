@@ -1,0 +1,175 @@
+@using System.Globalization
+@model StudentFinanceListViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Student finance", "مالية الطلاب");
+    ViewData["Breadcrumb"] = T("Fees / Student finance", "الرسوم / مالية الطلاب");
+    ViewData["FinanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+    var help = new HelpPanelViewModel
+    {
+        Id = "stufin-help", Title = T("Student finance — help", "مالية الطلاب — مساعدة"),
+        Intro = T("The year's roll with its money attached, read from the student rather than the guardian. Every figure is BR-FEE-008's one computation — gross − credit notes − discounts − allocated payments — and BR-DIS-010 keeps the reductions in their own columns instead of folding them into the net.", "قائمة طلاب العام ومعها أرصدتهم، من جهة الطالب لا ولي الأمر. كل رقم هنا هو حساب BR-FEE-008 نفسه — الإجمالي − الإشعارات الدائنة − الخصومات − المدفوعات المخصّصة — و BR-DIS-010 يبقي التخفيضات في أعمدتها بدل دمجها في الصافي."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Pay", "دفعة"), T("Opens the cashier at the guardian the school holds financially responsible (BR-FEE-004). A receipt belongs to the payer, not the child: BR-PAY-003 allocates it oldest-first across everything that payer owes, siblings included.", "يفتح الصندوق على ولي الأمر المسؤول مالياً (BR-FEE-004). السند يخص الدافع لا الطالب: يخصّصه BR-PAY-003 للأقدم أولاً على كل ما يستحق على ذلك الدافع، بما في ذلك الإخوة.")),
+            new HelpPanelViewModel.Item(T("Statement", "كشف حساب"), T("The child's own account across every year, printable. Payments appear as what was allocated to this child's invoices — an unallocated receipt is family money and shows on neither child's statement.", "حساب الطالب وحده عبر كل الأعوام، قابل للطباعة. تظهر المدفوعات بما خُصّص لفواتير هذا الطالب — والسند غير المخصّص مال أسرة لا يظهر في كشف أي منهم.")),
+            new HelpPanelViewModel.Item(T("Breakdown", "تفصيل الرسوم"), T("What the fee is made of: the approved price list of the child's grade, the invoices posted from it, how they are spread over installments, and every discount standing against them.", "مِمّ تتكوّن الرسوم: قائمة أسعار صف الطالب المعتمدة، والفواتير المرحّلة منها، وكيف وُزّعت على الأقساط، وكل خصم قائم عليها.")),
+            new HelpPanelViewModel.Item(T("No guardian responsible", "لا ولي أمر مسؤول"), T("The Pay button is disabled when nobody has been made financially responsible for the child (BR-PAR-005) — assign responsibility on the parent file first, or the receipt would be addressed to someone who never agreed to pay.", "زر الدفعة معطّل إن لم يُسنَد لأحد مسؤولية مالية عن الطالب (BR-PAR-005) — أسنِد المسؤولية في ملف ولي الأمر أولاً، وإلا صدر السند باسم من لم يلتزم بالدفع.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Find a student, see what is left on their fees, then take a payment, print a statement or open the breakdown.", "ابحث عن الطالب، واطّلع على المتبقي من رسومه، ثم سجّل دفعة أو اطبع كشف حساب أو افتح تفصيل الرسوم.")</p></div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form>
+        <partial name="_HelpModal" model="help" />
+    </div></div>
+<partial name="_FinanceNav" />
+
+@if (Model.Year == null)
+{
+    <div class="alert alert-info">@T("Define an academic year first — the roll is read per year.", "عرّف عاماً دراسياً أولاً — القائمة تُقرأ لكل عام على حدة.")</div>
+}
+else
+{
+    <div class="row g-3 mb-3">
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-mortarboard" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.MatchCount</span><span class="sms-tile__label">@T("students matched", "طالب مطابق")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-cash-stack" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalNet.ToString("N2")</span><span class="sms-tile__label">@T("net billed (listed)", "صافي المستحق (المعروض)")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-percent" aria-hidden="true"></i></span><span class="sms-tile__value"><bdi dir="ltr">−@Model.TotalDiscounts.ToString("N2")</bdi></span><span class="sms-tile__label">@T("discounts (listed)", "الخصومات (المعروض)")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-danger"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalRemaining.ToString("N2")</span><span class="sms-tile__label">@T("still due (listed)", "لا يزال مستحقاً (المعروض)")</span>@if (Model.AnyDeferred) { <span class="small text-muted">@T("collectible now", "القابل للتحصيل الآن") <bdi dir="ltr">@Model.TotalDueNow.ToString("N2")</bdi></span> }</div></div>
+    </div>
+
+    <div class="sms-card mb-3 p-3">
+        <form method="get" class="row g-2 align-items-end">
+            <input type="hidden" name="year" value="@yid" />
+            <div class="col-md-3"><label class="form-label small mb-1" for="f-q">@T("Student name or number", "اسم الطالب أو رقمه")</label><input id="f-q" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("name / student no.", "الاسم / رقم الطالب")" /></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-grade">@T("Grade", "الصف")</label><select id="f-grade" name="grade" class="form-select form-select-sm" onchange="this.form.submit()"><option value="">@T("All grades", "كل الصفوف")</option>@foreach (var g in Model.Grades) { <option value="@g.Id" selected="@(g.Id == Model.GradeId)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }</select></div>
+            <div class="col-md-2"><label class="form-label small mb-1" for="f-section">@T("Section", "الشعبة")</label>
+                <select id="f-section" name="section" class="form-select form-select-sm" disabled="@(Model.GradeId == null)">
+                    <option value="">@T("All sections", "كل الشعب")</option>
+                    @foreach (var s in Model.Sections) { <option value="@s.Id" selected="@(s.Id == Model.SectionId)">@(isRtl ? s.NameAr : s.NameEn)</option> }
+                </select>
+                @if (Model.GradeId == null) { <div class="form-text small">@T("Pick a grade first.", "اختر الصف أولاً.")</div> }
+            </div>
+            <div class="col-md-3"><label class="form-label small mb-1" for="f-guardian">@T("Guardian", "ولي الأمر")</label><input id="f-guardian" name="guardian" value="@Model.Guardian" class="form-control form-control-sm" placeholder="@T("name / file no. / mobile", "الاسم / رقم الملف / الجوال")" /></div>
+            <div class="col-md-1"><div class="form-check mt-4"><input class="form-check-input" type="checkbox" name="due" value="true" id="f-due" checked="@Model.DueOnly" /><label class="form-check-label small" for="f-due">@T("Owing", "المدين")</label></div></div>
+            <div class="col-md-1 d-flex gap-1">
+                <button class="btn btn-outline-primary btn-sm w-100" type="submit" aria-label="@T("Apply filters", "تطبيق التصفية")"><i class="bi bi-funnel" aria-hidden="true"></i></button>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="StudentFinance" asp-route-year="@yid" aria-label="@T("Clear filters", "مسح التصفية")"><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.IsTruncated)
+    {
+        <div class="alert alert-warning py-2 small d-print-none"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T($"Showing the first {Model.Rows.Count} of {Model.MatchCount} matching students — narrow by grade, section or name to see the rest.", $"يُعرض أول {Model.Rows.Count} من {Model.MatchCount} طالباً مطابقاً — ضيّق بالصف أو الشعبة أو الاسم لرؤية الباقي.")</div>
+    }
+
+    <div class="sms-card">
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+            <caption class="visually-hidden">@T("Students of the selected year with their financial position", "طلاب العام المحدد مع موقفهم المالي")</caption>
+            <thead><tr>
+                <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                <th scope="col">@T("Name", "الاسم")</th>
+                <th scope="col">@T("Grade", "الصف")</th>
+                <th scope="col">@T("Section", "الشعبة")</th>
+                <th scope="col">@T("Guardian", "ولي الأمر")</th>
+                <th scope="col" class="text-end">@T("Gross", "الإجمالي")</th>
+                <th scope="col" class="text-end">@T("Discounts", "الخصومات")</th>
+                <th scope="col" class="text-end">@T("Net", "الصافي")</th>
+                <th scope="col" class="text-end">@T("Paid", "المدفوع")</th>
+                <th scope="col" class="text-end">@T("Remaining", "المتبقي")</th>
+                @if (Model.AnyDeferred) { <th scope="col" class="text-end">@T("Due now", "مستحق الآن")</th> }
+                <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
+            </tr></thead>
+            <tbody>
+            @foreach (var r in Model.Rows)
+            {
+                <tr>
+                    <td><span class="font-monospace small">@r.Student.StudentNo</span></td>
+                    <td><a asp-action="StudentFinanceDetail" asp-route-id="@r.Student.Id" asp-route-year="@yid">@FinanceLabels.StudentName(r.Student, isRtl)</a></td>
+                    <td class="small">@(r.GradeName ?? "—")</td>
+                    <td class="small">@(r.SectionName ?? "—")</td>
+                    <td class="small">
+                        @if (r.Guardian == null)
+                        {
+                            <span class="text-muted">@T("none linked", "لا ولي أمر مرتبط")</span>
+                        }
+                        else
+                        {
+                            @FinanceLabels.ParentName(r.Guardian, isRtl)
+                            if (!r.GuardianIsResponsible)
+                            {
+                                <span class="badge bg-warning-subtle text-warning-emphasis ms-1" title="@T("Nobody is financially responsible for this student (BR-PAR-005).", "لا أحد مسؤول مالياً عن هذا الطالب (BR-PAR-005).")">@T("not responsible", "غير مسؤول مالياً")</span>
+                            }
+                        }
+                    </td>
+                    <td class="text-end">@r.Gross.ToString("N2")</td>
+                    <td class="text-end">@if (r.Discounts > 0m) { <bdi dir="ltr" class="text-success">−@r.Discounts.ToString("N2")</bdi> } else { <span class="text-muted">—</span> }</td>
+                    <td class="text-end">@r.Net.ToString("N2")</td>
+                    <td class="text-end text-success">@r.Paid.ToString("N2")</td>
+                    <td class="text-end fw-semibold @(r.Remaining > 0m ? "text-danger" : "")">
+                        @r.Remaining.ToString("N2")
+                        <span class="visually-hidden">@(r.Remaining > 0m ? T("due", "مستحق") : r.Remaining < 0m ? T("credit", "دائن") : T("settled", "مسدّد"))</span>
+                    </td>
+                    @* The collectible half of the balance: what an installment plan has already
+                       fallen due for, plus whatever is on no plan at all. Equal to the column
+                       beside it for a family without a plan. *@
+                    @if (Model.AnyDeferred)
+                    {
+                        <td class="text-end fw-semibold @(r.DueNow > 0m ? "text-danger" : "")">
+                            @r.DueNow.ToString("N2")
+                            @if (r.HasDeferred)
+                            {
+                                <i class="bi bi-calendar3 ms-1 text-muted" aria-hidden="true"></i>
+                                <span class="visually-hidden">@T("on an installment plan", "على خطة تقسيط")</span>
+                            }
+                        </td>
+                    }
+                    <td class="text-nowrap d-print-none">
+                        <div class="btn-group btn-group-sm" role="group" aria-label="@T("Actions for", "إجراءات") @FinanceLabels.StudentName(r.Student, isRtl)">
+                            @if (Model.CanOpenCashier)
+                            {
+                                @if (r.PayerId == null)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary" disabled title="@T("No guardian is financially responsible for this student — assign responsibility on the parent file first (BR-PAR-005).", "لا ولي أمر مسؤول مالياً عن هذا الطالب — أسنِد المسؤولية في ملف ولي الأمر أولاً (BR-PAR-005).")"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Pay", "دفعة")</button>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-primary" asp-controller="Payments" asp-action="Index" asp-route-payerId="@r.PayerId" asp-route-q="@r.Student.StudentNo" title="@T("Register a payment against the responsible guardian (BR-FEE-004).", "تسجيل دفعة على ولي الأمر المسؤول (BR-FEE-004).")"><i class="bi bi-cash-coin me-1" aria-hidden="true"></i>@T("Pay", "دفعة")</a>
+                                }
+                            }
+                            @if (Model.CanPrintStatement)
+                            {
+                                <a class="btn btn-outline-primary" asp-action="StudentStatement" asp-route-id="@r.Student.Id"><i class="bi bi-journal-text me-1" aria-hidden="true"></i>@T("Statement", "كشف حساب")</a>
+                            }
+                            <a class="btn btn-outline-secondary" asp-action="StudentFinanceDetail" asp-route-id="@r.Student.Id" asp-route-year="@yid"><i class="bi bi-list-columns-reverse me-1" aria-hidden="true"></i>@T("Breakdown", "تفصيل")</a>
+                        </div>
+                    </td>
+                </tr>
+            }
+            @if (Model.Rows.Count == 0)
+            {
+                <tr><td colspan="11" class="text-center text-muted py-4">
+                    @if (Model.DueOnly) { @T("No student in this selection still owes anything — every fee here is settled.", "لا طالب في هذا التحديد عليه مستحقات — كل الرسوم هنا مسدّدة.") }
+                    else if (!string.IsNullOrWhiteSpace(Model.Q) || !string.IsNullOrWhiteSpace(Model.Guardian) || Model.GradeId != null) { @T("No enrolled student matches these filters. Clear them to see the whole roll.", "لا طالب مسجّل يطابق هذه التصفية. امسحها لرؤية القائمة كاملة.") }
+                    else { @T("No student is actively enrolled in this year yet — register or re-register students first.", "لا طالب مسجّل فعلياً في هذا العام بعد — سجّل الطلاب أو أعد تسجيلهم أولاً.") }
+                </td></tr>
+            }
+            </tbody>
+            @if (Model.Rows.Count > 0)
+            {
+                <tfoot><tr class="fw-semibold">
+                    <td colspan="7" class="text-end">@T("Listed total", "إجمالي المعروض")</td>
+                    <td class="text-end">@Model.TotalNet.ToString("N2")</td>
+                    <td class="text-end">@Model.Rows.Sum(r => r.Paid).ToString("N2")</td>
+                    <td class="text-end @(Model.TotalRemaining > 0m ? "text-danger" : "")">@Model.TotalRemaining.ToString("N2")</td>
+                    @if (Model.AnyDeferred) { <td class="text-end @(Model.TotalDueNow > 0m ? "text-danger" : "")">@Model.TotalDueNow.ToString("N2")</td> }
+                    <td></td>
+                </tr></tfoot>
+            }
+        </table></div>
+    </div>
+}

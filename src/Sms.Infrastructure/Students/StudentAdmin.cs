@@ -7,7 +7,6 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Numbering;
 using Sms.Application.Students;
 using Sms.Domain.Common;
-using Sms.Domain.Parents;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
 
@@ -82,10 +81,9 @@ namespace Sms.Infrastructure.Students
 
         public async Task<Student> UpdateSocialProfileAsync(
             int studentId,
-            string? motherName, string? motherNationalId, string? motherOccupation, int? motherEducationLookupId, string? motherMobile,
-            ParentLifeStatus? fatherStatus, ParentLifeStatus? motherStatus, Religion? religion,
+            Religion? religion,
             ResidencyStatus? residencyStatus, FinancialStatus? financialStatus, string? rationCardNo,
-            string? placeOfBirth, int? familySize, int? birthOrder,
+            string? placeOfBirth, int? familySize, int? birthOrder, int? siblingCount, string? mobile,
             CancellationToken cancellationToken = default)
         {
             var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
@@ -93,14 +91,6 @@ namespace Sms.Infrastructure.Students
             // Blanks are stored as null, not as "". A social profile is read as "recorded or not" —
             // an empty ration-card box means the school does not have the number, and "" would make
             // that indistinguishable from a number of zero length in every later query.
-            student.MotherName = Blank(motherName);
-            student.MotherNationalId = Blank(motherNationalId);
-            student.MotherOccupation = Blank(motherOccupation);
-            student.MotherEducationLookupId = motherEducationLookupId;
-            student.MotherMobile = Blank(motherMobile);
-
-            student.FatherStatus = fatherStatus;
-            student.MotherStatus = motherStatus;
             student.Religion = religion;
             student.ResidencyStatus = residencyStatus;
             student.FinancialStatus = financialStatus;
@@ -109,6 +99,8 @@ namespace Sms.Infrastructure.Students
             student.PlaceOfBirth = Blank(placeOfBirth);
             student.FamilySize = familySize;
             student.BirthOrder = birthOrder;
+            student.SiblingCount = siblingCount;
+            student.Mobile = Blank(mobile);
 
             await _db.SaveChangesAsync(cancellationToken);
             return student;

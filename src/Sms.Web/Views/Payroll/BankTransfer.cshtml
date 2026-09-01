@@ -1,0 +1,138 @@
+@using System.Globalization
+@using Sms.Application.Payroll
+@model PayrollPrintViewModel<BankTransferList>
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var b = Model.Content;
+    var period = PayrollLabels.Period(b.PeriodYear, b.PeriodMonth, isRtl);
+    ViewData["Title"] = T($"Bank transfer list — {period}", $"كشف التحويل البنكي — {period}");
+    ViewData["Breadcrumb"] = T("Staff / Payroll / Bank transfer", "شؤون الموظفين / الرواتب / التحويل البنكي");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "bank-help",
+        Title = T("The transfer list — help", "كشف التحويل — مساعدة"),
+        Intro = T("The disbursement list for one payroll: who is owed what, and where it goes. This is the sheet handed to the bank.", "كشف الصرف لمسير واحد: لمن وكم وإلى أين. وهذه هي الورقة التي تُسلَّم للبنك."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Staff with no destination are listed, not hidden", "من لا جهة صرف له يُدرج ولا يُخفى"),
+                T("Someone with no bank account or wallet on file still appears, marked, with a count at the top. Dropping them silently would hand the bank a list that does not add up to the payroll.", "من لا حساب له ولا محفظة يظهر مع تمييزه وعدد في الأعلى. وإسقاطه بصمت يسلّم البنك كشفاً لا يساوي المسير.")),
+            new HelpPanelViewModel.Item(
+                T("Destinations are read now, not frozen", "جهات الصرف تُقرأ الآن ولا تُجمَّد"),
+                T("Account and wallet numbers come from the staff file at the moment the list is built, because it is produced to be acted on now. Reprinting after somebody changes their account shows the new one — and that change is itself audited with a stated reason.", "تُقرأ أرقام الحسابات والمحافظ من ملف الموظف لحظة بناء الكشف لأنه يُنتَج ليُنفَّذ الآن. وإعادة الطباعة بعد تغيير أحدهم حسابه تُظهر الجديد — وذلك التغيير نفسه مدقَّق بسبب مكتوب.")),
+            new HelpPanelViewModel.Item(
+                T("The order of preference", "ترتيب الأولوية"),
+                T("A bank account is used where there is one; otherwise the mobile wallet; otherwise the row says cash or nothing on file.", "يُستخدم الحساب البنكي إن وُجد، وإلا فالمحفظة، وإلا قال السطر نقداً أو غير مسجّل.")),
+        },
+    };
+
+    // The destination actually used, in the order the school would reach for it.
+    static (string Label, string? Value) Destination(BankTransferRow row, bool arabic)
+    {
+        if (!string.IsNullOrWhiteSpace(row.BankAccountNo)) return ((arabic ? row.BankNameAr : row.BankNameEn) ?? (arabic ? "حساب بنكي" : "Bank account"), row.BankAccountNo);
+        if (!string.IsNullOrWhiteSpace(row.PalPayWalletNo)) return (arabic ? "محفظة بالي بي" : "PalPay wallet", row.PalPayWalletNo);
+        if (!string.IsNullOrWhiteSpace(row.JawwalPayWalletNo)) return (arabic ? "محفظة جوال بي" : "JawwalPay wallet", row.JawwalPayWalletNo);
+        return (arabic ? "نقداً / غير محدد" : "Cash / not on file", null);
+    }
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@T("Bank transfer list", "كشف التحويل البنكي")</h1>
+        <p class="text-muted mb-0">@period &middot; <code>@b.RunNo</code></p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="Run" asp-route-id="@b.RunId">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to payroll", "عودة إلى المسير")
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (b.RowsWithoutDestination > 0)
+{
+    <div class="alert alert-warning py-2 d-print-none" role="alert">
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+        @T($"{b.RowsWithoutDestination} employee(s) have no bank account or wallet on file — they are listed below and must be paid another way.", $"{b.RowsWithoutDestination} من الموظفين بلا حساب بنكي أو محفظة مسجّلة — وهم مدرجون أدناه ويجب صرف رواتبهم بطريقة أخرى.")
+    </div>
+}
+
+<div class="sms-card">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@(isRtl ? Model.SchoolNameAr : Model.SchoolNameEn)</h2>
+        <p class="h6 mb-1">@T("Salary transfer list", "كشف تحويل الرواتب")</p>
+        <p class="text-muted small mb-0">
+            @period &middot; <code>@b.RunNo</code> &middot;
+            @T("payment date", "تاريخ الصرف"): @b.PaymentDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        </p>
+    </header>
+
+    @if (b.Rows.Count == 0)
+    {
+        <p class="text-muted mb-0">@T("This payroll has no employees on it.", "لا يوجد موظفون في هذا المسير.")</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table sms-table table-sm align-middle">
+                <caption class="visually-hidden">@T("Net amount payable to each employee and where it goes", "الصافي المستحق لكل موظف وإلى أين يُحوَّل")</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">@T("Employee no", "الرقم الوظيفي")</th>
+                        <th scope="col">@T("Name", "الاسم")</th>
+                        <th scope="col">@T("Destination", "جهة التحويل")</th>
+                        <th scope="col">@T("Account / wallet", "الحساب / المحفظة")</th>
+                        <th scope="col" class="text-end">@T("Net amount", "المبلغ الصافي")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @{ var n = 0; }
+                    @foreach (var row in b.Rows)
+                    {
+                        n++;
+                        var dest = Destination(row, isRtl);
+                        <tr class="@(row.HasDestination ? null : "table-warning")">
+                            <td>@n</td>
+                            <td class="text-nowrap"><code>@row.Employee.EmployeeNo</code></td>
+                            <td>@(isRtl ? row.Employee.NameAr : row.Employee.NameEn)</td>
+                            <td>@dest.Label</td>
+                            <td dir="ltr">
+                                @if (dest.Value == null)
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    <code>@dest.Value</code>
+                                }
+                            </td>
+                            <td class="text-end fw-bold" dir="ltr">@PayrollLabels.Money(row.NetPay)</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="5">@T("Total transferred", "إجمالي المحوَّل")</td>
+                        <td class="text-end" dir="ltr">@PayrollLabels.Money(b.TotalNet)</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <div class="row mt-5 text-center small">
+            <div class="col"><div class="border-top pt-2 mx-4">@T("Prepared by", "أعدّه")</div></div>
+            <div class="col"><div class="border-top pt-2 mx-4">@T("Approved by", "اعتمده")</div></div>
+            <div class="col"><div class="border-top pt-2 mx-4">@T("School stamp", "ختم المدرسة")</div></div>
+        </div>
+    }
+
+    <p class="text-muted small mt-4 mb-0">
+        @T("Printed", "طُبع"): @Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) UTC
+    </p>
+</div>

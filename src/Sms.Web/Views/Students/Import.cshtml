@@ -10,21 +10,58 @@
     var help = new HelpPanelViewModel
     {
         Id = "stu-import-help", Title = T("Import — help", "الاستيراد — مساعدة"),
-        Intro = T("Seven fields are read from the old register and nothing else: the four parts of the name, date of birth, gender and the identity number. Nationality is chosen once here and given to every row.", "تُقرأ سبعة حقول من السجل القديم لا غير: أجزاء الاسم الأربعة وتاريخ الميلاد والجنس ورقم الهوية. أما الجنسية فتُختار هنا مرة وتُسنَد لكل صف."),
+        Intro = T("The student's own seven fields are read from the old register — the four parts of the name, date of birth, gender and the identity number — and beside each child, the two guardians the register describes. Nationality is chosen once here and given to every row.", "تُقرأ من السجل القديم سبعة حقول للطالب نفسه — أجزاء الاسم الأربعة وتاريخ الميلاد والجنس ورقم الهوية — وإلى جانب كل طفل، وليّا أمره كما يصفهما السجل. أما الجنسية فتُختار هنا مرة وتُسنَد لكل صف."),
         Items = new[]
         {
             new HelpPanelViewModel.Item(T("Nothing is written until the last step", "لا يُكتَب شيء حتى الخطوة الأخيرة"), T("Uploading and previewing only read. The preview is produced by the very same code the import runs, so a row that looks right in it is a row that will go in — and one marked with a problem is one that will be skipped, counted and left behind in the old file.", "الرفع والمعاينة قراءة فقط. والمعاينة تنتجها الشيفرة ذاتها التي تنفّذ الاستيراد، فالسطر الذي يبدو صحيحاً فيها هو ما سيُكتَب — والمعلَّم بمشكلة يُتخطّى ويُحصى ويبقى في الملف القديم.")),
+            new HelpPanelViewModel.Item(T("A guardian is a file, not a column", "ولي الأمر ملف لا عمود"), T("Each parent becomes a parent file linked to the child, so four siblings reach one father rather than four copies of him. The ID number is what recognises him: rows carrying the same one are folded into a single file, an ID already in the register links to the file that holds it, and a guardian with no ID number gets a new file every time because nothing can say otherwise.", "يصبح كل من الأبوين ملفَّ ولي أمر مرتبطاً بالطفل، فيصل أربعة إخوة إلى أبٍ واحد لا إلى أربع نسخ منه. ورقم الهوية هو ما يتعرّف عليه: تُدمَج الصفوف الحاملة للرقم نفسه في ملف واحد، والرقم الموجود في السجل يُربَط بملفه، أما وليّ الأمر بلا رقم هوية فيُنشأ له ملف جديد في كل مرة لأن لا شيء يقول غير ذلك.")),
+            new HelpPanelViewModel.Item(T("An existing guardian file is never overwritten", "لا يُكتَب فوق ملف ولي أمر قائم"), T("When the ID number already names somebody here, the child is linked to that file and nothing in it changes. The old register is the source being retired, and a run that quietly rewrote six hundred parents' mobiles from it would be a loss nobody asked for.", "حين يكون رقم الهوية معروفاً هنا، يُربَط الطفل بذلك الملف ولا يتغيّر فيه شيء. فالسجل القديم هو المصدر الذي يجري التخلّي عنه، وتشغيلٌ يعيد كتابة جوالات ستمئة وليّ أمر منه بصمت خسارةٌ لم يطلبها أحد.")),
+            new HelpPanelViewModel.Item(T("The father's name can come from the child's", "اسم الأب قد يأتي من اسم الطفل"), T("Where the register has no column for it, the father's name is taken from the child's own — the father, grandfather and family parts are his name. This happens only when some other father column is mapped, so no guardian is invented out of a name alone.", "حيث لا يوجد عمود له، يُؤخذ اسم الأب من اسم الطفل نفسه — فأجزاء الأب والجد والعائلة هي اسمه. ولا يحدث ذلك إلا إذا أُسنِد عمود آخر من أعمدة الأب، فلا يُختلَق وليّ أمر من اسم وحده.")),
+            new HelpPanelViewModel.Item(T("Qualifications are matched, never invented", "المؤهلات تُطابَق ولا تُختلَق"), T("The qualification cell is matched against this school's Education Level list, ignoring hamza shapes, ة/ه and ال. A cell nothing answers to is left blank and counted in the preview — a blank field is filled in later, while a wrong one is a wrong fact nobody looks at again.", "تُطابَق خلية المؤهل مع قائمة المؤهلات العلمية في هذه المدرسة، متجاوزةً صور الهمزة والتاء المربوطة وأل التعريف. والخلية التي لا يجيبها شيء تُترك فارغة وتُحصى في المعاينة — فالحقل الفارغ يُملأ لاحقاً، أما الخاطئ فحقيقة خاطئة لا يعود إليها أحد.")),
             new HelpPanelViewModel.Item(T("Names go in twice", "الاسم يُخزَّن مرتين"), T("The model requires an English name as well as an Arabic one. The import stores the register's own text in both rather than transliterating: an invented spelling is harder to notice and harder to correct than an obviously untranslated one.", "يتطلب النموذج اسماً إنجليزياً كما يتطلب عربياً. والاستيراد يخزّن نص السجل نفسه في الاثنين بدل النقحرة: فالهجاء المخترَع أصعب ملاحظةً وأصعب تصحيحاً من نصٍّ ظاهر أنه لم يُترجَم.")),
             new HelpPanelViewModel.Item(T("Dates and gender", "التواريخ والجنس"), T("Dates are read as year-first or day-first, and a cell nothing can read is a skipped row rather than a guessed birthday. Gender is read from ذكر/أنثى, M/F, or 1/2.", "تُقرأ التواريخ بصيغة السنة أولاً أو اليوم أولاً، والخلية غير المقروءة تعني سطراً متخطّى لا تاريخ ميلاد مخمَّناً. ويُقرأ الجنس من ذكر/أنثى أو M/F أو 1/2.")),
-            new HelpPanelViewModel.Item(T("If the server has no Access driver", "إن لم يكن على الخادم مشغّل أكسس"), T("Reading an .accdb needs Microsoft's Access Database Engine installed on the server, in the same bitness as the application. Without it the upload step says so plainly instead of failing silently.", "قراءة ملف accdb. تتطلب تثبيت Microsoft Access Database Engine على الخادم بالمعمارية نفسها للتطبيق. وبدونه تقول خطوة الرفع ذلك صراحةً بدل أن تفشل بصمت.")),
+            new HelpPanelViewModel.Item(T("Occupations and qualifications are usually codes", "المهن والمؤهلات أرقام في الغالب"), T("An old register keeps 12 in the occupation column and \"مهندس\" in a table of its own. Name that table under Code tables and the numbers become words; get it wrong and the preview shows numbers, which is how you know.", "يحفظ السجل القديم الرقم 12 في عمود المهنة و«مهندس» في جدول خاص به. سمِّ ذلك الجدول في «جداول الترميز» فتصير الأرقام كلمات؛ وإن أخطأت ظهرت الأرقام في المعاينة، وبذلك تعرف.")),
+            new HelpPanelViewModel.Item(T("Reading the file needs a driver of the right bitness", "قراءة الملف تتطلب مشغّلاً بالمعمارية الصحيحة"), T("The Access driver is registered per bitness, and a school PC with Office 2007 or 2010 has the 32-bit one only, which this 64-bit application cannot load. Building tools/Sms.AccessBridge covers that: the read happens in a 32-bit helper process instead. Installing the 64-bit Access Database Engine is the alternative, and its installer refuses to run while 32-bit Office is present.", "يُسجَّل مشغّل أكسس بحسب المعمارية، وجهاز المدرسة الذي عليه Office 2007 أو 2010 لا يحمل إلا نسخة ٣٢‑بت لا يستطيع هذا التطبيق ٦٤‑بت تحميلها. وبناء tools/Sms.AccessBridge يعالج ذلك: تجري القراءة في عملية مساعدة ٣٢‑بت. والبديل تثبيت Microsoft Access Database Engine ٦٤‑بت، ويرفض مثبِّتها العمل ما دام Office ٣٢‑بت موجوداً.")),
         },
     };
+
+    // The name with its row count beside it. A register of this kind carries 160 tables of which
+    // four matter, and the count is what separates the students table that holds the school from
+    // the one a year-end rollover emptied — the difference an operator otherwise finds only by
+    // choosing wrong. A table whose count could not be taken keeps its name and shows no number.
+    // Arabic counts by bracket rather than by "one versus many": two is a dual, three to ten take
+    // the plural, and eleven upward take the accusative singular — so "8 صفاً" is wrong where
+    // "8 صفوف" is right. And zero is spelled as a word in both languages, because an empty table is
+    // the one thing this list exists to make obvious, and "فارغ" carries further than a digit.
+    string Sized(string table)
+    {
+        if (!Model.TableRowCounts.TryGetValue(table, out var rows)) { return table; }
+
+        var n = rows.ToString("N0", CultureInfo.InvariantCulture);
+        var counted = rows switch
+        {
+            0 => T("empty", "فارغ"),
+            1 => T("1 row", "صف واحد"),
+            2 => T("2 rows", "صفان"),
+            <= 10 => T($"{n} rows", $"{n} صفوف"),
+            _ => T($"{n} rows", $"{n} صفاً"),
+        };
+
+        return $"{table} · {counted}";
+    }
+
+    string Guardian(StudentImportViewModel.GuardianCandidate? g)
+    {
+        if (g == null) { return "—"; }
+        var parts = new[] { g.Name, g.IdNumber, g.Mobile, g.Occupation, g.EducationUnmatched ? null : Model.EducationLevels.Where(e => e.Id == g.EducationLookupId).Select(e => isRtl ? e.Ar : e.En).FirstOrDefault() };
+        return string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+    }
 }
 
 <div class="sms-page-head">
     <div>
         <h1 class="sms-page-title">@ViewData["Title"]</h1>
-        <p class="text-muted mb-0">@T("Name, father, grandfather, family, date of birth, gender, nationality and identity number — nothing else is read.", "الاسم والأب والجد والعائلة وتاريخ الميلاد والجنس والجنسية ورقم الهوية — ولا شيء غيرها يُقرأ.")</p>
+        <p class="text-muted mb-0">@T("The child's name, birth, gender, nationality and identity number — and beside each one, the father and the mother as guardian files.", "اسم الطفل وميلاده وجنسه وجنسيته ورقم هويته — وإلى جانب كل ذلك، الأب والأم كملفَّي وليّ أمر.")</p>
     </div>
     <div class="d-flex gap-2 align-items-center">
         <partial name="_HelpModal" model="help" />
@@ -65,7 +102,7 @@
                         <option value="">@T("— choose —", "— اختر —")</option>
                         @foreach (var t in Model.Tables)
                         {
-                            <option value="@t" selected="@(t == Model.Table)">@t</option>
+                            <option value="@t" selected="@(t == Model.Table)">@Sized(t)</option>
                         }
                     </select>
                 </div>
@@ -76,22 +113,46 @@
 
             @if (haveColumns)
             {
-                <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها.")</p>
+                <!-- Says the mapping below was answered, not merely guessed — so a field set back
+                     to "none" stays there instead of being re-guessed on the next post. -->
+                <input type="hidden" name="MappingChosen" value="true" />
+                <p class="small text-muted">@T("Say which column holds what. The guesses below come from the column names; correct any that are wrong. A field left at “none” is simply not imported.", "بيّن أي عمود يحمل ماذا. والتخمينات أدناه من أسماء الأعمدة؛ صحّح ما أخطأ منها. والحقل المتروك على «بلا» لا يُستورَد ببساطة.")</p>
+
+                var studentFields = new (string Prop, string En, string Ar, string? Value)[]
+                    {
+                        ("FirstNameColumn", "First name", "الاسم الأول", Model.FirstNameColumn),
+                        ("FatherNameColumn", "Father's name", "اسم الأب", Model.FatherNameColumn),
+                        ("GrandfatherNameColumn", "Grandfather's name", "اسم الجد", Model.GrandfatherNameColumn),
+                        ("FamilyNameColumn", "Family name", "اسم العائلة", Model.FamilyNameColumn),
+                        ("FullNameColumn", "Whole name in one column", "الاسم كاملاً في عمود واحد", Model.FullNameColumn),
+                        ("DateOfBirthColumn", "Date of birth", "تاريخ الميلاد", Model.DateOfBirthColumn),
+                        ("GenderColumn", "Gender", "الجنس", Model.GenderColumn),
+                        ("IdNumberColumn", "Identity number", "رقم الهوية", Model.IdNumberColumn),
+                        ("PlaceOfBirthColumn", "Place of birth", "مكان الميلاد", Model.PlaceOfBirthColumn),
+                        ("SiblingCountColumn", "Siblings", "عدد الأخوة", Model.SiblingCountColumn),
+                        ("BirthOrderColumn", "Birth order", "ترتيب الطالب بين الأخوة", Model.BirthOrderColumn),
+                        ("MobileColumn", "Student's mobile", "جوال الطالب", Model.MobileColumn),
+                    };
+                var fatherFields = new (string Prop, string En, string Ar, string? Value)[]
+                    {
+                        ("FatherIdNumberColumn", "ID number", "رقم الهوية", Model.FatherIdNumberColumn),
+                        ("FatherFullNameColumn", "Name", "الاسم", Model.FatherFullNameColumn),
+                        ("FatherOccupationColumn", "Occupation", "المهنة", Model.FatherOccupationColumn),
+                        ("FatherMobileColumn", "Mobile", "الجوال", Model.FatherMobileColumn),
+                        ("FatherEducationColumn", "Education level", "المؤهل العلمي", Model.FatherEducationColumn),
+                    };
+                var motherFields = new (string Prop, string En, string Ar, string? Value)[]
+                    {
+                        ("MotherIdNumberColumn", "ID number", "رقم الهوية", Model.MotherIdNumberColumn),
+                        ("MotherFullNameColumn", "Name", "الاسم", Model.MotherFullNameColumn),
+                        ("MotherOccupationColumn", "Occupation", "المهنة", Model.MotherOccupationColumn),
+                        ("MotherMobileColumn", "Mobile", "الجوال", Model.MotherMobileColumn),
+                        ("MotherEducationColumn", "Education level", "المؤهل العلمي", Model.MotherEducationColumn),
+                    };
+
+                <h3 class="h6 mt-3">@T("The student", "الطالب")</h3>
                 <div class="row g-2">
-                    @{
-                        var fields = new (string Prop, string En, string Ar, string? Value)[]
-                        {
-                            ("FirstNameColumn", "First name", "الاسم الأول", Model.FirstNameColumn),
-                            ("FatherNameColumn", "Father's name", "اسم الأب", Model.FatherNameColumn),
-                            ("GrandfatherNameColumn", "Grandfather's name", "اسم الجد", Model.GrandfatherNameColumn),
-                            ("FamilyNameColumn", "Family name", "اسم العائلة", Model.FamilyNameColumn),
-                            ("FullNameColumn", "Whole name in one column", "الاسم كاملاً في عمود واحد", Model.FullNameColumn),
-                            ("DateOfBirthColumn", "Date of birth", "تاريخ الميلاد", Model.DateOfBirthColumn),
-                            ("GenderColumn", "Gender", "الجنس", Model.GenderColumn),
-                            ("IdNumberColumn", "Identity number", "رقم الهوية", Model.IdNumberColumn),
-                        };
-                    }
-                    @foreach (var f in fields)
+                    @foreach (var f in studentFields)
                     {
                         <div class="col-md-3">
                             <label class="form-label small" for="map-@f.Prop">@(isRtl ? f.Ar : f.En)</label>
@@ -106,7 +167,67 @@
                     }
                 </div>
 
-                <div class="row g-2 mt-2">
+                <h3 class="h6 mt-4">@T("The father (guardian)", "الأب (ولي الأمر)")</h3>
+                <p class="form-text mt-0">@T("Leave the name unmapped where the register has no column for it — it is taken from the child's own name.", "اترك الاسم بلا إسناد حيث لا عمود له في السجل — فيُؤخذ من اسم الطفل نفسه.")</p>
+                <div class="row g-2">
+                    @foreach (var f in fatherFields)
+                    {
+                        <div class="col-md-2">
+                            <label class="form-label small" for="map-@f.Prop">@(isRtl ? f.Ar : f.En)</label>
+                            <select id="map-@f.Prop" name="@f.Prop" class="form-select form-select-sm">
+                                <option value="">@T("— none —", "— بلا —")</option>
+                                @foreach (var c in Model.Columns)
+                                {
+                                    <option value="@c" selected="@(c == f.Value)">@c</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                <h3 class="h6 mt-4">@T("The mother", "الأم")</h3>
+                <div class="row g-2">
+                    @foreach (var f in motherFields)
+                    {
+                        <div class="col-md-2">
+                            <label class="form-label small" for="map-@f.Prop">@(isRtl ? f.Ar : f.En)</label>
+                            <select id="map-@f.Prop" name="@f.Prop" class="form-select form-select-sm">
+                                <option value="">@T("— none —", "— بلا —")</option>
+                                @foreach (var c in Model.Columns)
+                                {
+                                    <option value="@c" selected="@(c == f.Value)">@c</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                <h3 class="h6 mt-4">@T("Code tables", "جداول الترميز")</h3>
+                <p class="form-text mt-0">@T("An old register keeps an occupation as a number and the word for it in another table. Name those tables and the numbers become words; leave them empty where the columns already hold text.", "يحفظ السجل القديم المهنة رقماً، وكلمتها في جدول آخر. سمِّ هذين الجدولين فتصير الأرقام كلمات؛ واتركهما فارغين حيث تحمل الأعمدة نصاً أصلاً.")</p>
+                <div class="row g-2">
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="OccupationCodeTable">@T("Occupations table", "جدول المهن")</label>
+                        <select asp-for="OccupationCodeTable" class="form-select form-select-sm">
+                            <option value="">@T("— the column holds text —", "— العمود يحمل نصاً —")</option>
+                            @foreach (var t in Model.Tables)
+                            {
+                                <option value="@t" selected="@(t == Model.OccupationCodeTable)">@Sized(t)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" asp-for="EducationCodeTable">@T("Qualifications table", "جدول المؤهلات")</label>
+                        <select asp-for="EducationCodeTable" class="form-select form-select-sm">
+                            <option value="">@T("— the column holds text —", "— العمود يحمل نصاً —")</option>
+                            @foreach (var t in Model.Tables)
+                            {
+                                <option value="@t" selected="@(t == Model.EducationCodeTable)">@Sized(t)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-2 mt-3">
                     <div class="col-md-3">
                         <label class="form-label small" asp-for="NationalityLookupId">@T("Nationality for every row", "الجنسية لكل صف")</label>
                         <select asp-for="NationalityLookupId" class="form-select form-select-sm">
@@ -145,6 +266,32 @@
             <span class="badge text-bg-warning">@Model.SkippedRows</span> @T("will be skipped", "سيُتخطّى") ·
             <span class="text-muted">@T("of", "من") @Model.TotalRows @T("rows", "صفاً")</span>
         </p>
+        @if (Model.MapsGuardians)
+        {
+            <p class="small">
+                <span class="badge text-bg-primary">@Model.GuardianCount</span> @T("guardian file(s) at most", "ملف ولي أمر على الأكثر")
+                @if (Model.GuardiansWithoutId > 0)
+                {
+                    <span class="text-warning-emphasis">· @Model.GuardiansWithoutId @T("with no ID number, so siblings cannot be recognised", "بلا رقم هوية، فلا يمكن التعرّف على الإخوة")</span>
+                }
+                @if (Model.UnmatchedEducations > 0)
+                {
+                    <span class="text-warning-emphasis">· @Model.UnmatchedEducations @T("qualification(s) nothing in the list answered to — imported blank", "مؤهلاً لم تجبه القائمة — يُستورَد فارغاً")</span>
+                }
+            </p>
+            @if (Model.UnmatchedEducationNames.Count > 0)
+            {
+                <div class="alert alert-warning py-2 small">
+                    @T("These qualifications are in the register but not in this school's Education Level list. Add them under Setup › Lookups and preview again, or import now and leave those fields blank.", "هذه المؤهلات موجودة في السجل وغير موجودة في قائمة المؤهل العلمي لهذه المدرسة. أضِفها من الإعدادات › القوائم ثم عاين مرة أخرى، أو استورد الآن واترك تلك الحقول فارغة.")
+                    <div class="mt-1">
+                        @foreach (var u in Model.UnmatchedEducationNames)
+                        {
+                            <span class="badge text-bg-light me-1">@u.Text · @u.Rows</span>
+                        }
+                    </div>
+                </div>
+            }
+        }
 
         <div class="table-responsive mb-3">
             <table class="table table-sm sms-table mb-0">
@@ -158,6 +305,14 @@
                     <th scope="col">@T("Born", "الميلاد")</th>
                     <th scope="col">@T("Gender", "الجنس")</th>
                     <th scope="col">@T("ID", "الهوية")</th>
+                    @if (Model.MapsSocial)
+                    {
+                        <th scope="col">@T("Born at · siblings · order · mobile", "مكان الميلاد · الأخوة · الترتيب · الجوال")</th>
+                    }
+                    @if (Model.MapsGuardians)
+                    {
+                        <th scope="col">@T("Guardians", "أولياء الأمور")</th>
+                    }
                     <th scope="col">@T("Problem", "المشكلة")</th>
                 </tr></thead>
                 <tbody>
@@ -169,6 +324,26 @@
                         <td class="small"><bdi dir="ltr">@r.DateOfBirth</bdi></td>
                         <td class="small">@(r.Gender == "F" ? T("Female", "أنثى") : r.Gender == "M" ? T("Male", "ذكر") : "—")</td>
                         <td class="small"><bdi dir="ltr">@r.IdNumber</bdi></td>
+                        @if (Model.MapsSocial)
+                        {
+                            <td class="small">
+                                @(r.Social.PlaceOfBirth ?? "—") ·
+                                @(r.Social.SiblingCount?.ToString() ?? "—") ·
+                                @(r.Social.BirthOrder?.ToString() ?? "—") ·
+                                <bdi dir="ltr">@(r.Social.Mobile ?? "—")</bdi>
+                            </td>
+                        }
+                        @if (Model.MapsGuardians)
+                        {
+                            <td class="small">
+                                <div><span class="text-muted">@T("F:", "أب:")</span> @Guardian(r.Father)</div>
+                                <div><span class="text-muted">@T("M:", "أم:")</span> @Guardian(r.Mother)</div>
+                                @if (r.Father?.EducationUnmatched == true || r.Mother?.EducationUnmatched == true)
+                                {
+                                    <div class="text-warning-emphasis">@T("qualification not matched:", "مؤهل غير مطابَق:") @(r.Father?.EducationUnmatched == true ? r.Father.EducationText : r.Mother!.EducationText)</div>
+                                }
+                            </td>
+                        }
                         <td class="small text-danger">@r.Problem</td>
                     </tr>
                 }
@@ -192,6 +367,22 @@
             <input type="hidden" asp-for="DateOfBirthColumn" />
             <input type="hidden" asp-for="GenderColumn" />
             <input type="hidden" asp-for="IdNumberColumn" />
+            <input type="hidden" asp-for="PlaceOfBirthColumn" />
+            <input type="hidden" asp-for="SiblingCountColumn" />
+            <input type="hidden" asp-for="BirthOrderColumn" />
+            <input type="hidden" asp-for="MobileColumn" />
+            <input type="hidden" asp-for="FatherFullNameColumn" />
+            <input type="hidden" asp-for="FatherIdNumberColumn" />
+            <input type="hidden" asp-for="FatherOccupationColumn" />
+            <input type="hidden" asp-for="FatherMobileColumn" />
+            <input type="hidden" asp-for="FatherEducationColumn" />
+            <input type="hidden" asp-for="MotherFullNameColumn" />
+            <input type="hidden" asp-for="MotherIdNumberColumn" />
+            <input type="hidden" asp-for="MotherOccupationColumn" />
+            <input type="hidden" asp-for="MotherMobileColumn" />
+            <input type="hidden" asp-for="MotherEducationColumn" />
+            <input type="hidden" asp-for="OccupationCodeTable" />
+            <input type="hidden" asp-for="EducationCodeTable" />
             <input type="hidden" asp-for="NationalityLookupId" />
             <input type="hidden" asp-for="IdTypeLookupId" />
             <button type="submit" class="btn btn-primary" @(Model.ReadyRows == 0 ? "disabled" : "")>

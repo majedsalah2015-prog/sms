@@ -19,13 +19,20 @@
     };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@Model.Rows.Count @T("teachers", "معلماً")</p></div>
-    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@(Model.IsFiltered ? T($"{Model.Rows.Count} of {Model.Total} teachers", $"{Model.Rows.Count} من {Model.Total} معلماً") : T($"{Model.Total} teachers", $"{Model.Total} معلماً"))</p></div>
+    <div class="d-flex gap-2 align-items-center"><form method="get" class="d-flex gap-2"><input type="hidden" name="q" value="@Model.Query" /><input type="hidden" name="subject" value="@Model.SubjectId" /><select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select></form><partial name="_HelpModal" model="help" /></div></div>
 <partial name="_StaffNav" />
 
 <div class="row g-3">
     <div class="col-xl-8">
         <div class="sms-card">
+            <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
+                <input type="hidden" name="year" value="@yid" />
+                <input name="q" class="form-control form-control-sm" style="max-width:16rem" value="@Model.Query" placeholder="@T("number, name, mobile…", "الرقم، الاسم، الجوال…")" aria-label="@T("Search teachers", "بحث عن معلم")" />
+                <select name="subject" class="form-select form-select-sm" style="max-width:13rem" onchange="this.form.submit()" aria-label="@T("Subject taught", "المادة المُدرَّسة")"><option value="">@T("Any subject", "كل المواد")</option>@foreach (var s in Model.Subjects) { <option value="@s.Id" selected="@(s.Id == Model.SubjectId)">@(isRtl ? s.Name.NameAr : s.Name.NameEn)</option> }</select>
+                <button class="btn btn-sm btn-outline-secondary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button>
+                @if (Model.IsFiltered) { <a class="btn btn-sm btn-link" asp-action="Index" asp-route-year="@yid">@T("Clear", "مسح")</a> }
+            </form>
             <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
                 <caption class="visually-hidden">@T("Teacher directory", "دليل المعلمين")</caption>
                 <thead><tr><th scope="col">@T("Teacher", "المعلم")</th><th scope="col">@T("Subjects", "المواد")</th><th scope="col">@T("Sections", "الشعب")</th><th scope="col">@T("Load", "النصاب")</th><th scope="col">@T("Homeroom", "مربي")</th><th scope="col">@T("Contract", "العقد")</th><th scope="col" class="text-end"></th></tr></thead>
@@ -35,16 +42,16 @@
                     <tr><td class="fw-semibold"><a asp-controller="Employees" asp-action="File" asp-route-id="@e.Id" asp-route-tab="teaching"><code>@e.EmployeeNo</code> @(isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}")</a></td>
                         <td class="small">@(r.Subjects.Count == 0 ? "—" : string.Join(" · ", r.Subjects))</td><td>@r.SectionCount</td>
                         <td><div class="d-flex align-items-center gap-2"><div class="sms-progress" style="width:6rem" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Load", "النصاب")"><span style="width:@(pct)%;@(r.Load > max ? "background:#dc2626" : r.Load < max / 2 ? "background:#f59e0b" : "")"></span></div><span class="small @(r.Load > max ? "text-danger fw-semibold" : "")">@r.Load/@max</span></div></td>
-                        <td>@(r.Homeroom ?? "—")</td><td>@if (r.HasActiveContract) { <span class="badge text-bg-success">@T("active", "ساري")</span> } else { <span class="badge text-bg-warning">@T("none", "لا عقد")</span> }</td><td class="text-end text-nowrap"><form method="post" asp-action="RemoveDesignation" asp-route-teacherProfileId="@r.Profile.Id" asp-route-year="@Model.Year?.Id" class="d-inline" onsubmit="return confirm('@T($"Remove {e.EmployeeNo} from teachers? Teaching assignments are deleted; the employee record is kept.", $"إزالة {e.EmployeeNo} من المعلمين؟ تُحذف التكليفات التدريسية ويبقى سجل الموظف.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove teacher designation", "حذف تعيين المعلم")" aria-label="@T("Remove teacher designation", "حذف تعيين المعلم")"><i class="bi bi-trash" aria-hidden="true"></i></button></form></td></tr>
+                        <td>@(r.Homeroom ?? "—")</td><td>@if (r.HasActiveContract) { <span class="badge text-bg-success">@T("active", "ساري")</span> } else { <span class="badge text-bg-warning">@T("none", "لا عقد")</span> }</td><td class="text-end text-nowrap"><form method="post" asp-action="RemoveDesignation" asp-route-teacherProfileId="@r.Profile.Id" asp-route-year="@Model.Year?.Id" asp-route-q="@Model.Query" asp-route-subject="@Model.SubjectId" class="d-inline" onsubmit="return confirm('@T($"Remove {e.EmployeeNo} from teachers? Teaching assignments are deleted; the employee record is kept.", $"إزالة {e.EmployeeNo} من المعلمين؟ تُحذف التكليفات التدريسية ويبقى سجل الموظف.")');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Remove teacher designation", "حذف تعيين المعلم")" aria-label="@T("Remove teacher designation", "حذف تعيين المعلم")"><i class="bi bi-trash" aria-hidden="true"></i></button></form></td></tr>
                 }
-                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No teachers designated yet.", "لم يُعيَّن معلمون بعد.")</td></tr> }</tbody>
+                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@(Model.IsFiltered ? T("No teacher matches this search.", "لا معلم مطابق لهذا البحث.") : T("No teachers designated yet.", "لم يُعيَّن معلمون بعد."))</td></tr> }</tbody>
             </table></div>
         </div>
     </div>
     <div class="col-xl-4">
         <div class="sms-card p-3">
             <h2 class="h6 mb-3"><i class="bi bi-person-workspace me-1" aria-hidden="true"></i>@T("Designate a teacher", "تعيين معلم")</h2>
-            <form method="post" asp-action="Designate" asp-route-year="@yid" class="d-grid gap-2">
+            <form method="post" asp-action="Designate" asp-route-year="@yid" asp-route-q="@Model.Query" asp-route-subject="@Model.SubjectId" class="d-grid gap-2">
                 <select name="employeeId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Employee to designate", "الموظف المراد تعيينه")"><option value="">@T("Employee…", "الموظف…")</option>@foreach (var e in Model.Designatable) { <option value="@e.Id">@e.EmployeeNo · @(isRtl ? $"{e.FirstNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FamilyNameEn}")</option> }</select>
                 <div class="d-flex gap-2 align-items-center"><label class="small text-nowrap" for="designate-maxWeeklyPeriods">@T("Max periods/week", "الحد/أسبوع")</label><input name="maxWeeklyPeriods" id="designate-maxWeeklyPeriods" type="number" min="1" class="form-control form-control-sm" value="24" /></div>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Designate", "تعيين")</button>

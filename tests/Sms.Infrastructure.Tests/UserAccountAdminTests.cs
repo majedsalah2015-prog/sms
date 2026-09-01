@@ -277,6 +277,101 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(account.Id, parent.UserAccountId);
         }
 
+        /// <summary>
+        /// The seeded parent template as PermissionSeedContributor leaves it, narrowed to the one
+        /// grant the portal's front door asks for.
+        /// </summary>
+        private async Task<int> AddPortalRoleTemplateAsync(string roleCode, bool active = true)
+        {
+            using var db = CreateContext();
+            var permission = new Permission
+            {
+                ModuleCode = ScreenCatalog.Modules.Portal,
+                ScreenCode = ScreenCatalog.Portal.Home,
+                Action = ActionVerb.View,
+            };
+            var role = new Role
+            {
+                Code = roleCode,
+                Name = new LocalizedName("ولي أمر", "Parent"),
+                IsActive = active,
+            };
+
+            db.Permissions.Add(permission);
+            db.Roles.Add(role);
+            await db.SaveChangesAsync();
+
+            db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            await db.SaveChangesAsync();
+            return role.Id;
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-006")]
+        public async Task A_provisioned_parent_can_actually_open_the_portal()
+        {
+            await AddPortalRoleTemplateAsync(RoleTemplates.Parent);
+            var parentId = AddParent("PAR-77");
+
+            ProvisionedAccount provisioned;
+            using (var db = CreateContext())
+            {
+                provisioned = await CreateService(db).ProvisionAsync(
+                    new NewUserAccount(ProvisionableAccountType.Parent, parentId, "par-77"));
+            }
+
+            // The symptom this covers is not a missing row, it is a parent who signs in with a
+            // working password and is answered by a bare not-found at /portal — deny-by-default
+            // refusing an account that holds no permission at all. So the assertion is the one the
+            // screen guard makes, not the one the schema does.
+            using var check = CreateContext();
+            var permissions = new PermissionService(check, new FixedUser { UserId = provisioned.UserAccountId });
+
+            Assert.True(await permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, ActionVerb.View));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-006")]
+        public async Task A_provisioned_staff_account_is_still_given_no_role_at_all()
+        {
+            await AddPortalRoleTemplateAsync(RoleTemplates.Parent);
+            var employeeId = AddEmployee("1042");
+
+            ProvisionedAccount provisioned;
+            using (var db = CreateContext())
+            {
+                provisioned = await CreateService(db).ProvisionAsync(
+                    new NewUserAccount(ProvisionableAccountType.Staff, employeeId, "emp-1042"));
+            }
+
+            // doc 06 §7 keeps SYS/Users/Create apart from SYS/UserRoles: which roles a colleague
+            // holds is a decision, and the screen asks for it on the next page. Only the portal
+            // account types have an answer that was already settled by the account type itself.
+            using var check = CreateContext();
+            Assert.Empty(check.RoleAssignments.Where(a => a.UserAccountId == provisioned.UserAccountId));
+        }
+
+        [Fact]
+        public async Task A_school_that_retired_its_parent_template_still_gets_the_account()
+        {
+            await AddPortalRoleTemplateAsync(RoleTemplates.Parent, active: false);
+            var parentId = AddParent("PAR-78");
+
+            ProvisionedAccount provisioned;
+            using (var db = CreateContext())
+            {
+                provisioned = await CreateService(db).ProvisionAsync(
+                    new NewUserAccount(ProvisionableAccountType.Parent, parentId, "par-78"));
+            }
+
+            // Reviving a template the school deactivated is not a side effect provisioning gets to
+            // have. The account is created either way; the assignment screen can still grant a role.
+            using var check = CreateContext();
+            Assert.NotNull(await check.UserAccounts.SingleOrDefaultAsync(a => a.Id == provisioned.UserAccountId));
+            Assert.Empty(check.RoleAssignments.IgnoreQueryFilters().Where(a => a.UserAccountId == provisioned.UserAccountId));
+        }
+
         // ------------------------------------------------------------------ the picker
 
         [Fact]

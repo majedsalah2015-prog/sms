@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Application.Lookups
 @using Sms.Domain.Lookups
 @model LookupsViewModel
 @{
@@ -6,14 +7,17 @@
     string T(string en, string ar) => isRtl ? ar : en;
     ViewData["Title"] = T("Lookup lists", "القوائم المرجعية");
     ViewData["Breadcrumb"] = T("System Setup / Lookup lists", "إعداد النظام / القوائم المرجعية");
-    var readOnly = Model.Selected?.Tier == LookupCategoryTier.ProductSeeded;
+    // The controller decides this, not the tier — SchoolAuthoredLookups. Three product-tier lists
+    // ship empty for the school to fill, and a view that locked them on tier alone showed an empty
+    // table with nothing to do to it.
+    var readOnly = !Model.CanEdit;
     var help = SetupHelp.Lookups(isRtl);
 }
 
 <div class="sms-page-head">
     <div>
         <h1 class="sms-page-title">@ViewData["Title"]</h1>
-        <p class="text-muted mb-0">@T("Two tiers (BR-SET-001): product-seeded lists are read-only for schools; school-managed lists are yours. Values are deactivated, never deleted (BR-SET-002).", "مستويان (BR-SET-001): القوائم المزوَّدة من المنتج للقراءة فقط؛ وقوائم المدرسة تخصكم. القيم تُعطَّل ولا تُحذف (BR-SET-002).")</p>
+        <p class="text-muted mb-0">@T("Two tiers (BR-SET-001): product lists are maintained by product releases — except the few the product ships empty for you to fill; school-managed lists are yours throughout. Values are deactivated, never deleted (BR-SET-002).", "مستويان (BR-SET-001): قوائم المنتج تُحدَّث بإصداراته — عدا القوائم التي يُسلِّمها فارغة لتملأوها؛ وقوائم المدرسة لكم بالكامل. القيم تُعطَّل ولا تُحذف (BR-SET-002).")</p>
     </div>
     <partial name="_HelpModal" model="help" />
 </div>
@@ -26,9 +30,21 @@
             <div class="list-group list-group-flush">
                 @foreach (var c in Model.Categories)
                 {
+                    @* Three states, not two: the badge answers "may I edit this?", and reading that
+                       off the tier alone put a locked label on lists the product ships for the
+                       school to author. *@
+                    var editable = SchoolAuthoredLookups.IsEditableBySchool(c);
+                    var badgeText = !editable
+                        ? T("product", "منتج")
+                        : c.Tier == LookupCategoryTier.ProductSeeded ? T("yours to fill", "لكم لتملأوها") : T("school", "مدرسة");
+                    var badgeTitle = !editable
+                        ? T("Product-seeded — read only (BR-SET-001)", "مزوَّدة من المنتج — للقراءة فقط (BR-SET-001)")
+                        : c.Tier == LookupCategoryTier.ProductSeeded
+                            ? T("The product defines the list; the values in it are yours to add and retire", "المنتج يعرّف القائمة؛ وقيمها لكم تضيفونها وتعطّلونها")
+                            : T("School-managed — you add and deactivate the values", "تديرها المدرسة — أنتم من يضيف القيم ويعطّلها");
                     <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(c.Id == Model.Selected?.Id ? "active" : "")" aria-current="@(c.Id == Model.Selected?.Id ? "true" : null)" asp-action="Lookups" asp-route-category="@c.Code">
                         <span>@(isRtl ? c.Name.NameAr : c.Name.NameEn)<br /><code class="small">@c.Code</code></span>
-                        <span class="badge rounded-pill @(c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-light border" : "text-bg-primary")" title="@(c.Tier == LookupCategoryTier.ProductSeeded ? T("Product-seeded — read only (BR-SET-001)", "مزوَّدة من المنتج — للقراءة فقط (BR-SET-001)") : T("School-managed — you add and deactivate the values", "تديرها المدرسة — أنتم من يضيف القيم ويعطّلها"))">@(c.Tier == LookupCategoryTier.ProductSeeded ? T("product", "منتج") : T("school", "مدرسة"))</span>
+                        <span class="badge rounded-pill @(!editable ? "text-bg-light border" : c.Tier == LookupCategoryTier.ProductSeeded ? "text-bg-info" : "text-bg-primary")" title="@badgeTitle">@badgeText</span>
                     </a>
                 }
             </div>
@@ -47,9 +63,20 @@
             <div class="sms-card">
                 <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
                     <h2 class="h6 mb-0">@(isRtl ? Model.Selected.Name.NameAr : Model.Selected.Name.NameEn) <code class="small text-muted">@Model.Selected.Code</code></h2>
-                    @if (readOnly && Model.Selected.Code == "Nationality") { <a class="btn btn-sm btn-outline-primary" asp-action="Nationalities"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Edit on the Nationalities screen", "التعديل من شاشة الجنسيات")</a> }
+                    @* A list with a richer editor elsewhere still says so — the link is "there is
+                       more of this over there", not "you cannot do it here". Leaving it off once the
+                       grid could edit would have quietly hidden the nationality screen. *@
+                    @if (Model.Selected.Code == "Nationality") { <a class="btn btn-sm btn-outline-secondary" asp-action="Nationalities"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>@T("Nationalities screen", "شاشة الجنسيات")</a> }
                     else if (readOnly) { <span class="badge text-bg-light border"><i class="bi bi-lock me-1" aria-hidden="true"></i>@T("Product-seeded — read only", "مزوَّدة من المنتج — للقراءة فقط")</span> }
                 </div>
+                @if (Model.IsSchoolAuthoredProductList)
+                {
+                    <div class="px-3 pt-3">
+                        <div class="alert alert-info py-2 mb-0 small">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("The product defines this list but ships no values for it — which universities, specializations or job titles a school recognises is a local decision. Add yours below; the code is optional and is derived from the English name.", "المنتج يعرّف هذه القائمة لكنه لا يزوّدها بقيم — فالجامعات والتخصصات والمسميات التي تعتمدها المدرسة قرار محلي. أضِف قيمك أدناه؛ والرمز اختياري ويُشتق من الاسم بالإنجليزية.")
+                        </div>
+                    </div>
+                }
                 <div class="table-responsive"><table class="table sms-table mb-0">
                     <caption class="visually-hidden">@T("Lookup values", "قيم القائمة")</caption>
                     <thead><tr><th scope="col">#</th><th scope="col">@T("Code", "الرمز")</th><th scope="col">@T("Arabic", "عربي")</th><th scope="col">@T("English", "إنجليزي")</th><th scope="col">@T("Active", "فعّال")</th><th scope="col"></th></tr></thead>
@@ -132,7 +159,9 @@
                     }
                     @if (Model.Values.Count == 0)
                     {
-                        <tr><td colspan="6" class="text-center text-muted py-4">@T("This list has no values yet. Add the first one below — both languages are required.", "لا قيم في هذه القائمة بعد. أضِف الأولى أدناه — واللغتان مطلوبتان.")</td></tr>
+                        <tr><td colspan="6" class="text-center text-muted py-4">@(readOnly
+                            ? T("This list has no values yet, and it is maintained by product releases (BR-SET-001).", "لا قيم في هذه القائمة بعد، وهي تُحدَّث بإصدارات المنتج (BR-SET-001).")
+                            : T("This list has no values yet. Add the first one below — both languages are required.", "لا قيم في هذه القائمة بعد. أضِف الأولى أدناه — واللغتان مطلوبتان."))</td></tr>
                     }
                     </tbody>
                 </table></div>
@@ -140,7 +169,7 @@
                 {
                     <form method="post" asp-action="DefineLookupValue" asp-route-category="@Model.Selected.Code" class="p-3 border-top">
                         <div class="row g-2 align-items-end">
-                            <div class="col-md-2"><label class="form-label small" for="new-value-code">@T("Code", "الرمز")</label><input name="Code" id="new-value-code" class="form-control form-control-sm" dir="ltr" /></div>
+                            <div class="col-md-2"><label class="form-label small" for="new-value-code">@T("Code", "الرمز") <span class="text-muted fw-normal">@T("(optional)", "(اختياري)")</span></label><input name="Code" id="new-value-code" class="form-control form-control-sm" dir="ltr" placeholder="@T("auto", "تلقائي")" title="@T("Left blank, the code is derived from the English name. It is the value's identity — other records point at it and it is never re-purposed (BR-SET-002).", "إذا تُرك فارغاً يُشتق الرمز من الاسم بالإنجليزية. وهو هوية القيمة — سجلات أخرى تشير إليه ولا يُعاد استخدامه (BR-SET-002).")" /></div>
                             <div class="col-md-4"><label class="form-label small" for="new-value-ar">@T("Arabic name", "الاسم بالعربية")</label><input name="NameAr" id="new-value-ar" class="form-control form-control-sm" dir="rtl" /></div>
                             <div class="col-md-3"><label class="form-label small" for="new-value-en">@T("English name", "الاسم بالإنجليزية")</label><input name="NameEn" id="new-value-en" class="form-control form-control-sm" dir="ltr" /></div>
                             <div class="col-md-1"><label class="form-label small" for="new-value-sort">#</label><input name="SortOrder" id="new-value-sort" class="form-control form-control-sm" type="number" value="@Model.SortOrder" aria-label="@T("Sort order", "الترتيب")" /></div>

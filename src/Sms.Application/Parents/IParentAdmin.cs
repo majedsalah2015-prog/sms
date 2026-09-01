@@ -23,6 +23,7 @@ namespace Sms.Application.Parents
             string? occupationEmployer = null, string preferredLanguage = "ar",
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
             ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            int? educationLookupId = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -37,6 +38,7 @@ namespace Sms.Application.Parents
             string? occupationEmployer = null, string preferredLanguage = "ar",
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
             ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            int? educationLookupId = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>

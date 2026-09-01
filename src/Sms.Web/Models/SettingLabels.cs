@@ -27,12 +27,17 @@ namespace Sms.Web.Models
             SettingKeys.WorkingDays => arabic ? "أيام الدوام" : "Working days",
             SettingKeys.HijriDisplay => arabic ? "عرض التاريخ الهجري" : "Show Hijri dates",
             SettingKeys.FirstDayOfWeek => arabic ? "أول أيام الأسبوع" : "First day of the week",
+            SettingKeys.MinimumInstructionalDays => arabic ? "الحد الأدنى للأيام الدراسية" : "Minimum instructional days",
             SettingKeys.EnabledLanguages => arabic ? "اللغات المفعّلة" : "Enabled languages",
             SettingKeys.DefaultLanguage => arabic ? "اللغة الافتراضية" : "Default language",
             SettingKeys.VatRate => arabic ? "نسبة ضريبة القيمة المضافة" : "VAT rate",
             SettingKeys.VatRegistrationNumber => arabic ? "الرقم الضريبي" : "VAT registration number",
             SettingKeys.ReceivablesAlertThreshold => arabic ? "حدّ التنبيه للذمم المدينة" : "Receivables alert threshold",
             SettingKeys.PortalSelfRegistration => arabic ? "التسجيل الذاتي في البوابة" : "Portal self-registration",
+            SettingKeys.DefaultDiallingCode => arabic ? "رمز الاتصال الدولي" : "Country dialling code",
+            SettingKeys.SmsMonthlyBudget => arabic ? "سقف الرسائل النصية شهرياً" : "SMS ceiling per month",
+            SettingKeys.WhatsAppMonthlyBudget => arabic ? "سقف رسائل واتساب شهرياً" : "WhatsApp ceiling per month",
+            SettingKeys.BudgetHardStop => arabic ? "إيقاف الإرسال عند بلوغ السقف" : "Stop sending at the ceiling",
             _ => key,
         };
 
@@ -51,6 +56,9 @@ namespace Sms.Web.Models
             SettingKeys.FirstDayOfWeek => arabic
                 ? "اليوم الذي يبدأ به الأسبوع في التقويمات والجداول."
                 : "The day the week starts on in calendars and timetables.",
+            SettingKeys.MinimumInstructionalDays => arabic
+                ? "الحد الأدنى الوزاري لعدد الأيام الدراسية في العام. تُنبِّه لوحة التقويم حين يقلّ العدد عنه ولا تمنع النشر. اتركه فارغاً إن لم يكن هناك حد. قابل للإصدار لكل عام."
+                : "The ministry minimum for instructional days in a year. The calendar board warns when the count falls below it; it never blocks publication. Leave it unset if there is no minimum. Versionable per year.",
             SettingKeys.EnabledLanguages => arabic
                 ? "اللغات التي يستطيع المستخدم التبديل بينها (ar,en)."
                 : "The languages a user may switch between (ar,en).",
@@ -69,6 +77,18 @@ namespace Sms.Web.Models
             SettingKeys.PortalSelfRegistration => arabic
                 ? "السماح لولي الأمر بإنشاء حساب البوابة بنفسه بدل أن تُنشئه المدرسة."
                 : "Whether a parent may create their own portal account instead of the school creating it.",
+            SettingKeys.DefaultDiallingCode => arabic
+                ? "الرمز الذي يُكمِل به النظام أرقام الجوال المكتوبة بالصيغة المحلية قبل إرسال واتساب أو رسالة نصية. وبدونه تُعامَل تلك الأرقام كأن لا رقم لها."
+                : "The code the system completes national-format mobile numbers with before a WhatsApp or SMS send. Without it, those numbers are treated as no number at all.",
+            SettingKeys.SmsMonthlyBudget => arabic
+                ? "عدد الرسائل النصية المسموح بها في الشهر قبل التنبيه، والإيقاف إن كان مفعَّلاً. والصفر يعني لا سقف (BR-NTF-004)."
+                : "How many SMS messages a month before the alert, and the stop if it is on. Zero means no ceiling (BR-NTF-004).",
+            SettingKeys.WhatsAppMonthlyBudget => arabic
+                ? "نفس السقف لرسائل واتساب، ويُحسب على حدة لأن الفوترة منفصلة."
+                : "The same ceiling for WhatsApp, counted separately because it is billed separately.",
+            SettingKeys.BudgetHardStop => arabic
+                ? "هل يوقف بلوغ السقف الإرسال فعلاً أم ينبّه فقط. ورسائل صنف السلامة تمرّ في الحالتين."
+                : "Whether reaching the ceiling actually stops sending or only warns. Safety-class messages go out either way.",
             _ => null,
         };
 
@@ -84,7 +104,7 @@ namespace Sms.Web.Models
 
             return key switch
             {
-                SettingKeys.HijriDisplay or SettingKeys.PortalSelfRegistration => Boolean(text, arabic),
+                SettingKeys.HijriDisplay or SettingKeys.PortalSelfRegistration or SettingKeys.BudgetHardStop => Boolean(text, arabic),
                 SettingKeys.CalendarType => Calendar(text, arabic),
                 SettingKeys.FirstDayOfWeek => Day(text, arabic),
                 SettingKeys.WorkingDays => string.Join("، ", text.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(d => Day(d.Trim(), arabic))),
@@ -97,7 +117,7 @@ namespace Sms.Web.Models
 
         /// <summary>True when the rendered value differs from the stored one and the raw form is worth showing beside it.</summary>
         public static bool IsTranslated(string key) => key is
-            SettingKeys.HijriDisplay or SettingKeys.PortalSelfRegistration or SettingKeys.CalendarType
+            SettingKeys.HijriDisplay or SettingKeys.PortalSelfRegistration or SettingKeys.BudgetHardStop or SettingKeys.CalendarType
             or SettingKeys.FirstDayOfWeek or SettingKeys.WorkingDays or SettingKeys.EnabledLanguages
             or SettingKeys.DefaultLanguage or SettingKeys.VatRate;
 

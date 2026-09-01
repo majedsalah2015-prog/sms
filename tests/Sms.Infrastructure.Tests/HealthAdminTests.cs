@@ -127,7 +127,7 @@ namespace Sms.Infrastructure.Tests
 
         private HealthAdmin CreateAdmin(AppDbContext db) => new(
             db, new NumberIssuer(db, _tenant, _tenant, _clock), _clock, _tenant,
-            new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), new NotificationPublisher(db), new AttendanceAdmin(db));
+            new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit), new NotificationPublisher(db, new TestAddressBook()), new AttendanceAdmin(db));
 
         // --- BR-HLT-001/002 file + banner ------------------------------------------------------------
 

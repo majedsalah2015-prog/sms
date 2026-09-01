@@ -203,17 +203,17 @@ namespace Sms.Infrastructure.Rollover
 
             if (decision == PromotionDecision.Undecided)
             {
-                throw new InvalidPromotionDecisionException(studentId, decision, "a manual decision must decide");
+                throw new InvalidPromotionDecisionException(studentId, decision, PromotionDecisionFault.MustDecide);
             }
 
             if (decision == PromotionDecision.Graduate && !grade.IsGraduating)
             {
-                throw new InvalidPromotionDecisionException(studentId, decision, "the student's grade is not a graduating grade");
+                throw new InvalidPromotionDecisionException(studentId, decision, PromotionDecisionFault.GradeDoesNotGraduate);
             }
 
             if ((decision == PromotionDecision.Promote || decision == PromotionDecision.Conditional) && grade.PromotionTargetGradeLevelId == null)
             {
-                throw new InvalidPromotionDecisionException(studentId, decision, "the student's grade has no promotion target (BR-GRD-002)");
+                throw new InvalidPromotionDecisionException(studentId, decision, PromotionDecisionFault.NoPromotionTarget);
             }
 
             state.Decision = decision;
@@ -286,7 +286,7 @@ namespace Sms.Infrastructure.Rollover
 
             if (state.Decision == PromotionDecision.Graduate)
             {
-                throw new InvalidPromotionDecisionException(studentId, state.Decision, "graduating students do not re-register");
+                throw new InvalidPromotionDecisionException(studentId, state.Decision, PromotionDecisionFault.GraduatesDoNotReRegister);
             }
 
             if (state.TargetGradeYearProfileId != null)
@@ -317,7 +317,7 @@ namespace Sms.Infrastructure.Rollover
             var state = await LoadStateAsync(batchId, studentId, cancellationToken);
             if (state.TargetEnrollmentId != null)
             {
-                throw new RolloverBatchStatusException(batchId, batch.Status, "the student is already enrolled in the target year — use WF-03 withdrawal");
+                throw new RolloverBatchStatusException(batchId, batch.Status, RolloverStepBlocker.AlreadyEnrolledInTargetYear);
             }
 
             state.ReRegistration = ReRegistrationStatus.Declined;
@@ -399,7 +399,7 @@ namespace Sms.Infrastructure.Rollover
 
             if (state.TargetEnrollmentId != null)
             {
-                throw new RolloverBatchStatusException(batchId, batch.Status, "the student is already enrolled — transfer via Module 06 instead");
+                throw new RolloverBatchStatusException(batchId, batch.Status, RolloverStepBlocker.AlreadyEnrolled);
             }
 
             var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);
@@ -764,7 +764,7 @@ namespace Sms.Infrastructure.Rollover
         {
             if (!allowed.Contains(batch.Status))
             {
-                throw new RolloverBatchStatusException(batch.Id, batch.Status, string.Join(" or ", allowed));
+                throw new RolloverBatchStatusException(batch.Id, batch.Status, RolloverStepBlocker.BatchStage, allowed);
             }
         }
 

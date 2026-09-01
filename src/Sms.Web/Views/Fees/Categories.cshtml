@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Application.GlExport
 @model FeeCategoryCatalogViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -15,6 +16,9 @@
         {
             new HelpPanelViewModel.Item(T("VAT", "الضريبة"), T("Enter 15 or 0.15; blank = exempt. Every charge snapshots the rate at posting — changing it later never rewrites history.", "أدخل 15 أو 0.15؛ الفراغ = معفاة. كل فاتورة تسجّل النسبة عند الترحيل — تغييرها لاحقاً لا يعدّل السابق.")),
             new HelpPanelViewModel.Item(T("Edit ✎ / Deactivate", "تعديل ✎ / إلغاء تفعيل"), T("Edit in place (T2, no reason). Deactivation is refused while structure lines or charges reference the category.", "تعديل مباشر (T2 بلا سبب). يُرفض إلغاء التفعيل ما دامت أسطر الهيكل أو الفواتير تشير للفئة.")),
+            new HelpPanelViewModel.Item(T("GL export code", "رمز التصدير المحاسبي"), Model.HasLedger
+                ? T("Pick from the ledger's own chart — type to filter, or open the list button to browse by code, name and nature. The account's name is shown under the field, and a code the chart does not have is flagged. Journal keys use this code in place of Revenue:N.", "اختر من دليل حسابات الأستاذ العام — اكتب للتصفية، أو افتح زر القائمة للاستعراض بالرمز والاسم والطبيعة. ويظهر اسم الحساب أسفل الحقل، ويُنبَّه على أي رمز لا يوجد في الدليل. ومفاتيح القيد تستخدم هذا الرمز بدل Revenue:N.")
+                : T("Free text — no ledger is attached to this deployment, so the code is not checked against any chart. Journal keys use it in place of Revenue:N.", "نص حرّ — لا يوجد أستاذ عام مرتبط بهذا التركيب، فلا يُتحقَّق من الرمز مقابل أي دليل حسابات. ومفاتيح القيد تستخدمه بدل Revenue:N.")),
         },
     };
 }
@@ -47,7 +51,16 @@
                                 <label class="me-2"><input form="@fid" type="checkbox" name="isRefundable" value="true" class="form-check-input" checked="@c.IsRefundable" /> @T("refundable", "قابل للاسترداد")</label>
                                 <label><input form="@fid" type="checkbox" name="isServiceLinked" value="true" class="form-check-input" checked="@c.IsServiceLinked" /> @T("service", "خدمة")</label>
                             </td>
-                            <td><input form="@fid" name="glExportCode" class="form-control form-control-sm" style="width:6rem" value="@c.GlExportCode" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" /></td>
+                            <td style="min-width:12rem">
+                                <div class="input-group input-group-sm">
+                                    <input form="@fid" name="glExportCode" class="form-control form-control-sm font-monospace js-gl-code" dir="ltr" list="@(Model.HasLedger ? "gl-accounts" : null)" value="@c.GlExportCode" maxlength="40" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" aria-describedby="gl-name-@c.Id" />
+                                    @if (Model.HasLedger)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary js-gl-browse" data-bs-toggle="modal" data-bs-target="#gl-chart" title="@T("Browse the chart of accounts", "استعراض دليل الحسابات")" aria-label="@T("Browse the chart of accounts", "استعراض دليل الحسابات")"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+                                    }
+                                </div>
+                                <div class="form-text small js-gl-name" id="gl-name-@c.Id" aria-live="polite"></div>
+                            </td>
                             <td class="small text-muted">@r.LineCount / @r.ChargeCount</td>
                             <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditCategory" asp-route-id="@c.Id" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form> <a class="btn btn-sm btn-outline-secondary" asp-action="Categories" aria-label="@T("Cancel", "إلغاء")"><i class="bi bi-x-lg" aria-hidden="true"></i></a></td>
                         </tr>
@@ -59,7 +72,27 @@
                             <td dir="ltr">@c.NameEn @if (!c.IsActive) { <span class="badge text-bg-secondary ms-1">@T("inactive", "غير مفعّلة")</span> }</td>
                             <td>@Pct(c.VatRate)</td>
                             <td class="small">@if (c.IsMandatory) { <span class="badge text-bg-dark me-1">@T("mandatory", "إلزامي")</span> } @if (c.IsRefundable) { <span class="badge text-bg-info me-1">@T("refundable", "قابل للاسترداد")</span> } @if (c.IsServiceLinked) { <span class="badge text-bg-light border">@T("service-linked", "مرتبط بخدمة")</span> }</td>
-                            <td><code>@(c.GlExportCode ?? "—")</code></td>
+                            @{ var acct = Model.FindAccount(c.GlExportCode); }
+                            <td>
+                                @if (string.IsNullOrWhiteSpace(c.GlExportCode))
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    <div><code><bdi dir="ltr">@c.GlExportCode</bdi></code></div>
+                                    @* The code alone does not tell an operator which account they mapped —
+                                       naming it is how a transposed digit becomes visible before a posting. *@
+                                    if (acct != null)
+                                    {
+                                        <div class="small text-muted">@acct.Name</div>
+                                    }
+                                    else if (Model.HasLedger)
+                                    {
+                                        <div class="small text-danger"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("not in the chart", "غير موجود في دليل الحسابات")</div>
+                                    }
+                                }
+                            </td>
                             <td class="small text-muted" title="@T("structure lines / charges", "أسطر الهيكل / الفواتير")">@r.LineCount @T("lines", "سطر") · @r.ChargeCount @T("charges", "فاتورة")</td>
                             <td class="text-end text-nowrap">
                                 @if (c.IsActive)
@@ -88,10 +121,169 @@
                     <label><input type="checkbox" name="isRefundable" value="true" class="form-check-input" /> @T("Refundable", "قابل للاسترداد")</label>
                     <label><input type="checkbox" name="isServiceLinked" value="true" class="form-check-input" /> @T("Service-linked", "مرتبط بخدمة")</label>
                 </div>
-                <input name="glExportCode" class="form-control form-control-sm" aria-label="@T("GL export code", "رمز التصدير المحاسبي")" placeholder="@T("GL export code (optional)", "رمز التصدير المحاسبي (اختياري)")" />
+                <div>
+                    <label class="form-label small text-muted mb-1" for="cat-new-gl">@T("GL export code", "رمز التصدير المحاسبي")</label>
+                    <div class="input-group input-group-sm">
+                        <input id="cat-new-gl" name="glExportCode" class="form-control form-control-sm font-monospace js-gl-code" dir="ltr" list="@(Model.HasLedger ? "gl-accounts" : null)" maxlength="40" aria-describedby="gl-name-new" placeholder="@T("optional", "اختياري")" />
+                        @if (Model.HasLedger)
+                        {
+                            <button type="button" class="btn btn-outline-secondary js-gl-browse" data-bs-toggle="modal" data-bs-target="#gl-chart" title="@T("Browse the chart of accounts", "استعراض دليل الحسابات")" aria-label="@T("Browse the chart of accounts", "استعراض دليل الحسابات")"><i class="bi bi-list-ul" aria-hidden="true"></i></button>
+                        }
+                    </div>
+                    <div class="form-text small js-gl-name" id="gl-name-new" aria-live="polite"></div>
+                    @if (Model.HasLedger)
+                    {
+                        <div class="form-text">@T("Pick the revenue account this category's income posts to — the list is the ledger's own chart of accounts.", "اختر حساب الإيراد الذي يُرحَّل إليه دخل هذه الفئة — القائمة هي دليل الحسابات في الأستاذ العام نفسه.")</div>
+                    }
+                </div>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
             </form>
             @if (Model.DefaultVatRate != null) { <div class="small text-muted mt-2">@T("School default VAT rate", "نسبة الضريبة الافتراضية للمدرسة"): @Pct(Model.DefaultVatRate) (Financial.VatRate)</div> }
         </div>
     </div>
 </div>
+
+@if (Model.HasLedger)
+{
+    @* Typeahead on every code field: the browser filters this list as the operator types, so a
+       code half-remembered still resolves without opening anything. The modal below is the other
+       half of the same answer — for the operator who does not know the code at all. *@
+    <datalist id="gl-accounts">
+        @foreach (var a in Model.GlAccounts)
+        {
+            <option value="@a.Code">@a.Name</option>
+        }
+    </datalist>
+
+    <div class="modal fade" id="gl-chart" tabindex="-1" aria-labelledby="gl-chart-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="gl-chart-title"><i class="bi bi-list-ul me-2" aria-hidden="true"></i>@T("Chart of accounts", "دليل الحسابات")</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">@T("The postable accounts of the attached ledger. Choosing one writes its code into the category.", "الحسابات القابلة للترحيل في الأستاذ العام المرتبط. اختيار حساب يكتب رمزه في الفئة.")</p>
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-7">
+                            <label class="visually-hidden" for="gl-filter">@T("Filter by code or name", "تصفية بالرمز أو الاسم")</label>
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text" id="gl-filter-icon"><i class="bi bi-funnel" aria-hidden="true"></i></span>
+                                <input id="gl-filter" class="form-control" type="search" autocomplete="off" placeholder="@T("Filter by code or name", "تصفية بالرمز أو الاسم")" aria-label="@T("Filter by code or name", "تصفية بالرمز أو الاسم")" />
+                            </div>
+                        </div>
+                        <div class="col-sm-5">
+                            <label class="visually-hidden" for="gl-nature">@T("Account nature", "طبيعة الحساب")</label>
+                            <select id="gl-nature" class="form-select form-select-sm">
+                                <option value="">@T("All natures", "كل الطبائع")</option>
+                                @foreach (var n in new[] { GlAccountNature.Revenue, GlAccountNature.Asset, GlAccountNature.Liability, GlAccountNature.Equity, GlAccountNature.Expense })
+                                {
+                                    <option value="@((int)n)">@FinanceLabels.AccountNature(n, isRtl)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="list-group list-group-flush border rounded" id="gl-rows" style="max-height:24rem;overflow-y:auto">
+                        @foreach (var a in Model.GlAccounts)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action js-gl-pick d-flex justify-content-between align-items-center gap-2"
+                                    data-code="@a.Code" data-name="@a.Name" data-nature="@((int)a.Nature)">
+                                <span class="text-truncate"><code class="me-2"><bdi dir="ltr">@a.Code</bdi></code>@a.Name</span>
+                                <span class="badge text-bg-light border flex-shrink-0">@FinanceLabels.AccountNature(a.Nature, isRtl)</span>
+                            </button>
+                        }
+                    </div>
+                    <p id="gl-empty" class="text-muted small mt-2 mb-0 d-none">@T("No account matches the filter.", "لا يوجد حساب يطابق التصفية.")</p>
+                    <p class="text-muted small mt-2 mb-0">@Model.GlAccounts.Count @T("postable accounts", "حساباً قابلاً للترحيل")</p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+@if (Model.HasLedger)
+{
+<script>
+    // The GL code field answers three questions the free-text box never did: which account is this,
+    // does it exist at all, and what else could I pick. The chart is already in the page — 164 rows
+    // of it — so filtering stays local and the operator never waits on a round trip.
+    (function () {
+        var modalEl = document.getElementById('gl-chart');
+        if (!modalEl) { return; }
+
+        var names = {};
+        modalEl.querySelectorAll('.js-gl-pick').forEach(function (b) { names[b.dataset.code] = b.dataset.name; });
+
+        var unknown = @Html.Raw(Json.Serialize(T("not in the chart", "غير موجود في دليل الحسابات")));
+
+        // Which field opened the picker. Set on the way in, because two fields on this page share
+        // one modal and picking must write back to the one the operator was actually editing.
+        var target = null;
+
+        function describe(input) {
+            // The field already names its own hint for screen readers; reusing that is one source
+            // of truth rather than a second, DOM-shaped guess that breaks when the markup moves.
+            var hint = document.getElementById(input.getAttribute('aria-describedby'));
+            if (!hint) { return; }
+            var code = (input.value || '').trim();
+            if (!code) { hint.textContent = ''; hint.className = 'form-text small js-gl-name'; return; }
+            if (names[code]) {
+                hint.textContent = names[code];
+                hint.className = 'form-text small js-gl-name text-muted';
+            } else {
+                hint.textContent = unknown;
+                hint.className = 'form-text small js-gl-name text-danger';
+            }
+        }
+
+        document.querySelectorAll('.js-gl-code').forEach(function (input) {
+            describe(input);
+            input.addEventListener('input', function () { describe(input); });
+        });
+
+        document.querySelectorAll('.js-gl-browse').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                target = btn.parentElement.querySelector('.js-gl-code');
+            });
+        });
+
+        var filter = document.getElementById('gl-filter');
+        var nature = document.getElementById('gl-nature');
+        var empty = document.getElementById('gl-empty');
+        var rows = Array.prototype.slice.call(modalEl.querySelectorAll('.js-gl-pick'));
+
+        function apply() {
+            var q = (filter.value || '').trim().toLowerCase();
+            var n = nature.value;
+            var shown = 0;
+            rows.forEach(function (row) {
+                var hit = (!q || row.dataset.code.toLowerCase().indexOf(q) >= 0 || row.dataset.name.toLowerCase().indexOf(q) >= 0)
+                       && (!n || row.dataset.nature === n);
+                row.classList.toggle('d-none', !hit);
+                if (hit) { shown++; }
+            });
+            empty.classList.toggle('d-none', shown > 0);
+        }
+
+        filter.addEventListener('input', apply);
+        nature.addEventListener('change', apply);
+
+        rows.forEach(function (row) {
+            row.addEventListener('click', function () {
+                if (target) {
+                    target.value = row.dataset.code;
+                    describe(target);
+                }
+                bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+            });
+        });
+
+        // A filter left over from the last visit would hide the account the operator came back for.
+        modalEl.addEventListener('shown.bs.modal', function () {
+            filter.value = ''; nature.value = ''; apply(); filter.focus();
+        });
+    })();
+</script>
+}
+}

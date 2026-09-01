@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Application.Calendar
 @using Sms.Domain.Calendar
 @model CalendarBoardViewModel
 @{
@@ -22,8 +23,20 @@
     string DayName(DayOfWeek d) => ci.DateTimeFormat.GetAbbreviatedDayName(d);
     string MonthName(int y, int m) => new DateTime(y, m, 1).ToString("MMMM yyyy", ci);
     string Cls(DayType t) => t switch { DayType.Working => "is-working", DayType.Weekend => "is-weekend", DayType.Holiday => "is-holiday", DayType.Partial => "is-partial", DayType.ExamPeriodWorking => "is-exam", _ => "" };
-    string TypeName(DayType t) => t switch { DayType.Working => T("Working", "عمل"), DayType.Weekend => T("Weekend", "عطلة أسبوعية"), DayType.Holiday => T("Holiday", "إجازة"), DayType.Partial => T("Partial day", "يوم جزئي"), DayType.ExamPeriodWorking => T("Exam period", "فترة اختبارات"), _ => t.ToString() };
-    string CatName(CalendarEventCategory c) => c switch { CalendarEventCategory.National => T("National", "وطني"), CalendarEventCategory.Religious => T("Religious", "ديني"), CalendarEventCategory.SchoolEvent => T("School event", "حدث مدرسي"), CalendarEventCategory.ProfessionalDay => T("Professional day", "يوم مهني"), _ => c.ToString() };
+    // Both names come from CalendarLabels now. The board named its own day types while the paint
+    // confirmation printed the enum, so the two disagreed in Arabic — «تم تعيين ٧ أيام كـ
+    // ExamPeriodWorking» beside a legend that said فترة اختبارات.
+    string TypeName(DayType t) => CalendarLabels.DayType(t, isRtl);
+    string CatName(CalendarEventCategory c) => CalendarLabels.Category(c, isRtl);
+
+    var minimum = Model.MinimumInstructionalDays;
+    var belowMinimum = CalendarStatistics.IsBelowMinimum(Model.InstructionalDays, minimum);
+    var shortfall = CalendarStatistics.ShortfallFromMinimum(Model.InstructionalDays, minimum);
+    var canPaint = Model.PaintFloor != null;
+    var paintFloor = (Model.PaintFloor ?? Model.Year.StartDate).ToString("yyyy-MM-dd");
+    var yearEnd = Model.Year.EndDate.ToString("yyyy-MM-dd");
+    var liveEvents = Model.Events.Count(e => e.IsActive);
+    var cancelledEvents = Model.Events.Count - liveEvents;
     var help = new HelpPanelViewModel
     {
         Id = "calendar-help",
@@ -32,37 +45,63 @@
         Items = new[]
         {
             new HelpPanelViewModel.Item(T("Weekends are a setting; paint is an exception", "العطلة الأسبوعية إعداد والتعيين استثناء"), T("The recurring weekend comes from the working-week setting, and painting a day overrides it for that date only (BR-CAL-001/002). Use paint for the one-off — a national holiday, a professional day, a Saturday the school opened for exams — and change the working-week setting when the pattern itself changed.", "العطلة الأسبوعية المتكررة تأتي من إعداد أسبوع العمل، وتعيين يوم يتجاوزها لذلك التاريخ وحده (BR-CAL-001/002). فاستخدم التعيين للحالة الفردية — إجازة وطنية أو يوم مهني أو سبتٍ فتحت فيه المدرسة للاختبارات — وغيّر إعداد أسبوع العمل حين يتغير النمط نفسه.")),
+            new HelpPanelViewModel.Item(T("Drag a range across the board", "اسحب مدى على اللوحة"), T("Drag across the grid, or click the first day and shift-click the last, to load a range into the paint card — the days light up as you go and the card says how many. Days already past are locked (BR-CAL-003) and cannot be selected at all, so the board no longer accepts a range the save is going to refuse.", "اسحب على الشبكة، أو انقر أول يوم ثم انقر آخر يوم مع Shift، ليُحمَّل المدى في بطاقة التعيين — تُضاء الأيام أثناء السحب وتذكر البطاقة عددها. والأيام الماضية مقفلة (BR-CAL-003) ولا يمكن اختيارها أصلاً، فلم تعد اللوحة تقبل مدى سيرفضه الحفظ.")),
             new HelpPanelViewModel.Item(T("Day types are not colours", "أنواع الأيام ليست ألواناً"), T("Working, Weekend, Holiday, Partial and Exam period each mean something to the modules that read them: a partial day still counts for attendance but on a shortened schedule, and an exam-period day is instructional even when normal lessons are not running.", "«عمل» و«عطلة أسبوعية» و«إجازة» و«يوم جزئي» و«فترة اختبارات» لكل منها معنى عند الوحدات التي تقرؤها: فاليوم الجزئي يُحتسب للحضور لكن بجدول مختصر، ويوم فترة الاختبارات يوم دراسي وإن لم تُعقد فيه الحصص المعتادة.")),
+            new HelpPanelViewModel.Item(T("Provisional days get confirmed, not left flagged", "الأيام المبدئية تُؤكَّد ولا تُترك معلَّمة"), T("A religious holiday whose Gregorian date waits on the moon sighting is painted provisional and marked ◔ (BR-CAL-005). The provisional card lists every one still waiting; Confirm clears the flag once the date is known. If the holiday actually landed a day later, repaint it first and then confirm.", "الإجازة الدينية التي يتوقف تاريخها الميلادي على رؤية الهلال تُعيَّن مبدئية وتُعلَّم بـ◔ (BR-CAL-005). وبطاقة «أيام مبدئية» تسرد كل ما ينتظر التأكيد؛ ويمسح زر «تأكيد» العلامة متى عُرف التاريخ. فإن وقعت الإجازة فعلاً بعد يوم فأعد تعيينها أولاً ثم أكّدها.")),
             new HelpPanelViewModel.Item(T("Publishing is what makes it real", "النشر هو ما يجعله واقعاً"), T("Edits are drafts until you publish, and publishing snapshots a new numbered version (BR-CAL-007). The button is disabled when there is nothing unpublished. Old versions stay readable, which is how you answer what the calendar said before a mid-year change.", "التعديلات مسوّدات حتى تنشر، والنشر يحفظ إصداراً مرقّماً جديداً (BR-CAL-007). والزر معطَّل حين لا يوجد غير منشور. وتبقى الإصدارات القديمة مقروءة، وبها تُجيب عمّا كان يقوله التقويم قبل تغيير في منتصف العام.")),
             new HelpPanelViewModel.Item(T("The Hijri overlay is display only", "العرض الهجري للعرض فقط"), T("Toggling it adds Hijri dates beside the Gregorian grid; it never changes what is stored or which day a record belongs to. The Arabic interface does not turn the overlay on by itself.", "تبديله يضيف التواريخ الهجرية بجانب الشبكة الميلادية؛ ولا يغيّر أبداً ما هو مخزَّن ولا اليوم الذي ينتمي إليه سجل. والواجهة العربية لا تشغّل العرض من تلقائها.")),
             new HelpPanelViewModel.Item(T("Events are edited and cancelled, never deleted", "الأحداث تُعدَّل وتُلغى ولا تُحذف"), T("The pencil on a row loads the event back into the entry card; the red button cancels it, which takes it off the board and off the portal but leaves it on the record with an audit entry (BR-GLB-005/006). A cancelled event can be reinstated. Once an event's start date has passed, both are refused — the calendar is then a record of what happened (BR-CAL-004).", "قلم التعديل في الصف يعيد الحدث إلى بطاقة الإدخال؛ والزر الأحمر يلغيه فيختفي من اللوحة ومن البوابة ويبقى في السجل مع قيد تدقيق (BR-GLB-005/006). ويمكن إعادة تفعيل الحدث الملغى. وبعد أن يمر تاريخ بداية الحدث يُرفض الاثنان — فالتقويم حينها سجلٌّ لما جرى (BR-CAL-004).")),
-            new HelpPanelViewModel.Item(T("Instructional days is the number to watch", "عدد الأيام الدراسية هو الرقم الذي تراقبه"), T("The count in the header is what the ministry minimum is checked against and what attendance percentages divide by. If it looks wrong, the cause is almost always a stretch of days painted with the wrong type rather than a miscount.", "العدد في الترويسة هو ما يُقاس عليه الحد الأدنى الوزاري وما تُقسم عليه نسب الحضور. فإن بدا خاطئاً فالسبب في الغالب مجموعة أيام عُيِّنت بنوع خاطئ لا خطأ في العدّ.")),
+            new HelpPanelViewModel.Item(T("Instructional days is the number to watch", "عدد الأيام الدراسية هو الرقم الذي تراقبه"), T("The count in the header is what attendance percentages divide by and what the ministry minimum is checked against. Set that minimum under Setup → Settings → Regional; below it the board warns and never blocks (BR-CAL-006). If the count looks wrong, the cause is almost always a stretch of days painted with the wrong type rather than a miscount.", "العدد في الترويسة هو ما تُقسم عليه نسب الحضور وما يُقاس عليه الحد الأدنى الوزاري. ويُضبط ذلك الحد من «الإعدادات ← الإعدادات ← الإقليمية»؛ وتحته تُنبِّه اللوحة ولا تمنع أبداً (BR-CAL-006). فإن بدا العدد خاطئاً فالسبب في الغالب مجموعة أيام عُيِّنت بنوع خاطئ لا خطأ في العدّ.")),
         },
     };
 }
 
 <div class="sms-page-head">
     <div><h1 class="sms-page-title">@ViewData["Title"] — @(isRtl ? Model.Year.LabelAr : Model.Year.LabelEn) <span class="text-muted fs-6">@Model.Year.HijriLabel</span></h1>
-        <p class="text-muted mb-0">@T("Weekends come from the working-week setting; painted days override them (BR-CAL-001/002). Instructional days:", "عطلات نهاية الأسبوع من إعداد أسبوع العمل؛ الأيام المعيَّنة تتجاوزها (BR-CAL-001/002). الأيام الدراسية:") <strong>@Model.InstructionalDays</strong> · @Model.OverrideCount @T("overrides", "تجاوزات")</p></div>
+        <p class="text-muted mb-0">@T("Weekends come from the working-week setting; painted days override them (BR-CAL-001/002). Instructional days:", "عطلات نهاية الأسبوع من إعداد أسبوع العمل؛ الأيام المعيَّنة تتجاوزها (BR-CAL-001/002). الأيام الدراسية:") <strong>@Model.InstructionalDays</strong>@if (minimum != null)
+            {<text> </text><span class="@(belowMinimum ? "text-danger-emphasis fw-semibold" : "text-success-emphasis")">@T($"of {minimum} minimum", $"من {minimum} كحد أدنى")</span>} · @Model.OverrideCount @T("overrides", "تجاوزات")@if (Model.ProvisionalDays.Count > 0)
+            {<text> · </text><a href="#provisional-days">@Model.ProvisionalDays.Count ◔ @T("provisional", "مبدئي")</a>}</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="get" class="d-flex gap-2 align-items-center">
-            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select>
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn) · @Labels.YearStatus(y.Status, isRtl)</option> }</select>
             <input type="hidden" name="hijri" value="@(!Model.HijriOverlay ? "true" : "false")" />
-            <button class="btn btn-sm @(Model.HijriOverlay ? "btn-primary" : "btn-outline-secondary")" type="submit" title="@T("Toggle Hijri overlay", "تبديل عرض الهجري")"><i class="bi bi-moon-stars" aria-hidden="true"></i> @T("Hijri", "هجري")</button>
+            <button class="btn btn-sm @(Model.HijriOverlay ? "btn-primary" : "btn-outline-secondary")" type="submit" title="@T("Toggle Hijri overlay", "تبديل عرض الهجري")" aria-pressed="@(Model.HijriOverlay ? "true" : "false")"><i class="bi bi-moon-stars" aria-hidden="true"></i> @T("Hijri", "هجري")</button>
         </form>
         <form method="post" asp-action="Publish"><input type="hidden" name="academicYearId" value="@Model.Year.Id" />
-            <button class="btn btn-sm btn-success" type="submit" @(Model.HasUnpublishedEdits ? "" : "disabled") title="@T("BR-CAL-007: snapshots a new published version", "BR-CAL-007: يحفظ إصداراً منشوراً جديداً")"><i class="bi bi-megaphone me-1" aria-hidden="true"></i>@T("Publish", "نشر") @(Model.Versions.Count > 0 ? $"v{Model.Versions[0].VersionNumber + 1}" : "v1")</button></form>
+            <button class="btn btn-sm btn-success" type="submit" @(Model.HasUnpublishedEdits ? "" : "disabled") title="@T("BR-CAL-007: snapshots a new published version", "BR-CAL-007: يحفظ إصداراً منشوراً جديداً")"><i class="bi bi-megaphone me-1" aria-hidden="true"></i>@T("Publish", "نشر") v@(Model.Versions.Count > 0 ? Model.Versions[0].VersionNumber + 1 : 1)</button></form>
         <partial name="_HelpModal" model="help" />
     </div>
 </div>
 
+@if (belowMinimum)
+{
+    @* BR-CAL-006 warns and never blocks — the rule says so in as many words, and §9 asks for the
+       warning to be surfaced at publication, which is the moment this banner sits above. *@
+    <div class="alert alert-warning d-flex align-items-center gap-2 py-2" role="status">
+        <i class="bi bi-exclamation-triangle flex-shrink-0" aria-hidden="true"></i>
+        <span>@T($"This year has {Model.InstructionalDays} instructional days — {shortfall} below the configured minimum of {minimum} (BR-CAL-006). Publishing is not blocked.", $"لهذا العام {Model.InstructionalDays} يوماً دراسياً، أي أقل بـ{shortfall} يوماً من الحد الأدنى المضبوط ({minimum}) — BR-CAL-006. والنشر غير ممنوع.")</span>
+    </div>
+}
+
 <div class="row g-3">
     <div class="col-xl-9">
         <div class="sms-card p-3 mb-3">
-            <div class="d-flex flex-wrap gap-3 small mb-2 sms-legend">
-                <span><i class="sms-cal-swatch is-working" aria-hidden="true"></i>@TypeName(DayType.Working)</span><span><i class="sms-cal-swatch is-weekend" aria-hidden="true"></i>@TypeName(DayType.Weekend)</span><span><i class="sms-cal-swatch is-holiday" aria-hidden="true"></i>@TypeName(DayType.Holiday)</span><span><i class="sms-cal-swatch is-partial" aria-hidden="true"></i>@TypeName(DayType.Partial)</span><span><i class="sms-cal-swatch is-exam" aria-hidden="true"></i>@TypeName(DayType.ExamPeriodWorking)</span><span><i class="sms-cal-swatch is-event" aria-hidden="true"></i>@T("Event", "حدث")</span><span class="text-muted">◔ @T("provisional (BR-CAL-005)", "مبدئي (BR-CAL-005)")</span>
+            @* One row, not a column: this key used to borrow .sms-legend from the
+               donut chart, whose flex-direction: column stacked all nine keys one
+               per line above the board. *@
+            <div class="sms-cal-legend">
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-working" aria-hidden="true"></i>@TypeName(DayType.Working)</span>
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-weekend" aria-hidden="true"></i>@TypeName(DayType.Weekend)</span>
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-holiday" aria-hidden="true"></i>@TypeName(DayType.Holiday)</span>
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-partial" aria-hidden="true"></i>@TypeName(DayType.Partial)</span>
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-exam" aria-hidden="true"></i>@TypeName(DayType.ExamPeriodWorking)</span>
+                <span class="sms-cal-legend__item"><i class="sms-cal-swatch is-event" aria-hidden="true"></i>@T("Event", "حدث")</span>
+                <span class="sms-cal-legend__sep" aria-hidden="true"></span>
+                <span class="sms-cal-legend__item is-mark">◔ @T("provisional (BR-CAL-005)", "مبدئي (BR-CAL-005)")</span>
+                <span class="sms-cal-legend__item is-mark"><i class="sms-cal-swatch is-today" aria-hidden="true"></i>@T("today", "اليوم")</span>
+                <span class="sms-cal-legend__item is-mark"><i class="bi bi-lock-fill" aria-hidden="true"></i>@T("past — locked (BR-CAL-003)", "ماضٍ — مقفل (BR-CAL-003)")</span>
             </div>
-            <div class="sms-cal-months">
+            <div class="sms-cal-months" id="calendar-board">
                 @foreach (var m in Model.Months)
                 {
                     <div class="sms-cal-month">
@@ -78,12 +117,31 @@
                                 <tr>@foreach (var c in w)
                                 {
                                     if (c == null) { <td aria-hidden="true"></td>; continue; }
-                                    var title = $"{c.Date:yyyy-MM-dd} · {TypeName(c.Type)}" + (c.Events.Count > 0 ? " · " + string.Join(", ", c.Events.Select(e => isRtl ? e.NameAr : e.NameEn)) : "");
-                                    <td class="sms-cal-day @Cls(c.Type) @(c.InYear ? "" : "is-out") @(c.Events.Count > 0 ? "has-event" : "") @(c.IsOverride ? "is-override" : "")" title="@title" data-date="@c.Date.ToString("yyyy-MM-dd")">
+                                    @* A day that has passed cannot be painted (BR-CAL-003) and a day outside the
+                                       year is not part of it, so neither carries a date and neither takes a click.
+                                       The board used to accept both and let the save refuse after the round trip. *@
+                                    var isToday = c.Date == Model.TodayUtc;
+                                    var locked = !c.InYear || c.Date < Model.TodayUtc;
+                                    var eventNames = c.Events.Count > 0 ? " · " + string.Join(", ", c.Events.Select(e => isRtl ? e.NameAr : e.NameEn)) : "";
+                                    var label = $"{c.Date:yyyy-MM-dd} · {TypeName(c.Type)}" + eventNames
+                                        + (c.IsProvisional ? " · " + T("provisional", "مبدئي") : "")
+                                        + (isToday ? " · " + T("today", "اليوم") : "")
+                                        + (locked && c.InYear ? " · " + T("locked", "مقفل") : "");
+                                    @*
+                                        The four attributes that make a cell a selectable button are written
+                                        as one group rather than four expressions, because Razor drops a null
+                                        `role` and a null `tabindex` but writes a null `data-` attribute as
+                                        an empty one — which left every locked day still matching
+                                        `[data-date]` and still selectable on the board.
+                                    *@
+                                    <td class="sms-cal-day @Cls(c.Type) @(c.InYear ? "" : "is-out") @(c.Events.Count > 0 ? "has-event" : "") @(c.IsOverride ? "is-override" : "") @(isToday ? "is-today" : "") @(locked && c.InYear ? "is-locked" : "")"
+                                        title="@label"
+                                        aria-label="@label"
+                                        aria-disabled="@(locked && c.InYear ? "true" : null)"
+                                        @(locked ? null : Html.Raw($"data-date=\"{c.Date:yyyy-MM-dd}\" role=\"button\" tabindex=\"0\" aria-pressed=\"false\""))>
                                         <span class="sms-cal-day__num">@c.Date.Day</span>
-                                        <span class="visually-hidden">@TypeName(c.Type)</span>
                                         @if (c.HijriDay != null) { <span class="sms-cal-day__hijri">@c.HijriDay</span> }
-                                        @if (c.IsProvisional) { <span class="sms-cal-day__prov">◔</span> }
+                                        @if (c.IsProvisional) { <span class="sms-cal-day__prov" aria-hidden="true">◔</span> }
                                     </td>
                                 }</tr>
                             }
@@ -94,7 +152,7 @@
             </div>
         </div>
         <div class="sms-card">
-            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Events", "الأحداث")</h2><span class="small text-muted">@Model.Events.Count</span></div>
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center"><h2 class="h6 mb-0">@T("Events", "الأحداث")</h2><span class="small text-muted">@liveEvents @T("live", "قائم")@if (cancelledEvents > 0) { <text> · </text>@cancelledEvents<text> </text>@T("cancelled", "ملغى") }</span></div>
             <div class="table-responsive"><table class="table table-sm sms-table mb-0">
                 <caption class="visually-hidden">@T("Events", "الأحداث")</caption>
                 <thead><tr><th scope="col">@T("Event", "الحدث")</th><th scope="col">@T("Category", "الفئة")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col">@T("Audience", "الجمهور")</th><th scope="col">@T("Portal", "البوابة")</th><th scope="col" class="text-end">@T("Actions", "إجراءات")</th></tr></thead>
@@ -138,17 +196,65 @@
     <div class="col-xl-3">
         <div class="sms-card p-3 mb-3">
             <h2 class="h6">@T("Paint days", "تعيين أيام")</h2>
-            <form method="post" asp-action="Day">
-                <input type="hidden" name="AcademicYearId" value="@Model.Year.Id" />
-                <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small" for="paint-from">@T("From", "من")</label><input name="Date" id="paint-from" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div>
-                    <div class="col-6"><label class="form-label small" for="paint-to">@T("To (optional)", "إلى (اختياري)")</label><input name="EndDate" id="paint-to" type="date" class="form-control form-control-sm" min="@Model.Year.StartDate.ToString("yyyy-MM-dd")" max="@Model.Year.EndDate.ToString("yyyy-MM-dd")" /></div></div>
-                <div class="mb-2"><label class="form-label small" for="paint-daytype">@T("Day type", "نوع اليوم")</label><select name="DayType" id="paint-daytype" class="form-select form-select-sm">@foreach (DayType t in Enum.GetValues(typeof(DayType))) { <option value="@t" selected="@(t == DayType.Holiday)">@TypeName(t)</option> }</select></div>
-                <div class="mb-2"><label class="form-label small" for="paint-audience">@T("Audience", "الجمهور")</label><select name="Audience" id="paint-audience" class="form-select form-select-sm">@foreach (CalendarAudience a in Enum.GetValues(typeof(CalendarAudience))) { <option value="@a">@CalendarLabels.Audience(a, isRtl)</option> }</select></div>
-                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="IsProvisional" value="true" id="prov" /><label class="form-check-label small" for="prov">@T("Provisional (Hijri, pending confirmation)", "مبدئي (هجري، بانتظار التأكيد)")</label></div>
-                <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-brush me-1" aria-hidden="true"></i>@T("Paint", "تعيين")</button>
-                <div class="form-text">@T("Past dates are locked (BR-CAL-003). Click a day in the grid to pick it.", "التواريخ الماضية مقفلة (BR-CAL-003). انقر يوماً في الشبكة لاختياره.")</div>
-            </form>
+            @if (!canPaint)
+            {
+                @* Every date in the year is behind us: BR-CAL-003 would refuse every submit, so the
+                   card says that once instead of once per attempt. *@
+                <p class="small text-muted mb-0"><i class="bi bi-lock-fill me-1" aria-hidden="true"></i>@T("This academic year has ended — its days are a record now and cannot be repainted (BR-CAL-003).", "انتهى هذا العام الدراسي — فأيامه سجلٌّ الآن ولا يمكن إعادة تعيينها (BR-CAL-003).")</p>
+            }
+            else
+            {
+                <form method="post" asp-action="Day">
+                    <input type="hidden" name="AcademicYearId" value="@Model.Year.Id" />
+                    <div class="row g-2 mb-2"><div class="col-6"><label class="form-label small" for="paint-from">@T("From", "من")</label><input name="Date" id="paint-from" type="date" class="form-control form-control-sm" min="@paintFloor" max="@yearEnd" /></div>
+                        <div class="col-6"><label class="form-label small" for="paint-to">@T("To (optional)", "إلى (اختياري)")</label><input name="EndDate" id="paint-to" type="date" class="form-control form-control-sm" min="@paintFloor" max="@yearEnd" /></div></div>
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2 small">
+                        <span id="paint-count" class="text-muted" aria-live="polite"
+                              data-empty="@T("No days selected", "لم تُختر أيام")"
+                              data-one="@T("1 day selected", "يوم واحد مختار")"
+                              data-many="@T("{0} days selected", "{0} يوماً مختاراً")">@T("No days selected", "لم تُختر أيام")</span>
+                        <button type="button" id="paint-clear" class="btn btn-link btn-sm p-0 text-decoration-none" hidden>@T("Clear", "مسح")</button>
+                    </div>
+                    <div class="mb-2"><label class="form-label small" for="paint-daytype">@T("Day type", "نوع اليوم")</label><select name="DayType" id="paint-daytype" class="form-select form-select-sm">@foreach (DayType t in Enum.GetValues(typeof(DayType))) { <option value="@t" selected="@(t == DayType.Holiday)">@TypeName(t)</option> }</select></div>
+                    <div class="mb-2"><label class="form-label small" for="paint-audience">@T("Audience", "الجمهور")</label><select name="Audience" id="paint-audience" class="form-select form-select-sm">@foreach (CalendarAudience a in Enum.GetValues(typeof(CalendarAudience))) { <option value="@a">@CalendarLabels.Audience(a, isRtl)</option> }</select></div>
+                    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="IsProvisional" value="true" id="prov" /><label class="form-check-label small" for="prov">@T("Provisional (Hijri, pending confirmation)", "مبدئي (هجري، بانتظار التأكيد)")</label></div>
+                    <button class="btn btn-sm btn-primary w-100" type="submit"><i class="bi bi-brush me-1" aria-hidden="true"></i>@T("Paint", "تعيين")</button>
+                    <div class="form-text">@T("Drag across the board, or click a day and shift-click another. Past dates are locked (BR-CAL-003).", "اسحب على اللوحة، أو انقر يوماً ثم انقر آخر مع Shift. والتواريخ الماضية مقفلة (BR-CAL-003).")</div>
+                </form>
+            }
         </div>
+        @if (Model.ProvisionalDays.Count > 0)
+        {
+            @*
+                BR-CAL-005 reads "entered provisionally and confirmed later (flagged until
+                confirmed)". The flag had no confirm and no list, so a Ramadan holiday painted in
+                August wore ◔ on one cell of a three-hundred-cell board for the rest of the year.
+            *@
+            <div class="sms-card p-3 mb-3" id="provisional-days">
+                <h2 class="h6">◔ @T("Provisional days", "أيام مبدئية") <span class="badge bg-warning text-dark">@Model.ProvisionalDays.Count</span></h2>
+                <p class="form-text mt-0">@T("Hijri-mapped dates awaiting confirmation (BR-CAL-005). If the date moved, repaint it first, then confirm.", "تواريخ هجرية بانتظار التأكيد (BR-CAL-005). فإن تغيّر التاريخ فأعد التعيين أولاً ثم أكّد.")</p>
+                <ul class="list-unstyled small mb-0">
+                    @foreach (var d in Model.ProvisionalDays)
+                    {
+                        <li class="d-flex justify-content-between align-items-center gap-2 py-1 border-bottom">
+                            <span><bdi>@d.Date.ToString("yyyy-MM-dd")</bdi> <span class="text-muted">· @TypeName(d.DayType)</span></span>
+                            @if (d.Date.Date < Model.TodayUtc)
+                            {
+                                <span class="text-muted text-nowrap"><i class="bi bi-lock-fill" aria-hidden="true"></i> @T("passed", "مضى")</span>
+                            }
+                            else
+                            {
+                                <form method="post" asp-action="ConfirmDay" class="d-inline">
+                                    <input type="hidden" name="academicYearId" value="@Model.Year.Id" />
+                                    <input type="hidden" name="date" value="@d.Date.ToString("yyyy-MM-dd")" />
+                                    <button class="btn btn-sm btn-outline-success py-0" type="submit" title="@T("Confirm this date is final", "تأكيد أن هذا التاريخ نهائي")"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Confirm", "تأكيد")</button>
+                                </form>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
         @*
             One card for both jobs. With ?edit=<id> it is the same fields carrying the event's
             current values, which is how the events list's pencil reaches a form — the alternative
@@ -177,7 +283,16 @@
         <div class="sms-card p-3 mb-3">
             <h2 class="h6">@T("Working-day counters", "عدّاد أيام العمل")</h2>
             <table class="table table-sm mb-0 small"><caption class="visually-hidden">@T("Working-day counters", "عدّاد أيام العمل")</caption><tbody>@foreach (var c in Model.Counters) { <tr><td style="white-space:pre">@c.Label</td><td class="text-end fw-semibold">@c.WorkingDays</td><td class="text-muted text-end">/ @c.TotalDays</td></tr> }</tbody></table>
-            <div class="form-text">@T("BR-CAL-006 — instructional-day totals per semester/term.", "BR-CAL-006 — مجموع الأيام الدراسية لكل فصل/فترة.")</div>
+            @if (minimum != null)
+            {
+                <div class="d-flex justify-content-between align-items-center small mt-2 pt-2 border-top">
+                    <span class="text-muted">@T("Ministry minimum", "الحد الأدنى الوزاري")</span>
+                    <span class="@(belowMinimum ? "text-danger-emphasis fw-semibold" : "text-success-emphasis fw-semibold")">@minimum @(belowMinimum ? T($"— short {shortfall}", $"— ناقص {shortfall}") : "✓")</span>
+                </div>
+            }
+            <div class="form-text">@(minimum == null
+                ? T("BR-CAL-006 — instructional-day totals per semester/term. Set a ministry minimum under Setup → Settings → Regional to have the year's total measured against it.", "BR-CAL-006 — مجموع الأيام الدراسية لكل فصل/فترة. اضبط حداً أدنى وزارياً من «الإعدادات ← الإعدادات ← الإقليمية» ليُقاس عليه مجموع العام.")
+                : T("BR-CAL-006 — instructional-day totals per semester/term, and the year's total against the configured minimum.", "BR-CAL-006 — مجموع الأيام الدراسية لكل فصل/فترة، ومجموع العام مقابل الحد الأدنى المضبوط."))</div>
         </div>
         <div class="sms-card p-3">
             <h2 class="h6">@T("Published versions", "الإصدارات المنشورة")</h2>
@@ -189,14 +304,5 @@
 </div>
 
 @section Scripts {
-<script>
-    document.querySelectorAll('.sms-cal-day[data-date]').forEach(function (td) {
-        td.addEventListener('click', function () {
-            var from = document.getElementById('paint-from'), to = document.getElementById('paint-to');
-            if (!from.value || (from.value && to.value)) { from.value = td.dataset.date; to.value = ''; }
-            else if (td.dataset.date >= from.value) { to.value = td.dataset.date; }
-            else { to.value = from.value; from.value = td.dataset.date; }
-        });
-    });
-</script>
+<script src="~/js/calendar-board.js" asp-append-version="true"></script>
 }

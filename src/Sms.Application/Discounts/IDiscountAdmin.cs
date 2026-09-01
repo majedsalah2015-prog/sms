@@ -26,6 +26,30 @@ namespace Sms.Application.Discounts
             bool requiresHardshipDocumentation = false, IReadOnlyList<EligibilityRuleInput>? rules = null, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// doc/Modules/22 §8.2. Corrects a type in place. The catalog could only append: a
+        /// mistyped name, a wrong basis or a stacking cap set too high could never be fixed,
+        /// only shadowed by a second type — and the register then carried both.
+        /// <para>
+        /// The eligibility rules are replaced wholesale rather than merged: BR-DIS-002 reads the
+        /// ladder as one ordered set, and a partial update would leave a rung nobody entered.
+        /// Grants already approved keep the terms they were granted under — this changes what the
+        /// type means for the next grant, never what a past one paid.
+        /// </para>
+        /// </summary>
+        Task UpdateTypeAsync(
+            int discountTypeId, string nameAr, string nameEn, DiscountBasis basis, DiscountEligibilityMode eligibilityMode,
+            int? feeCategoryId = null, DiscountComputationStage stage = DiscountComputationStage.BeforeVat, decimal? capAmountPerStudent = null,
+            bool isStackable = true, decimal maxCombinedPercent = 100m, DiscountRenewalMode renewalMode = DiscountRenewalMode.ManualRegrant,
+            bool requiresHardshipDocumentation = false, IReadOnlyList<EligibilityRuleInput>? rules = null, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// BR-GLB-005: retires a type or puts it back. A retired type stops being offered to new
+        /// grants; the grants already carrying it are untouched and keep renewing under it, which
+        /// is why this is a flag and not a delete.
+        /// </summary>
+        Task SetTypeActiveAsync(int discountTypeId, bool isActive, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// BR-DIS-003: manual grant, threshold-routed; stacking checked at grant (BR-DIS-001,
         /// <see cref="Common.Exceptions.DiscountStackingViolationException"/>); hardship types need
         /// <paramref name="hasHardshipDocumentation"/> (<see cref="Common.Exceptions.HardshipDocumentationRequiredException"/>).

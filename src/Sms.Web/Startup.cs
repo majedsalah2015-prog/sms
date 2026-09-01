@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using System.Net.Http;
 using Sms.Web.Security;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -77,6 +78,7 @@ using Sms.Application.Dashboards;
 using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Employees;
+using Sms.Application.Payroll;
 using Sms.Application.Examinations;
 using Sms.Application.Fees;
 using Sms.Application.GlExport;
@@ -87,6 +89,7 @@ using Sms.Application.Grading;
 using Sms.Application.Health;
 using Sms.Application.Installments;
 using Sms.Application.Jobs;
+using Sms.Application.Learning;
 using Sms.Application.Library;
 using Sms.Application.Lookups;
 using Sms.Application.Messaging;
@@ -127,6 +130,7 @@ using Sms.Infrastructure.Classrooms;
 using Sms.Infrastructure.Dashboards;
 using Sms.Infrastructure.Common;
 using Sms.Infrastructure.Employees;
+using Sms.Infrastructure.Payroll;
 using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
 using Sms.Infrastructure.GlExport;
@@ -137,6 +141,7 @@ using Sms.Infrastructure.Grading;
 using Sms.Infrastructure.Health;
 using Sms.Infrastructure.Installments;
 using Sms.Infrastructure.Jobs;
+using Sms.Infrastructure.Learning;
 using Sms.Infrastructure.Library;
 using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Messaging;
@@ -227,6 +232,60 @@ namespace Sms.Web
                 options.Filters.Add<RequirePasswordChangeFilter>();
                 // BR-SEC-010: portal accounts never see staff URLs (404, not 403).
                 options.Filters.Add<Sms.Web.Security.PortalAreaFilter>();
+
+                // MVC infers [Required] from a non-nullable reference type, and this project has
+                // <Nullable>enable</Nullable> everywhere — so `public string UserName` was carrying
+                // a hidden required rule whose message is the framework's English one, ahead of the
+                // bilingual attribute written beside it. The inferred rule is switched off and the
+                // written one governs: a field that must be filled says so through
+                // [RequiredField], where the sentence can be read by the person being refused.
+                options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+
+                // The other half of a bilingual form. Sms.Web.Models' own validation attributes
+                // cover the rules an author wrote; these cover the ones the binder raises on its
+                // own — a date typed into a date box wrong, a letter in a number field — and their
+                // English defaults reached the screen exactly the same way, with nothing in the
+                // source to notice.
+                //
+                // The delegates run per request, so CurrentUICulture is the reader's, not the
+                // process's; a message chosen here at startup would be the wrong language for
+                // everybody but the first visitor.
+                var messages = options.ModelBindingMessageProvider;
+                bool Ar() => System.Globalization.CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+
+                messages.SetValueIsInvalidAccessor(value => Ar()
+                    ? $"القيمة {value} غير صالحة."
+                    : $"The value {value} is not valid.");
+                messages.SetValueMustNotBeNullAccessor(value => Ar()
+                    ? "هذا الحقل مطلوب."
+                    : "This field is required.");
+                messages.SetMissingBindRequiredValueAccessor(field => Ar()
+                    ? $"لم تصل قيمة للحقل «{field}»."
+                    : $"A value for the '{field}' field was not supplied.");
+                messages.SetMissingKeyOrValueAccessor(() => Ar()
+                    ? "هذا الحقل مطلوب."
+                    : "A value is required.");
+                messages.SetMissingRequestBodyRequiredValueAccessor(() => Ar()
+                    ? "لم يصل أي محتوى في الطلب."
+                    : "A non-empty request body is required.");
+                messages.SetAttemptedValueIsInvalidAccessor((value, field) => Ar()
+                    ? $"القيمة {value} غير صالحة للحقل «{field}»."
+                    : $"The value {value} is not valid for {field}.");
+                messages.SetUnknownValueIsInvalidAccessor(field => Ar()
+                    ? $"القيمة المُدخَلة غير صالحة للحقل «{field}»."
+                    : $"The supplied value is not valid for {field}.");
+                messages.SetValueMustBeANumberAccessor(field => Ar()
+                    ? $"يجب أن يكون «{field}» رقماً."
+                    : $"The field {field} must be a number.");
+                messages.SetNonPropertyAttemptedValueIsInvalidAccessor(value => Ar()
+                    ? $"القيمة {value} غير صالحة."
+                    : $"The value {value} is not valid.");
+                messages.SetNonPropertyUnknownValueIsInvalidAccessor(() => Ar()
+                    ? "القيمة المُدخَلة غير صالحة."
+                    : "The supplied value is not valid.");
+                messages.SetNonPropertyValueMustBeANumberAccessor(() => Ar()
+                    ? "يجب أن تكون القيمة رقماً."
+                    : "The field must be a number.");
             })
             // The embedded ERP modules ship their controllers and compiled views in Razor class
             // libraries; MVC finds neither without being told the assemblies are part of this
@@ -237,7 +296,28 @@ namespace Sms.Web
             .AddApplicationPart(typeof(PurchasingWebRegistration).Assembly)
             .AddApplicationPart(typeof(SalesWebRegistration).Assembly)
             .AddApplicationPart(typeof(CashWebRegistration).Assembly)
-            .AddApplicationPart(typeof(PartnersWebRegistration).Assembly);
+            .AddApplicationPart(typeof(PartnersWebRegistration).Assembly)
+            // Applies only to controllers marked [ApiController] — which in this
+            // application is exactly the mobile API under Api/ (see
+            // docs/Integration/03-Mobile-API.md). The framework's two default
+            // shapes are both replaced so that a client parses one error format
+            // and never three.
+            .ConfigureApiBehaviorOptions(options =>
+            {
+                // ValidationProblemDetails is RFC 7807 and would be a fine choice if it
+                // were the only one; alongside the hand-written refusals it is a second
+                // format for the same event, told apart only by which one happened to
+                // fire. One envelope, always.
+                options.InvalidModelStateResponseFactory = context =>
+                    Sms.Web.Api.ApiResults.Error(StatusCodes.Status400BadRequest,
+                        Sms.Web.Api.ApiProblem.Validation(context.ModelState));
+
+                // And the third: [ApiController] silently rewrites a bare NotFound()
+                // into ProblemDetails. The permission guard returns exactly that
+                // (BR-SEC-010), so leaving this on would give the one refusal a client
+                // sees most often a shape of its own.
+                options.SuppressMapClientErrors = true;
+            });
 
             // Login (doc 06 §3): cookie principal bound to a sec.UserSession row,
             // re-validated per request by SessionCookieEvents; a second, 5-minute
@@ -261,7 +341,20 @@ namespace Sms.Web
                     options.Cookie.Name = "Sms.TwoFactor";
                     options.Cookie.HttpOnly = true;
                     options.ExpireTimeSpan = System.TimeSpan.FromMinutes(5);
-                });
+                })
+                // The same session, reached by a phone. sec.UserSession.SessionToken is
+                // already an opaque bearer token — the cookie carries nothing else — so
+                // the mobile API validates it through the same IAuthenticationService and
+                // inherits BR-SEC-004 expiry and revocation whole, rather than minting a
+                // second credential that would outlive a revoked session.
+                .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
+                           Sms.Web.Api.Auth.SessionTokenAuthenticationHandler>(
+                    Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                    Sms.Web.Api.Auth.SessionTokenDefaults.DisplayName,
+                    _ => { });
+
+            // Shared by both transports' sign-in — the cookie's and the bearer token's.
+            services.AddScoped<SessionPrincipalFactory>();
 
             // Deny-by-default (doc 06 §1): every endpoint needs an authenticated
             // user unless explicitly [AllowAnonymous] (login, static assets).
@@ -337,15 +430,37 @@ namespace Sms.Web
 
             // E-007 notifications core (doc 09): publish queues Deliveries atomically
             // with the business event; the dispatcher drains them through whichever
-            // channel senders are registered. Email/SMS/WhatsApp are stub transports
-            // pending a provider decision (doc 09 §9 Q1) — only In-App is live.
+            // channel senders are registered.
+            //
+            // WhatsApp and SMS are live transports as of M32/M33's screens: the owner
+            // chose an official intermediary (Twilio / 360dialog), so both channels
+            // resolve to TwilioStyleChannelSender, which reads the school's own
+            // credentials off msg.Provider at dispatch. A deployment that has
+            // registered no gateway fails those deliveries with a stated reason
+            // instead of reporting a send nobody received — which is what the stub
+            // used to do, and the reason it is gone from these two channels.
+            //
+            // Email is still stubbed: doc 09 §9 Q1's SMTP decision is unmade, and a
+            // stub that claims success is only tolerable where nothing yet depends on
+            // it. It is registered so the dispatch loop stays exercised end to end.
+            services.AddHttpClient();
+            services.AddScoped<ISecretProtector, DataProtectionSecretProtector>();
+            services.AddScoped<IRecipientAddressBook, RecipientAddressBook>();
             services.AddScoped<INotificationPublisher, NotificationPublisher>();
             services.AddScoped<INotificationDispatcher, NotificationDispatcher>();
             services.AddScoped<INotificationConfigAdmin, NotificationConfigAdmin>();
             services.AddScoped<IChannelSender, InAppChannelSender>();
             services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Email));
-            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.Sms));
-            services.AddScoped<IChannelSender>(_ => new StubChannelSender(NotificationChannel.WhatsApp));
+            services.AddScoped<IChannelSender>(sp => new TwilioStyleChannelSender(
+                NotificationChannel.Sms,
+                sp.GetRequiredService<AppDbContext>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<ISecretProtector>()));
+            services.AddScoped<IChannelSender>(sp => new TwilioStyleChannelSender(
+                NotificationChannel.WhatsApp,
+                sp.GetRequiredService<AppDbContext>(),
+                sp.GetRequiredService<IHttpClientFactory>(),
+                sp.GetRequiredService<ISecretProtector>()));
 
             // E-008 attachments core (doc 10): typed upload/version pipeline with a
             // mandatory scan gate. No virus-scan vendor/ICAP adapter chosen yet
@@ -366,7 +481,16 @@ namespace Sms.Web
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
             services.AddScoped<IAttachmentService, AttachmentService>();
             services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
+
+            // Every file the product takes goes through the intake (doc 10 §5); the photo service is
+            // one slot of it, kept as its own type only because a face has its own frame and limit.
+            services.AddScoped<Sms.Web.Services.AttachmentIntake>();
             services.AddScoped<Sms.Web.Services.PersonPhotoService>();
+            services.AddScoped<Sms.Web.Services.SchoolBrandingService>();
+
+            // The shell's read of the same slot: asked once per request by the layout, again by
+            // whichever page draws the school's name, and memoised across the two.
+            services.AddScoped<Sms.Web.Services.SchoolBrandMark>();
 
             // E-010 lookup framework (BR-SET-001/002/007). The seeder harness
             // (SeedRunner + ISeedContributor implementations) is registered in
@@ -456,6 +580,15 @@ namespace Sms.Web
             services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
             services.AddScoped<ITeacherAdmin, TeacherAdmin>();
 
+            // Payroll and staff advances (owner request, 2026-08-28). A stated deviation from
+            // doc/Modules/12 §2 and BR-EMP-007, which scope payroll calculation out of the product
+            // and hand it to whatever the school runs payroll on — see Sms.Domain.Payroll.PayrollRun
+            // for what was asked for, what was built, and what was deliberately left out. No GL
+            // journal is posted for a run; that was the owner's call and it is the next piece.
+            services.AddScoped<IPayrollAdmin, PayrollAdmin>();
+            services.AddScoped<ISalaryAdvanceAdmin, SalaryAdvanceAdmin>();
+            services.AddScoped<IPayrollStatements, PayrollStatements>();
+
             // S3/E-301 (Attendance, doc/Modules/14, BR-ATD-002/003/005/006/007).
             // Daily mode only - Period mode needs Module 15's timetable sessions,
             // which don't exist yet. Escalation thresholds, gate-event auto-flip
@@ -474,6 +607,16 @@ namespace Sms.Web
             // rendering still needs the O6 engine decision (open); transcripts,
             // appeals, and comment banks remain deferred.
             services.AddScoped<IGradingAdmin, GradingAdmin>();
+
+            // Module 37 (doc/Modules/37 §8.1-2, BR-LRN-001/002/003/006/016) —
+            // e-learning slice 1: the lesson planner and its resource library.
+            // Scope opened 2026-08-30 at the owner's instruction and NOT part of
+            // approved Analysis v1.0; the module doc's open question 1
+            // (build-or-partner) was answered "build" by the owner. Homework,
+            // question banks, papers, online sittings and the portal write
+            // surface are later slices and are not registered yet.
+            services.AddScoped<ILessonAdmin, LessonAdmin>();
+            services.AddScoped<IHomeworkAdmin, HomeworkAdmin>();
 
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
@@ -515,6 +658,12 @@ namespace Sms.Web
             // fees (Module 19 policy), service-suspension list (Q2, legal),
             // Hangfire scheduling of RunDunningAsync, portal screens.
             services.AddScoped<IInstallmentAdmin, InstallmentAdmin>();
+            // doc/Modules/20 §8.5's other half — the collection roll and the human-issued notice
+            // batches the ladder deliberately does not fire. Separate from the admin because it
+            // reads across every family's schedule at once, and across families with no schedule at
+            // all, whose posted charges are aged by posting date exactly as the receivables snapshot
+            // ages them.
+            services.AddScoped<ICollectionFollowUp, CollectionFollowUp>();
             // The usage guard for a plan template: what would break if it went away. Registered beside the
             // admin it guards, and asked by the screen before a destructive action is offered, not after.
             services.AddScoped<IUsageInspector<Sms.Domain.Installments.PlanTemplate>, PlanTemplateUsageInspector>();
@@ -634,6 +783,12 @@ namespace Sms.Web
             // bank reconciliation, and the online gateway (BR-PAY-007,
             // dormant per doc itself) are all deferred.
             services.AddScoped<IFeeAdmin, FeeAdmin>();
+
+            // doc/Modules/19 §8.7 from the counter's side: the items, the plan and the
+            // discount chosen on one screen and committed together. Registered after the
+            // three admins it composes and owning no rule of its own — see
+            // StudentFeeFileService for why the order and the transaction are the point.
+            services.AddScoped<IStudentFeeFileService, StudentFeeFileService>();
             services.AddScoped<IPaymentAdmin, PaymentAdmin>();
 
             // S3/E-304 (Portal essentials, BR-SEC-010..013). Read-only aggregation
@@ -675,6 +830,13 @@ namespace Sms.Web
             // PermissionService, but for an arbitrary target user.
             services.AddScoped<IDashboardAdmin, DashboardAdmin>();
             services.AddScoped<IDashboardQuery, DashboardQuery>();
+
+            // The same discipline one screen wider: doc/Modules/31 §1's question
+            // asked of the school rather than of a persona. Takes IGlLedgerSummary
+            // as an optional dependency, so the expenses section appears exactly
+            // when the ERP bridge is registered and says "no ledger attached"
+            // rather than "zero" when it is not.
+            services.AddScoped<IStatisticsQuery, StatisticsQuery>();
 
             // S7/E-703 (Messaging + Notifications admin, doc/Modules/32+33,
             // BR-MSG-001/002/004, BR-NTF-001/002/004). Messaging (human-composed:
@@ -881,7 +1043,65 @@ namespace Sms.Web
                     .Concat(SalesPermissions.All)
                     .Concat(CashPermissions.All)
                     .Concat(PartnersPermissions.All)));
+
+            // The mobile API's contract, generated rather than written: a hand-kept
+            // endpoint list is stale the first time somebody adds a field, and the
+            // client team finds out from a null. Served only in Development (see
+            // Configure) — the schema of every endpoint is a map of the product's
+            // surface, and a school's public host has no reason to publish one.
+            services.AddSwaggerGen(options =>
+            {
+                options.SwaggerDoc(MobileApiDoc, new Microsoft.OpenApi.Models.OpenApiInfo
+                {
+                    Title = "SMS Mobile API",
+                    Version = "v1",
+                    Description =
+                        "School Management System — the endpoints behind the school's mobile app: "
+                        + "sign-in, the parent/student portal, e-learning, students, employees, "
+                        + "school finance and read-only accounting summaries. "
+                        + "Send Accept-Language: ar-SA or en-US; every human-readable string and "
+                        + "every refusal comes back in that language.",
+                });
+
+                // Not "JWT". The value is sec.UserSession.SessionToken, returned by
+                // POST /api/v1/auth/login, and it dies when the session does.
+                options.AddSecurityDefinition(Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                    new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        Name = "Authorization",
+                        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+                        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+                        Scheme = "Bearer",
+                        Description = "Type: Bearer {sessionToken from /api/v1/auth/login}",
+                    });
+
+                options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+                {
+                    [new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+                    {
+                        Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                        {
+                            Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                            Id = Sms.Web.Api.Auth.SessionTokenDefaults.Scheme,
+                        },
+                    }] = System.Array.Empty<string>(),
+                });
+
+                // MVC controllers and the ERP's areas are in the same application and would
+                // otherwise be documented as if they were part of the API.
+                options.DocInclusionPredicate((_, description) =>
+                    description.ActionDescriptor is Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor controller
+                    && typeof(Sms.Web.Api.ApiControllerBase).IsAssignableFrom(controller.ControllerTypeInfo));
+
+                // Two API controllers may legitimately declare the same action name on
+                // different routes; without this the generator throws at first request
+                // rather than at build, which is the worst place to learn it.
+                options.CustomSchemaIds(type => type.FullName ?? type.Name);
+            });
         }
+
+        /// <summary>The single OpenAPI document name, used by both the generator and the UI below.</summary>
+        private const string MobileApiDoc = "mobile-v1";
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -889,6 +1109,18 @@ namespace Sms.Web
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
+
+                // The mobile API's contract, at /api/docs. Development only, and
+                // deliberately: this document lists every endpoint, field and refusal
+                // code in the product, which is a reconnaissance aid on a school's
+                // public host and a convenience only on a developer's machine.
+                app.UseSwagger(options => options.RouteTemplate = "api/docs/{documentName}.json");
+                app.UseSwaggerUI(options =>
+                {
+                    options.SwaggerEndpoint($"/api/docs/{MobileApiDoc}.json", "SMS Mobile API v1");
+                    options.RoutePrefix = "api/docs";
+                    options.DocumentTitle = "SMS Mobile API";
+                });
             }
             else
             {
@@ -961,6 +1193,11 @@ namespace Sms.Web
                 endpoints.MapControllerRoute(
                     name: "default",
                     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+                // The mobile API routes itself with [Route] attributes rather than by
+                // convention: /api/v1/... is a contract a client has hard-coded, and it
+                // must not move because somebody renames a controller class.
+                endpoints.MapControllers();
             });
 
             // E-011: Hangfire's built-in dashboard is the job admin surface (WBS)

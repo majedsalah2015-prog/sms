@@ -5,11 +5,13 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Attachments;
 using Sms.Domain.Attendance;
 using Sms.Domain.Common;
 using Sms.Domain.Fees;
 using Sms.Domain.Grades;
 using Sms.Domain.Grading;
+using Sms.Domain.Learning;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Schools;
@@ -338,6 +340,212 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(1000m, position.Position);
             Assert.Single(position.Charges);
             Assert.Equal("INV-000001", position.Charges[0].ChargeNo);
+        }
+
+        // --- doc/Modules/37 §5 "read content" ----------------------------------------
+
+        /// <summary>
+        /// Adds one lesson on the fixture's offering, plus one resource whose
+        /// attachment carries the given scan verdict. Returns (lessonId, resourceId).
+        /// </summary>
+        private (int LessonId, int ResourceId) SeedLesson(
+            LessonStatus status,
+            ScanStatus scan = ScanStatus.Clean,
+            int weekNumber = 4)
+        {
+            using var db = CreateContext();
+            var offering = db.CurriculumOfferings.Single();
+
+            // The material rides doc.Attachment, which needs a real type behind it.
+            var documentType = db.DocumentTypes.FirstOrDefault(t => t.Code == "LRN-RESOURCE");
+            if (documentType == null)
+            {
+                documentType = new DocumentType
+                {
+                    SchoolId = 1, Code = "LRN-RESOURCE", ModuleCode = "LRN",
+                    Name = new LocalizedName("مادة تعليمية", "Teaching material"),
+                };
+                db.DocumentTypes.Add(documentType);
+                db.SaveChanges();
+            }
+
+            var lesson = new Lesson
+            {
+                SchoolId = 1, AcademicYearId = _tenant.AcademicYearId, CurriculumOfferingId = offering.Id,
+                WeekNumber = weekNumber, TitleAr = "الكسور", TitleEn = "Fractions",
+                ObjectivesAr = "قسمة الكسور", ObjectivesEn = "Dividing fractions",
+                Status = status,
+                PublishedAtUtc = status == LessonStatus.Draft ? null : _clock.UtcNow,
+            };
+            db.Lessons.Add(lesson);
+            db.SaveChanges();
+
+            var attachment = new Attachment
+            {
+                SchoolId = 1, DocumentTypeId = documentType.Id, OwningEntityType = "Lesson", OwningEntityId = lesson.Id,
+                Status = scan == ScanStatus.Clean ? AttachmentStatus.Active : AttachmentStatus.PendingScan,
+                CurrentVersionNumber = 1,
+            };
+            db.Attachments.Add(attachment);
+            db.SaveChanges();
+
+            db.AttachmentVersions.Add(new AttachmentVersion
+            {
+                SchoolId = 1, AttachmentId = attachment.Id, VersionNumber = 1, FileName = "worksheet.pdf",
+                Format = DocumentFormat.Pdf, SizeBytes = 1024, ContentHash = "hash", StorageReference = "ref",
+                ScanStatus = scan,
+            });
+
+            var resource = new LessonResource
+            {
+                SchoolId = 1, AcademicYearId = _tenant.AcademicYearId, LessonId = lesson.Id,
+                AttachmentId = attachment.Id, TitleAr = "ورقة عمل", TitleEn = "Worksheet", DisplayOrder = 1,
+            };
+            db.LessonResources.Add(resource);
+            db.SaveChanges();
+
+            return (lesson.Id, resource.Id);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-003")]
+        public async Task Published_lessons_reach_the_portal_with_their_material()
+        {
+            var seeded = SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lessons = await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId);
+
+            var lesson = Assert.Single(lessons);
+            Assert.Equal(seeded.LessonId, lesson.LessonId);
+            Assert.Equal("Fractions", lesson.TitleEn);
+            Assert.Equal("الكسور", lesson.TitleAr);
+            Assert.Equal("Math", lesson.SubjectNameEn);
+            Assert.Equal(4, lesson.WeekNumber);
+            var resource = Assert.Single(lesson.Resources);
+            Assert.Equal(seeded.ResourceId, resource.ResourceId);
+        }
+
+        /// <summary>
+        /// The rule the whole page rests on. A student's own account reads its own
+        /// syllabus, which is what doc/Modules/37 §5 gives them — the portal held
+        /// the homework set from these lessons and none of the lessons themselves.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SEC-011")]
+        public async Task A_student_account_reads_its_own_lessons()
+        {
+            SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lessons = await query.GetPublishedLessonsAsync(_studentUserAccountId, _studentId);
+
+            Assert.Single(lessons);
+        }
+
+        [Theory]
+        [InlineData(LessonStatus.Draft)]
+        [InlineData(LessonStatus.Retired)]
+        [BusinessRule("BR-LRN-003")]
+        public async Task An_unpublished_lesson_is_invisible_in_the_portal(LessonStatus status)
+        {
+            SeedLesson(status);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            Assert.Empty(await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId));
+        }
+
+        /// <summary>
+        /// BR-LRN-006: "an unscanned or infected file is never served, to staff or
+        /// to the portal". The lesson still reads; only the material waits.
+        /// </summary>
+        [Theory]
+        [InlineData(ScanStatus.Pending)]
+        [InlineData(ScanStatus.Infected)]
+        [BusinessRule("BR-LRN-006")]
+        public async Task Material_that_is_not_scan_clean_is_not_even_listed(ScanStatus scan)
+        {
+            SeedLesson(LessonStatus.Published, scan);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lesson = Assert.Single(await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId));
+            Assert.Empty(lesson.Resources);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-016")]
+        public async Task Withdrawn_material_leaves_the_lesson_without_retiring_it()
+        {
+            var seeded = SeedLesson(LessonStatus.Published);
+            using (var write = CreateContext())
+            {
+                var resource = write.LessonResources.Single(r => r.Id == seeded.ResourceId);
+                resource.IsActive = false;
+                write.SaveChanges();
+            }
+
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            var lesson = Assert.Single(await query.GetPublishedLessonsAsync(_parentUserAccountId, _studentId));
+            Assert.Empty(lesson.Resources);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-011")]
+        public async Task A_stranger_is_refused_the_lessons_of_a_student_they_may_not_see()
+        {
+            SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            await Assert.ThrowsAsync<PortalAccessDeniedException>(
+                () => query.GetPublishedLessonsAsync(_parentUserAccountId + 9999, _studentId));
+        }
+
+        // --- the resource download gate, asked from the resource id -------------------
+
+        [Fact]
+        [BusinessRule("BR-SEC-011")]
+        public async Task The_family_may_read_the_file_behind_a_published_lesson_resource()
+        {
+            var seeded = SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            Assert.True(await query.CanReadLessonResourceAsync(_parentUserAccountId, seeded.ResourceId));
+            Assert.True(await query.CanReadLessonResourceAsync(_studentUserAccountId, seeded.ResourceId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-SEC-011")]
+        public async Task A_caller_with_no_student_on_the_offering_is_refused_the_file()
+        {
+            var seeded = SeedLesson(LessonStatus.Published);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            Assert.False(await query.CanReadLessonResourceAsync(_parentUserAccountId + 9999, seeded.ResourceId));
+        }
+
+        /// <summary>
+        /// BR-LRN-003 again, from the download end: material hanging off a lesson
+        /// the school has not published is not portal material, whatever the
+        /// resource row's own state says. Guessing a resource id does not reach it.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-LRN-003")]
+        public async Task The_file_behind_an_unpublished_lesson_is_refused()
+        {
+            var seeded = SeedLesson(LessonStatus.Draft);
+            using var db = CreateContext();
+            var query = new ParentPortalQuery(db, _tenant);
+
+            Assert.False(await query.CanReadLessonResourceAsync(_parentUserAccountId, seeded.ResourceId));
         }
     }
 }

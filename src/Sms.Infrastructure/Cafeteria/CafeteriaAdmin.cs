@@ -187,7 +187,7 @@ namespace Sms.Infrastructure.Cafeteria
             {
                 foreach (var item in items.Values.Where(i => !NutritionPolicy.SellableToStudent(i.NutritionClass, i.IsStaffOnly)))
                 {
-                    throw new SaleBlockedException($"item {item.Id} is not sellable to students (BR-CAF-008)");
+                    throw new SaleBlockedException(SaleBlockReason.ItemNotSellableToStudents);
                 }
 
                 // BR-CAF-002 real-time controls: parent limits + allergy feed from Module 24's emergency banner (severe allergies).
@@ -199,17 +199,17 @@ namespace Sms.Infrastructure.Cafeteria
                     spentToday, control?.DailyLimit, SpendControlEvaluator.SplitTags(control?.BlockedCategories), banner?.SevereAllergies ?? Array.Empty<string>(), control?.AllergyHardBlock ?? false);
                 if (verdict.OverDailyLimit)
                 {
-                    throw new SaleBlockedException("daily spend limit exceeded");
+                    throw new SaleBlockedException(SaleBlockReason.DailyLimitExceeded);
                 }
 
                 if (verdict.BlockedCategoriesHit.Count > 0)
                 {
-                    throw new SaleBlockedException($"blocked categories: {string.Join(", ", verdict.BlockedCategoriesHit)}");
+                    throw new SaleBlockedException(SaleBlockReason.BlockedCategory);
                 }
 
                 if (verdict.AllergyBlocks)
                 {
-                    throw new SaleBlockedException($"allergy hard-block: {string.Join(", ", verdict.AllergyMatches)}");
+                    throw new SaleBlockedException(SaleBlockReason.AllergyHardBlock);
                 }
 
                 if (verdict.AllergyMatches.Count > 0)
@@ -232,7 +232,7 @@ namespace Sms.Infrastructure.Cafeteria
                 var level = StockLevelCalculator.Level(await _db.StockMovements.Where(m => m.CafeteriaItemId == line.CafeteriaItemId).Select(m => m.Quantity).ToListAsync(cancellationToken));
                 if (!StockLevelCalculator.CanDeduct(level, line.Quantity))
                 {
-                    throw new SaleBlockedException($"insufficient stock for item {line.CafeteriaItemId}");
+                    throw new SaleBlockedException(SaleBlockReason.InsufficientStock);
                 }
             }
 
@@ -243,27 +243,27 @@ namespace Sms.Infrastructure.Cafeteria
             {
                 case SaleTender.MealPlan:
                     subscription = await _db.MealPlanSubscriptions.Where(s => s.StudentId == holderId && s.StartDate <= now.Date && s.EndDate >= now.Date).OrderByDescending(s => s.Id).FirstOrDefaultAsync(cancellationToken)
-                                   ?? throw new SaleBlockedException("no active meal plan");
+                                   ?? throw new SaleBlockedException(SaleBlockReason.NoActiveMealPlan);
                     var plan = await _db.MealPlans.SingleAsync(p => p.Id == subscription.MealPlanId, cancellationToken);
                     var redeemedToday = await _db.Redemptions.AnyAsync(r => r.MealPlanSubscriptionId == subscription.Id && r.Date == now.Date, cancellationToken);
                     if (!MealPlanRedemptionPolicy.CanRedeem(now, subscription.StartDate, subscription.EndDate, redeemedToday, total, plan.DailyValueCap))
                     {
-                        throw new SaleBlockedException("meal plan already redeemed today or basket exceeds the daily entitlement");
+                        throw new SaleBlockedException(SaleBlockReason.MealPlanEntitlementUsed);
                     }
 
                     break;
                 case SaleTender.Wallet:
-                    wallet = await _db.Wallets.SingleOrDefaultAsync(w => w.HolderKind == holderKind && w.HolderId == holderId, cancellationToken) ?? throw new SaleBlockedException("no wallet");
+                    wallet = await _db.Wallets.SingleOrDefaultAsync(w => w.HolderKind == holderKind && w.HolderId == holderId, cancellationToken) ?? throw new SaleBlockedException(SaleBlockReason.NoWallet);
                     if (!WalletBalanceCalculator.CanAfford(await BalanceAsync(wallet.Id, cancellationToken), wallet.OverdraftAllowance, total))
                     {
-                        throw new SaleBlockedException("insufficient wallet balance");
+                        throw new SaleBlockedException(SaleBlockReason.InsufficientWalletBalance);
                     }
 
                     break;
                 case SaleTender.Cash:
                     if (!tillSessionId.HasValue || (await _db.TillSessions.SingleAsync(s => s.Id == tillSessionId.Value, cancellationToken)).Status != TillSessionStatus.Open)
                     {
-                        throw new SaleBlockedException("cash sales need an open till session (BR-CAF-007)");
+                        throw new SaleBlockedException(SaleBlockReason.TillSessionNotOpen);
                     }
 
                     break;

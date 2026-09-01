@@ -99,6 +99,32 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(ParentLifeStatus.Martyr, stored.LifeStatus);
         }
 
+        /// <summary>
+        /// The mother's qualification was five columns on her children until 2026-08-24 and is a
+        /// guardian field now (owner request). It is not audit-reason-gated: a qualification is a
+        /// fact being recorded, not a decision being defended, so an edit that changes only it must
+        /// go through without a reason the way a phone number does.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-PAR-001")]
+        public async Task A_parent_carries_an_educational_qualification_that_needs_no_audit_reason_to_change()
+        {
+            using var db = CreateContext();
+            var admin = new ParentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+
+            var parent = await admin.RegisterParentAsync(
+                "نجاح أبو ندى", "Najah Abu Nada", "0507777777", occupationEmployer: "معلمة", educationLookupId: 6);
+            Assert.Equal(6, db.Parents.Single(p => p.Id == parent.Id).EducationLookupId);
+
+            _audit.Reason = null;
+            var updated = await admin.UpdateParentAsync(
+                parent.Id, "نجاح أبو ندى", "Najah Abu Nada", "0507777777",
+                occupationEmployer: "معلمة", educationLookupId: 7);
+
+            Assert.Equal(7, updated.EducationLookupId);
+            Assert.Equal(7, db.Parents.Single(p => p.Id == parent.Id).EducationLookupId);
+        }
+
         /// <summary>Alive is the default so the overwhelmingly common case costs the registrar nothing.</summary>
         [Fact]
         public async Task A_parent_nobody_said_otherwise_about_is_alive()

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Schools;
 using Sms.Domain.Schools;
 using Sms.Infrastructure.Persistence;
@@ -25,7 +26,7 @@ namespace Sms.Infrastructure.Schools
         {
             if (!AcademicYearValidation.HasValidSpan(startDate, endDate))
             {
-                throw new InvalidAcademicYearDatesException("span must be 6-14 months with an end date after the start date");
+                throw new InvalidAcademicYearDatesException(AcademicYearDateFault.SpanOutOfRange);
             }
 
             // Proactive check for a clear error on the expected path; the filtered
@@ -33,7 +34,7 @@ namespace Sms.Infrastructure.Schools
             var existingYears = await _db.AcademicYears.ToListAsync(cancellationToken);
             if (existingYears.Any(y => AcademicYearValidation.Overlaps(startDate, endDate, y.StartDate, y.EndDate)))
             {
-                throw new InvalidAcademicYearDatesException("overlaps an existing academic year for this school");
+                throw new InvalidAcademicYearDatesException(AcademicYearDateFault.OverlapsAnotherYear);
             }
 
             if (existingYears.Any(y => y.Status == AcademicYearStatus.Preparation))
@@ -63,20 +64,20 @@ namespace Sms.Infrastructure.Schools
 
             if (!AcademicYearValidation.HasValidSpan(startDate, endDate))
             {
-                throw new InvalidAcademicYearDatesException("span must be 6-14 months with an end date after the start date");
+                throw new InvalidAcademicYearDatesException(AcademicYearDateFault.SpanOutOfRange);
             }
 
             var otherYears = await _db.AcademicYears.AsNoTracking().Where(y => y.Id != academicYearId).ToListAsync(cancellationToken);
             if (otherYears.Any(y => AcademicYearValidation.Overlaps(startDate, endDate, y.StartDate, y.EndDate)))
             {
-                throw new InvalidAcademicYearDatesException("overlaps an existing academic year for this school");
+                throw new InvalidAcademicYearDatesException(AcademicYearDateFault.OverlapsAnotherYear);
             }
 
             // Shrinking the year must keep its semesters nested (BR-AYR-007).
             var semesters = await _db.Semesters.AsNoTracking().Where(s => s.AcademicYearId == academicYearId).ToListAsync(cancellationToken);
             foreach (var s in semesters)
             {
-                RequireNested(s.StartDate, s.EndDate, startDate, endDate, $"semester {s.SequenceNumber}", "academic year");
+                RequireNested(s.StartDate, s.EndDate, startDate, endDate, SchoolPeriodKind.Semester);
             }
 
             year.LabelAr = labelAr;
@@ -112,20 +113,20 @@ namespace Sms.Infrastructure.Schools
             // clear reason; every other FK is Restrict and surfaces as DbUpdateException.
             if (await _db.RolloverBatches.AnyAsync(b => b.SourceAcademicYearId == academicYearId || b.TargetAcademicYearId == academicYearId, cancellationToken))
             {
-                throw new AcademicYearInUseException("a rollover batch references this year");
+                throw new AcademicYearInUseException(UsageReport.From(new UsageReference("rollover batch(es)", "دفعة ترحيل", 1)));
             }
 
             if (await _db.GradeYearProfiles.AnyAsync(p => p.AcademicYearId == academicYearId, cancellationToken)
                 || await _db.Sections.AnyAsync(s => s.AcademicYearId == academicYearId, cancellationToken))
             {
-                throw new AcademicYearInUseException("grade profiles or sections are defined for this year");
+                throw new AcademicYearInUseException(UsageReport.From(new UsageReference("grade or section definition(s) for this year", "تعريف صف أو شعبة في هذا العام", 1)));
             }
 
             if (await _db.CalendarDays.AnyAsync(d => d.AcademicYearId == academicYearId, cancellationToken)
                 || await _db.CalendarEvents.AnyAsync(e => e.AcademicYearId == academicYearId, cancellationToken)
                 || await _db.CalendarVersions.AnyAsync(v => v.AcademicYearId == academicYearId, cancellationToken))
             {
-                throw new AcademicYearInUseException("a calendar is defined for this year");
+                throw new AcademicYearInUseException(UsageReport.From(new UsageReference("calendar day(s) or event(s)", "يوم أو حدث في التقويم", 1)));
             }
 
             _db.Terms.RemoveRange(await _db.Terms.Where(t => t.AcademicYearId == academicYearId).ToListAsync(cancellationToken));
@@ -138,7 +139,13 @@ namespace Sms.Infrastructure.Schools
             }
             catch (DbUpdateException ex)
             {
-                throw new AcademicYearInUseException("other records still reference this year (" + (ex.InnerException?.Message ?? ex.Message) + ")");
+                // The database refused on a foreign key the proactive checks above do not name.
+                // The provider's own message is English SQL and belongs in the log, not on a screen,
+                // so it goes to the exception's inner slot while the user is told, in their own
+                // language, that something still points at the year.
+                throw new AcademicYearInUseException(
+                    UsageReport.From(new UsageReference("record(s) elsewhere in the system", "سجل في مواضع أخرى من النظام", 1)),
+                    ex);
             }
         }
 
@@ -147,7 +154,7 @@ namespace Sms.Infrastructure.Schools
             var enrolled = await _db.Enrollments.CountAsync(e => e.AcademicYearId == academicYearId, cancellationToken);
             if (enrolled > 0)
             {
-                throw new AcademicYearInUseException($"{enrolled} student enrollment(s) exist for this year");
+                throw new AcademicYearInUseException(UsageReport.From(new UsageReference("student enrollment(s)", "قيد طالب", enrolled)));
             }
         }
 
@@ -213,10 +220,10 @@ namespace Sms.Infrastructure.Schools
             int academicYearId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
         {
             var year = await _db.AcademicYears.SingleAsync(y => y.Id == academicYearId, cancellationToken);
-            RequireNested(startDate, endDate, year.StartDate, year.EndDate, "semester", "academic year");
+            RequireNested(startDate, endDate, year.StartDate, year.EndDate, SchoolPeriodKind.Semester);
 
             var siblings = await _db.Semesters.Where(s => s.AcademicYearId == academicYearId && s.SequenceNumber != sequenceNumber).ToListAsync(cancellationToken);
-            RequireNoOverlap(startDate, endDate, siblings.Select(s => (s.StartDate, s.EndDate)), "semester");
+            RequireNoOverlap(startDate, endDate, siblings.Select(s => (s.StartDate, s.EndDate)), SchoolPeriodKind.Semester);
 
             var semester = await _db.Semesters.SingleOrDefaultAsync(s => s.AcademicYearId == academicYearId && s.SequenceNumber == sequenceNumber, cancellationToken);
             if (semester == null)
@@ -230,7 +237,7 @@ namespace Sms.Infrastructure.Schools
                 var terms = await _db.Terms.Where(t => t.SemesterId == semester.Id).ToListAsync(cancellationToken);
                 foreach (var t in terms)
                 {
-                    RequireNested(t.StartDate, t.EndDate, startDate, endDate, $"term {t.SequenceNumber}", "semester");
+                    RequireNested(t.StartDate, t.EndDate, startDate, endDate, SchoolPeriodKind.Term);
                 }
             }
 
@@ -246,10 +253,10 @@ namespace Sms.Infrastructure.Schools
             int semesterId, int sequenceNumber, string nameAr, string nameEn, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default)
         {
             var semester = await _db.Semesters.SingleAsync(s => s.Id == semesterId, cancellationToken);
-            RequireNested(startDate, endDate, semester.StartDate, semester.EndDate, "term", "semester");
+            RequireNested(startDate, endDate, semester.StartDate, semester.EndDate, SchoolPeriodKind.Term);
 
             var siblings = await _db.Terms.Where(t => t.SemesterId == semesterId && t.SequenceNumber != sequenceNumber).ToListAsync(cancellationToken);
-            RequireNoOverlap(startDate, endDate, siblings.Select(t => (t.StartDate, t.EndDate)), "term");
+            RequireNoOverlap(startDate, endDate, siblings.Select(t => (t.StartDate, t.EndDate)), SchoolPeriodKind.Term);
 
             var term = await _db.Terms.SingleOrDefaultAsync(t => t.SemesterId == semesterId && t.SequenceNumber == sequenceNumber, cancellationToken);
             if (term == null)
@@ -266,24 +273,24 @@ namespace Sms.Infrastructure.Schools
             return term;
         }
 
-        private static void RequireNested(DateTime start, DateTime end, DateTime outerStart, DateTime outerEnd, string inner, string outer)
+        private static void RequireNested(DateTime start, DateTime end, DateTime outerStart, DateTime outerEnd, SchoolPeriodKind kind)
         {
             if (end <= start)
             {
-                throw new InvalidPeriodDatesException($"{inner} end date must be after its start date");
+                throw new InvalidPeriodDatesException(PeriodDateFault.EndsBeforeItStarts, kind);
             }
 
             if (start < outerStart || end > outerEnd)
             {
-                throw new InvalidPeriodDatesException($"{inner} ({start:yyyy-MM-dd}..{end:yyyy-MM-dd}) must lie within the {outer} ({outerStart:yyyy-MM-dd}..{outerEnd:yyyy-MM-dd})");
+                throw new InvalidPeriodDatesException(PeriodDateFault.NotInsideItsParent, kind);
             }
         }
 
-        private static void RequireNoOverlap(DateTime start, DateTime end, System.Collections.Generic.IEnumerable<(DateTime Start, DateTime End)> siblings, string kind)
+        private static void RequireNoOverlap(DateTime start, DateTime end, System.Collections.Generic.IEnumerable<(DateTime Start, DateTime End)> siblings, SchoolPeriodKind kind)
         {
             if (siblings.Any(s => AcademicYearValidation.Overlaps(start, end, s.Start, s.End)))
             {
-                throw new InvalidPeriodDatesException($"{kind} overlaps a sibling {kind}");
+                throw new InvalidPeriodDatesException(PeriodDateFault.OverlapsASibling, kind);
             }
         }
 

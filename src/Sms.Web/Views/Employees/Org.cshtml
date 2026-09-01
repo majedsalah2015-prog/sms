@@ -1,8 +1,10 @@
 @using System.Globalization
+@using Sms.Domain.Employees
 @model OrgChartViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
+    string Name(Employee e) => isRtl ? $"{e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}";
     // A CSS length is not written in the reader's language. Formatted with the ambient culture,
     // ar-SA renders 2.5 as "2٫5" — U+066B, not a period — and the browser drops the whole
     // declaration, so a child unit lost its indent and sat flatter than its own children while
@@ -17,7 +19,8 @@
         Intro = T("The administrative tree (BR-EMP-002) — distinct from the academic departments in Subjects. Every employee's current position points at a unit here.", "الشجرة الإدارية (BR-EMP-002) — مستقلة عن الأقسام الأكاديمية في المواد. منصب كل موظف الحالي يشير إلى وحدة هنا."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("Add / edit ✎", "إضافة / تعديل ✎"), T("Bilingual name + optional parent. Re-parenting is refused when it would create a cycle.", "اسم بلغتين + وحدة أم اختيارية. يُرفض النقل إذا أنشأ حلقة.")),
+            new HelpPanelViewModel.Item(T("Add / edit ✎", "إضافة / تعديل ✎"), T("Bilingual name + optional parent. The English name fills itself in as the Arabic one is typed — correct it before saving whenever the translation is not the one this school uses. Re-parenting is refused when it would create a cycle.", "اسم بلغتين + وحدة أم اختيارية. يُملأ الاسم الإنجليزي تلقائياً أثناء كتابة العربي — صحّحه قبل الحفظ متى لم تكن الترجمة هي المعتمدة في المدرسة. ويُرفض النقل إذا أنشأ حلقة.")),
+            new HelpPanelViewModel.Item(T("Current staff 👥", "الكادر الحالي 👥"), T("Opens the unit's whole roster — number, name, position and status — with a link to each employee's file and to the register filtered by the unit.", "يفتح كامل كادر الوحدة — الرقم والاسم والمنصب والحالة — مع رابط لملف كل موظف ولسجل الموظفين مُرشَّحاً بالوحدة.")),
             new HelpPanelViewModel.Item(T("Delete 🗑", "حذف 🗑"), T("Only a unit with no child units and no assignment history (past or present) can be deleted — the button is disabled otherwise.", "لا تُحذف إلا وحدة بلا وحدات فرعية وبلا سجل إسناد (سابق أو حالي) — الزر معطل خلاف ذلك.")),
         },
     };
@@ -38,10 +41,10 @@
                     var fid = $"ou{n.Unit.Id}";
                     var deletable = n.ChildCount == 0 && n.HeadCount == 0;
                     <tr>
-                        <td style="padding-@(isRtl ? "right" : "left"):@(Indent(n.Depth))rem"><div class="d-flex gap-1"><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@n.Unit.NameAr" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (Arabic)", $"الوحدة {n.Unit.NameAr} — الاسم (عربي)")" /><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@n.Unit.NameEn" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (English)", $"الوحدة {n.Unit.NameAr} — الاسم (إنجليزي)")" /></div></td>
+                        <td style="padding-@(isRtl ? "right" : "left"):@(Indent(n.Depth))rem"><div class="d-flex gap-1"><input form="@fid" id="ou-ar-@n.Unit.Id" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@n.Unit.NameAr" style="width:10rem" aria-label="@T($"Unit {n.Unit.NameEn} — name (Arabic)", $"الوحدة {n.Unit.NameAr} — الاسم (عربي)")" /><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@n.Unit.NameEn" style="width:10rem" data-translit-from="#ou-ar-@n.Unit.Id" data-translit-mode="term" aria-label="@T($"Unit {n.Unit.NameEn} — name (English)", $"الوحدة {n.Unit.NameAr} — الاسم (إنجليزي)")" /></div></td>
                         <td><select form="@fid" name="parentId" class="form-select form-select-sm" style="width:12rem" aria-label="@T($"Unit {n.Unit.NameEn} — parent unit", $"الوحدة {n.Unit.NameAr} — الوحدة الأم")"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All.Where(u => u.Id != n.Unit.Id)) { <option value="@u.Id" selected="@(u.Id == n.Unit.ParentOrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></td>
                         <td>@n.HeadCount</td>
-                        <td class="small">@string.Join(" · ", n.Current.Take(6).Select(c => $"{(isRtl ? $"{c.Employee.FirstNameAr} {c.Employee.FamilyNameAr}" : $"{c.Employee.FirstNameEn} {c.Employee.FamilyNameEn}")}{(c.Position == null ? "" : $" ({c.Position})")}"))@(n.Current.Count > 6 ? $" +{n.Current.Count - 6}" : "")</td>
+                        <td>@if (n.Current.Count == 0) { <span class="text-muted">—</span> } else { <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-bs-toggle="modal" data-bs-target="#staff-@n.Unit.Id" aria-label="@T($"Show the current staff of {n.Unit.NameEn}", $"عرض الكادر الحالي للوحدة {n.Unit.NameAr}")"><i class="bi bi-people me-1" aria-hidden="true"></i>@T("Show", "عرض")</button> }</td>
                         <td class="text-end text-nowrap"><form id="@fid" method="post" asp-action="EditOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline"><button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form> <form method="post" asp-action="DeleteOrgUnit" asp-route-unitId="@n.Unit.Id" class="d-inline" onsubmit="return confirm('@T("Delete this unit?", "حذف هذه الوحدة؟")');"><button class="btn btn-sm btn-outline-danger" type="submit" @(deletable ? "" : "disabled") title="@(deletable ? T("Delete", "حذف") : T("Has child units or assignment history", "لها وحدات فرعية أو سجل إسناد"))" aria-label="@T("Delete unit", "حذف الوحدة")"><i class="bi bi-trash" aria-hidden="true"></i></button></form></td>
                     </tr>
                 }
@@ -54,10 +57,46 @@
         <div class="sms-card p-3">
             <h2 class="h6 mb-3"><i class="bi bi-plus-circle me-1" aria-hidden="true"></i>@T("New unit", "وحدة جديدة")</h2>
             <form method="post" asp-action="CreateOrgUnit" class="d-grid gap-2">
-                <input name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الشؤون الأكاديمية" required aria-required="true" aria-label="@T("Unit name (Arabic)", "اسم الوحدة (عربي)")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Academic Affairs" required aria-required="true" aria-label="@T("Unit name (English)", "اسم الوحدة (إنجليزي)")" />
+                <input id="ou-new-ar" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="الشؤون الأكاديمية" required aria-required="true" aria-label="@T("Unit name (Arabic)", "اسم الوحدة (عربي)")" /><input name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="Academic Affairs" required aria-required="true" data-translit-from="#ou-new-ar" data-translit-mode="term" aria-label="@T("Unit name (English)", "اسم الوحدة (إنجليزي)")" />
                 <select name="parentId" class="form-select form-select-sm" aria-label="@T("Parent unit", "الوحدة الأم")"><option value="">@T("(root)", "(جذر)")</option>@foreach (var u in Model.All) { <option value="@u.Id">@(isRtl ? u.NameAr : u.NameEn)</option> }</select>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button>
             </form>
+            <p class="form-text mb-0 mt-2"><i class="bi bi-translate me-1" aria-hidden="true"></i>@T("The English name is filled from the Arabic one as you type — overwrite it whenever the school's own wording differs.", "يُملأ الاسم الإنجليزي من العربي أثناء الكتابة — استبدله متى اختلفت التسمية المعتمدة في المدرسة.")</p>
         </div>
     </div>
 </div>
+
+@* One roster dialog per staffed unit. A table cell was never the place for thirty names, and
+   truncating at six hid whoever came seventh from the only screen that lists a unit's people. *@
+@foreach (var n in Model.Nodes.Where(x => x.Current.Count > 0))
+{
+    <div class="modal fade" id="staff-@n.Unit.Id" tabindex="-1" aria-labelledby="staff-@(n.Unit.Id)-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title h6" id="staff-@(n.Unit.Id)-title"><i class="bi bi-people me-1" aria-hidden="true"></i>@T("Current staff", "الكادر الحالي") — @(isRtl ? n.Unit.NameAr : n.Unit.NameEn) <span class="badge text-bg-secondary">@n.Current.Count</span></h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button>
+            </div>
+            <div class="modal-body p-0">
+                <table class="table sms-table mb-0 align-middle">
+                    <caption class="visually-hidden">@T($"Current staff of {n.Unit.NameEn}", $"الكادر الحالي للوحدة {n.Unit.NameAr}")</caption>
+                    <thead><tr><th scope="col">@T("No.", "الرقم")</th><th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Position", "المنصب")</th><th scope="col">@T("Status", "الحالة")</th></tr></thead>
+                    <tbody>
+                    @foreach (var c in n.Current.OrderBy(c => isRtl ? c.Employee.FirstNameAr : c.Employee.FirstNameEn, StringComparer.CurrentCulture).ThenBy(c => c.Employee.EmployeeNo, StringComparer.Ordinal))
+                    {
+                        <tr>
+                            <td><a asp-action="File" asp-route-id="@c.Employee.Id"><code>@c.Employee.EmployeeNo</code></a></td>
+                            <td class="fw-semibold"><a asp-action="File" asp-route-id="@c.Employee.Id">@Name(c.Employee)</a></td>
+                            <td>@(c.Position ?? "—")</td>
+                            <td><span class="badge @StaffLabels.EmployeeBadge(c.Employee.Status)">@StaffLabels.EmployeeStatus(c.Employee.Status, isRtl)</span></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <a class="btn btn-sm btn-outline-primary" asp-action="Index" asp-route-org="@n.Unit.Id"><i class="bi bi-card-list me-1" aria-hidden="true"></i>@T("Open in the staff register", "فتح في سجل الموظفين")</a>
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">@T("Close", "إغلاق")</button>
+            </div>
+        </div></div>
+    </div>
+}

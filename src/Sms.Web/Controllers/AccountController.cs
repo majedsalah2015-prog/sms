@@ -15,8 +15,6 @@ using Sms.Domain.Security;
 using Sms.Infrastructure.Persistence;
 using Sms.Web.Models;
 using Sms.Web.Security;
-using ERP2028.Application.Abstractions.Identity;
-using Sms.Erp.Bridge.Identity;
 using IAuthenticationService = Sms.Application.Security.IAuthenticationService;
 
 namespace Sms.Web.Controllers
@@ -36,13 +34,15 @@ namespace Sms.Web.Controllers
 
         private readonly IAuthenticationService _auth;
         private readonly AppDbContext _db;
-        private readonly IPermissionService _permissions;
 
-        public AccountController(IAuthenticationService auth, AppDbContext db, IPermissionService permissions)
+        /// <summary>Shared with the mobile API's bearer handler — see <see cref="SessionPrincipalFactory"/>.</summary>
+        private readonly SessionPrincipalFactory _principals;
+
+        public AccountController(IAuthenticationService auth, AppDbContext db, SessionPrincipalFactory principals)
         {
             _auth = auth;
             _db = db;
-            _permissions = permissions;
+            _principals = principals;
         }
 
         [HttpGet]
@@ -90,13 +90,13 @@ namespace Sms.Web.Controllers
             {
                 var pending = new ClaimsIdentity(TwoFactorScheme);
                 pending.AddClaim(new Claim(ClaimTypes.NameIdentifier, outcome.UserAccountId.ToString(CultureInfo.InvariantCulture)));
-                pending.AddClaim(new Claim("remember", model.RememberMe ? "1" : "0"));
+                pending.AddClaim(new Claim("remember", model.RememberMe == true ? "1" : "0"));
                 await HttpContext.SignInAsync(TwoFactorScheme, new ClaimsPrincipal(pending),
                     new AuthenticationProperties { ExpiresUtc = DateTimeOffset.UtcNow.AddMinutes(5), IsPersistent = false });
                 return RedirectToAction(nameof(TwoFactor), new { returnUrl = model.ReturnUrl });
             }
 
-            await SignInSessionAsync(outcome.Session!, outcome.MustChangePassword, model.RememberMe);
+            await SignInSessionAsync(outcome.Session!, outcome.MustChangePassword, model.RememberMe == true);
             return outcome.MustChangePassword
                 ? RedirectToAction(nameof(ChangePassword))
                 : LocalRedirect(SafeReturnUrl(model.ReturnUrl));
@@ -223,30 +223,14 @@ namespace Sms.Web.Controllers
 
         private async Task SignInSessionAsync(UserSession session, bool mustChangePassword, bool persistent)
         {
-            var account = await _db.UserAccounts.AsNoTracking().SingleAsync(u => u.Id == session.UserAccountId);
-            var claims = new List<Claim>
-            {
-                new(ClaimTypes.NameIdentifier, account.Id.ToString(CultureInfo.InvariantCulture)),
-                new(ClaimTypes.Name, account.UserName),
-                new(SmsClaimTypes.SessionToken, session.SessionToken),
-                new(SmsClaimTypes.SchoolId, account.SchoolId.ToString(CultureInfo.InvariantCulture)),
-                new(SmsClaimTypes.AccountType, account.AccountType.ToString()),
-            };
-            if (mustChangePassword)
-            {
-                claims.Add(new Claim(SmsClaimTypes.MustChangePassword, "1"));
-            }
+            // The identity itself — including the ERP permission claims the embedded
+            // accounting screens authorize against — is built by SessionPrincipalFactory,
+            // shared with the mobile API's bearer handler. Two transports minting a
+            // principal from two copies of the same code is how one of them quietly loses
+            // a claim, and an accounting screen missing a claim denies rather than errors.
+            var identity = await _principals.BuildAsync(
+                session, mustChangePassword, CookieAuthenticationDefaults.AuthenticationScheme, HttpContext.RequestAborted);
 
-            // The embedded ERP modules authorize by claim, not by a service call, so every accounting
-            // permission this account holds has to be on the principal before it is signed in. They are
-            // ordinary sec.RolePermission grants under the reserved "ERP" module code
-            // (IExternalPermissionCatalog); an account with none simply carries none, and every
-            // accounting screen denies it — the correct deny-by-default answer, not a gap to patch.
-            var erpPermissions = await _permissions.GetGrantedScreenCodesAsync(
-                account.Id, ErpPermissionCatalog.ErpModuleCode, ActionVerb.View, HttpContext.RequestAborted);
-            claims.AddRange(erpPermissions.Select(p => new Claim(AppClaimTypes.Permission, p)));
-
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
                 new ClaimsPrincipal(identity),

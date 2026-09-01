@@ -40,7 +40,89 @@ namespace Sms.Web.Finance
             }
 
             var payers = await db.Payers.AsNoTracking().Where(p => parentFilter == null || (p.ParentId != null && parentFilter.Contains(p.ParentId.Value))).OrderByDescending(p => p.Id).Take(take).ToListAsync();
-            return await CardsAsync(db, payers, includeChildren);
+            var cards = await CardsAsync(db, payers, includeChildren);
+            // Searching a student number returns every guardian who has ever been billed, and the one
+            // the school actually holds responsible must not be the second name on the list — picking
+            // the wrong one addresses the receipt, the statement and every dunning message to somebody
+            // who never agreed to pay (BR-FEE-004, BR-PAR-005). OrderBy is stable, so equals keep their order.
+            return cards.OrderByDescending(c => c.Children.Any(ch => ch.IsFinanciallyResponsible)).ToList();
+        }
+
+        /// <summary>
+        /// Guardians on file who have no <c>Payer</c> row yet — the ones <see cref="SearchPayersAsync"/>
+        /// cannot see, because a payer is created by the first charge (BR-FEE-004) and not by being a
+        /// guardian. A school that has registered a register and billed nobody has every family here.
+        /// <para>
+        /// Returns the count of all of them alongside the matches, because the count is what explains
+        /// a payer list of two beside a parent directory of six hundred; without it a short list is
+        /// indistinguishable from a broken search.
+        /// </para>
+        /// </summary>
+        public static async Task<(IReadOnlyList<UnbilledGuardian> Matches, int Total)> SearchUnbilledGuardiansAsync(AppDbContext db, string? q, int take = 30)
+        {
+            q = q?.Trim();
+            var billed = await db.Payers.AsNoTracking().Where(p => p.ParentId != null).Select(p => p.ParentId!.Value).ToListAsync();
+            var billedSet = billed.ToHashSet();
+
+            // IgnoreQueryFilters for the same reason the payer search uses it: a guardian deactivated
+            // after a family left must still be findable by the clerk asked about their file.
+            var parents = db.Parents.IgnoreQueryFilters().AsNoTracking().Where(p => p.SchoolId == db.CurrentSchoolId);
+            var total = await parents.CountAsync() - billedSet.Count;
+
+            if (string.IsNullOrEmpty(q)) return (Array.Empty<UnbilledGuardian>(), Math.Max(0, total));
+
+            var byParent = await parents
+                .Where(p => p.NameAr.Contains(q) || p.NameEn.Contains(q) || p.ParentFileNo.Contains(q) || p.PrimaryMobile.Contains(q))
+                .ToListAsync();
+            var byStudent = await db.Students.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == db.CurrentSchoolId && (s.StudentNo.Contains(q) || s.FirstNameAr.Contains(q) || s.FamilyNameAr.Contains(q) || s.FirstNameEn.Contains(q) || s.FamilyNameEn.Contains(q)))
+                .Select(s => s.Id).ToListAsync();
+            var viaStudents = byStudent.Count == 0
+                ? new List<int>()
+                : await db.StudentGuardianLinks.AsNoTracking().Where(l => byStudent.Contains(l.StudentId) && l.EffectiveToUtc == null).Select(l => l.ParentId).ToListAsync();
+
+            var matchedIds = byParent.Select(p => p.Id).Concat(viaStudents).Distinct().Where(id => !billedSet.Contains(id)).Take(take).ToList();
+            if (matchedIds.Count == 0) return (Array.Empty<UnbilledGuardian>(), Math.Max(0, total));
+
+            var matched = byParent.Where(p => matchedIds.Contains(p.Id)).ToList();
+            var missing = matchedIds.Except(matched.Select(p => p.Id)).ToList();
+            if (missing.Count > 0)
+            {
+                matched.AddRange(await db.Parents.IgnoreQueryFilters().AsNoTracking().Where(p => missing.Contains(p.Id)).ToListAsync());
+            }
+
+            var links = await db.StudentGuardianLinks.AsNoTracking()
+                .Where(l => matchedIds.Contains(l.ParentId) && l.EffectiveToUtc == null).ToListAsync();
+            var childIds = links.Select(l => l.StudentId).Distinct().ToList();
+            var children = childIds.Count == 0
+                ? new List<Student>()
+                : await db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => childIds.Contains(s.Id)).ToListAsync();
+
+            var cards = matched
+                .Select(p => new UnbilledGuardian(
+                    p,
+                    links.Where(l => l.ParentId == p.Id).Select(l => children.FirstOrDefault(s => s.Id == l.StudentId))
+                        .Where(s => s != null).Select(s => s!).OrderBy(s => s.StudentNo).ToList()))
+                .OrderBy(c => c.Parent.ParentFileNo)
+                .ToList();
+
+            return (cards, Math.Max(0, total));
+        }
+
+        /// <summary>One unbilled guardian by id, or null when they exist and have in fact been billed.</summary>
+        public static async Task<UnbilledGuardian?> UnbilledGuardianAsync(AppDbContext db, int parentId)
+        {
+            if (await db.Payers.AsNoTracking().AnyAsync(p => p.ParentId == parentId)) return null;
+            var parent = await db.Parents.IgnoreQueryFilters().AsNoTracking()
+                .SingleOrDefaultAsync(p => p.Id == parentId && p.SchoolId == db.CurrentSchoolId);
+            if (parent == null) return null;
+
+            var links = await db.StudentGuardianLinks.AsNoTracking().Where(l => l.ParentId == parentId && l.EffectiveToUtc == null).ToListAsync();
+            var childIds = links.Select(l => l.StudentId).Distinct().ToList();
+            var children = childIds.Count == 0
+                ? new List<Student>()
+                : await db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => childIds.Contains(s.Id)).OrderBy(s => s.StudentNo).ToListAsync();
+            return new UnbilledGuardian(parent, children);
         }
 
         public static async Task<PayerCard?> CardAsync(AppDbContext db, int payerId)
@@ -62,20 +144,36 @@ namespace Sms.Web.Finance
             // Charges can also name students the parent isn't (any longer) linked to — include them so the card is complete.
             if (includeChildren)
             {
+                // Retiring a relationship type from the catalogue must not blank out "father" on the
+                // cashier screen, so the label is looked up through the soft-active filter, not inside it.
+                var relIds = links.Select(l => l.RelationshipLookupId).Distinct().ToList();
+                var relationships = await db.LookupValues.IgnoreQueryFilters().AsNoTracking().Where(v => relIds.Contains(v.Id)).ToListAsync();
                 var payerIds = payers.Select(p => p.Id).ToList();
                 var chargedStudentIds = await db.Charges.AsNoTracking().Where(c => payerIds.Contains(c.PayerId)).Select(c => new { c.PayerId, c.StudentId }).Distinct().ToListAsync();
                 var missing = chargedStudentIds.Select(x => x.StudentId).Except(studentIds).ToList();
                 if (missing.Count > 0) students.AddRange(await db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => missing.Contains(s.Id)).ToListAsync());
+                var liveLinks = links.Select(l => new PayerResponsibilityEvaluator.GuardianLink(l.StudentId, l.ParentId, l.IsFinanciallyResponsible)).ToList();
                 return payers.Select(p =>
                 {
                     var parent = parents.FirstOrDefault(x => x.Id == p.ParentId);
                     var kids = links.Where(l => l.ParentId == p.ParentId).Select(l => l.StudentId)
                         .Concat(chargedStudentIds.Where(x => x.PayerId == p.Id).Select(x => x.StudentId)).Distinct()
-                        .Select(id => students.FirstOrDefault(s => s.Id == id)).Where(s => s != null).Select(s => s!).OrderBy(s => s.StudentNo).ToList();
-                    return new PayerCard(p, parent, kids);
+                        .Select(id => students.FirstOrDefault(s => s.Id == id)).Where(s => s != null).Select(s => s!).OrderBy(s => s.StudentNo)
+                        .Select(s =>
+                        {
+                            var link = links.FirstOrDefault(l => l.ParentId == p.ParentId && l.StudentId == s.Id);
+                            var rel = link == null ? null : relationships.FirstOrDefault(v => v.Id == link.RelationshipLookupId);
+                            return new PayerChild(s, rel?.Name.NameAr ?? "", rel?.Name.NameEn ?? "",
+                                PayerResponsibilityEvaluator.IsResponsibleFor(p.ParentId, s.Id, liveLinks));
+                        }).ToList();
+                    return new PayerCard(p, parent, kids)
+                    {
+                        IsResponsibleForNothing = PayerResponsibilityEvaluator.IsResponsibleForNothing(
+                            p.ParentId, kids.Select(k => k.Student.Id).ToList(), liveLinks),
+                    };
                 }).ToList();
             }
-            return payers.Select(p => new PayerCard(p, parents.FirstOrDefault(x => x.Id == p.ParentId), Array.Empty<Student>())).ToList();
+            return payers.Select(p => new PayerCard(p, parents.FirstOrDefault(x => x.Id == p.ParentId), Array.Empty<PayerChild>())).ToList();
         }
 
         /// <summary>Posted charges of a payer (or a student) with their remaining balance — the cashier's allocation targets.</summary>

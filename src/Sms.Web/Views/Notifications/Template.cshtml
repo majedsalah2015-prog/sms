@@ -1,0 +1,249 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model TemplateEditorViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+
+    var template = Model.Detail.Template;
+    var latest = Model.Detail.Latest;
+
+    string EventName(string code)
+        => NotificationEventCatalog.TryGet(code, out var e) ? (isRtl ? e.TitleAr : e.TitleEn) : code;
+
+    string Channel(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("In-app", "داخل النظام"),
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        _ => "WhatsApp",
+    };
+
+    string Status(TemplatePublishStatus s) => s switch
+    {
+        TemplatePublishStatus.Draft => T("Draft", "مسودة"),
+        TemplatePublishStatus.TestSent => T("Test sent", "أُرسل اختبارها"),
+        _ => T("Published", "منشورة"),
+    };
+
+    ViewData["Title"] = EventName(template.EventCode) + " · " + Channel(template.Channel);
+    ViewData["Breadcrumb"] = T("Notifications / Template studio / ", "الإشعارات / استوديو القوالب / ") + EventName(template.EventCode);
+
+    var canPublish = latest.PublishStatus == TemplatePublishStatus.TestSent;
+    var isLive = template.CurrentVersionNumber == latest.VersionNumber
+                 && latest.PublishStatus == TemplatePublishStatus.Published;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "tpl-edit-help",
+        Title = T("This template — help", "هذا القالب — مساعدة"),
+        Intro = T("The wording one kind of message goes out in, on one channel, in both languages. What is on screen is the newest version; what parents actually receive is whichever version is marked live.",
+                  "صياغة نوع واحد من الرسائل، على قناة واحدة، باللغتين. وما على الشاشة هو أحدث نسخة؛ وما يستلمه أولياء الأمور فعلاً هو النسخة الموسومة «فعّالة»."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Newest is not the same as live", "الأحدث ليست الفعّالة"),
+                T("Saving adds a version and changes nothing about what is being sent. Only publishing moves the live marker, and only a version that has been test-sent can be published (BR-NTF-001). A studio full of drafts sends exactly what it sent last month.",
+                  "الحفظ يضيف نسخة ولا يغيّر شيئاً مما يُرسل. والنشر وحده ينقل علامة «الفعّالة»، ولا تُنشر إلا نسخة أُرسل اختبارها (BR-NTF-001). فالاستوديو المليء بالمسودات يرسل تماماً ما أرسله الشهر الماضي.")),
+            new HelpPanelViewModel.Item(
+                T("The test is a real message", "الاختبار رسالة حقيقية"),
+                T("It goes to your own account on this template's own channel, with the placeholders filled by their own names in brackets so you can see where each value lands. On WhatsApp or SMS it costs one message and counts against the budget — which is the point: a template the gateway will refuse looks perfectly correct on this screen.",
+                  "يذهب إلى حسابك أنت على قناة هذا القالب نفسها، والرموز مملوءة بأسمائها بين قوسين لترى أين يحلّ كل قيمة. وعلى واتساب أو الرسائل النصية يكلّف رسالة واحدة ويُحسب على الميزانية — وذلك هو المقصود: فالقالب الذي سترفضه البوابة يبدو سليماً تماماً على هذه الشاشة.")),
+            new HelpPanelViewModel.Item(
+                T("Old versions are never edited", "النسخ القديمة لا تُعدَّل"),
+                T("Every message already delivered points at the version it was rendered from, and that version is frozen. It is what lets the school show a parent, two years later, the exact words it sent them (BR-NOT-008).",
+                  "كل رسالة سُلِّمت تشير إلى النسخة التي بُنيت منها، وتلك النسخة مجمَّدة. وهذا ما يتيح للمدرسة أن تُري ولي أمر، بعد عامين، الكلمات نفسها التي أرسلتها إليه (BR-NOT-008).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            <code>@template.EventCode</code> ·
+            @T($"version {latest.VersionNumber}", $"النسخة {latest.VersionNumber}") ·
+            @Status(latest.PublishStatus)
+            @if (isLive)
+            {
+                <span class="badge bg-success ms-2">@T("live", "فعّالة")</span>
+            }
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-outline-secondary" asp-action="Templates">@T("Back to the studio", "العودة إلى الاستوديو")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_NotificationsNav" />
+
+@if (!isLive)
+{
+    <div class="alert alert-warning">
+        @if (latest.PublishStatus == TemplatePublishStatus.Draft)
+        {
+            @T("This version is a draft. Send a test on its own channel, then publish it — until then, deliveries render whichever version was published before it, or none at all (BR-NTF-001).",
+               "هذه النسخة مسودة. أرسل اختباراً على قناتها ثم انشرها — وحتى ذلك تُبنى التسليمات على النسخة المنشورة قبلها، أو لا تُبنى أصلاً (BR-NTF-001).")
+        }
+        else
+        {
+            @T("A test has gone out. Publishing makes this the wording every future delivery renders.",
+               "خرج الاختبار. والنشر يجعل هذه الصياغة هي ما تُبنى عليه كل تسليمة قادمة.")
+        }
+    </div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div class="sms-card">
+            <div class="p-3">
+                <h2 class="h5 mb-3">@T("Latest version", "أحدث نسخة")</h2>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">@T("Subject (English)", "الموضوع (إنجليزي)")</label>
+                        <div class="border rounded p-2 bg-light" dir="ltr">@(latest.SubjectEn ?? "—")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">@T("Subject (Arabic)", "الموضوع (عربي)")</label>
+                        <div class="border rounded p-2 bg-light" dir="rtl">@(latest.SubjectAr ?? "—")</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">@T("Body (English)", "النص (إنجليزي)")</label>
+                        <div class="border rounded p-2 bg-light" dir="ltr" style="white-space: pre-wrap;">@latest.BodyEn</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">@T("Body (Arabic)", "النص (عربي)")</label>
+                        <div class="border rounded p-2 bg-light" dir="rtl" style="white-space: pre-wrap;">@latest.BodyAr</div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 mt-3">
+                    <form asp-action="TestTemplate" asp-route-templateId="@template.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="versionId" value="@latest.Id" />
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="bi bi-send me-1" aria-hidden="true"></i>@T("Send a test to myself", "أرسل اختباراً إليّ")
+                        </button>
+                    </form>
+
+                    <form asp-action="PublishTemplate" asp-route-templateId="@template.Id" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="versionId" value="@latest.Id" />
+                        <button type="submit" class="btn btn-primary" disabled="@(!canPublish)">
+                            <i class="bi bi-check2-circle me-1" aria-hidden="true"></i>@T("Publish", "نشر")
+                        </button>
+                    </form>
+                </div>
+
+                @if (!canPublish && latest.PublishStatus == TemplatePublishStatus.Draft)
+                {
+                    <p class="form-text mb-0 mt-2">
+                        @T("Publishing is available once a test has actually gone out on this channel.",
+                           "يُتاح النشر بعد خروج اختبار فعلي على هذه القناة.")
+                    </p>
+                }
+            </div>
+        </div>
+
+        <div class="sms-card mt-4">
+            <div class="p-3 pb-0"><h2 class="h5 mb-0">@T("Version history", "سجل النسخ")</h2></div>
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Version history", "سجل النسخ")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Version", "النسخة")</th>
+                    <th scope="col">@T("State", "الحالة")</th>
+                    <th scope="col">@T("Body (English)", "النص (إنجليزي)")</th>
+                    <th scope="col">@T("Written", "كُتبت")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var version in Model.Detail.Versions)
+                {
+                    <tr class="@(version.Id == latest.Id ? "" : "text-muted")">
+                        <td>
+                            v@(version.VersionNumber)
+                            @if (version.VersionNumber == template.CurrentVersionNumber)
+                            {
+                                <span class="badge bg-success ms-1">@T("live", "فعّالة")</span>
+                            }
+                        </td>
+                        <td>@Status(version.PublishStatus)</td>
+                        <td dir="ltr" class="text-truncate" style="max-width: 22rem;">@version.BodyEn</td>
+                        <td dir="ltr">@version.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="sms-card">
+            <div class="p-3">
+                <h2 class="h6">@T("Placeholders this event supplies", "الرموز التي يوفّرها هذا الحدث")</h2>
+
+                @if (Model.PlaceholdersUnknown)
+                {
+                    <p class="text-muted small mb-0">
+                        @T("No module raises this event yet, so nothing is known about what it will carry — placeholders are not checked here, and any you write will be left as written until the module that sends it exists.",
+                           "لا تُطلق أي وحدة هذا الحدث بعد، فلا يُعرف ما سيحمله — ولا تُفحص الرموز هنا، وما تكتبه منها يبقى كما هو حتى توجد الوحدة التي ترسله.")
+                    </p>
+                }
+                else
+                {
+                    <p class="text-muted small">
+                        @T("Copy one exactly, braces and capitals included — the match is literal.",
+                           "انسخ الرمز بحروفه وأقواسه — فالمطابقة حرفية.")
+                    </p>
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var key in Model.Placeholders)
+                        {
+                            <li class="mb-1"><code dir="ltr">@("{" + key + "}")</code></li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+        <div class="sms-card mt-4">
+            <div class="p-3">
+                <h2 class="h6">@T("Write a new version", "كتابة نسخة جديدة")</h2>
+                <p class="text-muted small">
+                    @T("Saving never overwrites this one — it adds the next version and leaves everything already delivered pointing where it pointed (BR-NOT-008).",
+                       "الحفظ لا يستبدل هذه النسخة أبداً — بل يضيف النسخة التالية ويترك كل ما سُلِّم مشيراً إلى حيث كان يشير (BR-NOT-008).")
+                </p>
+                <form asp-action="SaveTemplate" method="post">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="eventCode" value="@template.EventCode" />
+                    <input type="hidden" name="channel" value="@((int)template.Channel)" />
+
+                    <div class="mb-2">
+                        <label class="form-label small" for="v-subjectEn">@T("Subject (English)", "الموضوع (إنجليزي)")</label>
+                        <input class="form-control form-control-sm" id="v-subjectEn" name="subjectEn" dir="ltr"
+                               maxlength="200" value="@latest.SubjectEn" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small" for="v-subjectAr">@T("Subject (Arabic)", "الموضوع (عربي)")</label>
+                        <input class="form-control form-control-sm" id="v-subjectAr" name="subjectAr" dir="rtl"
+                               maxlength="200" value="@latest.SubjectAr" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small" for="v-bodyEn">@T("Body (English)", "النص (إنجليزي)")</label>
+                        <textarea class="form-control form-control-sm" id="v-bodyEn" name="bodyEn" dir="ltr" rows="4" required>@latest.BodyEn</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small" for="v-bodyAr">@T("Body (Arabic)", "النص (عربي)")</label>
+                        <textarea class="form-control form-control-sm" id="v-bodyAr" name="bodyAr" dir="rtl" rows="4" required>@latest.BodyAr</textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        @T("Save as the next version", "حفظ كنسخة تالية")
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

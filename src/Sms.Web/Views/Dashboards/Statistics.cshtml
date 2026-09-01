@@ -1,0 +1,373 @@
+@using System.Globalization
+@using Sms.Application.Dashboards
+@model StatisticsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("School statistics", "إحصائيات المدرسة");
+    ViewData["Breadcrumb"] = T("Dashboards / Statistics", "لوحات المعلومات / الإحصائيات");
+
+    string Money(decimal v) => v.ToString("N2", CultureInfo.InvariantCulture);
+    string Count(decimal v) => v.ToString("N0", CultureInfo.InvariantCulture);
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "dsh-statistics-help",
+        Title = T("Statistics — help", "الإحصائيات — مساعدة"),
+        Intro = T(
+            "Five readings of one academic year: who is enrolled, who teaches them, what the school billed, what it collected, and what the ledger says it spent. Nothing here is stored — pick a different year and every figure is recomputed, so there is no snapshot to go stale.",
+            "خمس قراءات لعام دراسي واحد: من المقيَّدون، ومن يُدرِّسهم، وما الذي طالبت به المدرسة، وما الذي حصَّلته، وما تقوله دفاتر المحاسبة عمّا أنفقته. ولا شيء هنا مخزَّن — اختر عاماً آخر فتُعاد حوسبة كل رقم، فلا لقطة تتقادم."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Students are counted by enrollment", "الطلاب محسوبون بالقيد"),
+                T("The headcount is active enrollments in the chosen year, not student records. A student's file outlives the year that created it, so counting files would report every alumnus as if they were still in a classroom.",
+                  "العدد هو القيود السارية في العام المختار، لا سجلات الطلاب. فملف الطالب يبقى بعد العام الذي أنشأه، وعدُّ الملفات يجعل كل خريج يُحسب وكأنه ما زال في الصف.")),
+            new HelpPanelViewModel.Item(
+                T("Outstanding is the fee module's own figure", "المستحق رقم وحدة الرسوم نفسها"),
+                T("What is owed comes from the same calculation the receivables report uses — posted charges, less credit notes, less discounts, less what has been allocated against them. The two screens cannot disagree.",
+                  "المستحق مأخوذ من الحساب نفسه الذي يستعمله تقرير الذمم: المطالبات المرحَّلة، ناقص إشعارات الدائن، ناقص الخصومات، ناقص ما خُصّص من المدفوعات. فلا يمكن أن تتعارض الشاشتان.")),
+            new HelpPanelViewModel.Item(
+                T("Payments are dated, not enrolled", "المدفوعات مؤرَّخة لا مقيَّدة"),
+                T("A receipt carries no academic year, so collections are bounded by the year's own calendar dates. Voided receipts collected nothing and are excluded.",
+                  "السند لا يحمل عاماً دراسياً، لذا يُحدَّد التحصيل بتواريخ العام نفسه. والسندات الملغاة لم تُحصِّل شيئاً فهي مستثناة.")),
+            new HelpPanelViewModel.Item(
+                T("Expenses come from the ledger", "المصروفات من دفتر الأستاذ"),
+                T("This system bills and collects; it never records a salary or a supplier invoice. Expenses are read from the attached accounting ledger, posted entries only. With no ledger attached the section says so rather than showing a zero it did not measure.",
+                  "هذا النظام يُطالب ويُحصِّل، ولا يسجل راتباً ولا فاتورة مورِّد. والمصروفات مقروءة من دفتر الأستاذ المحاسبي الموصول، من القيود المرحَّلة وحدها. وإن لم يكن موصولاً قال القسم ذلك بدل أن يعرض صفراً لم يقِسه.")),
+            new HelpPanelViewModel.Item(
+                T("Trend charts read left to right", "المخططات الزمنية تُقرأ من اليسار"),
+                T("The month axis does not mirror with the page. Time runs left to right in both languages so the same series never slopes one way in Arabic and the other in English; the month names are translated and follow the line.",
+                  "محور الأشهر لا ينعكس مع الصفحة. فالزمن يجري من اليسار إلى اليمين في اللغتين كي لا تصعد السلسلة نفسها في العربية وتهبط في الإنجليزية؛ وأسماء الأشهر مترجمة وتتبع الخط.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("The year in numbers: students, staff, fees, payments and spending.", "العام بالأرقام: الطلاب والكادر والرسوم والمدفوعات والإنفاق.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_DashboardsNav" />
+
+@if (Model.Year == null)
+{
+    <div class="sms-card p-4 text-center text-muted">
+        @T("No academic year has been created yet, so there is nothing to count. Create one in Academic years first.",
+           "لم يُنشأ عام دراسي بعد، فلا شيء يُحصى. أنشئ عاماً من شاشة الأعوام الدراسية أولاً.")
+    </div>
+    return;
+}
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-auto">
+        <label for="f-year" class="form-label small text-muted">@T("Academic year", "العام الدراسي")</label>
+        <select id="f-year" name="year" class="form-select form-select-sm" style="width:auto">
+            @foreach (var y in Model.Years)
+            {
+                <option value="@y.Id" selected="@(y.Id == Model.Year.Id)">@(isRtl ? y.LabelAr : y.LabelEn)</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-primary">@T("Show", "اعرض")</button>
+    </div>
+    <div class="col-auto ms-auto">
+        <span class="small text-muted">
+            @string.Format(T("As of {0} UTC", "حتى {0} بتوقيت UTC"), Model.AsOfUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
+        </span>
+    </div>
+</form>
+
+@if (Model.Stats == null)
+{
+    <div class="sms-card p-4 text-center text-muted">@T("Nothing to show for this year.", "لا شيء لعرضه لهذا العام.")</div>
+    return;
+}
+
+@{
+    var s = Model.Stats;
+}
+
+@* ==================================================================== students *@
+<h2 class="sms-section-title">@T("Students", "الطلاب")</h2>
+<div class="row g-3 mb-3">
+    @{
+        var studentTiles = new (string En, string Ar, string Value, string? Note)[]
+        {
+            ("Enrolled", "المقيَّدون", Count(s.Students.Total), null),
+            ("Boys", "بنون", Count(s.Students.Male), ChartGeometry.Percent(s.Students.Male, s.Students.Total).ToString("0.#", CultureInfo.InvariantCulture) + "%"),
+            ("Girls", "بنات", Count(s.Students.Female), ChartGeometry.Percent(s.Students.Female, s.Students.Total).ToString("0.#", CultureInfo.InvariantCulture) + "%"),
+            ("Admitted this year", "ملتحقون هذا العام", Count(s.Students.Admitted), null),
+            ("Withdrawn", "منسحبون", Count(s.Students.Withdrawn), null),
+        };
+    }
+    @foreach (var tile in studentTiles)
+    {
+        <div class="col-6 col-md-4 col-xl">
+            <div class="sms-tile">
+                <span class="sms-tile__value"><bdi dir="ltr">@tile.Value</bdi></span>
+                <span class="sms-tile__label">@T(tile.En, tile.Ar)</span>
+                @if (tile.Note != null)
+                {
+                    <span class="small text-muted"><bdi dir="ltr">@tile.Note</bdi></span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-lg-7">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Enrolled by grade", "المقيَّدون بحسب الصف")</h3>
+            <partial name="_ChartBars" model="@(new BarChartViewModel {
+                Title = T("Enrolled by grade", "المقيَّدون بحسب الصف"),
+                Slices = s.Students.ByGrade,
+                EmptyText = T("No grade has an active enrollment this year.", "لا صفَّ فيه قيد سارٍ هذا العام.") })" />
+        </div>
+    </div>
+    <div class="col-12 col-lg-5">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Enrollments by outcome", "القيود بحسب المآل")</h3>
+            <partial name="_ChartDonut" model="@(new DonutChartViewModel {
+                Title = T("Enrollments by outcome", "القيود بحسب المآل"),
+                Slices = s.Students.ByStatus,
+                EmptyText = T("No enrollment has been made for this year.", "لم يُسجَّل قيد لهذا العام.") })" />
+        </div>
+    </div>
+</div>
+
+@* ==================================================================== staff *@
+<h2 class="sms-section-title">@T("Staff and teachers", "الكادر والمعلمون")</h2>
+<div class="row g-3 mb-3">
+    @{
+        var staffTiles = new (string En, string Ar, string Value, string? NoteEn, string? NoteAr)[]
+        {
+            ("Employees", "الموظفون", Count(s.Staff.Employees), null, null),
+            ("On duty", "على رأس العمل", Count(s.Staff.ActiveEmployees), null, null),
+            ("Teachers", "المعلمون", Count(s.Staff.Teachers), null, null),
+            ("Teaching this year", "يُدرِّسون هذا العام", Count(s.Staff.AssignedTeachers), null, null),
+            ("Average periods", "متوسط الحصص", s.Staff.AveragePeriods.ToString("0.#", CultureInfo.InvariantCulture), "per week", "أسبوعياً"),
+            ("Students per teacher", "طالب لكل معلم", s.Staff.StudentsPerTeacher.ToString("0.#", CultureInfo.InvariantCulture), null, null),
+        };
+    }
+    @foreach (var tile in staffTiles)
+    {
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="sms-tile">
+                <span class="sms-tile__value"><bdi dir="ltr">@tile.Value</bdi></span>
+                <span class="sms-tile__label">@T(tile.En, tile.Ar)</span>
+                @if (tile.NoteEn != null)
+                {
+                    <span class="small text-muted">@T(tile.NoteEn, tile.NoteAr!)</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-lg-5">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Employees by status", "الموظفون بحسب الحالة")</h3>
+            <partial name="_ChartDonut" model="@(new DonutChartViewModel {
+                Title = T("Employees by status", "الموظفون بحسب الحالة"),
+                Slices = s.Staff.ByStatus,
+                EmptyText = T("No employee has been recorded yet.", "لم يُسجَّل موظف بعد.") })" />
+        </div>
+    </div>
+    <div class="col-12 col-lg-7">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-1">@T("Teaching load", "نصاب التدريس")</h3>
+            <p class="small text-muted mb-3">@T("Each teacher measured against their own weekly cap, not a school-wide one.", "كل معلم مقيس على نصابه الأسبوعي هو، لا على نصاب موحَّد للمدرسة.")</p>
+            <partial name="_ChartBars" model="@(new BarChartViewModel {
+                Title = T("Teaching load", "نصاب التدريس"),
+                Slices = s.Staff.ByLoadBand,
+                EmptyText = T("No teacher holds an assignment this year.", "لا معلم لديه إسناد هذا العام.") })" />
+        </div>
+    </div>
+</div>
+
+@* ==================================================================== fees *@
+<h2 class="sms-section-title">@T("Fees billed", "الرسوم المطالَب بها")</h2>
+<div class="row g-3 mb-3">
+    @{
+        var feeTiles = new (string En, string Ar, string Value, bool Danger)[]
+        {
+            ("Billed (gross)", "المطالَب به (إجمالي)", Money(s.Fees.Billed), false),
+            ("Before VAT", "قبل الضريبة", Money(s.Fees.Net), false),
+            ("VAT", "الضريبة", Money(s.Fees.Vat), false),
+            ("Discounts", "الخصومات", Money(s.Fees.Discounts), false),
+            ("Credit notes", "إشعارات دائنة", Money(s.Fees.CreditNotes), false),
+            ("Outstanding", "المستحق", Money(s.Fees.Outstanding), s.Fees.Outstanding > 0m),
+        };
+    }
+    @foreach (var tile in feeTiles)
+    {
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="sms-tile">
+                <span class="sms-tile__value @(tile.Danger ? "text-danger" : "")"><bdi dir="ltr">@tile.Value</bdi></span>
+                <span class="sms-tile__label">@T(tile.En, tile.Ar)</span>
+            </div>
+        </div>
+    }
+</div>
+<p class="small text-muted mb-3">
+    @string.Format(T("From {0} posted charges.", "من {0} مطالبة مرحَّلة."), Count(s.Fees.ChargeCount))
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-lg-5">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Billed by fee category", "المطالَب به بحسب فئة الرسم")</h3>
+            <partial name="_ChartDonut" model="@(new DonutChartViewModel {
+                Title = T("Billed by fee category", "المطالَب به بحسب فئة الرسم"),
+                Slices = s.Fees.ByCategory,
+                IsMoney = true,
+                EmptyText = T("Nothing has been billed this year.", "لم يُطالَب بشيء هذا العام.") })" />
+        </div>
+    </div>
+    <div class="col-12 col-lg-7">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Billed against collected", "المطالَب به مقابل المحصَّل")</h3>
+            <partial name="_ChartTrend" model="@(new TrendChartViewModel {
+                Title = T("Billed against collected, by month", "المطالَب به مقابل المحصَّل، شهرياً"),
+                Points = s.Payments.ByMonth,
+                FirstLabel = T("Billed", "المطالَب به"),
+                SecondLabel = T("Collected", "المحصَّل"),
+                EmptyText = T("Nothing was billed or collected inside this year's own months.", "لم يُطالَب ولم يُحصَّل شيء داخل أشهر هذا العام نفسه.") })" />
+            @*
+                The bars need not sum to the "Billed" tile above them, and saying so
+                is the point: early registration bills a year months before it opens,
+                and that charge belongs to the year it is for rather than the month
+                it was raised in. A chart quietly totalling less than the number
+                printed above it is the failure BR-DSH-002 exists to prevent.
+            *@
+            @if (s.Fees.BilledOutsideMonths != 0m)
+            {
+                <p class="small text-muted mb-0 mt-2">
+                    @string.Format(
+                        T("A further {0} was billed to this year but posted outside its months — early registration, most often — so it counts in the total above and appears on no bar here.",
+                          "وهناك {0} إضافية مطالَب بها على هذا العام لكنها مُرحَّلة خارج أشهره — تسجيل مبكر في الغالب — فهي داخلة في الإجمالي أعلاه ولا تظهر على أي عمود هنا."),
+                        Money(s.Fees.BilledOutsideMonths))
+                </p>
+            }
+        </div>
+    </div>
+</div>
+
+@* ==================================================================== payments *@
+<h2 class="sms-section-title">@T("Payments collected", "المدفوعات المحصَّلة")</h2>
+<div class="row g-3 mb-3">
+    @{
+        var paymentTiles = new (string En, string Ar, string Value)[]
+        {
+            ("Collected", "المحصَّل", Money(s.Payments.Collected)),
+            ("Refunded", "المرتجَع", Money(s.Payments.Refunded)),
+            ("Receipts", "السندات", Count(s.Payments.ReceiptCount)),
+            ("Average receipt", "متوسط السند", Money(s.Payments.AverageReceipt)),
+            ("Collection rate", "نسبة التحصيل", s.Payments.CollectionRate.ToString("0.#", CultureInfo.InvariantCulture) + "%"),
+        };
+    }
+    @foreach (var tile in paymentTiles)
+    {
+        <div class="col-6 col-md-4 col-xl">
+            <div class="sms-tile">
+                <span class="sms-tile__value"><bdi dir="ltr">@tile.Value</bdi></span>
+                <span class="sms-tile__label">@T(tile.En, tile.Ar)</span>
+            </div>
+        </div>
+    }
+</div>
+<p class="small text-muted mb-3">
+    @T("Refunds are counted by the date the voucher was raised — a refund records no payout date of its own.",
+       "المرتجعات محسوبة بتاريخ تحرير السند، إذ لا يسجل المرتجع تاريخ صرف خاصاً به.")
+</p>
+
+<div class="row g-3 mb-4">
+    <div class="col-12 col-lg-5">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-3">@T("Collected by method", "المحصَّل بحسب طريقة الدفع")</h3>
+            <partial name="_ChartDonut" model="@(new DonutChartViewModel {
+                Title = T("Collected by method", "المحصَّل بحسب طريقة الدفع"),
+                Slices = s.Payments.ByMethod,
+                IsMoney = true,
+                EmptyText = T("No receipt was issued inside this year's dates.", "لم يُصدر سند داخل تواريخ هذا العام.") })" />
+        </div>
+    </div>
+    <div class="col-12 col-lg-7">
+        <div class="sms-card p-3 h-100">
+            <h3 class="h6 mb-1">@T("Collected by month", "المحصَّل شهرياً")</h3>
+            <p class="small text-muted mb-3">@T("The same pair as above, read for the collection side.", "الزوج نفسه أعلاه، مقروءاً من جانب التحصيل.")</p>
+            <partial name="_ChartBars" model="@(new BarChartViewModel {
+                Title = T("Collected by month", "المحصَّل شهرياً"),
+                Slices = s.Payments.ByMonth
+                    .Select(p => new StatisticSlice(
+                        StatisticsLabels.MonthYear(p.Year, p.Month, false),
+                        StatisticsLabels.MonthYear(p.Year, p.Month, true),
+                        p.Second))
+                    .ToList(),
+                IsMoney = true,
+                EmptyText = T("No receipt was issued inside this year's dates.", "لم يُصدر سند داخل تواريخ هذا العام.") })" />
+        </div>
+    </div>
+</div>
+
+@* ==================================================================== expenses *@
+<h2 class="sms-section-title">@T("Spending", "الإنفاق")</h2>
+@if (!Model.HasLedger)
+{
+    <div class="sms-card p-4 mb-4">
+        <p class="mb-1 fw-semibold">@T("No accounting ledger is attached.", "لا يوجد دفتر أستاذ محاسبي موصول.")</p>
+        <p class="text-muted small mb-0">
+            @T("This system bills and collects but never records a salary or a supplier invoice, so it has no expense figure of its own. With the accounting module attached, posted revenue and expenses appear here.",
+               "هذا النظام يُطالب ويُحصِّل ولا يسجل راتباً ولا فاتورة مورِّد، فليس لديه رقم مصروفات خاص به. وبوصل وحدة المحاسبة تظهر هنا الإيرادات والمصروفات المرحَّلة.")
+        </p>
+    </div>
+}
+else
+{
+    var e = Model.Stats.Expenses!;
+    <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+            <div class="sms-tile">
+                <span class="sms-tile__value"><bdi dir="ltr">@Money(e.Revenue)</bdi></span>
+                <span class="sms-tile__label">@T("Revenue posted", "الإيرادات المرحَّلة")</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="sms-tile">
+                <span class="sms-tile__value"><bdi dir="ltr">@Money(e.Expenses)</bdi></span>
+                <span class="sms-tile__label">@T("Expenses posted", "المصروفات المرحَّلة")</span>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="sms-tile">
+                <span class="sms-tile__value @(e.Net < 0m ? "text-danger" : "text-success")"><bdi dir="ltr">@Money(e.Net)</bdi></span>
+                <span class="sms-tile__label">@(e.Net < 0m ? T("Deficit", "عجز") : T("Surplus", "فائض"))</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sms-card p-3 mb-4">
+        <h3 class="h6 mb-1">@T("Revenue against expenses", "الإيرادات مقابل المصروفات")</h3>
+        <p class="small text-muted mb-3">
+            @T("Posted entries only — a draft is an intention, not a financial fact. These are the ledger's own figures and will not match fees billed above, which counts what this system charged rather than what the books recognised.",
+               "القيود المرحَّلة وحدها — فالمسودة نية لا واقعة مالية. وهذه أرقام دفتر الأستاذ نفسه، ولن تطابق الرسوم أعلاه لأن تلك تعدّ ما طالب به هذا النظام لا ما اعترفت به الدفاتر.")
+        </p>
+        <partial name="_ChartTrend" model="@(new TrendChartViewModel {
+            Title = T("Revenue against expenses, by month", "الإيرادات مقابل المصروفات، شهرياً"),
+            Points = e.ByMonth,
+            FirstLabel = T("Revenue", "الإيرادات"),
+            SecondLabel = T("Expenses", "المصروفات"),
+            EmptyText = T("The ledger has no posted entry inside this year's dates.", "لا قيد مرحَّل في دفتر الأستاذ داخل تواريخ هذا العام.") })" />
+    </div>
+
+    <p class="small text-muted">
+        @T("A breakdown of expenses by account — salaries against utilities against supplies — needs a method the accounting module does not publish yet. It belongs in the accounting product, not here.",
+           "أما توزيع المصروفات على الحسابات — رواتب مقابل مرافق مقابل لوازم — فيحتاج إلى دالة لا تنشرها وحدة المحاسبة بعد. ومكانها منتج المحاسبة لا هنا.")
+    </p>
+}

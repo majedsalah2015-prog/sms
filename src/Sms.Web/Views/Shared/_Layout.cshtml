@@ -4,6 +4,7 @@
 @inject ISystemSetupAdmin SetupAdmin
 @inject Sms.Web.Navigation.ModuleVisibility Visibility
 @inject Sms.Web.Navigation.ErpNavigationSource ErpNavigation
+@inject Sms.Web.Services.SchoolBrandMark BrandMark
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     var culture = CultureInfo.CurrentUICulture;
@@ -25,6 +26,29 @@
     }
     var canExportToLedger = await Visibility.CanSeeScreenAsync(
         Sms.Application.Security.ScreenCatalog.Modules.Fees, Sms.Application.Security.ScreenCatalog.Fees.GlExport);
+    // The assignment board gets its own entry under People, so it needs its own screen right asked
+    // for — holding the Sections module is not the same as being allowed to redistribute a grade.
+    var canSeeSectionBoard = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Sections, Sms.Application.Security.ScreenCatalog.Sections.Board);
+    // The users-and-permissions section, one right per entry: designing a role reaches every
+    // permission in the product, handing an existing one out does not.
+    var canSeeRoles = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.SystemAdministration, Sms.Application.Security.ScreenCatalog.SystemAdministration.Roles);
+    var canSeeUserRoles = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.SystemAdministration, Sms.Application.Security.ScreenCatalog.SystemAdministration.UserRoles);
+    // Student finance gets its own entry under Finance, so it needs its own screen right asked for —
+    // reading one family's position is not the right to browse the whole roll's.
+    var canSeeStudentFinance = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Fees, Sms.Application.Security.ScreenCatalog.Fees.StudentFinance);
+    // Bulk placement gets its own entry under People, so it needs its own screen right asked for —
+    // reading the student directory is not the right to enrol a whole year group.
+    var canSeeBulkPlacement = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Students, Sms.Application.Security.ScreenCatalog.Students.Enrollment);
+    // The outstanding-fees roll gets its own entry under Finance, so it needs its own screen right
+    // asked for — reading the instalment templates is not the right to open the whole school's
+    // arrears, nor to write a notice to every family on it (BR-SEC-010, BR-GLB-102).
+    var canSeeCollection = await Visibility.CanSeeScreenAsync(
+        Sms.Application.Security.ScreenCatalog.Modules.Installments, Sms.Application.Security.ScreenCatalog.Installments.Collection);
     // The embedded ERP's own sidebar, one group per module, nested inside the accounting section.
     // Filtered by the ERP against the erp.permission claims this principal carries, so a user
     // granted nothing accounting-related sees no accounting section at all.
@@ -33,13 +57,21 @@
         m => FeatureCatalog.ForModule(m.Code) is not { } f || featureStates[f.Code],
         m => visibleModules.Contains(m.Code),
         canExportToLedger,
-        erpGroups);
+        erpGroups,
+        canSeeSectionBoard,
+        canSeeRoles,
+        canSeeUserRoles,
+        canSeeStudentFinance,
+        canSeeBulkPlacement,
+        canSeeCollection);
     // Companion ERP2028 system; the link renders only when ExternalApps:ErpUrl is configured.
     var erpUrl = Configuration["ExternalApps:ErpUrl"];
     var erpTitle = isRtl ? "نظام تخطيط موارد المؤسسة" : "ERP System";
     // The embedded accounting modules render inside this same shell; their screens are the ones
     // served from an MVC area, which no screen of this system uses.
     var isErpArea = !string.IsNullOrEmpty(ViewContext.RouteData.Values["area"] as string);
+    // BR-SCH-006: the sidebar wears the school's logo once one is uploaded; null keeps the generic mark.
+    var brandLogoVersion = await BrandMark.VersionAsync();
 }
 <!DOCTYPE html>
 <html lang="@lang" dir="@dir">
@@ -76,7 +108,18 @@
         <aside class="sms-sidebar" id="sms-sidebar">
             <div class="sms-sidebar__brand">
                 <a asp-controller="Home" asp-action="Index" class="sms-brand">
-                    <span class="sms-brand__mark"><i class="bi bi-mortarboard-fill" aria-hidden="true"></i></span>
+                    @* BR-SCH-006: the school's own mark when it has uploaded one, the product's
+                       generic one when it has not. Decorative — "SMS" is right beside it. *@
+                    <span class="sms-brand__mark@(brandLogoVersion.HasValue ? " sms-brand__mark--logo" : "")">
+                        @if (brandLogoVersion is int logoVersion)
+                        {
+                            <img src="@Url.Action("BrandLogo", "Home", new { v = logoVersion })" alt="" class="sms-brand__logo" />
+                        }
+                        else
+                        {
+                            <i class="bi bi-mortarboard-fill" aria-hidden="true"></i>
+                        }
+                    </span>
                     <span class="sms-brand__text">
                         <span class="sms-brand__name">SMS</span>
                         <span class="sms-brand__sub">@productName</span>
@@ -120,6 +163,12 @@
                        lands, not bolted on ahead of it. *@
                     <a class="btn btn-sm sms-icon-btn" asp-controller="Approvals" asp-action="Index" title="@(isRtl ? "موافقاتي" : "My approvals")" aria-label="@(isRtl ? "موافقاتي" : "My approvals")"><i class="bi bi-inbox" aria-hidden="true"></i></a>
                     <a class="btn btn-sm sms-icon-btn" href="/hangfire" title="@(isRtl ? "المهام الخلفية" : "Background jobs")" aria-label="@(isRtl ? "المهام الخلفية" : "Background jobs")"><i class="bi bi-activity" aria-hidden="true"></i></a>
+                    @* The guide to the product itself. Every screen already explains itself through
+                       _HelpModal beside its own title; this is the part no single screen can say —
+                       that nothing is deleted, that a missing menu entry is a role, that a refusal is
+                       a sentence. It sits in the shell so it is reachable from a screen that has just
+                       refused someone, which is exactly when it is wanted. *@
+                    <a class="btn btn-sm sms-icon-btn" asp-area="" asp-controller="Help" asp-action="Index" title="@(isRtl ? "دليل الاستخدام" : "User guide")" aria-label="@(isRtl ? "دليل الاستخدام" : "User guide")"><i class="bi bi-question-circle" aria-hidden="true"></i></a>
                     <div class="dropdown">
                         <button class="btn sms-user dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="@(isRtl ? "حساب المستخدم" : "User menu")">
                             <i class="bi bi-person-circle" aria-hidden="true"></i> <span class="d-none d-md-inline">@(User.Identity?.Name ?? "")</span>
@@ -158,6 +207,7 @@
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/translit.js" asp-append-version="true"></script>
     <script src="~/js/quickadd.js" asp-append-version="true"></script>
+    <script src="~/js/uploads.js" asp-append-version="true"></script>
     @RenderSection("Scripts", required: false)
 </body>
 </html>

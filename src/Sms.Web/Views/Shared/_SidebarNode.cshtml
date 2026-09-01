@@ -12,13 +12,12 @@
     var item = Model.Item;
     var depth = Model.Depth;
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
-    var routeValues = ViewContext.RouteData.Values;
     var indent = depth > 0 ? $" sms-nav-link--depth{depth}" : string.Empty;
 }
 
 @if (!item.HasChildren)
 {
-    var active = NavLinks.IsActive(item, routeValues);
+    var active = ReferenceEquals(item, Model.Active);
     // A root-relative URL is resolved against the application's base path; anything else (an absolute
     // one) is already complete and is emitted as given.
     var href = item.Url is { } explicitUrl
@@ -31,7 +30,7 @@
 }
 else
 {
-    var groupActive = NavLinks.IsBranchActive(item, routeValues);
+    var groupActive = NavLinks.Contains(item, Model.Active);
     var collapseId = $"nav-{item.Key}";
     <div class="sms-nav-group @(groupActive ? "is-active" : "")">
         <button class="sms-nav-link@(indent)" type="button" data-bs-toggle="collapse"
@@ -44,7 +43,7 @@ else
             <div class="sms-nav-group__items">
                 @foreach (var child in item.Items)
                 {
-                    @await Html.PartialAsync("_SidebarNode", new SidebarNode(child, depth + 1))
+                    @await Html.PartialAsync("_SidebarNode", new SidebarNode(child, depth + 1, Model.Active))
                 }
             </div>
         </div>

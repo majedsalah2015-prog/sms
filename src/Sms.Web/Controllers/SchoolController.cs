@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
@@ -81,14 +82,18 @@ namespace Sms.Web.Controllers
         private readonly ITenantContext _tenant;
         private readonly IAuditContext _audit;
         private readonly IClock _clock;
+        private readonly Sms.Web.Services.SchoolBrandingService _branding;
 
-        public SchoolController(ISchoolAdmin schools, AppDbContext db, ITenantContext tenant, IAuditContext audit, IClock clock)
+        public SchoolController(
+            ISchoolAdmin schools, AppDbContext db, ITenantContext tenant, IAuditContext audit, IClock clock,
+            Sms.Web.Services.SchoolBrandingService branding)
         {
             _schools = schools;
             _db = db;
             _tenant = tenant;
             _audit = audit;
             _clock = clock;
+            _branding = branding;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -148,6 +153,104 @@ namespace Sms.Web.Controllers
                 form.ActiveTab = TabOfFirstError(form.ActiveTab);
                 return View(await BuildProfileAsync(form));
             }
+        }
+
+        // ==================================================================
+        // §8.1 Branding — BR-SCH-006
+        // ==================================================================
+        //
+        // The logo and the seal are attachments (doc 10), not columns of bytes: same intake, same
+        // content inspection, same scan gate, same versioning as any other filed document. The
+        // school row keeps a pointer, so replacing a mark is a new version of one slot — which is
+        // what will let a certificate issued last year still name the branding it was issued under
+        // once a template renderer exists to ask.
+        //
+        // What BR-SCH-006 also asks for and this build cannot give: "every official template
+        // references current branding at render time". There is no template renderer in this
+        // product yet, so nothing renders the mark onto a document. The upload, the slot and the
+        // pointer are here; the surface that consumes them is not, and the tab says so.
+
+        /// <summary>
+        /// Serves a branding mark. An action rather than a data URI in the page: a logo is exactly
+        /// the sort of thing a browser should cache for itself, and inlining it would put the image
+        /// into every profile response whether or not the Branding tab was the one being read.
+        /// </summary>
+        [HttpGet("branding/{asset}")]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Profile, ActionVerb.View)]
+        public async Task<IActionResult> Branding(SchoolBrandingAsset asset)
+        {
+            var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _tenant.SchoolId);
+            if (school == null) { return NotFound(); }
+
+            var attachmentId = asset == SchoolBrandingAsset.Logo ? school.LogoAttachmentId : school.SealAttachmentId;
+            var file = await _branding.ReadAsync(attachmentId, HttpContext.RequestAborted);
+            if (file == null) { return NotFound(); }
+
+            return File(file.Content, file.ContentType);
+        }
+
+        [HttpPost("branding/{asset}")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Profile, ActionVerb.Edit)]
+        public async Task<IActionResult> UploadBranding(SchoolBrandingAsset asset, IFormFile? file)
+        {
+            // One school per tenant (ADR-2) — the slot belongs to the tenant's row, never to a
+            // posted id. A school that does not exist yet has no branding to carry.
+            var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _tenant.SchoolId);
+            if (school == null)
+            {
+                TempData["Error"] = T(
+                    "Save the school's identity first — there is no record yet for a logo to belong to.",
+                    "احفظ هوية المدرسة أولاً — لا يوجد سجل بعد ينتمي إليه الشعار.");
+                return RedirectToAction(nameof(Profile), new { tab = "branding" });
+            }
+
+            try
+            {
+                var attachmentId = await _branding.SaveAsync(
+                    file!, asset, school.Id, ScreenCatalog.Modules.Schools, HttpContext.RequestAborted);
+                await _schools.SetBrandingAsync(school.Id, asset, attachmentId, HttpContext.RequestAborted);
+
+                TempData["Flash"] = asset == SchoolBrandingAsset.Logo
+                    ? T("Logo updated.", "تم تحديث الشعار.")
+                    : T("Seal updated.", "تم تحديث الختم.");
+            }
+            // The policy exception is an InvalidOperationException, so it has to be caught first or
+            // its own message — which names a rule rather than a fact — is what reaches the screen.
+            catch (Sms.Application.Common.Exceptions.AttachmentPolicyViolationException)
+            {
+                TempData["Error"] = asset == SchoolBrandingAsset.Logo
+                    ? T("That file is not an acceptable logo.", "هذا الملف ليس شعاراً مقبولاً.")
+                    : T("That file is not an acceptable seal.", "هذا الملف ليس ختماً مقبولاً.");
+            }
+            // Also an InvalidOperationException, and it carries a reason rather than a sentence —
+            // the wording is chosen here, in the reader's language, never thrown from the service.
+            catch (Sms.Web.Services.FileRejectedException ex)
+            {
+                TempData["Error"] = Labels.FileRejection(ex.Rejection, IsArabic, ex.AllowedFormats, ex.MaxBytes);
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+
+            return RedirectToAction(nameof(Profile), new { tab = "branding" });
+        }
+
+        [HttpPost("branding/{asset}/remove")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Schools, ScreenCatalog.Schools.Profile, ActionVerb.Edit)]
+        public async Task<IActionResult> RemoveBranding(SchoolBrandingAsset asset)
+        {
+            var school = await _db.Schools.AsNoTracking().SingleOrDefaultAsync(s => s.Id == _tenant.SchoolId);
+            if (school == null) { return NotFound(); }
+
+            // The pointer is cleared; the attachment itself stays, because doc 10 does not delete
+            // files while the record that owned them exists (BR-ATT-007). There is no Delete verb
+            // in this product (BR-GLB-005), and a mark that once headed a document is evidence.
+            await _schools.SetBrandingAsync(school.Id, asset, null, HttpContext.RequestAborted);
+
+            TempData["Flash"] = asset == SchoolBrandingAsset.Logo
+                ? T("Logo removed.", "تمت إزالة الشعار.")
+                : T("Seal removed.", "تمت إزالة الختم.");
+            return RedirectToAction(nameof(Profile), new { tab = "branding" });
         }
 
         /// <summary>Trims what the operator typed, so a trailing space does not read as a changed identity field.</summary>
@@ -294,6 +397,21 @@ namespace Sms.Web.Controllers
                 m.CountryPackNameEn = pack?.Name.NameEn;
             }
 
+            // BR-SCH-006. The marks are described here and served from their own actions: putting
+            // the bytes in the model would inline a logo into every profile response, including the
+            // five tabs nobody opened.
+            var logo = await BrandingSlotAsync(school?.LogoAttachmentId);
+            m.HasLogo = logo != null;
+            m.LogoFileName = logo?.FileName;
+            m.LogoSizeBytes = logo?.SizeBytes ?? 0;
+            m.LogoVersion = logo?.VersionNumber ?? 0;
+
+            var seal = await BrandingSlotAsync(school?.SealAttachmentId);
+            m.HasSeal = seal != null;
+            m.SealFileName = seal?.FileName;
+            m.SealSizeBytes = seal?.SizeBytes ?? 0;
+            m.SealVersion = seal?.VersionNumber ?? 0;
+
             // The lookup, not the picker: a retired stage still has grades pointing at it, and a
             // profile that silently drops it reads as "we do not teach that any more" when the
             // enrollments say otherwise. Filters off means tenant scoping goes too — hence the
@@ -324,6 +442,28 @@ namespace Sms.Web.Controllers
 
             return m;
         }
+
+        /// <summary>
+        /// What a branding slot currently holds, or null when it holds nothing a reader could be
+        /// shown — no pointer, no version, or a file the scan gate is holding back (BR-ATT-009).
+        /// The status is read here rather than by fetching the bytes, so describing a logo does not
+        /// cost reading one.
+        /// </summary>
+        private async Task<BrandingSlot?> BrandingSlotAsync(int? attachmentId)
+        {
+            if (attachmentId is not int id) { return null; }
+
+            return await (
+                from a in _db.Attachments.AsNoTracking()
+                where a.Id == id && a.Status == Sms.Domain.Attachments.AttachmentStatus.Active
+                join v in _db.AttachmentVersions.AsNoTracking() on a.Id equals v.AttachmentId
+                where v.VersionNumber == a.CurrentVersionNumber
+                    && v.ScanStatus == Sms.Domain.Attachments.ScanStatus.Clean
+                select new BrandingSlot(v.FileName, v.SizeBytes, v.VersionNumber))
+                .SingleOrDefaultAsync();
+        }
+
+        private sealed record BrandingSlot(string FileName, long SizeBytes, int VersionNumber);
 
         /// <summary>
         /// What is still blank and why it matters. BR-SCH-001's four are marked required

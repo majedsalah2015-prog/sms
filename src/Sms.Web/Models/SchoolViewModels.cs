@@ -292,6 +292,30 @@ namespace Sms.Web.Models
 
         public string? CountryPackCode { get; set; }
 
+        // ---------------------------------------------------------------- branding (BR-SCH-006)
+        //
+        // The ids rather than the bytes: the marks are served from their own actions so a browser
+        // can cache them, instead of a data URI putting the logo into every profile response.
+
+        /// <summary>Null when no logo has been filed, or when the scan gate is still holding the one that has.</summary>
+        public bool HasLogo { get; set; }
+
+        public bool HasSeal { get; set; }
+
+        /// <summary>What the current logo is called and how big it is, so the tab can say what is filed without serving it twice.</summary>
+        public string? LogoFileName { get; set; }
+
+        public long LogoSizeBytes { get; set; }
+
+        public string? SealFileName { get; set; }
+
+        public long SealSizeBytes { get; set; }
+
+        /// <summary>Bumped on every upload and hung off the image URL, so a replaced mark is not answered from the browser's cache.</summary>
+        public int LogoVersion { get; set; }
+
+        public int SealVersion { get; set; }
+
         public IReadOnlyList<StageRow> StagesOffered { get; set; } = Array.Empty<StageRow>();
 
         /// <summary>Document classes with no signatory in force — printed documents would carry no signature block (BR-SCH-004).</summary>

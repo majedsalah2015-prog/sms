@@ -155,7 +155,7 @@ namespace Sms.Web.Controllers
             try
             {
                 await _security.SetRolePermissionsAsync(id, PermissionGrid.Parse(granted), HttpContext.RequestAborted);
-                TempData["Message"] = "Permissions saved.";
+                TempData["Message"] = T("Permissions saved.", "تم حفظ الصلاحيات.");
             }
             catch (InvalidOperationException ex)
             {
@@ -169,9 +169,9 @@ namespace Sms.Web.Controllers
 
         [HttpGet("users")]
         [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.UserRoles, ActionVerb.View)]
-        public async Task<IActionResult> Users(string? q = null)
+        public async Task<IActionResult> Users(string? q = null, bool includeInactive = false)
         {
-            var users = await _security.ListUserRolesAsync(q, HttpContext.RequestAborted);
+            var users = await _security.ListUserRolesAsync(q, includeInactive, HttpContext.RequestAborted);
             var roles = await _security.ListRolesAsync(false, HttpContext.RequestAborted);
 
             // Shown once, immediately after provisioning, and never again: the password is not stored
@@ -191,6 +191,7 @@ namespace Sms.Web.Controllers
                 Users = users,
                 Roles = roles,
                 Search = q,
+                IncludeInactive = includeInactive,
                 JustProvisioned = provisioned,
                 CanProvision = await _permissions.HasPermissionAsync(
                     ScreenCatalog.Modules.SystemAdministration,
@@ -308,7 +309,7 @@ namespace Sms.Web.Controllers
         [HttpPost("users/{userAccountId:int}/reset-password")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.Users, ActionVerb.Edit)]
-        public async Task<IActionResult> ResetPassword(int userAccountId, string? q)
+        public async Task<IActionResult> ResetPassword(int userAccountId, string? q, bool includeInactive = false)
         {
             try
             {
@@ -327,7 +328,7 @@ namespace Sms.Web.Controllers
                 TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
-            return RedirectToAction(nameof(Users), new { q });
+            return RedirectToAction(nameof(Users), new { q, includeInactive });
         }
 
         private async Task<NewUserViewModel> BuildNewUserAsync(NewUserViewModel form)
@@ -352,7 +353,7 @@ namespace Sms.Web.Controllers
         [HttpPost("users/{userAccountId:int}/roles")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.UserRoles, ActionVerb.Create)]
-        public async Task<IActionResult> Assign(int userAccountId, int roleId, string? q)
+        public async Task<IActionResult> Assign(int userAccountId, int roleId, string? q, bool includeInactive = false)
         {
             try
             {
@@ -363,13 +364,13 @@ namespace Sms.Web.Controllers
                 TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
-            return RedirectToAction(nameof(Users), new { q });
+            return RedirectToAction(nameof(Users), new { q, includeInactive });
         }
 
         [HttpPost("users/{userAccountId:int}/roles/{roleId:int}/revoke")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.UserRoles, ActionVerb.Deactivate)]
-        public async Task<IActionResult> Revoke(int userAccountId, int roleId, string? q)
+        public async Task<IActionResult> Revoke(int userAccountId, int roleId, string? q, bool includeInactive = false)
         {
             try
             {
@@ -380,7 +381,7 @@ namespace Sms.Web.Controllers
                 TempData["Error"] = UserMessage.For(ex, IsArabic);
             }
 
-            return RedirectToAction(nameof(Users), new { q });
+            return RedirectToAction(nameof(Users), new { q, includeInactive });
         }
     }
 }

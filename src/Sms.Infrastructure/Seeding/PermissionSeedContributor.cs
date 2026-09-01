@@ -226,11 +226,45 @@ namespace Sms.Infrastructure.Seeding
             new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Cases, Read),
             new("HOMEROOM_TEACHER", ScreenCatalog.Modules.Discipline, ScreenCatalog.Discipline.Analytics, Read),
 
+            // E-Learning (doc/Modules/37 §6). The module shipped its screens with no row here at
+            // all, which made it invisible rather than merely ungranted: the sidebar and the
+            // launcher both hide a module the user can open no screen of (BR-SEC-010), so a
+            // teacher was not refused the lesson planner — they were never shown that one exists.
+            //
+            // §6 gives the planner and the resource library to "Teacher, HoD" and the homework desk
+            // to "Teacher"; BR-LRN-002 then extends a head of department's reach across their
+            // department's offerings for content *and* homework, which is why the desk is granted to
+            // both and not only to the teacher the table names. Reach is the engine's business
+            // either way — these open the screen, and BR-LRN-002 decides which (offering, section)
+            // pairs it will list.
+            //
+            // DEVIATION, inherited from ScreenCatalog rather than introduced here: §6's table names
+            // no verb for publishing a lesson or issuing homework, and the catalogue maps both onto
+            // Approve. So the null verb list is deliberate — granting only the four verbs §6 spells
+            // out would leave a teacher able to write a plan and never publish it, with no other
+            // role named to publish it for them.
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Home, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Announcements, null),
             new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Child, null),
+            // doc/Modules/37 §6 gives "my work" to the student in the POR space. The parent reaches
+            // it through the wildcard above; the student is enumerated screen by screen, so a screen
+            // added to the portal after this list was written reaches the parent and silently misses
+            // the student — which is what happened to this one. It is the same page for both
+            // audiences (§8.10): a student account's family is itself.
+            new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Work, null),
+            // §5 gives the student "read content" beside "submit homework". The
+            // parent reads the same page (§8.10's own audience note) and reaches
+            // it through the wildcard above.
+            new("STUDENT", ScreenCatalog.Modules.Portal, ScreenCatalog.Portal.Lessons, null),
         };
 
         // ------------------------------------------------------------------ seeding
@@ -295,13 +329,26 @@ namespace Sms.Infrastructure.Seeding
                     continue;
                 }
 
-                // The system administrator is topped up on every run, unlike every other role. It is
+                // The system administrator is topped up on every run, unlike a staff role. It is
                 // the role that grants the others, so a permission it cannot reach is a permission
                 // nobody in the school can ever be given: a screen shipped after first provisioning
-                // would be invisible to the entire product, permanently and silently. Every other
-                // role keeps its curation, because revoking from a cashier is a decision and this is
+                // would be invisible to the entire product, permanently and silently. A staff role
+                // keeps its curation, because revoking from a cashier is a decision and this is
                 // not.
-                var alwaysTopUp = string.Equals(roleCode, SystemAdministrator, StringComparison.OrdinalIgnoreCase);
+                //
+                // The two portal roles are topped up for the same reason, and it is not a widening.
+                // A staff role is a decision - doc 06 §7 keeps "who exists" apart from "what they
+                // may do" precisely so a school can curate one. A portal role is not: it follows
+                // from the account type (RoleTemplates.ForPortalAccount), PortalAreaFilter already
+                // confines the account to the portal (BR-SEC-010), and exactly one seeded role opens
+                // it. So the same permanent-invisibility trap applies with nobody able to notice it,
+                // and it has already been sprung: POR|Work was added to this matrix for the student
+                // after these databases were provisioned, and reached the student on none of them -
+                // "my work" was catalogued, granted to nobody, and therefore hidden by the portal's
+                // own bar. A top-up only ever adds, so a school that granted something extra keeps it.
+                var alwaysTopUp = string.Equals(roleCode, SystemAdministrator, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(roleCode, RoleTemplates.Parent, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(roleCode, RoleTemplates.Student, StringComparison.OrdinalIgnoreCase);
                 if (rolesWithGrants.Contains(roleId) && !alwaysTopUp)
                 {
                     continue;

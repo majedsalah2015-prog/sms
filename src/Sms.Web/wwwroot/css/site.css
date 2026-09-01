@@ -72,6 +72,11 @@ a:hover { color: var(--sms-primary-hover); }
 .sms-sidebar__brand { height: var(--sms-topbar-height); display: flex; align-items: center; padding: 0 .9rem; border-bottom: 1px solid var(--sms-sidebar-border); }
 .sms-brand { display: flex; align-items: center; gap: .65rem; color: inherit; overflow: hidden; }
 .sms-brand__mark { width: 38px; height: 38px; flex: 0 0 38px; border-radius: var(--sms-radius-sm); background: var(--sms-primary); color: #fff; display: grid; place-items: center; font-size: 1.25rem; }
+/* BR-SCH-006: the school's own logo takes the mark slot once one is uploaded. It sits on white with
+   a hairline rather than on the brand colour — a school's logo is drawn for its letterhead and is
+   usually a dark mark on paper, which disappears when it is laid on a blue tile. */
+.sms-brand__mark--logo { background: #fff; padding: 3px; box-shadow: inset 0 0 0 1px var(--sms-border, #d5dae2); }
+.sms-brand__logo { max-width: 100%; max-height: 100%; object-fit: contain; }
 .sms-brand__text { display: flex; flex-direction: column; line-height: 1.1; white-space: nowrap; }
 .sms-brand__name { font-weight: 700; letter-spacing: .04em; }
 .sms-brand__sub { font-size: .72rem; color: var(--sms-muted); }
@@ -151,6 +156,11 @@ a:hover { color: var(--sms-primary-hover); }
 .sms-footer { padding: .9rem 1.25rem; border-top: 1px solid var(--sms-sidebar-border); font-size: .82rem; }
 
 .sms-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+/* The school's logo beside the school's name (BR-SCH-006). Height-bound and width-free: a crest and
+   a wordmark are wildly different shapes, and only capping the height keeps both from shoving the
+   name off the line. Direction-agnostic — flex puts the mark on the reading side in both. */
+.sms-page-ident { display: flex; align-items: center; gap: .75rem; min-width: 0; }
+.sms-page-logo { height: 46px; width: auto; max-width: 140px; object-fit: contain; flex: 0 0 auto; }
 .sms-page-title { font-size: 1.45rem; font-weight: 700; margin: 0 0 .25rem; }
 .sms-section-title { font-size: 1rem; font-weight: 600; color: var(--sms-muted); text-transform: uppercase; letter-spacing: .06em; margin: .5rem 0 .75rem; }
 
@@ -235,6 +245,11 @@ a.sms-card:hover { border-color: rgba(var(--sms-primary-rgb), .45); color: inher
 .sms-auth__card { width: 100%; max-width: 420px; background: var(--sms-surface); border: 1px solid var(--sms-sidebar-border); border-radius: var(--sms-radius); box-shadow: 0 10px 30px rgba(16, 24, 40, .08); padding: 2rem 1.75rem 1.75rem; }
 .sms-auth__brand { text-align: center; margin-bottom: 1.5rem; }
 .sms-auth__mark { display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: var(--sms-radius); background: linear-gradient(135deg, var(--sms-primary), var(--sms-primary-hover)); color: #fff; font-size: 1.6rem; margin-bottom: .6rem; }
+/* BR-SCH-006: the school's own mark on the sign-in screen. Larger than the generic tile and on
+   white — this is the one screen with room for a real logo, and the gradient behind a letterhead
+   mark drawn for paper would swallow it. */
+.sms-auth__mark--logo { width: 76px; height: 76px; background: #fff; padding: 5px; box-shadow: inset 0 0 0 1px var(--sms-border, #d5dae2); }
+.sms-auth__logo { max-width: 100%; max-height: 100%; object-fit: contain; }
 .sms-auth__name { font-size: 1.35rem; font-weight: 700; margin: 0; letter-spacing: .04em; }
 .sms-auth__sub { color: var(--sms-muted); margin: 0; font-size: .9rem; }
 .sms-auth__title { font-size: 1.05rem; font-weight: 600; margin-bottom: 1rem; }
@@ -301,11 +316,32 @@ input[type=number].form-control { min-width: 4.5rem; }
 .sms-cal-day.is-out { opacity: .35; pointer-events: none; }
 .sms-cal-day.has-event::after { content: ""; position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--sms-primary); }
 .sms-cal-day.is-override { box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+/* Today, so a ten-month board has somewhere to start reading. */
+.sms-cal-day.is-today { box-shadow: inset 0 0 0 2px var(--sms-primary); font-weight: 600; }
+/* A day the save would refuse — past (BR-CAL-003) or outside the year — takes no click. */
+.sms-cal-day.is-locked { cursor: not-allowed; opacity: .55; }
+.sms-cal-day.is-locked:hover { border-color: transparent; }
+/* The live range while dragging or shift-clicking across the board. */
+.sms-cal-day.is-picked { outline: 2px solid var(--sms-primary); outline-offset: -2px; background-image: linear-gradient(rgba(13,110,253,.16), rgba(13,110,253,.16)); }
+.sms-cal-months { -webkit-user-select: none; user-select: none; }
 .sms-cal-day__num { display: block; line-height: 1; padding-top: 4px; }
 .sms-cal-day__hijri { display: block; font-size: .58rem; color: var(--sms-muted); line-height: 1; }
 .sms-cal-day__prov { position: absolute; top: 1px; inset-inline-end: 3px; font-size: .6rem; }
 .sms-cal-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-inline-end: .35rem; vertical-align: -1px; border: 1px solid var(--sms-sidebar-border); }
+.sms-cal-swatch.is-today { background: transparent; box-shadow: inset 0 0 0 2px var(--sms-primary); }
 .sms-cal-swatch.is-working { background: #fff; } .sms-cal-swatch.is-weekend { background: #f1f5f9; } .sms-cal-swatch.is-holiday { background: #fee2e2; } .sms-cal-swatch.is-partial { background: #fef3c7; } .sms-cal-swatch.is-exam { background: #ede9fe; } .sms-cal-swatch.is-event { background: var(--sms-primary); }
+
+/* The key above the board (doc/Modules/17). Its own class rather than the
+   donut chart's .sms-legend, which is a vertical <ul>: borrowing it put
+   flex-direction: column on this row and stacked all nine keys one per line.
+   One row always — narrow viewports scroll it, the way .sms-kanban does,
+   rather than reflowing the board's header into three lines. */
+.sms-cal-legend { display: flex; flex-wrap: nowrap; align-items: stretch; gap: .25rem; margin-bottom: .75rem; padding-bottom: .15rem; overflow-x: auto; scrollbar-width: thin; }
+.sms-cal-legend__item { display: inline-flex; align-items: center; gap: .3rem; flex: 0 0 auto; white-space: nowrap; font-size: .75rem; line-height: 1.35; padding: .2rem .6rem; border: 1px solid var(--sms-sidebar-border); border-radius: 999px; background: var(--sms-surface); color: var(--sms-text); }
+/* Second group: not a day type but a mark laid over one. */
+.sms-cal-legend__item.is-mark { background: var(--sms-body-bg); color: var(--sms-muted); }
+.sms-cal-legend__item .sms-cal-swatch { width: 10px; height: 10px; margin-inline-end: 0; vertical-align: 0; }
+.sms-cal-legend__sep { flex: 0 0 auto; width: 1px; margin-inline: .25rem; background: var(--sms-sidebar-border); }
 
 /* ---- Admissions pipeline board (doc/Modules/09 §8.4) ---- */
 .sms-kanban { display: flex; gap: .75rem; overflow-x: auto; padding-bottom: .5rem; }
@@ -430,6 +466,12 @@ input[type=number].form-control { min-width: 4.5rem; }
     background: var(--sms-body-bg);
 }
 
+/* Centred and capped rather than sized to the file: a school uploads the mark it has, and a
+   1200px banner must not decide how tall the preview is. */
+.sms-doc-preview__logo { text-align: center; margin-bottom: .5rem; }
+.sms-doc-preview__logo img { max-height: 64px; max-width: 60%; object-fit: contain; }
+.sms-doc-preview__seal { max-height: 56px; max-width: 56px; object-fit: contain; vertical-align: middle; margin-inline-start: .6rem; opacity: .9; }
+
 .sms-doc-preview__names { display: flex; justify-content: space-between; gap: 1rem; font-weight: 700; }
 .sms-doc-preview__meta { color: var(--sms-muted); font-size: .76rem; margin-top: .3rem; }
 .sms-doc-preview__rule { border: 0; border-top: 1px solid var(--sms-sidebar-border); margin: .55rem 0 .35rem; }
@@ -483,3 +525,144 @@ input[type=number].form-control { min-width: 4.5rem; }
 .sms-board-card { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: .35rem; padding: .35rem .5rem; margin-bottom: .35rem; background: var(--bs-body-bg, #fff); cursor: grab; }
 .sms-board-card:active { cursor: grabbing; }
 .sms-board-card--dragging { opacity: .45; }
+
+/* --- the one upload box (doc 10 §5) ------------------------------------
+   Every file this product takes is chosen through this control, so it has to
+   read the same on a registration form beside a photograph and on a documents
+   tab beside a contract. One frame carries both jobs: what is on file now, and
+   what is about to replace it. Logical properties throughout — the layout
+   follows `dir` without an RTL branch. */
+.sms-upload { display: block; }
+
+.sms-upload__drop {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: 100%;
+    margin: 0;
+    padding: .625rem .75rem;
+    border: 1px dashed var(--sms-border, #d5dae2);
+    border-radius: var(--sms-radius, .5rem);
+    background: var(--sms-surface, #fff);
+    cursor: pointer;
+    transition: border-color .12s ease, background-color .12s ease;
+}
+
+.sms-upload__drop:hover { border-color: var(--sms-primary, #0d6efd); }
+
+/* The input is visually-hidden but still focusable, and it sits after the box in
+   the DOM, so the keyboard ring is drawn from the panel rather than from a
+   sibling selector — on the box the eye is actually looking at. */
+.sms-upload:focus-within .sms-upload__drop { outline: 2px solid var(--sms-primary, #0d6efd); outline-offset: 2px; border-color: var(--sms-primary, #0d6efd); }
+
+.sms-upload.is-dragging .sms-upload__drop { border-color: var(--sms-primary, #0d6efd); border-style: solid; background: rgba(13, 110, 253, .04); }
+.sms-upload.has-file .sms-upload__drop { border-style: solid; }
+
+.sms-upload__frame {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: .375rem;
+    background: #f4f6f9;
+    border: 1px solid var(--sms-border, #d5dae2);
+}
+
+.sms-upload__frame img { width: 100%; height: 100%; object-fit: cover; }
+.sms-upload__glyph { font-size: 1.35rem; color: #8f9aa8; line-height: 1; }
+
+.sms-upload.is-strip .sms-upload__frame { width: 3rem; height: 3rem; }
+
+/* A face is judged by its shape as much as its content, so the portrait frame
+   is the same 8.5 × 10.5 the file screens print. */
+.sms-upload.is-portrait .sms-upload__drop { flex-direction: column; text-align: center; padding: .75rem; }
+.sms-upload.is-portrait .sms-upload__frame { width: 8.5rem; height: 10.5rem; border-radius: .5rem; }
+.sms-upload.is-portrait .sms-upload__glyph { font-size: 3rem; }
+.sms-upload.is-portrait .sms-upload__clear { position: absolute; inset-block-start: .5rem; inset-inline-end: .5rem; }
+.sms-upload.is-portrait { position: relative; }
+
+.sms-upload__body { display: flex; flex-direction: column; gap: .1rem; min-width: 0; flex: 1 1 auto; }
+.sms-upload__prompt { font-size: .85rem; }
+.sms-upload__chosen { font-size: .85rem; font-weight: 600; word-break: break-all; }
+.sms-upload__hint { font-size: .75rem; color: var(--sms-muted, #6b7280); }
+
+/* Once a file is chosen its name answers the question the prompt was asking. */
+.sms-upload.has-file .sms-upload__prompt { display: none; }
+
+.sms-upload__clear { flex: 0 0 auto; }
+
+/* --- documents tab -----------------------------------------------------
+   A stored document is mostly its name and its state; the row leads with the
+   type, because that is what a registrar is looking for when they scan the
+   list for the one paper that is missing. */
+.sms-doc-name { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.sms-doc-thumb { width: 2.25rem; height: 2.25rem; border-radius: .375rem; object-fit: cover; border: 1px solid var(--sms-border, #d5dae2); flex: 0 0 auto; }
+.sms-doc-glyph { width: 2.25rem; height: 2.25rem; border-radius: .375rem; border: 1px solid var(--sms-border, #d5dae2); background: #f4f6f9; display: flex; align-items: center; justify-content: center; color: #8f9aa8; flex: 0 0 auto; }
+
+/* --- one person, several facts -----------------------------------------
+   A phone number, an ID number, a job and a degree are four different
+   answers, and running them together with dots made the reader count digits
+   to tell the first two apart. Each keeps its own icon and its own gap; the
+   row wraps rather than pushing the table wide. */
+.sms-facts { display: flex; flex-wrap: wrap; gap: .1rem .9rem; margin-top: .15rem; }
+.sms-fact { display: inline-flex; align-items: center; gap: .3rem; white-space: nowrap; }
+.sms-fact > .bi { opacity: .65; font-size: .9em; }
+
+/* --- statistics charts (doc/Modules/31 §8.1) ----------------------------
+   A categorical ramp, not a gradient: these name unrelated things — a fee
+   category, a payment method — and a reader must be able to tell any two
+   apart, not order them. Every chart in this product pairs its colours with a
+   legend or a table carrying the same numbers, so colour is never the only
+   thing saying what a wedge is (WCAG 1.4.1); the ramp is here to be scanned,
+   not decoded.
+
+   Chosen against --sms-surface, and kept clear of the danger/success reds and
+   greens the rest of the product uses to mean "wrong" and "settled" — a
+   payment method tinted the same red as an overdue balance reads as a
+   warning it is not. */
+:root {
+  --sms-chart-1: #2563eb;
+  --sms-chart-2: #0d9488;
+  --sms-chart-3: #d97706;
+  --sms-chart-4: #7c3aed;
+  --sms-chart-5: #c2410c;
+  --sms-chart-6: #0891b2;
+  --sms-chart-7: #4d7c0f;
+  --sms-chart-grid: #e6e9f2;
+  --sms-chart-axis: var(--sms-muted);
+}
+
+/* The bar track is a full-width rail so short bars still have a length to be
+   read against; without it a 4% bar and an 8% bar look equally like "almost
+   nothing". */
+.sms-bar-row { display: grid; grid-template-columns: minmax(6rem, 11rem) 1fr auto; gap: .6rem; align-items: center; padding: .3rem 0; }
+.sms-bar-label { color: var(--sms-text); font-size: .875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sms-bar-track { background: var(--sms-chart-grid); border-radius: 999px; height: .6rem; overflow: hidden; }
+.sms-bar-fill { display: block; height: 100%; border-radius: 999px; background: var(--sms-chart-1); min-width: 2px; }
+.sms-bar-value { font-size: .875rem; font-variant-numeric: tabular-nums; color: var(--sms-text); }
+
+/* max-width rather than width: a donut in a half-width card must not grow
+   past its legend, and an SVG with a viewBox scales to whatever it is given. */
+.sms-donut { max-width: 13rem; width: 100%; height: auto; }
+.sms-donut__slice { stroke: var(--sms-surface); stroke-width: 1.5; }
+.sms-donut__hole-value { font-size: 1.35rem; font-weight: 700; fill: var(--sms-text); }
+.sms-donut__hole-label { font-size: .72rem; fill: var(--sms-muted); }
+
+.sms-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35rem; }
+.sms-legend li { display: grid; grid-template-columns: .7rem 1fr auto; gap: .5rem; align-items: center; font-size: .875rem; }
+.sms-legend__swatch { width: .7rem; height: .7rem; border-radius: .2rem; }
+.sms-legend__value { font-variant-numeric: tabular-nums; color: var(--sms-muted); }
+
+.sms-trend { width: 100%; height: auto; }
+.sms-trend__grid { stroke: var(--sms-chart-grid); stroke-width: 1; }
+.sms-trend__axis { fill: var(--sms-chart-axis); font-size: 10px; }
+.sms-trend__line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.sms-trend__area { opacity: .12; }
+
+/* The series key sits above the plot, not inside it: an SVG-internal legend
+   does not reflow, and this one has to survive a narrow phone in two
+   directions. */
+.sms-trend-key { display: flex; flex-wrap: wrap; gap: .25rem 1rem; font-size: .8rem; color: var(--sms-muted); }
+.sms-trend-key span { display: inline-flex; align-items: center; gap: .35rem; }
+.sms-trend-key i { width: .85rem; height: .2rem; border-radius: 999px; display: inline-block; }

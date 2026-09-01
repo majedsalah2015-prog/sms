@@ -35,7 +35,23 @@
             @if (!string.IsNullOrWhiteSpace(Model.Q))
             {
                 <div class="list-group list-group-flush mt-2">
-                    @foreach (var p in Model.Matches) { <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Index" asp-route-q="@Model.Q" asp-route-payerId="@p.Payer.Id"><span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span> <span class="opacity-75">· @p.Parent?.ParentFileNo · @p.Parent?.PrimaryMobile</span><br /><span class="opacity-75">@string.Join(" · ", p.Children.Select(c => c.StudentNo))</span></a> }
+                    @* A student number matches every guardian who has ever been billed, so the row has to
+                       say which of them the school bills — a name and a student number look identical on
+                       the father and the mother of the same child (BR-FEE-004, BR-PAR-005). *@
+                    @foreach (var p in Model.Matches)
+                    {
+                        <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Index" asp-route-q="@Model.Q" asp-route-payerId="@p.Payer.Id">
+                            <span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span> <span class="opacity-75">· @p.Parent?.ParentFileNo · @p.Parent?.PrimaryMobile</span>
+                            @foreach (var ch in p.Children)
+                            {
+                                <br />
+                                <span class="opacity-75">@ch.Student.StudentNo @FinanceLabels.StudentName(ch.Student, isRtl)</span>
+                                <span class="opacity-75">· @(ch.IsCurrentGuardian ? ch.Relationship(isRtl) : T("former guardian", "ولي أمر سابق"))</span>
+                                @if (ch.IsFinanciallyResponsible) { <span class="badge text-bg-success">@T("billed", "المفوتر")</span> }
+                            }
+                            @if (p.IsResponsibleForNothing) { <br /><span class="badge text-bg-warning">@T("not the billed payer", "ليس الدافع المفوتر")</span> }
+                        </a>
+                    }
                     @if (Model.Matches.Count == 0) { <div class="list-group-item small text-muted">@T("No payer matches — a payer record appears once the guardian has a charge.", "لا دافع مطابق — يظهر سجل الدافع بعد أول فاتورة لولي الأمر.")</div> }
                 </div>
             }
@@ -52,16 +68,40 @@
         @if (sel == null) { <div class="alert alert-light border">@T("Search and pick a payer to start.", "ابحث واختر دافعاً للبدء.")</div> }
         else
         {
+            @* Anyone may hand money over — a grandfather settling his grandson's fees is ordinary, so this
+               warns and never refuses. But a payer the school bills for none of these children has no open
+               invoice to allocate against, so the whole amount becomes an advance balance on the wrong
+               account while the child's fees stay open on the guardian who really owes them. The screen
+               has to say so before the receipt prints, not after (BR-FEE-004, BR-PAY-003). *@
+            @if (sel.IsResponsibleForNothing)
+            {
+                <div class="alert alert-warning d-flex gap-2" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                    <div>
+                        <strong>@T("This is not the payer the school bills.", "هذا ليس الدافع الذي تفوتره المدرسة.")</strong>
+                        <div class="small">@T("No child on this card is billed to this person, so a receipt here allocates to nothing and is held as advance balance — the fees stay open on whoever is financially responsible. Check the payer before issuing.", "لا يوجد ابن على هذه البطاقة مفوتر على هذا الشخص، فأي سند هنا لن يُخصّص ويُحفظ كرصيد مقدّم — وتبقى الرسوم مفتوحة على المسؤول مالياً. تحقّق من الدافع قبل الإصدار.")</div>
+                    </div>
+                </div>
+            }
+            else if (sel.HasSplitResponsibility)
+            {
+                <div class="alert alert-info small" role="alert">
+                    <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Responsibility is split on this card — only the children marked \"billed to this payer\" carry invoices addressed here (BR-PAR-005).", "المسؤولية مقسّمة على هذه البطاقة — الأبناء المعلّمون بـ\"مفوتر على هذا الدافع\" وحدهم تحمل فواتيرهم اسمه (BR-PAR-005).")
+                </div>
+            }
             <div class="sms-card mb-3">
                 <div class="p-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
                     <div>
                         <span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span>
                         @* The children as faces, not just numbers: money is taken at this counter for
                            one child of several, and the sibling on the screen should be the sibling in
-                           front of it. Names stay whether or not the photo does (BR-STU-008). *@
-                        <div class="d-flex flex-wrap gap-2 mt-2">
-                            @foreach (var ch in sel.Children)
+                           front of it. Names stay whether or not the photo does (BR-STU-008). Beside
+                           each one, what this payer is to them and whether the school bills this payer
+                           for them — BR-PAR-005 assigns that per child, so it differs sibling to sibling. *@
+                        <div class="d-flex flex-wrap gap-3 mt-2">
+                            @foreach (var pc in sel.Children)
                             {
+                                var ch = pc.Student;
                                 <span class="d-inline-flex align-items-center gap-2 small text-muted">
                                     @if (Model.CanSeeStudentPhotos && ch.PhotoAttachmentId != null)
                                     {
@@ -69,7 +109,18 @@
                                              src="@Url.Action("Photo", "Students", new { id = ch.Id })"
                                              alt="@T("Photo of", "صورة") @FinanceLabels.StudentName(ch, isRtl)" />
                                     }
-                                    <span>@ch.StudentNo @FinanceLabels.StudentName(ch, isRtl)</span>
+                                    <span>
+                                        @ch.StudentNo @FinanceLabels.StudentName(ch, isRtl)
+                                        <span class="opacity-75">· @(pc.IsCurrentGuardian ? pc.Relationship(isRtl) : T("former guardian", "ولي أمر سابق"))</span>
+                                        @if (pc.IsFinanciallyResponsible)
+                                        {
+                                            <span class="badge text-bg-success">@T("billed to this payer", "مفوتر على هذا الدافع")</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-light border">@T("billed to someone else", "مفوتر على غيره")</span>
+                                        }
+                                    </span>
                                 </span>
                             }
                         </div>

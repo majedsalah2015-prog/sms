@@ -1,4 +1,5 @@
 using System;
+using Sms.Application.Common.Guards;
 using Sms.Domain.Grades;
 
 namespace Sms.Application.Common.Exceptions
@@ -17,12 +18,23 @@ namespace Sms.Application.Common.Exceptions
     /// deactivated while nothing downstream (grades, profiles, sections, enrollments,
     /// promotion paths) depends on it.
     /// </summary>
+    /// <remarks>
+    /// What blocks the change is carried as a <see cref="UsageReport"/> rather than as an English
+    /// clause. The report is bilingual by construction — the same shape <c>RecordInUseException</c>
+    /// uses — so the screen can name what is in the way in the reader's own language instead of
+    /// telling an Arabic-speaking registrar, in English, that a stage "still has 3 active grade
+    /// level(s)".
+    /// </remarks>
     public class GradeStructureInUseException : InvalidOperationException
     {
-        public GradeStructureInUseException(string reason)
-            : base($"Cannot change grade structure: {reason} (BR-GRD-007).")
+        public GradeStructureInUseException(UsageReport usage)
+            : base($"Cannot change grade structure: {usage.Describe(arabic: false)} (BR-GRD-007).")
         {
+            Usage = usage;
         }
+
+        /// <summary>Everything that still depends on the row, so the refusal can list what to clear first.</summary>
+        public UsageReport Usage { get; }
     }
 
     /// <summary>BR-GRD-004: a grade/section may narrow its stage's gender policy, never widen it.</summary>

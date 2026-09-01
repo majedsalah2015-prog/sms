@@ -156,21 +156,34 @@ namespace Sms.Web.Controllers
                 CurrentUserId = _user.UserId,
                 Closing = close == null ? null : rows.FirstOrDefault(r => r.Session.Id == close && r.Session.Status == TillSessionStatus.Open),
             };
+
+            // Only for the cashier who can actually press Open — one already at a drawer sees the
+            // "close it first" notice instead, and a code offered beside it would be a second
+            // drawer the rule will not give them.
+            if (!m.Open.Any(r => r.Session.CashierUserId == _user.UserId))
+            {
+                m.NextTillCode = await _payments.NextTillCodeForAsync(_user.UserId, HttpContext.RequestAborted);
+
+                // Their own history, not the 60 rows above it: a cashier back after a busy month is
+                // still returning to their drawer, and the screen should not call it a new one.
+                m.NextTillIsReturning = await _db.TillSessions.AnyAsync(s => s.CashierUserId == _user.UserId && s.TillCode == m.NextTillCode);
+            }
             return View(m);
         }
 
         [HttpPost("till/open")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Create)]
-        public async Task<IActionResult> OpenTill(string tillCode, decimal floatAmount = 0m)
+        public async Task<IActionResult> OpenTill(decimal floatAmount = 0m)
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(tillCode)) throw new InvalidOperationException(T("Till code is required.", "رمز الصندوق مطلوب."));
                 if (floatAmount < 0) throw new InvalidOperationException(T("Float cannot be negative.", "لا يمكن أن تكون العهدة سالبة."));
-                if (await _db.TillSessions.AnyAsync(s => s.Status == TillSessionStatus.Open && s.CashierUserId == _user.UserId)) throw new InvalidOperationException(T("You already have an open session — close it first.", "لديك جلسة مفتوحة — أغلقها أولاً."));
-                if (await _db.TillSessions.AnyAsync(s => s.Status == TillSessionStatus.Open && s.TillCode == tillCode.Trim())) throw new InvalidOperationException(T("That till already has an open session.", "هذا الصندوق له جلسة مفتوحة."));
-                var session = await _payments.OpenTillSessionAsync(_user.UserId, tillCode.Trim(), floatAmount);
+
+                // No till code from the form: the drawer is the system's key, assigned by
+                // PaymentAdmin (BR-PAY-001), which also holds the one-per-cashier and
+                // one-per-till guards this action used to duplicate.
+                var session = await _payments.OpenTillSessionAsync(_user.UserId, tillCode: null, floatAmount);
                 TempData["Flash"] = T($"Session opened on till {session.TillCode} with float {session.FloatAmount:N2}.", $"فُتحت الجلسة على الصندوق {session.TillCode} بعهدة {session.FloatAmount:N2}.");
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }

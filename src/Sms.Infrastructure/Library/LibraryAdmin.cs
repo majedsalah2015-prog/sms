@@ -144,7 +144,12 @@ namespace Sms.Infrastructure.Library
                 // Copy availability is physical - no override can lend a copy that isn't on the shelf.
                 if (!verdict.CopyAvailable || string.IsNullOrWhiteSpace(overrideReason))
                 {
-                    throw new CheckoutBlockedException(barcode, !verdict.CopyAvailable ? $"copy is {copy.Status}" : !verdict.WithinLoanLimit ? "loan limit reached" : "unpaid fines / clearance hold");
+                    throw new CheckoutBlockedException(
+                        barcode,
+                        !verdict.CopyAvailable ? CheckoutBlockReason.CopyUnavailable
+                            : !verdict.WithinLoanLimit ? CheckoutBlockReason.LoanLimitReached
+                            : CheckoutBlockReason.MemberOnHold,
+                        copy.Status);
                 }
 
                 isOverride = true;

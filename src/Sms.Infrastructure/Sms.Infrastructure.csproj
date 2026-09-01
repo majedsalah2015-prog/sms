@@ -8,6 +8,14 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="5.0.17" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="5.0.17" />
     <PackageReference Include="Microsoft.Extensions.Identity.Core" Version="5.0.17" />
+    <!--
+      BR-NTF-003's encrypted gateway credentials. Data protection is the host's own key
+      ring rather than a key this project invents and then has to store somewhere; the
+      .NET 5-era version, pinned with the rest.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.DataProtection" Version="5.0.17" />
+    <!-- The WhatsApp/SMS sender is an HTTP client, and IHttpClientFactory is how one is obtained without socket exhaustion. -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="5.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

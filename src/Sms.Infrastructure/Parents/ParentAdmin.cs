@@ -26,12 +26,14 @@ namespace Sms.Infrastructure.Parents
             string? occupationEmployer = null, string preferredLanguage = "ar",
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
             ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            int? educationLookupId = null,
             CancellationToken cancellationToken = default)
         {
             var parent = await _db.Parents.SingleAsync(p => p.Id == parentId, cancellationToken);
             parent.NameAr = nameAr; parent.NameEn = nameEn; parent.PrimaryMobile = primaryMobile; parent.Email = email;
             parent.Address = address; parent.OccupationEmployer = occupationEmployer; parent.PreferredLanguage = preferredLanguage;
             parent.PrimaryIdTypeLookupId = primaryIdTypeLookupId;
+            parent.EducationLookupId = educationLookupId;
             parent.PrimaryIdNo = Trimmed(primaryIdNo);
             parent.LifeStatus = lifeStatus;
 
@@ -77,6 +79,7 @@ namespace Sms.Infrastructure.Parents
             string? occupationEmployer = null, string preferredLanguage = "ar",
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null,
             ParentLifeStatus lifeStatus = ParentLifeStatus.Alive, string? lifeStatusNote = null,
+            int? educationLookupId = null,
             CancellationToken cancellationToken = default)
         {
             var fileNo = await _numberIssuer.IssueAsync("PAR", cancellationToken);
@@ -92,6 +95,7 @@ namespace Sms.Infrastructure.Parents
                 OccupationEmployer = occupationEmployer,
                 PreferredLanguage = preferredLanguage,
                 PrimaryIdTypeLookupId = primaryIdTypeLookupId,
+                EducationLookupId = educationLookupId,
                 PrimaryIdNo = Trimmed(primaryIdNo),
                 LifeStatus = lifeStatus,
                 LifeStatusNote = lifeStatus == ParentLifeStatus.Other ? Trimmed(lifeStatusNote) : null,

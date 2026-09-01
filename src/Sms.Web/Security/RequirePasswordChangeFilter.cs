@@ -1,7 +1,10 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Sms.Web.Api;
 
 namespace Sms.Web.Security
 {
@@ -10,6 +13,12 @@ namespace Sms.Web.Security
     /// "before any other action". Registered globally; while the principal
     /// carries the must-change claim every request except the change-password
     /// and logout endpoints is redirected there.
+    /// <para>
+    /// The mobile API is held to the same rule by the same filter, and answers
+    /// it differently: a redirect to an HTML form is not something a phone can
+    /// act on, so an API caller is refused with <c>must_change_password</c> and
+    /// pointed at the endpoint that clears it.
+    /// </para>
     /// </summary>
     public sealed class RequirePasswordChangeFilter : IAsyncActionFilter
     {
@@ -20,7 +29,9 @@ namespace Sms.Web.Security
                 && user.FindFirst(SmsClaimTypes.MustChangePassword)?.Value == "1"
                 && !IsExempt(context))
             {
-                context.Result = new RedirectToActionResult("ChangePassword", "Account", null);
+                context.Result = context.Controller is ApiControllerBase
+                    ? ApiResults.Error(StatusCodes.Status403Forbidden, ApiProblem.MustChangePassword())
+                    : new RedirectToActionResult("ChangePassword", "Account", null);
                 return Task.CompletedTask;
             }
 
@@ -29,6 +40,11 @@ namespace Sms.Web.Security
 
         private static bool IsExempt(ActionExecutingContext context)
         {
+            if (context.ActionDescriptor.EndpointMetadata.OfType<PasswordChangeExemptAttribute>().Any())
+            {
+                return true;
+            }
+
             var controller = context.RouteData.Values["controller"] as string;
             var action = context.RouteData.Values["action"] as string;
             return string.Equals(controller, "Account", StringComparison.OrdinalIgnoreCase)

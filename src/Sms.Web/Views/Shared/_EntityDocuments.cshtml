@@ -1,0 +1,188 @@
+@using System.Globalization
+@using Sms.Domain.Attachments
+@using Sms.Web.Services
+@model EntityDocumentsViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var today = DateTime.UtcNow.Date;
+
+    // The picker offers several types at once, each with its own formats and ceiling, so the box
+    // starts on the widest of them and narrows to the chosen type's own rules as soon as one is
+    // picked. The server judges the type that was actually chosen either way.
+    DocumentFormat union = 0;
+    long widest = 0;
+    foreach (var t in Model.Types)
+    {
+        union |= t.AllowedFormats;
+        widest = Math.Max(widest, AttachmentIntake.EffectiveMaxBytes(t));
+    }
+    if (union == 0) { union = DocumentFormat.Pdf | DocumentFormat.Jpg | DocumentFormat.Png; }
+    if (widest == 0) { widest = 10L * 1024 * 1024; }
+
+    string Badge(AttachmentStatus s) => s switch
+    {
+        AttachmentStatus.Active => "text-bg-success",
+        AttachmentStatus.PendingScan => "text-bg-secondary",
+        AttachmentStatus.Quarantined => "text-bg-danger",
+        _ => "text-bg-light border",
+    };
+}
+
+<table class="table table-sm sms-table mb-3">
+    <caption class="visually-hidden">@T("Documents on file", "المستندات في الملف")</caption>
+    <thead>
+        <tr>
+            <th scope="col">@T("Document", "المستند")</th>
+            <th scope="col">@T("File", "الملف")</th>
+            <th scope="col">@T("Uploaded", "الرفع")</th>
+            <th scope="col">@T("Expires", "ينتهي")</th>
+            <th scope="col">@T("State", "الحالة")</th>
+            <th scope="col"></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            var readable = r.Status != AttachmentStatus.Void && r.ScanStatus == ScanStatus.Clean;
+
+            // The title is a clerk's free note ("issued 2015"), stored in whichever language they
+            // were working in — not a translated label. Showing the other language's note beats
+            // showing nothing and letting a reader think the document has no note at all.
+            var title = (isRtl ? r.TitleAr : r.TitleEn) ?? (isRtl ? r.TitleEn : r.TitleAr);
+            <tr class="@(r.Status == AttachmentStatus.Void ? "text-muted" : null)">
+                <td>
+                    <div class="sms-doc-name">
+                        @* A thumbnail only where there is something to recognise. Everything else
+                           gets its format's glyph — a page icon standing in for a photograph would
+                           hide the one case where a picture actually helps. *@
+                        @if (readable && AttachmentIntake.IsImage(r.Format))
+                        {
+                            <img class="sms-doc-thumb" loading="lazy" alt=""
+                                 src="@Url.Action("DownloadDocument", Model.Controller, new { id = Model.OwnerId, attachmentId = r.AttachmentId })" />
+                        }
+                        else
+                        {
+                            <span class="sms-doc-glyph" aria-hidden="true"><i class="bi @(r.Format == DocumentFormat.Pdf ? "bi-file-earmark-pdf" : "bi-file-earmark")"></i></span>
+                        }
+                        <span class="text-truncate">
+                            @(isRtl ? r.TypeNameAr : r.TypeNameEn)
+                            @if (r.TypeIsRestricted)
+                            {
+                                <i class="bi bi-lock-fill small ms-1" aria-hidden="true"></i><span class="visually-hidden">@T("restricted", "مقيَّد")</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(title))
+                            {
+                                <span class="d-block small text-muted">@title</span>
+                            }
+                        </span>
+                    </div>
+                </td>
+                <td class="small"><span dir="ltr">@r.FileName</span><span class="d-block text-muted">@Labels.FileSize(r.SizeBytes, isRtl) · @T($"version {r.VersionNumber}", $"الإصدار {r.VersionNumber}")</span></td>
+                <td class="small">@r.UploadedAtUtc.ToString("yyyy-MM-dd")</td>
+                <td class="small">
+                    @if (r.ExpiryDateUtc is DateTime expiry)
+                    {
+                        <span class="@(expiry.Date <= today ? "text-danger fw-semibold" : null)">@expiry.ToString("yyyy-MM-dd")</span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </td>
+                <td>
+                    <span class="badge @Badge(r.Status)">@Labels.AttachmentStatus(r.Status, isRtl)</span>
+                    @if (r.VerifiedAtUtc != null)
+                    {
+                        <span class="badge text-bg-primary">@T("verified", "مدقَّق")</span>
+                    }
+                </td>
+                <td class="text-end text-nowrap">
+                    @if (readable)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" title="@T("Download", "تنزيل")" aria-label="@T("Download", "تنزيل")"
+                           asp-controller="@Model.Controller" asp-action="DownloadDocument" asp-route-id="@Model.OwnerId" asp-route-attachmentId="@r.AttachmentId">
+                            <i class="bi bi-download" aria-hidden="true"></i>
+                        </a>
+                    }
+                    @if (Model.CanVerify && readable && r.VerifiedAtUtc == null && r.Status == AttachmentStatus.Active)
+                    {
+                        <form method="post" class="d-inline" asp-controller="@Model.Controller" asp-action="VerifyDocument" asp-route-id="@Model.OwnerId">
+                            <input type="hidden" name="attachmentId" value="@r.AttachmentId" />
+                            <button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Mark as sighted", "تأكيد المطابقة")" aria-label="@T("Mark as sighted", "تأكيد المطابقة")"><i class="bi bi-patch-check" aria-hidden="true"></i></button>
+                        </form>
+                    }
+                    @if (Model.CanEdit && r.Status != AttachmentStatus.Void)
+                    {
+                        @* BR-ATT-007: voided with a reason, never deleted while the record that owns
+                           it exists. The reason travels with the button rather than through a
+                           prompt, so what was typed is what is stored. *@
+                        <form method="post" class="d-inline-flex gap-1 align-middle" asp-controller="@Model.Controller" asp-action="VoidDocument" asp-route-id="@Model.OwnerId"
+                              onsubmit="return confirm('@T("Void this document?", "إلغاء هذا المستند؟")');">
+                            <input type="hidden" name="attachmentId" value="@r.AttachmentId" />
+                            <input name="reason" class="form-control form-control-sm" style="width:11rem" required
+                                   placeholder="@T("reason", "السبب")" aria-label="@T("Reason for voiding", "سبب الإلغاء")" />
+                            <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Void", "إلغاء")" aria-label="@T("Void", "إلغاء")"><i class="bi bi-x-octagon" aria-hidden="true"></i></button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        @if (Model.Rows.Count == 0)
+        {
+            <tr><td colspan="6" class="text-center text-muted py-3">@T("No documents on file yet.", "لا توجد مستندات في الملف بعد.")</td></tr>
+        }
+    </tbody>
+</table>
+
+@if (Model.CanEdit)
+{
+    @if (Model.Types.Count == 0)
+    {
+        <p class="small text-warning-emphasis mb-0">
+            @T("No document type is defined for this module yet — define one under Setup › Document types before filing anything here.", "لا يوجد نوع مستند معرَّف لهذه الوحدة بعد — عرِّف نوعاً من الإعدادات › أنواع المستندات قبل الإرفاق هنا.")
+        </p>
+    }
+    else
+    {
+        <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end"
+              asp-controller="@Model.Controller" asp-action="UploadDocument" asp-route-id="@Model.OwnerId">
+            <div class="col-md-3">
+                <label class="form-label small" for="doc-type-@Model.OwnerId">@T("Document type", "نوع المستند")</label>
+                <select id="doc-type-@Model.OwnerId" name="typeCode" class="form-select form-select-sm" required>
+                    @foreach (var t in Model.Types)
+                    {
+                        @* Each option carries its own rules so the box narrows to the chosen type
+                           rather than promising whatever the widest type allows. *@
+                        <option value="@t.Code"
+                                data-accept="@Labels.AcceptAttribute(t.AllowedFormats)"
+                                data-max-bytes="@AttachmentIntake.EffectiveMaxBytes(t)">
+                            @(isRtl ? t.Name.NameAr : t.Name.NameEn)@(t.IsExpiryTracked ? " ⏰" : "")@(t.IsRestricted ? " 🔒" : "")
+                        </option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <partial name="_FileUploadField" model="@(new FileUploadFieldViewModel {
+                    Id = $"doc-file-{Model.OwnerId}", Name = "file",
+                    Label = T("File", "الملف"),
+                    AllowedFormats = union, MaxBytes = widest, Required = true,
+                    RulesFrom = $"doc-type-{Model.OwnerId}" })" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small" for="doc-title-@Model.OwnerId">@T("Title (optional)", "العنوان (اختياري)")</label>
+                <input id="doc-title-@Model.OwnerId" name="title" class="form-control form-control-sm"
+                       placeholder="@T("e.g. issued 2024", "مثال: صادر 2024")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small" for="doc-expiry-@Model.OwnerId">@T("Expiry", "الانتهاء")</label>
+                <input id="doc-expiry-@Model.OwnerId" name="expiry" type="date" class="form-control form-control-sm" />
+                <div class="form-text">@T("Required for ⏰ types.", "مطلوب لأنواع ⏰.")</div>
+            </div>
+            <div class="col-12">
+                <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-paperclip me-1" aria-hidden="true"></i>@T("Attach", "إرفاق")</button>
+                <span class="form-text ms-2">@T("Every file is scanned before it can be opened, and a re-upload of the same type becomes a new version rather than a second document.", "يُفحص كل ملف قبل أن يُفتح، وإعادة رفع النوع نفسه تصبح إصداراً جديداً لا مستنداً ثانياً.")</span>
+            </div>
+        </form>
+    }
+}

@@ -1,0 +1,41 @@
+@using System.Globalization
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    var controller = (ViewContext.RouteData.Values["controller"] as string) ?? "";
+    var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
+
+    // The subscription matrix is Setup's screen, not this controller's: doc/Modules/01 §8.3
+    // puts it in the settings hub and it has been there since E-007. It is a tab here because
+    // it is part of the same job, and a second copy of it would be two places to change one
+    // decision.
+    var tabs = new (string Controller, string Action, string En, string Ar, string Icon)[]
+    {
+        ("Notifications", "Index", "My notifications", "إشعاراتي", "bi-bell"),
+        ("Messaging", "Index", "Announcements", "الإعلانات", "bi-megaphone"),
+        ("Notifications", "Templates", "Template studio", "استوديو القوالب", "bi-file-earmark-text"),
+        ("Setup", "Notifications", "Subscriptions", "الاشتراكات", "bi-grid-3x3"),
+        ("Notifications", "Providers", "Gateways", "البوابات", "bi-hdd-network"),
+        ("Notifications", "Deliveries", "Delivery log", "سجل التسليم", "bi-send-check"),
+        ("Notifications", "Budgets", "Budget", "الميزانية", "bi-cash-stack"),
+    };
+
+    bool Active(string c, string a) =>
+        string.Equals(c, controller, StringComparison.OrdinalIgnoreCase)
+        && (string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
+            || (a == "Templates" && string.Equals(action, "Template", StringComparison.OrdinalIgnoreCase))
+            || (a == "Index" && c == "Messaging" && string.Equals(action, "Compose", StringComparison.OrdinalIgnoreCase)));
+}
+<nav aria-label="@(isRtl ? "المراسلات والإشعارات" : "Messaging and notifications")">
+<ul class="nav nav-pills sms-subnav mb-4">
+    @foreach (var t in tabs)
+    {
+        var isActive = Active(t.Controller, t.Action);
+        <li class="nav-item">
+            <a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)"
+               asp-controller="@t.Controller" asp-action="@t.Action">
+                <i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)
+            </a>
+        </li>
+    }
+</ul>
+</nav>

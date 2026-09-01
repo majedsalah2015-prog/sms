@@ -270,5 +270,68 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(2, count);
         }
+
+        // --- doc/Modules/33 §8.2 registry: correct in place, retire, put back ------------------
+
+        [Fact]
+        public async Task A_widget_registered_against_the_wrong_permission_is_corrected_in_place()
+        {
+            using var db = CreateContext();
+            var admin = new DashboardAdmin(db);
+            var widget = await DefineWidgetAsync(admin);
+            var other = new Permission { ModuleCode = "ATT", ScreenCode = "Capture", Action = ActionVerb.View };
+            db.Permissions.Add(other);
+            await db.SaveChangesAsync();
+
+            await admin.UpdateWidgetAsync(
+                widget.Id, "ATT", "الحضور اليوم", "Attendance today", other.Id,
+                WidgetRefreshClass.Cached15Min, "Attendance/Index", isPortalEligible: true);
+
+            using var after = CreateContext();
+            var saved = await after.WidgetDefinitions.IgnoreQueryFilters().SingleAsync(w => w.Id == widget.Id);
+            Assert.Equal(other.Id, saved.RequiredPermissionId);
+            Assert.Equal("ATT", saved.OwningModuleCode);
+            Assert.Equal("Attendance today", saved.TitleEn);
+            Assert.Equal("الحضور اليوم", saved.TitleAr);
+            Assert.Equal(WidgetRefreshClass.Cached15Min, saved.RefreshClass);
+            Assert.Equal("Attendance/Index", saved.DrillTargetCode);
+            Assert.True(saved.IsPortalEligible);
+            // The code is the identity — templates and personalizations point at it.
+            Assert.Equal("DSH-DSH-001", saved.Code);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task A_retired_widget_keeps_the_layouts_that_carry_it_and_can_be_put_back()
+        {
+            using var db = CreateContext();
+            var admin = new DashboardAdmin(db);
+            var widget = await DefineWidgetAsync(admin);
+            await admin.PersonalizeAsync(_grantedUserId, widget.Id, sortOrder: 1, isVisible: true);
+
+            await admin.SetWidgetActiveAsync(widget.Id, false);
+
+            using var retired = CreateContext();
+            Assert.False((await retired.WidgetDefinitions.IgnoreQueryFilters().SingleAsync(w => w.Id == widget.Id)).IsActive);
+            // Retired, not deleted: the personalization still points at the row.
+            Assert.Contains(retired.UserLayouts, l => l.WidgetDefinitionId == widget.Id);
+            Assert.Empty(await retired.WidgetDefinitions.Where(w => w.Id == widget.Id).ToListAsync());
+
+            await new DashboardAdmin(retired).SetWidgetActiveAsync(widget.Id, true);
+
+            using var back = CreateContext();
+            Assert.Single(await back.WidgetDefinitions.Where(w => w.Id == widget.Id).ToListAsync());
+        }
+
+        [Fact]
+        public async Task Editing_a_widget_that_is_not_there_is_refused_in_a_sentence()
+        {
+            using var db = CreateContext();
+            var admin = new DashboardAdmin(db);
+
+            await Assert.ThrowsAsync<WidgetDefinitionNotFoundException>(
+                () => admin.UpdateWidgetAsync(4242, "DSH", "أ", "A", _permissionId, WidgetRefreshClass.Live, "X", false));
+            await Assert.ThrowsAsync<WidgetDefinitionNotFoundException>(() => admin.SetWidgetActiveAsync(4242, false));
+        }
     }
 }

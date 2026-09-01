@@ -133,10 +133,67 @@
     }
     else
     {
-        <form method="post" asp-action="Subscribe" class="row g-2 align-items-end">
+        @* doc/Modules/23 §8.3 asks this desk for a student search. It used to ask for a student *id*,
+           which meant the clerk left the screen to go and find one. The search is a GET beside the
+           subscribe form rather than inside it — a form cannot nest — and it carries the list's own
+           filters through so narrowing the picker never resets the page above it. *@
+        <form method="get" class="row g-2 align-items-end mb-3">
+            <input type="hidden" name="status" value="@(Model.Status?.ToString())" />
+            <input type="hidden" name="q" value="@Model.Search" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="stuQ">@T("Find the student", "ابحث عن الطالب")</label>
+                <input type="search" id="stuQ" name="stuQ" value="@Model.StudentQuery" class="form-control"
+                       placeholder="@T("student no / any part of the name…", "رقم الطالب / أي جزء من الاسم…")"
+                       aria-label="@T("Search students by number or name", "بحث عن الطلاب بالرقم أو الاسم")" />
+            </div>
             <div class="col-6 col-md-2">
-                <label class="form-label" for="stu">@T("Student id", "رقم الطالب")</label>
-                <input id="stu" name="studentId" type="number" class="form-control" required />
+                <button type="submit" class="btn btn-outline-secondary w-100">@T("Search", "بحث")</button>
+            </div>
+            @if (Model.StudentQuery != null)
+            {
+                <div class="col-6 col-md-2">
+                    <a class="btn btn-link w-100" asp-action="Subscriptions" asp-route-status="@Model.Status" asp-route-q="@Model.Search">@T("Clear", "مسح")</a>
+                </div>
+            }
+        </form>
+
+        <form method="post" asp-action="Subscribe" class="row g-2 align-items-end">
+            <input type="hidden" name="status" value="@(Model.Status?.ToString())" />
+            <input type="hidden" name="q" value="@Model.Search" />
+            <input type="hidden" name="stuQ" value="@Model.StudentQuery" />
+            <div class="col-12 col-md-4">
+                <label class="form-label" for="stu">
+                    @T("Student", "الطالب")
+                    <span class="text-muted small">
+                        @if (Model.CandidateCount == 0)
+                        {
+                            @T("— none match", "— لا نتائج")
+                        }
+                        else if (Model.CandidatesTruncated)
+                        {
+                            @($"— {Model.CandidateCount} " + T("match, showing the first", "مطابق، يُعرض أول") + $" {Model.Candidates.Count}")
+                        }
+                        else
+                        {
+                            @($"— {Model.CandidateCount}")
+                        }
+                    </span>
+                </label>
+                <select id="stu" name="studentId" class="form-select" required>
+                    <option value="">@T("choose a student…", "اختر طالباً…")</option>
+                    @foreach (var candidate in Model.Candidates)
+                    {
+                        <option value="@candidate.Id" selected="@(Model.SelectedStudentId == candidate.Id)">@candidate.Text(isRtl)</option>
+                    }
+                </select>
+                @if (Model.CandidateCount == 0)
+                {
+                    <div class="form-text text-warning">
+                        @(Model.StudentQuery == null
+                            ? T("No student is enrolled in the working year yet — a transport subscription hangs off an enrolment.", "لا يوجد طالب مسجَّل في العام الدراسي الحالي بعد — واشتراك النقل مبني على التسجيل.")
+                            : T("No enrolled student matches that search.", "لا يوجد طالب مسجَّل مطابق لهذا البحث."))
+                    </div>
+                }
             </div>
             <div class="col-6 col-md-2">
                 <label class="form-label" for="payer">@T("Payer id", "رقم الدافع")</label>

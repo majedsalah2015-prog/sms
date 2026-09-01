@@ -335,5 +335,67 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(2, db.Attachments.Count(a => a.OwningEntityId == 501));
         }
+
+        // --- doc 10 §5 type catalog: retire, put back, and the retired code ---------------------
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task A_retired_document_type_keeps_its_files_and_can_be_put_back()
+        {
+            using var db = CreateContext();
+            var admin = new AttachmentTypeAdmin(db);
+            var type = await admin.DefineDocumentTypeAsync(
+                "STU-EXTRA", "STU", "إضافي", "Extra", DocumentFormat.Pdf, null, false, false, false);
+            await CreateService(db).UploadAsync("STU-EXTRA", "Student", 700, Bytes("z"), "z.pdf", DocumentFormat.Pdf);
+
+            await admin.SetDocumentTypeActiveAsync(type.Id, false);
+
+            using var retired = CreateContext();
+            Assert.False((await retired.DocumentTypes.IgnoreQueryFilters().SingleAsync(t => t.Id == type.Id)).IsActive);
+            // Retired, not deleted: the file filed under it is untouched and still points at it.
+            Assert.Contains(retired.Attachments, a => a.DocumentTypeId == type.Id);
+            // The soft-active filter is what takes it out of the upload pickers.
+            Assert.Empty(await retired.DocumentTypes.Where(t => t.Id == type.Id).ToListAsync());
+
+            await new AttachmentTypeAdmin(retired).SetDocumentTypeActiveAsync(type.Id, true);
+
+            using var back = CreateContext();
+            Assert.Single(await back.DocumentTypes.Where(t => t.Id == type.Id).ToListAsync());
+        }
+
+        /// <summary>
+        /// The upsert used to look the code up through the soft-active filter, so once a type
+        /// could be retired the lookup found nothing and the insert that followed collided with
+        /// the row still sitting under the unique index. Re-defining a retired code has to reach
+        /// that row — which is also how a school un-retires one by redefining it.
+        /// </summary>
+        [Fact]
+        public async Task Redefining_a_retired_code_reaches_the_retired_row_rather_than_inserting_a_second()
+        {
+            using var db = CreateContext();
+            var admin = new AttachmentTypeAdmin(db);
+            var type = await admin.DefineDocumentTypeAsync(
+                "STU-DUP", "STU", "مكرر", "Dup", DocumentFormat.Pdf, null, false, false, false);
+            await admin.SetDocumentTypeActiveAsync(type.Id, false);
+
+            var again = await admin.DefineDocumentTypeAsync(
+                "STU-DUP", "STU", "مكرر مصحّح", "Dup corrected", DocumentFormat.Pdf | DocumentFormat.Jpg, null, false, false, false);
+
+            Assert.Equal(type.Id, again.Id);
+            using var after = CreateContext();
+            Assert.Single(await after.DocumentTypes.IgnoreQueryFilters().Where(t => t.Code == "STU-DUP").ToListAsync());
+            var saved = await after.DocumentTypes.IgnoreQueryFilters().SingleAsync(t => t.Code == "STU-DUP");
+            Assert.Equal("Dup corrected", saved.Name.NameEn);
+            Assert.True(saved.IsActive);
+        }
+
+        [Fact]
+        public async Task Retiring_a_document_type_that_is_not_there_is_refused_in_a_sentence()
+        {
+            using var db = CreateContext();
+
+            await Assert.ThrowsAsync<DocumentTypeNotFoundException>(
+                () => new AttachmentTypeAdmin(db).SetDocumentTypeActiveAsync(4242, false));
+        }
     }
 }

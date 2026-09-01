@@ -8,6 +8,8 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Security;
 using Sms.Domain.Common;
+using Sms.Domain.Employees;
+using Sms.Domain.Parents;
 using Sms.Domain.Security;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Persistence;
@@ -418,6 +420,223 @@ namespace Sms.Infrastructure.Tests
             var users = await Admin_(db).ListUserRolesAsync("cler");
 
             Assert.Equal("clerk", Assert.Single(users).UserName);
+        }
+
+        // ------------------------------------------------------------------ who the account belongs to
+
+        /// <summary>
+        /// The screen's own question is "who holds this role", and a column of user names does not
+        /// answer it — nobody in a school office knows who <c>emp-1042</c> is. The person's name and
+        /// file number come back with the account so the list can be read without translating it.
+        /// </summary>
+        [Fact]
+        public async Task Each_account_is_listed_with_the_person_it_belongs_to()
+        {
+            AddAccount("emp-1042", AccountType.Staff, AddEmployee("1042", "Ahmed", "أحمد"));
+
+            using var db = CreateContext();
+            var row = Assert.Single(await Admin_(db).ListUserRolesAsync());
+
+            Assert.Equal("Ahmed Salem Al-Hasan", row.PersonNameEn);
+            Assert.Equal("أحمد سالم الحسن", row.PersonNameAr);
+            Assert.Equal("1042", row.PersonReference);
+        }
+
+        /// <summary>
+        /// What an administrator types is the name on the colleague's door or the number on their
+        /// file, in whichever language the screen is being read in. Matching the user name alone
+        /// meant the search only worked for somebody who already knew the answer.
+        /// </summary>
+        [Fact]
+        public async Task An_account_is_found_by_the_person_name_in_either_language_or_by_the_file_number()
+        {
+            AddAccount("emp-1042", AccountType.Staff, AddEmployee("1042", "Ahmed", "أحمد"));
+            AddAccount("emp-2311", AccountType.Staff, AddEmployee("2311", "Mona", "منى"));
+
+            using var db = CreateContext();
+            var admin = Admin_(db);
+
+            Assert.Equal("emp-2311", Assert.Single(await admin.ListUserRolesAsync("mona")).UserName);
+            Assert.Equal("emp-1042", Assert.Single(await admin.ListUserRolesAsync("أحمد")).UserName);
+            Assert.Equal("emp-2311", Assert.Single(await admin.ListUserRolesAsync("2311")).UserName);
+
+            // And the user name still finds it, which is what the box did before.
+            Assert.Equal("emp-1042", Assert.Single(await admin.ListUserRolesAsync("emp-1042")).UserName);
+        }
+
+        /// <summary>
+        /// Three registers, three tables, and the account type is what says which one to look in:
+        /// employee 7, parent 7 and student 7 are three different people.
+        /// </summary>
+        [Fact]
+        public async Task A_parent_account_is_named_from_the_parent_register_and_not_the_staff_one()
+        {
+            AddEmployee("1042", "Ahmed", "أحمد");
+            AddAccount("par-77", AccountType.Parent, AddParent("77"));
+
+            using var db = CreateContext();
+            var row = Assert.Single(await Admin_(db).ListUserRolesAsync());
+
+            Assert.Equal("Salem Al-Hasan", row.PersonNameEn);
+            Assert.Equal("77", row.PersonReference);
+        }
+
+        /// <summary>
+        /// The lookup reads past the soft-active filter. A deactivated parent still holds an account
+        /// somebody has come here to deal with, and a list that went anonymous the moment a person
+        /// was retired would go blank at the least useful moment (the trap
+        /// <c>SoftActiveLookupTests</c> exists for).
+        /// </summary>
+        [Fact]
+        public async Task A_deactivated_person_is_still_named_beside_their_account()
+        {
+            var parentId = AddParent("77");
+            AddAccount("par-77", AccountType.Parent, parentId);
+
+            using (var db = CreateContext())
+            {
+                var parent = await db.Parents.SingleAsync(p => p.Id == parentId);
+                parent.IsActive = false;
+                await db.SaveChangesAsync();
+            }
+
+            using var check = CreateContext();
+            var row = Assert.Single(await Admin_(check).ListUserRolesAsync());
+
+            Assert.Equal("Salem Al-Hasan", row.PersonNameEn);
+            Assert.Equal("77", row.PersonReference);
+        }
+
+        /// <summary>
+        /// An integration account belongs to nobody by design (doc 06 §2), and so does any account
+        /// written before this product could link one. Both are listed as themselves rather than
+        /// throwing the whole screen away.
+        /// </summary>
+        [Fact]
+        public async Task An_account_that_belongs_to_no_person_is_still_listed()
+        {
+            await ProvisionAsync("root", "SYSADMIN", Admin);
+
+            using var db = CreateContext();
+            var row = Assert.Single(await Admin_(db).ListUserRolesAsync());
+
+            Assert.Equal("root", row.UserName);
+            Assert.Null(row.PersonNameEn);
+            Assert.Null(row.PersonNameAr);
+            Assert.Null(row.PersonReference);
+        }
+
+        /// <summary>
+        /// The everyday list answers "who can reach what today", so a closed account stays out of it.
+        /// But there is no delete in this product (BR-GLB-005) and no other screen that shows one, so
+        /// asking must bring it back — read past the soft-active filter, with the school scope
+        /// restated, or the request would also reach the next school's accounts.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task A_deactivated_account_is_out_of_the_list_until_it_is_asked_for()
+        {
+            await ProvisionAsync("root", "SYSADMIN", Admin);
+            var (clerkId, _) = await ProvisionAsync("clerk", "REGISTRAR", ViewStudents);
+
+            using (var db = CreateContext())
+            {
+                var clerk = await db.UserAccounts.SingleAsync(u => u.Id == clerkId);
+                clerk.IsActive = false;
+                await db.SaveChangesAsync();
+            }
+
+            using var check = CreateContext();
+            var admin = Admin_(check);
+
+            Assert.Equal("root", Assert.Single(await admin.ListUserRolesAsync()).UserName);
+
+            var withInactive = await admin.ListUserRolesAsync(includeInactive: true);
+            Assert.Equal(2, withInactive.Count);
+            Assert.False(withInactive.Single(u => u.UserName == "clerk").IsActive);
+
+            // The roles it still holds come with it: what a closed account could reach is the
+            // question somebody re-reading it has come to answer.
+            Assert.Single(withInactive.Single(u => u.UserName == "clerk").Roles);
+        }
+
+        /// <summary>The search narrows the same list whichever accounts are in it.</summary>
+        [Fact]
+        public async Task Searching_still_narrows_the_list_when_deactivated_accounts_are_shown()
+        {
+            await ProvisionAsync("root", "SYSADMIN", Admin);
+            var (clerkId, _) = await ProvisionAsync("clerk", "REGISTRAR", ViewStudents);
+
+            using (var db = CreateContext())
+            {
+                var clerk = await db.UserAccounts.SingleAsync(u => u.Id == clerkId);
+                clerk.IsActive = false;
+                await db.SaveChangesAsync();
+            }
+
+            using var check = CreateContext();
+            var found = await Admin_(check).ListUserRolesAsync("cler", includeInactive: true);
+
+            Assert.Equal("clerk", Assert.Single(found).UserName);
+        }
+
+        // ------------------------------------------------------------------ people fixture
+
+        private int AddEmployee(string employeeNo, string firstNameEn, string firstNameAr)
+        {
+            using var db = CreateContext();
+            var employee = new Employee
+            {
+                EmployeeNo = employeeNo,
+                FirstNameAr = firstNameAr,
+                FatherNameAr = "سالم",
+                GrandfatherNameAr = "علي",
+                FamilyNameAr = "الحسن",
+                FirstNameEn = firstNameEn,
+                FatherNameEn = "Salem",
+                GrandfatherNameEn = "Ali",
+                FamilyNameEn = "Al-Hasan",
+                Gender = Gender.Male,
+                DateOfBirth = new DateTime(1990, 1, 1),
+                NationalityLookupId = 1,
+                Status = EmployeeStatus.Active,
+            };
+
+            db.Employees.Add(employee);
+            db.SaveChanges();
+            return employee.Id;
+        }
+
+        private int AddParent(string fileNo)
+        {
+            using var db = CreateContext();
+            var parent = new Parent
+            {
+                ParentFileNo = fileNo,
+                NameAr = "سالم الحسن",
+                NameEn = "Salem Al-Hasan",
+                PrimaryMobile = "0590000000",
+            };
+
+            db.Parents.Add(parent);
+            db.SaveChanges();
+            return parent.Id;
+        }
+
+        private int AddAccount(string userName, AccountType accountType, int personId)
+        {
+            using var db = CreateContext();
+            var account = new UserAccount
+            {
+                UserName = userName,
+                AccountType = accountType,
+                PersonId = personId,
+                IsActive = true,
+            };
+
+            db.UserAccounts.Add(account);
+            db.SaveChanges();
+            return account.Id;
         }
 
         // ------------------------------------------------------------------ role lifecycle

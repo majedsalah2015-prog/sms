@@ -27,5 +27,13 @@ namespace Sms.Domain.Employees
 
         /// <summary>أرمل / أرملة</summary>
         Widowed = 4,
+
+        /// <summary>
+        /// غير ذلك — added at the owner's request (2026-08-27) for the cases the four above do not
+        /// name. Deliberately without a free-text note beside it: the four categories are what a
+        /// staff register and a ministry return read, and a note nothing reports on would collect
+        /// personal circumstances the school has no use for.
+        /// </summary>
+        Other = 5,
     }
 }

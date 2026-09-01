@@ -24,6 +24,7 @@ using Sms.Domain.Grading;
 using Sms.Domain.Health;
 using Sms.Domain.Installments;
 using Sms.Domain.Jobs;
+using Sms.Domain.Learning;
 using Sms.Domain.Library;
 using Sms.Domain.Lookups;
 using Sms.Domain.Messaging;
@@ -32,6 +33,7 @@ using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
 using Sms.Domain.Transport;
 using Sms.Domain.Payments;
+using Sms.Domain.Payroll;
 using Sms.Domain.Backup;
 using Sms.Domain.ReadModels;
 using Sms.Domain.Reports;
@@ -230,6 +232,20 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<Qualification> Qualifications => Set<Qualification>();
 
+        // Payroll and staff advances (owner request, 2026-08-28). Kept beside the rest of Module
+        // 12's people because that is the schema they live in; see Sms.Domain.Payroll.PayrollRun
+        // for the stated deviation from doc/Modules/12 §2, which scopes payroll calculation out.
+
+        public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+
+        public DbSet<PayrollRunLine> PayrollRunLines => Set<PayrollRunLine>();
+
+        public DbSet<PayrollLineAdjustment> PayrollLineAdjustments => Set<PayrollLineAdjustment>();
+
+        public DbSet<SalaryAdvance> SalaryAdvances => Set<SalaryAdvance>();
+
+        public DbSet<SalaryAdvanceInstallment> SalaryAdvanceInstallments => Set<SalaryAdvanceInstallment>();
+
         public DbSet<TeacherProfile> TeacherProfiles => Set<TeacherProfile>();
 
         public DbSet<TeacherAssignment> TeacherAssignments => Set<TeacherAssignment>();
@@ -255,6 +271,13 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<MarkEntry> MarkEntries => Set<MarkEntry>();
 
         public DbSet<TermResult> TermResults => Set<TermResult>();
+
+        // Module 37 (doc/Modules/37 §7) — scope opened 2026-08-30, not yet approved.
+        public DbSet<Lesson> Lessons => Set<Lesson>();
+
+        public DbSet<LessonResource> LessonResources => Set<LessonResource>();
+
+        public DbSet<Homework> Homeworks => Set<Homework>();
 
         public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
 
@@ -331,6 +354,8 @@ namespace Sms.Infrastructure.Persistence
         public DbSet<PromiseToPay> PromisesToPay => Set<PromiseToPay>();
 
         public DbSet<DunningEvent> DunningEvents => Set<DunningEvent>();
+
+        public DbSet<CollectionNotice> CollectionNotices => Set<CollectionNotice>();
 
         public DbSet<DiscountType> DiscountTypes => Set<DiscountType>();
 

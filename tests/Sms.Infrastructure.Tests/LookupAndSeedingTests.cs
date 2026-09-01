@@ -242,12 +242,32 @@ namespace Sms.Infrastructure.Tests
             var firstVersionCount = db.NumberingSeries.Count();
             await contributor.SeedAsync();
 
-            Assert.Equal(20, db.NumberingSeries.Count(s => s.IsActive));
+            // 20 from doc 08 §4, plus PAY and ADV — payroll and staff advances, the owner's
+            // 2026-08-28 addition to a module the docs scope payroll out of — plus DUN, the arrears
+            // notice BR-INS-008 calls a numbered formal document.
+            Assert.Equal(23, db.NumberingSeries.Count(s => s.IsActive));
             Assert.Equal(firstVersionCount, db.NumberingSeries.Count()); // no spurious cutover on re-seed
             var student = db.NumberingSeries.Single(s => s.Code == "STU");
             Assert.Equal(ResetPolicy.Never, student.ResetPolicy);
             var receipt = db.NumberingSeries.Single(s => s.Code == "RCP");
             Assert.Equal(GapPolicy.Strict, receipt.GapPolicy);
+
+            // A payroll run is a money document, so its sequence is strict for the same reason a
+            // receipt's is: a hole in it is a question somebody has to answer.
+            var payroll = db.NumberingSeries.Single(s => s.Code == "PAY");
+            Assert.Equal(GapPolicy.Strict, payroll.GapPolicy);
+            Assert.Equal(ResetPolicy.PerCalendarYear, payroll.ResetPolicy);
+
+            // An advance is not: a withdrawn request should not oblige anyone to explain a gap.
+            var advance = db.NumberingSeries.Single(s => s.Code == "ADV");
+            Assert.Equal(GapPolicy.Normal, advance.GapPolicy);
+
+            // Nor is an arrears notice — no money moves when one is issued, and an officer who
+            // abandons a batch half-way should not leave a hole somebody has to account for. It
+            // resets per academic year because arrears are chased within a school year.
+            var notice = db.NumberingSeries.Single(s => s.Code == "DUN");
+            Assert.Equal(GapPolicy.Normal, notice.GapPolicy);
+            Assert.Equal(ResetPolicy.PerAcademicYear, notice.ResetPolicy);
         }
 
         private sealed class RecordingContributor : ISeedContributor

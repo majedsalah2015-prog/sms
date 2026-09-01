@@ -16,6 +16,7 @@
     {
         ("personal", "Personal", "الشخصية", null), ("position", "Position & org", "المنصب والهيكل", Model.Assignments.Count.ToString()), ("contracts", "Contracts 🔒", "العقود 🔒", Model.Contracts.Count.ToString()),
         ("qualifications", "Qualifications", "المؤهلات", Model.Qualifications.Count.ToString()), ("teaching", "Teaching", "التدريس", Model.TeacherProfile == null ? null : Model.Teaching.Count(t => t.Assignment.EffectiveToUtc == null).ToString()),
+        ("documents", "Documents", "المستندات", Model.Documents.Rows.Count.ToString()),
         ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()), ("more", "More…", "المزيد…", null),
     };
     var help = new HelpPanelViewModel
@@ -28,7 +29,7 @@
             new HelpPanelViewModel.Item(T("Positions are dated, not replaced", "المناصب مؤرَّخة لا مستبدَلة"), T("A promotion adds an assignment and closes the previous one; it does not overwrite it (BR-EMP-002). The row with no end date is the current one. That is what lets a certificate reissued for last year name the position that was actually held then.", "الترقية تضيف إسناداً وتغلق السابق؛ ولا تكتب فوقه (BR-EMP-002). والصف بلا تاريخ انتهاء هو الحالي. وهذا ما يتيح لشهادة يُعاد إصدارها عن العام الماضي أن تسمّي المنصب الذي كان مشغولاً فعلاً حينها.")),
             new HelpPanelViewModel.Item(T("The contracts tab is restricted", "لسان العقود مقيَّد"), T("Salary and contract terms are a restricted category with their own permission (BR-GLB-072). The padlock is not decoration — without the grant the tab's contents are not sent to the browser at all.", "الراتب وشروط العقد فئة مقيَّدة لها صلاحيتها (BR-GLB-072). والقفل ليس زينة — فبدون المنح لا تُرسل محتويات اللسان إلى المتصفح أصلاً.")),
             new HelpPanelViewModel.Item(T("Teaching is a profile on top of the employee", "التدريس ملف فوق الموظف"), T("The teaching tab appears once the person has a teacher profile. Subject qualifications there are what the timetable checks before it will let someone be assigned a class (BR-TCH-001, BR-SUB-006) — an unqualified assignment is refused there, not here.", "يظهر لسان التدريس متى صار للشخص ملف معلم. ومؤهلات المواد فيه هي ما يفحصه الجدول قبل أن يسمح بإسناد حصة لأحد (BR-TCH-001، BR-SUB-006) — فالإسناد غير المؤهَّل يُرفض هناك لا هنا.")),
-            new HelpPanelViewModel.Item(T("Ending service does not remove the person", "إنهاء الخدمة لا يزيل الشخص"), T("Status moves them out of the active directory and leaves everything they did in place. There is no delete in this product — and it is the reason a rehire can pick their old record back up intact.", "الحالة تُخرجه من الدليل النشط وتترك كل ما فعله في مكانه. فلا حذف في هذا المنتج — وهو السبب في أن العائد يستطيع استئناف سجله القديم سليماً.")),
+            new HelpPanelViewModel.Item(T("Ending service does not remove the person", "إنهاء الخدمة لا يزيل الشخص"), T("Status moves them out of the active directory and leaves everything they did in place — a rehire picks their old record back up intact. Ending service is never a delete; the delete on the qualifications tab is a correction to that one row, not to the person.", "الحالة تُخرجه من الدليل النشط وتترك كل ما فعله في مكانه — فالعائد يستأنف سجله القديم سليماً. وإنهاء الخدمة ليس حذفاً أبداً؛ أما الحذف في لسان المؤهلات فتصحيح لذلك السطر وحده لا للشخص.")),
         },
     };
 }
@@ -60,9 +61,13 @@
             </div>
             <div class="col-md-9 col-lg-10">
             <form method="post" asp-action="Edit" asp-route-id="@e.Id">
-                <div class="sms-bilingual mb-3">
-                    <div><label class="form-label small" for="emp-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="emp-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
-                    <div><label class="form-label small" for="emp-FirstNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameEn" id="emp-FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FirstNameEn" aria-label="@T("First name (English)", "الاسم الأول (إنجليزي)")" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FatherNameEn" aria-label="@T("Father name (English)", "اسم الأب (إنجليزي)")" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.GrandfatherNameEn" aria-label="@T("Grandfather name (English)", "اسم الجد (إنجليزي)")" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FamilyNameEn" aria-label="@T("Family name (English)", "اسم العائلة (إنجليزي)")" /></div></div></div>
+                @* The English quad name is filled from the Arabic one by the helper button of
+                   docs/UI/01 §"Bilingual entry pattern" — assist only. Imported staff carry the
+                   register's own Arabic text in both columns on purpose (see Import's help panel),
+                   so this screen is where that gets turned into a name an English report can use. *@
+                <div class="sms-bilingual mb-3" id="emp-name-block">
+                    <div><label class="form-label small" for="emp-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="emp-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" id="emp-FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" id="emp-GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@e.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" id="emp-FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@e.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
+                    <div><div class="d-flex align-items-center justify-content-between gap-2"><label class="form-label small mb-1" for="emp-FirstNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><button type="button" class="btn btn-link btn-sm p-0 mb-1 text-decoration-none" data-translit-fill="#emp-name-block" title="@T("Transliterate the four Arabic names into the English boxes. Check the result before saving — it is a starting point, not an authority.", "نقحرة الأسماء العربية الأربعة إلى الخانات الإنجليزية. راجع الناتج قبل الحفظ — فهو نقطة بداية لا مرجع.")">@T("Fill from Arabic", "تعبئة من العربي")</button></div><div class="row g-1"><div class="col-3"><input name="FirstNameEn" id="emp-FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FirstNameEn" data-translit-from="#emp-FirstNameAr" aria-label="@T("First name (English)", "الاسم الأول (إنجليزي)")" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FatherNameEn" data-translit-from="#emp-FatherNameAr" aria-label="@T("Father name (English)", "اسم الأب (إنجليزي)")" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@e.GrandfatherNameEn" data-translit-from="#emp-GrandfatherNameAr" aria-label="@T("Grandfather name (English)", "اسم الجد (إنجليزي)")" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@e.FamilyNameEn" data-translit-from="#emp-FamilyNameAr" aria-label="@T("Family name (English)", "اسم العائلة (إنجليزي)")" /></div></div></div>
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-md-2"><label class="form-label small" for="emp-Gender">@T("Gender", "الجنس")</label><select name="Gender" id="emp-Gender" class="form-select form-select-sm"><option value="Male" selected="@(e.Gender == Sms.Domain.Common.Gender.Male)">@T("Male", "ذكر")</option><option value="Female" selected="@(e.Gender == Sms.Domain.Common.Gender.Female)">@T("Female", "أنثى")</option></select></div>
@@ -71,9 +76,79 @@
                     <div class="col-md-2"><label class="form-label small" for="emp-PrimaryIdTypeLookupId">@T("ID type", "نوع الهوية")</label><select name="PrimaryIdTypeLookupId" id="emp-PrimaryIdTypeLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(t.Id == e.PrimaryIdTypeLookupId)">@(isRtl ? t.Ar : t.En)</option> }</select></div>
                     <div class="col-md-2"><label class="form-label small" for="emp-PrimaryIdNo">@T("ID number", "رقم الهوية")</label><input name="PrimaryIdNo" id="emp-PrimaryIdNo" class="form-control form-control-sm" dir="ltr" value="@e.PrimaryIdNo" /></div>
                     <div class="col-md-1"><label class="form-label small" for="emp-PrimaryIdExpiry">@T("Expiry", "الانتهاء")</label><input name="PrimaryIdExpiry" id="emp-PrimaryIdExpiry" type="date" class="form-control form-control-sm" value="@e.PrimaryIdExpiry?.ToString("yyyy-MM-dd")" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="emp-Mobile">@T("Mobile", "الجوال")</label><input name="Mobile" id="emp-Mobile" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.Mobile" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="emp-WhatsAppNumber">@T("WhatsApp", "الواتس اب")</label><input name="WhatsAppNumber" id="emp-WhatsAppNumber" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.WhatsAppNumber" /><div class="form-text">@T("Leave empty if it is the same number.", "اتركه فارغاً إن كان نفس الرقم.")</div></div>
                     <div class="col-md-2"><label class="form-label small" for="emp-UserAccountId">@T("User account id", "معرّف حساب المستخدم")</label><input name="UserAccountId" id="emp-UserAccountId" type="number" class="form-control form-control-sm" dir="ltr" value="@e.UserAccountId" /><div class="form-text">@T("Bridge to sec.UserAccount (BR-EMP-001); provisioning lands with Module 36.", "ربط بـ sec.UserAccount (BR-EMP-001)؛ الإنشاء مع الوحدة 36.")</div></div>
                 </div>
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="emp-Reason">@T("Reason (required when name fields change — BR-EMP-001, T1)", "السبب (مطلوب عند تغيير حقول الاسم — BR-EMP-001)")</label><input name="Reason" id="emp-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
+            </form>
+
+            @* ------------------------------------------------------------------ personal & financial
+                A second form rather than a longer first one: the identity block above wants a reason
+                whenever a name moves, and putting a mandatory-reason box in front of someone
+                correcting a street name is how the reason box stops meaning anything. This half asks
+                for one only when the marital status or a payment destination actually changes — the
+                audit captor decides that, not the screen. *@
+            <hr class="my-4" />
+            <form method="post" asp-action="PersonalDetails" asp-route-id="@e.Id">
+                <h2 class="h6 text-muted mb-3">@T("Personal details", "البيانات الشخصية")</h2>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3"><label class="form-label small" for="pd-maritalStatus">@T("Marital status", "الحالة الاجتماعية")</label><select name="maritalStatus" id="pd-maritalStatus" class="form-select form-select-sm"><option value="">—</option>@foreach (MaritalStatus ms in Enum.GetValues(typeof(MaritalStatus))) { <option value="@ms" selected="@(e.MaritalStatus == ms)">@StaffLabels.MaritalStatus(ms, isRtl)</option> }</select></div>
+                    <div class="col-md-3"><label class="form-label small" for="pd-spouseIdTypeLookupId">@T("Spouse ID type", "نوع هوية الزوج/الزوجة")</label><select name="spouseIdTypeLookupId" id="pd-spouseIdTypeLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var t in Model.IdTypes) { <option value="@t.Id" selected="@(t.Id == e.SpouseIdTypeLookupId)">@(isRtl ? t.Ar : t.En)</option> }</select></div>
+                    <div class="col-md-3"><label class="form-label small" for="pd-spouseIdNo">@T("Spouse ID number", "رقم هوية الزوج/الزوجة")</label><input name="spouseIdNo" id="pd-spouseIdNo" class="form-control form-control-sm" dir="ltr" maxlength="30" value="@e.SpouseIdNo" /></div>
+                    <div class="col-md-3"><label class="form-label small" for="pd-originTown">@T("Town of origin", "البلدة الأصلية")</label><input name="originTown" id="pd-originTown" class="form-control form-control-sm" maxlength="100" value="@e.OriginTown" /></div>
+                    <div class="col-12"><label class="form-label small" for="pd-address">@T("Address", "العنوان")</label><input name="address" id="pd-address" class="form-control form-control-sm" maxlength="250" value="@e.Address" /></div>
+                </div>
+
+                <h2 class="h6 text-muted mb-3">@T("Payment details", "البيانات المالية")</h2>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small" for="pd-bankLookupId">@T("Bank", "البنك")</label>
+                        <select name="bankLookupId" id="pd-bankLookupId" class="form-select form-select-sm">
+                            <option value="">—</option>
+                            @foreach (var b in Model.Banks)
+                            {
+                                <option value="@b.Id" selected="@(b.Id == e.BankLookupId)">@(isRtl ? b.Ar : b.En)</option>
+                            }
+                            @*  Model.Banks is the picker — active values only, so a retired bank is
+                                not in it. Without this option the select would render "—" for an
+                                employee paid into one and blank the field on the next save of an
+                                unrelated address. It stays offered to the row already holding it and
+                                to nobody else.  *@
+                            @if (e.BankLookupId != null && !Model.Banks.Any(b => b.Id == e.BankLookupId))
+                            {
+                                <option value="@e.BankLookupId" selected="selected">@Model.BankName @T("(retired)", "(ملغى)")</option>
+                            }
+                        </select>
+                        @*  The bank of a register entered before this picker existed is not in the
+                            catalogue and cannot be selected, so it stays editable as text rather
+                            than being dropped: without a field of its own it would be blanked by
+                            the next save of an unrelated address, and there would be no way to
+                            correct or clear it either. Picking from the list supersedes it —
+                            EmployeeAdmin keeps one answer, never both.  *@
+                        @if (e.BankLookupId == null && !string.IsNullOrWhiteSpace(e.BankName))
+                        {
+                            <input name="bankName" class="form-control form-control-sm mt-1" maxlength="120" value="@e.BankName" aria-label="@T("Bank, as typed before the list was offered", "البنك كما كُتب قبل توفّر القائمة")" />
+                            <div class="form-text">@T("Typed before this list was offered. Pick one above to replace it, or clear it here.", "كُتب قبل توفّر هذه القائمة. اختر بنكاً أعلاه ليحلّ محله، أو امسحه من هنا.")</div>
+                        }
+                    </div>
+                    <div class="col-md-4"><label class="form-label small" for="pd-bankAccountNo">@T("Account number / IBAN", "رقم الحساب / الآيبان")</label><input name="bankAccountNo" id="pd-bankAccountNo" class="form-control form-control-sm" dir="ltr" maxlength="40" value="@e.BankAccountNo" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="pd-palPayWalletNo">@T("PalPay wallet", "محفظة بالي بي")</label><input name="palPayWalletNo" id="pd-palPayWalletNo" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.PalPayWalletNo" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="pd-jawwalPayWalletNo">@T("JawwalPay wallet", "محفظة جوال بي")</label><input name="jawwalPayWalletNo" id="pd-jawwalPayWalletNo" class="form-control form-control-sm" dir="ltr" inputmode="tel" maxlength="20" value="@e.JawwalPayWalletNo" /></div>
+                </div>
+                @* The catalogue ships empty on purpose (LookupProductSeedContributor): which banks a
+                   school pays through is a local list. Say where to author it rather than leaving a
+                   registrar looking at a picker with one dash in it. *@
+                @if (Model.Banks.Count == 0)
+                {
+                    <div class="alert alert-light border small py-2 mb-3">
+                        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+                        @T("The bank list ships empty — a school authors its own.", "قائمة البنوك تصل فارغة — كل مدرسة تُدخل قائمتها.")
+                        <a asp-action="Reference" asp-route-list="Bank">@T("Add banks under Staff → Reference data", "أضِف البنوك من الموظفين ← الثوابت")</a>@T(", then they appear here.", "، ثم تظهر هنا.")
+                    </div>
+                }
+                <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="pd-reason">@T("Reason (required when the marital status or a payment destination changes — T1)", "السبب (مطلوب عند تغيير الحالة الاجتماعية أو أي جهة تُصرف إليها الرواتب — T1)")</label><input name="reason" id="pd-reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
+                <div class="form-text mt-2">@T("This system never computes a salary (BR-EMP-007) — these are the destinations the payroll export carries. Nothing here pays anybody.", "هذا النظام لا يحتسب راتباً (BR-EMP-007) — وهذه هي الجهات التي يحملها تصدير الرواتب. ولا شيء هنا يصرف لأحد.")</div>
             </form>
             </div>
             </div>
@@ -135,12 +210,92 @@
         </div>
 
         <div class="tab-pane fade @Show("qualifications")" id="tab-qualifications">
-            <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Qualifications", "المؤهلات")</caption><thead><tr><th scope="col">@T("Title", "المؤهل")</th><th scope="col">@T("Institution", "الجهة")</th><th scope="col">@T("Awarded", "تاريخ المنح")</th><th scope="col">@T("Teaching-relevant", "يخص التدريس")</th></tr></thead>
-                <tbody>@foreach (var q in Model.Qualifications) { <tr><td>@(isRtl ? q.TitleAr : q.TitleEn)</td><td>@(q.InstitutionName ?? "—")</td><td>@q.DateAwarded.ToString("yyyy-MM-dd")</td><td><span aria-hidden="true">@(q.IsTeachingRelevant ? "✓" : "—")</span><span class="visually-hidden">@(q.IsTeachingRelevant ? T("yes", "نعم") : T("no", "لا"))</span></td></tr> }@if (Model.Qualifications.Count == 0) { <tr><td colspan="4" class="text-center text-muted py-3">@T("No qualifications recorded.", "لا مؤهلات مسجلة.")</td></tr> }</tbody></table>
-            <form method="post" asp-action="AddQualification" asp-route-id="@e.Id" class="row g-2 align-items-end">
-                <div class="col-md-3"><input name="titleAr" class="form-control form-control-sm" dir="rtl" placeholder="بكالوريوس رياضيات" aria-label="@T("Qualification title (Arabic)", "عنوان المؤهل (عربي)")" /></div><div class="col-md-3"><input name="titleEn" class="form-control form-control-sm" dir="ltr" placeholder="BSc Mathematics" aria-label="@T("Qualification title (English)", "عنوان المؤهل (إنجليزي)")" /></div><div class="col-md-2"><input name="institution" class="form-control form-control-sm" placeholder="@T("institution", "الجهة")" aria-label="@T("Institution", "الجهة المانحة")" /></div><div class="col-md-2"><input name="dateAwarded" type="date" class="form-control form-control-sm" aria-label="@T("Date awarded", "تاريخ المنح")" /></div><div class="col-md-1 small"><label><input type="checkbox" name="isTeachingRelevant" value="true" class="form-check-input" checked /> @T("teaching", "تدريس")</label></div><div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit" aria-label="@T("Add qualification", "إضافة مؤهل")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button></div>
-            </form>
-            <div class="form-text">@T("Teaching-relevant entries are meant to feed the BR-SUB-006 qualification matrix (Subjects → matrix) — the auto-feed and document upload are deferred.", "المدخلات الخاصة بالتدريس تغذي مصفوفة التأهيل BR-SUB-006 (المواد → المصفوفة) — التغذية التلقائية ورفع المستندات مؤجلان.")</div>
+            @*
+                One field set, drawn twice — once empty to add and once per row to correct. Written
+                as a local function rather than copied, because six fields chosen from four
+                dropdowns is exactly the shape that drifts between two copies of the same markup.
+                async Task and awaited: the repository's Razor rule for a local function that emits
+                markup.
+            *@
+            @{
+                async Task QualificationFields(string id, Sms.Domain.Employees.Qualification? q)
+                {
+                    await Task.CompletedTask;
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-education">@T("Qualification", "المؤهل")</label><select name="educationLookupId" id="@(id)-education" class="form-select form-select-sm"><option value="">—</option>@foreach (var v in Model.EducationLevels) { <option value="@v.Id" selected="@(v.Id == q?.EducationLookupId)">@(isRtl ? v.Ar : v.En)</option> }</select></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-specialization">@T("Specialization", "التخصص")</label><select name="specializationLookupId" id="@(id)-specialization" class="form-select form-select-sm"><option value="">—</option>@foreach (var v in Model.Specializations) { <option value="@v.Id" selected="@(v.Id == q?.SpecializationLookupId)">@(isRtl ? v.Ar : v.En)</option> }</select></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-university">@T("University", "الجامعة")</label><select name="universityLookupId" id="@(id)-university" class="form-select form-select-sm"><option value="">—</option>@foreach (var v in Model.Universities) { <option value="@v.Id" selected="@(v.Id == q?.UniversityLookupId)">@(isRtl ? v.Ar : v.En)</option> }</select></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-grade">@T("Classification", "التقدير")</label><select name="academicGradeLookupId" id="@(id)-grade" class="form-select form-select-sm"><option value="">—</option>@foreach (var v in Model.AcademicGrades) { <option value="@v.Id" selected="@(v.Id == q?.AcademicGradeLookupId)">@(isRtl ? v.Ar : v.En)</option> }</select></div>
+                    </div>
+                    <div class="row g-2 mb-2 align-items-end">
+                        <div class="col-md-2"><label class="form-label small mb-0" for="@(id)-gpa">@T("GPA", "المعدل")</label><input name="gpa" id="@(id)-gpa" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" dir="ltr" value="@(q?.Gpa?.ToString(CultureInfo.InvariantCulture))" /></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-dateAwarded">@T("Graduation date", "تاريخ التخرج")</label><input name="dateAwarded" id="@(id)-dateAwarded" type="date" class="form-control form-control-sm" value="@(q?.DateAwarded.ToString("yyyy-MM-dd"))" /></div>
+                        <div class="col-md-3"><div class="form-check"><input type="checkbox" name="isTeachingRelevant" value="true" class="form-check-input" id="@(id)-teaching" checked="@(q == null || q.IsTeachingRelevant)" /><label class="form-check-label small" for="@(id)-teaching">@T("Teaching-relevant", "يخص التدريس")</label></div></div>
+                    </div>
+                    @* The written fallback, for what the four catalogues cannot name: BR-EMP-004
+                       covers licences and certificates as well as degrees, and a laboratory-safety
+                       certificate has no university and no classification. *@
+                    <div class="row g-2">
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-titleAr">@T("Or write the title (Arabic)", "أو اكتب العنوان (عربي)")</label><input name="titleAr" id="@(id)-titleAr" class="form-control form-control-sm" dir="rtl" value="@q?.TitleAr" placeholder="شهادة السلامة المخبرية" /></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-titleEn">@T("Or write the title (English)", "أو اكتب العنوان (إنجليزي)")</label><input name="titleEn" id="@(id)-titleEn" class="form-control form-control-sm" dir="ltr" value="@q?.TitleEn" placeholder="Laboratory Safety Certificate" /></div>
+                        <div class="col-md-3"><label class="form-label small mb-0" for="@(id)-institution">@T("Awarding body (if not a university)", "الجهة المانحة (إن لم تكن جامعة)")</label><input name="institution" id="@(id)-institution" class="form-control form-control-sm" value="@q?.InstitutionName" /></div>
+                    </div>
+                }
+            }
+            <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Qualifications", "المؤهلات")</caption><thead><tr><th scope="col">@T("Qualification", "المؤهل")</th><th scope="col">@T("Specialization", "التخصص")</th><th scope="col">@T("University / body", "الجامعة / الجهة")</th><th scope="col">@T("Classification", "التقدير")</th><th scope="col">@T("GPA", "المعدل")</th><th scope="col">@T("Graduated", "تاريخ التخرج")</th><th scope="col">@T("Teaching-relevant", "يخص التدريس")</th><th scope="col"></th></tr></thead>
+                <tbody>
+                @foreach (var row in Model.Qualifications)
+                {
+                    var q = row.Qualification;
+                    var written = isRtl ? q.TitleAr : q.TitleEn;
+                    <tr>
+                        @* The catalogued value when there is one, the written title when there is not — the two ways BR-EMP-004 lets an entry name itself. *@
+                        <td>@(row.Education ?? (string.IsNullOrWhiteSpace(written) ? "—" : written))</td>
+                        <td>@(row.Specialization ?? "—")</td>
+                        <td>@(row.University ?? q.InstitutionName ?? "—")</td>
+                        <td>@(row.AcademicGrade ?? "—")</td>
+                        <td dir="ltr" class="text-end">@(q.Gpa?.ToString("0.##", CultureInfo.InvariantCulture) ?? "—")</td>
+                        <td>@q.DateAwarded.ToString("yyyy-MM-dd")</td>
+                        <td><span aria-hidden="true">@(q.IsTeachingRelevant ? "✓" : "—")</span><span class="visually-hidden">@(q.IsTeachingRelevant ? T("yes", "نعم") : T("no", "لا"))</span></td>
+                        @*
+                            The date names the row in the confirmation, not its title: this file's
+                            confirm() dialogs interpolate codes only (employee no, cheque no), because
+                            a written title reaching the JS string literal through an HTML attribute
+                            brings its apostrophes with it — "Bachelor's degree" would end the string
+                            early and swallow the dialog. A date is digits, and it is also what tells
+                            two bachelor's degrees apart.
+                        *@
+                        <td class="text-end text-nowrap"><div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#qedit@(q.Id)" aria-expanded="false" aria-controls="qedit@(q.Id)" title="@T("Edit", "تعديل")" aria-label="@T($"Edit qualification {q.Id}", $"تعديل المؤهل {q.Id}")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                            <form method="post" asp-action="DeleteQualification" asp-route-id="@e.Id" asp-route-qualificationId="@q.Id" class="d-inline" onsubmit="return confirm('@T($"Delete the qualification dated {q.DateAwarded.ToString("yyyy-MM-dd")}? This cannot be undone.", $"حذف المؤهل المؤرخ في {q.DateAwarded.ToString("yyyy-MM-dd")}؟ لا يمكن التراجع عن هذا الإجراء.")');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Delete", "حذف")" aria-label="@T($"Delete qualification {q.Id}", $"حذف المؤهل {q.Id}")"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                            </form>
+                        </div></td>
+                    </tr>
+                    @* The edit sits in its own full-width row: Bootstrap's collapse animates a block, and a table row is not one. *@
+                    <tr><td colspan="8" class="p-0 border-0">
+                        <div class="collapse" id="qedit@(q.Id)"><div class="border rounded p-3 mb-2 bg-body-tertiary">
+                            <form method="post" asp-action="EditQualification" asp-route-id="@e.Id" asp-route-qualificationId="@q.Id">
+                                @{ await QualificationFields($"q{q.Id}", q); }
+                                <div class="mt-3"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
+                            </form>
+                        </div></div>
+                    </td></tr>
+                }
+                @if (Model.Qualifications.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-3">@T("No qualifications recorded.", "لا مؤهلات مسجلة.")</td></tr> }</tbody></table>
+
+            <div class="border rounded p-3">
+                <h2 class="h6 text-muted mb-3">@T("Add a qualification", "إضافة مؤهل")</h2>
+                <form method="post" asp-action="AddQualification" asp-route-id="@e.Id">
+                    @{ await QualificationFields("qnew", null); }
+                    <div class="mt-3"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Add", "إضافة")</button></div>
+                </form>
+            </div>
+            <div class="form-text">@T("Pick the qualification from the list, or write a title for a certificate no list names — one of the two is required. Teaching-relevant entries are meant to feed the BR-SUB-006 qualification matrix (Subjects → matrix); the auto-feed and document upload are deferred.", "اختر المؤهل من القائمة، أو اكتب عنواناً لشهادة لا تسميها أي قائمة — أحدهما مطلوب. والمدخلات الخاصة بالتدريس تغذي مصفوفة التأهيل BR-SUB-006 (المواد → المصفوفة)؛ التغذية التلقائية ورفع المستندات مؤجلان.")</div>
+            @if (Model.Universities.Count == 0 || Model.Specializations.Count == 0)
+            {
+                <div class="alert alert-light border small py-2 mt-2 mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("The university and specialization lists ship empty — a school authors its own. Add them under Setup → Lookups, then they appear here.", "قائمتا الجامعة والتخصص تصلان فارغتين — كل مدرسة تُدخل قوائمها. أضِفهما من الإعدادات ← القوائم المرجعية لتظهرا هنا.")</div>
+            }
         </div>
 
         <div class="tab-pane fade @Show("teaching")" id="tab-teaching">
@@ -168,6 +323,9 @@
             <div class="form-text">@T("Offboarding clearance (handover, assets, final settlement, account deactivation — BR-EMP-008) arrives as a wizard; today Terminated is a plain transition.", "معالج إخلاء الطرف (التسليم، العهد، التسوية النهائية، تعطيل الحساب — BR-EMP-008) يأتي لاحقاً؛ حالياً الإنهاء انتقال بسيط.")</div>
         </div>
 
+        @* doc 10 §5: contracts, qualifications and ID papers filed through the one intake the whole
+           product uses — the same partial, the same four verbs, as the student file. *@
+        <div class="tab-pane fade @Show("documents")" id="tab-documents"><partial name="_EntityDocuments" model="Model.Documents" /></div>
         <div class="tab-pane fade @Show("audit")" id="tab-audit"><table class="table table-sm sms-table mb-0 small"><caption class="visually-hidden">@T("Audit trail", "سجل التدقيق")</caption><thead><tr><th scope="col">@T("When", "متى")</th><th scope="col">@T("Action", "الإجراء")</th><th scope="col">@T("Field", "الحقل")</th><th scope="col">@T("Old", "قبل")</th><th scope="col">@T("New", "بعد")</th><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("Actor", "المنفذ")</th></tr></thead><tbody>@foreach (var a in Model.Audit) { <tr><td>@a.At.ToString("yyyy-MM-dd HH:mm")</td><td>@a.Action</td><td>@a.Field</td><td>@a.Old</td><td>@a.New</td><td>@a.Reason</td><td>#@a.Actor</td></tr> }</tbody></table></div>
         <div class="tab-pane fade @Show("more")" id="tab-more"><ul class="small text-muted mb-0"><li>@T("Training (PD hours), Attendance (staff console), Leave (WF-10 balances + requests), Documents (attachments), Payroll-prep, Offboarding — open as their engines/screens land.", "التدريب (ساعات التطوير)، الحضور (كونسول الموظفين)، الإجازات (WF-10)، المستندات، تجهيز الرواتب، إنهاء الخدمة — تُفعَّل مع محركاتها/شاشاتها.")</li></ul></div>
     </div>

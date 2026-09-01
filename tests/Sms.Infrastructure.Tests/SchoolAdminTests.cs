@@ -185,5 +185,86 @@ namespace Sms.Infrastructure.Tests
 
             Assert.Equal(2, db.Signatories.Count(s => s.EffectiveToUtc == null));
         }
+
+        // --- BR-SCH-006 branding slots -------------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-SCH-006")]
+        public async Task A_branding_slot_points_the_school_at_the_stored_mark()
+        {
+            using var db = CreateContext();
+            var admin = new SchoolAdmin(db);
+            var school = await admin.DefineSchoolAsync(
+                null, "مدرسة الأندلس", "Al-Andalus School", "LIC-001", "MIN-001", "Arab Standard Time", "SAR");
+
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Logo, 41);
+
+            Assert.Equal(41, db.Schools.Single(s => s.Id == school.Id).LogoAttachmentId);
+        }
+
+        /// <summary>
+        /// Two slots, not one field used twice: a school that uploads a seal must not lose the logo
+        /// it uploaded last week, which is the failure a single "branding attachment" column invites.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCH-006")]
+        public async Task The_logo_and_the_seal_are_independent_slots()
+        {
+            using var db = CreateContext();
+            var admin = new SchoolAdmin(db);
+            var school = await admin.DefineSchoolAsync(
+                null, "مدرسة الأندلس", "Al-Andalus School", "LIC-001", "MIN-001", "Arab Standard Time", "SAR");
+
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Logo, 41);
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Seal, 42);
+
+            var stored = db.Schools.Single(s => s.Id == school.Id);
+            Assert.Equal(41, stored.LogoAttachmentId);
+            Assert.Equal(42, stored.SealAttachmentId);
+        }
+
+        /// <summary>
+        /// BR-ATT-007 / BR-GLB-005: removing a mark clears the pointer and nothing else. The
+        /// attachment stays readable, because a document issued under the old logo still has to be
+        /// explicable once the new one is in place.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCH-006")]
+        public async Task Clearing_a_branding_slot_drops_the_pointer_and_leaves_the_other_alone()
+        {
+            using var db = CreateContext();
+            var admin = new SchoolAdmin(db);
+            var school = await admin.DefineSchoolAsync(
+                null, "مدرسة الأندلس", "Al-Andalus School", "LIC-001", "MIN-001", "Arab Standard Time", "SAR");
+
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Logo, 41);
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Seal, 42);
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Logo, null);
+
+            var stored = db.Schools.Single(s => s.Id == school.Id);
+            Assert.Null(stored.LogoAttachmentId);
+            Assert.Equal(42, stored.SealAttachmentId);
+        }
+
+        /// <summary>
+        /// A logo is not an identity field, so replacing one must not demand the sentence
+        /// BR-SCH-002 asks of a name change. The save below runs with no ambient reason set; if
+        /// [RequiresAuditReason] ever spreads to the branding columns, this is what says so.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-SCH-006")]
+        public async Task Setting_branding_does_not_demand_an_audit_reason()
+        {
+            using var db = CreateContext();
+            var admin = new SchoolAdmin(db);
+            var school = await admin.DefineSchoolAsync(
+                null, "مدرسة الأندلس", "Al-Andalus School", "LIC-001", "MIN-001", "Arab Standard Time", "SAR");
+
+            _audit.Reason = null;
+
+            await admin.SetBrandingAsync(school.Id, SchoolBrandingAsset.Logo, 41);
+
+            Assert.Equal(41, db.Schools.Single(s => s.Id == school.Id).LogoAttachmentId);
+        }
     }
 }

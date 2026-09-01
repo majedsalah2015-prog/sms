@@ -50,7 +50,26 @@ namespace Sms.Infrastructure.Persistence.Configurations
         {
             builder.ToTable("Provider", "msg");
             builder.Property(x => x.ProviderCode).HasMaxLength(50).IsRequired();
+            builder.Property(x => x.DisplayName).HasMaxLength(100).IsRequired();
+            builder.Property(x => x.AccountIdentifier).HasMaxLength(200);
+
+            // The ciphertext, not the token: data protection's payload is base64 and grows
+            // with the value, so this is sized for a long API key rather than for a password.
+            builder.Property(x => x.SecretCipher).HasMaxLength(2000);
+            builder.Property(x => x.SenderId).HasMaxLength(32);
+            builder.Property(x => x.ApiBaseUrl).HasMaxLength(300);
+            builder.Property(x => x.LastTestDetail).HasMaxLength(500);
+
+            // IsConfigured is computed from three columns and has no setter — EF would
+            // otherwise try to map it and fail on the missing set accessor.
+            builder.Ignore(x => x.IsConfigured);
+
             builder.HasIndex(x => new { x.SchoolId, x.Channel });
+
+            // Failover order is only meaningful if two gateways on one channel cannot claim
+            // the same rank — otherwise "lowest first" is decided by whatever order the
+            // database happens to return, which is not a decision a school made.
+            builder.HasIndex(x => new { x.SchoolId, x.Channel, x.FailoverOrder }, "UX_Provider_Channel_Failover").IsUnique();
         }
     }
 
@@ -63,7 +82,12 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.Property(x => x.RenderedSubject).HasMaxLength(200);
             builder.Property(x => x.RenderedBody).IsRequired();
             builder.Property(x => x.FailureReason).HasMaxLength(500);
+
+            // 320 is the longest a mailbox may be (RFC 3696); an E.164 number fits in 16.
+            builder.Property(x => x.RecipientAddress).HasMaxLength(320);
+
             builder.HasOne<TemplateVersion>().WithMany().HasForeignKey(x => x.TemplateVersionId);
+            builder.HasOne<Sms.Domain.Messaging.Announcement>().WithMany().HasForeignKey(x => x.AnnouncementId);
             builder.HasOne<UserAccount>().WithMany().HasForeignKey(x => x.RecipientUserId);
             builder.HasIndex(x => new { x.RecipientUserId, x.Status });
             builder.HasIndex(x => x.Status);

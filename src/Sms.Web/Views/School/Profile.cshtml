@@ -1,5 +1,6 @@
 @using System.Globalization
 @using Sms.Domain.Schools
+@using Sms.Web.Services
 @model SchoolProfileViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -292,11 +293,101 @@
                     @* ------------------------------------------------ Branding *@
                     <div class="tab-pane fade @Show("branding")" id="tab-branding" role="tabpanel" aria-labelledby="tabbtn-branding">
                         <h2 class="sms-section-title mt-0">@T("Logo and seal", "الشعار والختم")</h2>
-                        <div class="alert alert-info small">
-                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Not built yet. BR-SCH-006 wants a logo and a seal stored as attachments (PNG or SVG, 2 MB or less) that official templates render at the moment a document is issued — with issued-immutable documents keeping the branding they were issued under. It waits on the attachment screens of doc 10 and on a template renderer; neither exists in this build.", "لم يُبنَ بعد. يطلب BR-SCH-006 شعاراً وختماً محفوظين كمرفقات (PNG أو SVG، 2 م.ب أو أقل) تعرضهما القوالب الرسمية لحظة إصدار المستند — مع احتفاظ المستندات النهائية بالهوية البصرية التي صدرت بها. وهو ينتظر شاشات المرفقات في الوثيقة 10 ومحرّك القوالب، ولا وجود لأيٍّ منهما في هذا الإصدار.")
+
+                        @* BR-SCH-006. Each mark is uploaded on its own rather than inside the identity
+                           form: a file input in that form would mean saving a name change every time
+                           somebody wanted to replace a logo. *@
+                        @{ var hasSchool = Model.SchoolId != null; }
+                        <div class="row g-4">
+                            @foreach (var slot in new[]
+                            {
+                                (Asset: SchoolBrandingAsset.Logo, En: "Logo", Ar: "الشعار",
+                                 Has: Model.HasLogo, FileName: Model.LogoFileName, Size: Model.LogoSizeBytes, Version: Model.LogoVersion,
+                                 Shape: FileUploadShape.Strip,
+                                 HintEn: "Heads official documents. PNG with a transparent background reproduces best.",
+                                 HintAr: "يتصدَّر المستندات الرسمية. وصيغة PNG بخلفية شفافة هي الأفضل ظهوراً."),
+                                (Asset: SchoolBrandingAsset.Seal, En: "Seal", Ar: "الختم",
+                                 Has: Model.HasSeal, FileName: Model.SealFileName, Size: Model.SealSizeBytes, Version: Model.SealVersion,
+                                 Shape: FileUploadShape.Portrait,
+                                 HintEn: "Stamped beside the signature block on issued documents.",
+                                 HintAr: "يُختم بجانب كتلة التوقيع في المستندات الصادرة."),
+                            })
+                            {
+                                var label = T(slot.En, slot.Ar);
+                                var key = slot.Asset.ToString().ToLowerInvariant();
+                                @* The version rides the URL so a replaced mark is not answered out of the
+                                   browser's cache — the commonest way an upload looks like it failed. *@
+                                var url = hasSchool ? Url.Action("Branding", new { asset = slot.Asset, v = slot.Version }) : null;
+
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h3 class="sms-section-title mt-0 h6">@label</h3>
+                                            @if (!hasSchool)
+                                            {
+                                                <div class="alert alert-warning small mb-0">
+                                                    <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Save the school's identity first — there is no record yet for a mark to belong to.", "احفظ هوية المدرسة أولاً — لا يوجد سجل بعد ينتمي إليه هذا الشعار.")
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                @* The posting form itself is emitted after this page's identity
+                                                   form closes, and named here — see the note beside it. A
+                                                   <form> written at this point would be inside that one, and
+                                                   HTML has no nested forms: the parser drops the tag and hands
+                                                   the file box to the identity form, so "Upload" would save the
+                                                   school's name and never carry the file anywhere. *@
+                                                <div class="d-grid gap-2">
+                                                    <partial name="_FileUploadField" model="@(new FileUploadFieldViewModel {
+                                                        Id = "school-" + key, Name = "file",
+                                                        FormId = "school-branding-" + key,
+                                                        AllowedFormats = SchoolBrandingService.BrandingFormats,
+                                                        MaxBytes = SchoolBrandingService.MaxBrandingBytes,
+                                                        Required = true,
+                                                        Shape = slot.Shape,
+                                                        CurrentImageUrl = slot.Has ? url : null,
+                                                        Hint = T(slot.HintEn, slot.HintAr) })" />
+                                                    <button type="submit" form="school-branding-@key" class="btn btn-sm btn-outline-primary">
+                                                        <i class="bi bi-upload me-1" aria-hidden="true"></i>@(slot.Has ? T("Replace", "استبدال") : T("Upload", "رفع"))
+                                                    </button>
+                                                </div>
+
+                                                if (slot.Has)
+                                                {
+                                                    <div class="d-flex align-items-center justify-content-between mt-2 small">
+                                                        <span class="text-muted text-truncate">
+                                                            <span dir="ltr">@slot.FileName</span> ·
+                                                            <span class="sms-num">@Labels.FileSize(slot.Size, isRtl)</span>
+                                                        </span>
+                                                        <button type="submit" form="school-branding-remove-@key" class="btn btn-sm btn-link text-danger p-0 ms-2"
+                                                                onclick="return confirm('@T("Remove this mark? The file itself is kept.", "إزالة هذا الشعار؟ يبقى الملف محفوظاً.")');">@T("Remove", "إزالة")</button>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    <div class="form-text mt-2">@T("Nothing on file.", "لا شيء محفوظ.")</div>
+                                                }
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        @* Two gaps, stated rather than hidden — see SchoolBrandingService and
+                           SchoolController for the same words in the code. *@
+                        <div class="alert alert-info small mt-3">
+                            <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("The marks are stored and versioned here, but nothing renders them onto a document yet: BR-SCH-006 also asks that every official template show the current branding at the moment of issue, and this build has no template renderer. SVG, which doc 02 §9 lists, is not accepted — it can carry script, and these files are served inline.", "تُحفظ الشعارات هنا وتُدار إصداراتها، لكن لا شيء يعرضها على مستند بعد: إذ يطلب BR-SCH-006 أيضاً أن تُظهر كل القوالب الرسمية الهوية البصرية السارية لحظة الإصدار، ولا محرّك قوالب في هذا الإصدار. أما صيغة SVG التي تذكرها الوثيقة 02 §9 فغير مقبولة — لأنها قد تحمل نصوصاً برمجية، وهذه الملفات تُعرض مباشرة.")
                         </div>
                         <h2 class="sms-section-title">@T("What a document carries today", "ما يحمله المستند اليوم")</h2>
                         <div class="sms-doc-preview">
+                            @if (Model.HasLogo)
+                            {
+                                <div class="sms-doc-preview__logo">
+                                    <img src="@Url.Action("Branding", new { asset = SchoolBrandingAsset.Logo, v = Model.LogoVersion })"
+                                         alt="@T("School logo", "شعار المدرسة")" />
+                                </div>
+                            }
                             <div class="sms-doc-preview__names sms-name-pair">
                                 <span class="sms-name-ar" dir="rtl">@(Model.NameAr ?? "…")</span>
                                 <span class="sms-name-en" dir="ltr">@(Model.NameEn ?? "…")</span>
@@ -318,6 +409,15 @@
                                 {
                                     <span class="sms-amber">@T($"Signature block: empty for {Model.DocumentClassesWithoutSignatory.Count} document class(es) — no signatory is in force.", $"كتلة التوقيع: فارغة لـ {Model.DocumentClassesWithoutSignatory.Count} من فئات المستندات — لا موقّع سارٍ.")</span>
                                     <text> </text><a asp-action="Signatories">@T("Define one", "عرّف موقّعاً")</a>
+                                }
+                                @* The seal sits where it would be stamped — beside the signature, not
+                                   at the head — so the preview answers both halves of §8.1 rather than
+                                   showing one mark and describing the other. *@
+                                @if (Model.HasSeal)
+                                {
+                                    <img class="sms-doc-preview__seal"
+                                         src="@Url.Action("Branding", new { asset = SchoolBrandingAsset.Seal, v = Model.SealVersion })"
+                                         alt="@T("School seal", "ختم المدرسة")" />
                                 }
                             </div>
                         </div>
@@ -519,6 +619,26 @@
         </div>
     </div>
 </form>
+
+@* BR-SCH-006 — the branding slots' posting forms, deliberately out here.
+   They belong to the Branding tab above and are named from it by `form="…"`, because they cannot be
+   written where they are used: HTML has no nested forms, and a <form> opened inside the identity
+   form above is dropped by the parser, which then adopts its controls into that form. That is not a
+   theoretical tidiness point — it is what used to happen: "Upload" under the logo posted to
+   /school, so it saved the school's name and the chosen file went nowhere, while the seal's form
+   survived only because the dropped tag's </form> had already released the parser's form pointer.
+   Empty on purpose: every control they post lives in the tab and names them. *@
+@if (Model.SchoolId != null)
+{
+    foreach (var asset in new[] { SchoolBrandingAsset.Logo, SchoolBrandingAsset.Seal })
+    {
+        var brandingKey = asset.ToString().ToLowerInvariant();
+        <form id="school-branding-@brandingKey" method="post" asp-action="UploadBranding" asp-route-asset="@asset"
+              asp-antiforgery="true" enctype="multipart/form-data" class="d-none"></form>
+        <form id="school-branding-remove-@brandingKey" method="post" asp-action="RemoveBranding" asp-route-asset="@asset"
+              asp-antiforgery="true" class="d-none"></form>
+    }
+}
 
 <script>
     // The profile is tabbed (P-DETAIL), which used to mean two things went wrong quietly:

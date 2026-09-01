@@ -29,7 +29,7 @@
 <div class="row g-3">
     <div class="col-lg-3 d-print-none">
         <div class="sms-card p-3 mb-3">
-            <form method="get" class="d-flex gap-1"><input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("payer / student / mobile", "الدافع / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button></form>
+            <form method="get" class="d-flex gap-1"><input name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("guardian / student / mobile", "ولي الأمر / الطالب / الجوال")" /><button class="btn btn-sm btn-outline-primary" type="submit" aria-label="@T("Search", "بحث")"><i class="bi bi-search" aria-hidden="true"></i></button></form>
         </div>
         <div class="sms-card">
             <div class="list-group list-group-flush" style="max-height:60vh;overflow:auto">
@@ -37,16 +37,56 @@
                 {
                     <a class="list-group-item list-group-item-action small @(sel?.Payer.Id == p.Payer.Id ? "active" : "")" asp-action="Position" asp-route-payerId="@p.Payer.Id" asp-route-q="@Model.Q"><span class="fw-semibold">@FinanceLabels.ParentName(p.Parent, isRtl)</span><br /><span class="opacity-75">@p.Parent?.ParentFileNo · @p.Children.Count @T("children", "أبناء")</span></a>
                 }
-                @if (Model.Payers.Count == 0) { <div class="list-group-item small text-muted">@T("No payers match.", "لا دافعين مطابقين.")</div> }
+                @if (Model.Payers.Count == 0 && Model.Unbilled.Count == 0) { <div class="list-group-item small text-muted">@T("No guardians match.", "لا أولياء أمور مطابقين.")</div> }
+
+                @* A guardian with no payer row behind them. Listed apart rather than mixed in, because
+                   the two answer different questions: these have an account to open, not a balance. *@
+                @if (Model.Unbilled.Count > 0)
+                {
+                    <div class="list-group-item small text-muted bg-body-secondary">@T("Never billed", "لم تُفوتَر بعد")</div>
+                    foreach (var g in Model.Unbilled)
+                    {
+                        <a class="list-group-item list-group-item-action small @(Model.SelectedUnbilled?.Parent.Id == g.Parent.Id ? "active" : "")" asp-action="Position" asp-route-parentId="@g.Parent.Id" asp-route-q="@Model.Q"><span class="fw-semibold">@FinanceLabels.ParentName(g.Parent, isRtl)</span><br /><span class="opacity-75">@g.Parent.ParentFileNo · @g.Children.Count @T("children", "أبناء")</span></a>
+                    }
+                }
             </div>
         </div>
+        @if (Model.UnbilledTotal > 0)
+        {
+            <p class="text-muted small mt-2 mb-0">@T($"{Model.UnbilledTotal} guardian(s) on file have never been billed, so they carry no statement yet. Search by name, file number or a child's name to open one.", $"{Model.UnbilledTotal} من أولياء الأمور المسجَّلين لم تُصدَر لهم أي فاتورة بعد، فلا كشف لهم. ابحث بالاسم أو رقم الملف أو اسم أحد الأبناء لفتح أحدهم.")</p>
+        }
     </div>
     <div class="col-lg-9">
-        @if (sel == null || st == null) { <div class="alert alert-light border">@T("Pick a payer to build the statement.", "اختر دافعاً لبناء الكشف.")</div> }
+        @if (Model.SelectedUnbilled is { } ug)
+        {
+            @* Not an error and not an empty screen: the guardian is on file, and the school has
+               simply never charged them. BR-FEE-004 — the payer identity is minted by the first
+               charge, and a statement before that would be a document about nothing. *@
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
+                <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(ug.Parent, isRtl)</span> <span class="text-muted">· @ug.Parent.ParentFileNo · <bdi dir="ltr">@ug.Parent.PrimaryMobile</bdi></span></div>
+            </div>
+            <div class="alert alert-light border">
+                <p class="mb-2">@T("No invoice has ever been issued to this guardian, so there is nothing to state. An account is opened by the first charge (BR-FEE-004) — post one from the student's fee breakdown and the statement starts here.", "لم تُصدَر لهذا الولي أي فاتورة، فلا شيء يُكشف. ويُفتح الحساب بأول رسم (BR-FEE-004) — رحِّل رسماً من تفصيل رسوم الطالب ليبدأ الكشف من هنا.")</p>
+                @if (ug.Children.Count == 0)
+                {
+                    <p class="text-muted small mb-0">@T("No children are linked to this guardian.", "لا أبناء مرتبطون بهذا الولي.")</p>
+                }
+                else
+                {
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var child in ug.Children)
+                        {
+                            <a class="btn btn-sm btn-outline-primary" asp-action="StudentFinanceDetail" asp-route-id="@child.Id"><i class="bi bi-person-vcard me-1" aria-hidden="true"></i>@child.StudentNo @FinanceLabels.StudentName(child, isRtl)</a>
+                        }
+                    </div>
+                }
+            </div>
+        }
+        else if (sel == null || st == null) { <div class="alert alert-light border">@T("Pick a guardian to build the statement.", "اختر ولي أمر لبناء الكشف.")</div> }
         else
         {
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-2 gap-2">
-                <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span><br /><span class="small text-muted">@string.Join(" · ", sel.Children.Select(ch => $"{ch.StudentNo} {FinanceLabels.StudentName(ch, isRtl)}"))</span></div>
+                <div><span class="fs-5 fw-semibold">@FinanceLabels.ParentName(sel.Parent, isRtl)</span> <span class="text-muted">· @sel.Parent?.ParentFileNo · @sel.Parent?.PrimaryMobile</span><br /><span class="small text-muted">@string.Join(" · ", sel.Students.Select(ch => $"{ch.StudentNo} {FinanceLabels.StudentName(ch, isRtl)}"))</span></div>
                 <form method="get" class="d-flex gap-1 align-items-center d-print-none"><input type="hidden" name="payerId" value="@sel.Payer.Id" /><input type="hidden" name="q" value="@Model.Q" /><label class="small text-muted">@T("as of", "حتى")</label><input type="date" name="asOf" class="form-control form-control-sm" value="@Model.AsOf?.ToString("yyyy-MM-dd")" onchange="this.form.submit()" />@if (Model.AsOf != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="Position" asp-route-payerId="@sel.Payer.Id">@T("now", "الآن")</a> }</form>
             </div>
 

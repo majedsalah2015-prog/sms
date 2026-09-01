@@ -1,0 +1,165 @@
+@using System.Globalization
+@model StudentPlacementViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var s = Model.Student;
+    var name = isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
+    ViewData["Title"] = T("Grade & section", "الصف والشعبة");
+    ViewData["Breadcrumb"] = T("Students / ", "الطلاب / ") + name + T(" / grade & section", " / الصف والشعبة");
+    var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+    var seated = Model.Section != null;
+    var help = new HelpPanelViewModel
+    {
+        Id = "student-placement-help",
+        Title = T("Grade & section — help", "الصف والشعبة — مساعدة"),
+        Intro = T("Where one child sits: the grade-year they are enrolled in, and the section within it. The same two operations the academic tab and the section page perform, asked from the student's end so that moving one child does not require knowing which section they are in already.", "أين يجلس طفل واحد: الصف السنوي المقيَّد فيه، والشعبة داخله. هما العمليتان نفساهما اللتان يؤديهما تبويب السجل الأكاديمي وصفحة الشعبة، لكن السؤال هنا يبدأ من الطالب، فلا يحتاج نقل طفل إلى معرفة شعبته الحالية سلفاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The grade comes before the section", "الصف قبل الشعبة"), T("A section belongs to one grade-year, so a student with no open enrollment has nowhere to be seated. Enroll them first; the section picker then offers that grade-year's sections and no others.", "الشعبة تتبع صفاً سنوياً واحداً، فالطالب بلا قيد مفتوح لا مكان له ليُسند إليه. قيِّده أولاً، عندها يعرض منتقي الشعب شعب ذلك الصف السنوي وحدها.")),
+            new HelpPanelViewModel.Item(T("A first seat is not a transfer", "الإسناد الأول ليس نقلاً"), T("Seating a student who has no section is recorded without a reason code. Moving one who already has a section closes the old membership on the effective date and opens the new one, and that always carries a reason (BR-SCN-005/006) — the history keeps both.", "إسناد طالب بلا شعبة يُسجَّل بلا رمز سبب. أما نقل من له شعبة فيُغلق العضوية القديمة في تاريخ السريان ويفتح الجديدة، وهذا يحمل سبباً دائماً (BR-SCN-005/006) — والسجل يحفظ الاثنتين.")),
+            new HelpPanelViewModel.Item(T("A section can refuse", "الشعبة قد ترفض"), T("Capacity (BR-SCN-002) and the section's gender policy (BR-SCN-003) are checked on the way in, and a refusal names which of the two failed. The seat counter beside each section is what it holds right now, not what it was planned to hold.", "تُفحص السعة (BR-SCN-002) وسياسة جنس الشعبة (BR-SCN-003) عند الدخول، والرفض يسمّي أيهما أخفق. وعدّاد المقاعد بجانب كل شعبة هو ما تضمّه الآن لا ما خُطِّط لها أن تضمّه.")),
+            new HelpPanelViewModel.Item(T("Enrolling twice in one year is refused", "القيد مرتين في عام واحد مرفوض"), T("One student holds one open enrollment per academic year (BR-GLB-024). Registering a child again in the same year is a data-entry mistake, not a second enrollment, and is refused rather than recorded.", "للطالب قيد مفتوح واحد في كل عام دراسي (BR-GLB-024). وإعادة قيد الطفل في العام نفسه خطأ إدخال لا قيد ثانٍ، فيُرفض بدل أن يُسجَّل.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div><div class="text-muted small"><code>@s.StudentNo</code> · @(s.Gender == Sms.Domain.Common.Gender.Male ? T("Male", "ذكر") : T("Female", "أنثى"))@if (!string.IsNullOrWhiteSpace(s.Mobile)) { <span> · <span dir="ltr">@s.Mobile</span></span> }</div>
+        <h1 class="sms-page-title">@name</h1>
+        <p class="text-muted mb-0">@ViewData["Title"]</p></div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary" asp-action="File" asp-route-id="@s.Id"><i class="bi bi-folder2-open me-1" aria-hidden="true"></i>@T("Student file", "ملف الطالب")</a>
+        <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("List", "القائمة")</a>
+        <partial name="_HelpModal" model="help" /></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-xl-7">
+        @* --- the section half. It is the one that is asked for most, so it leads — but it is
+             inert until the student is enrolled, and says so rather than offering an empty picker. *@
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("Section", "الشعبة")</h2>
+                <span class="badge @(seated ? "text-bg-success" : "text-bg-secondary")">@(seated ? (isRtl ? Model.Section!.NameAr : Model.Section!.NameEn) : T("Not seated", "بلا شعبة"))</span>
+            </div>
+            <div class="p-3">
+                @if (Model.Enrollment == null)
+                {
+                    <p class="text-muted mb-0">@T("The student is not enrolled in a grade-year, so there is no section to place them in. Assign a grade first.", "الطالب غير مقيَّد في صف سنوي، فلا شعبة تُسند إليه. أسنِد صفاً أولاً.")</p>
+                }
+                else if (Model.Sections.Count == 0)
+                {
+                    <p class="text-muted mb-0">@T("This grade-year has no open sections yet — they are defined in the Sections module.", "لا شعب مفتوحة لهذا الصف السنوي بعد — وتُعرَّف من وحدة الشعب.")</p>
+                    <a class="btn btn-sm btn-outline-primary mt-2" asp-controller="Sections" asp-action="Index"><i class="bi bi-grid-3x3-gap me-1" aria-hidden="true"></i>@T("Sections", "الشعب")</a>
+                }
+                else if (!Model.CanSeat)
+                {
+                    <p class="text-muted mb-0">@T("You may read this placement but not change it.", "يمكنك قراءة هذا الإسناد لا تغييره.")</p>
+                }
+                else
+                {
+                    <form method="post" asp-action="PlaceInSection" asp-route-id="@s.Id" class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label small" for="place-sectionId">@T("Section", "الشعبة") <span class="text-danger" aria-hidden="true">*</span></label>
+                            <select name="sectionId" id="place-sectionId" class="form-select form-select-sm" required aria-required="true">
+                                <option value="">—</option>
+                                @foreach (var o in Model.Sections)
+                                {
+                                    <option value="@o.Section.Id" selected="@o.IsCurrent" disabled="@(o.Members >= o.Section.Capacity && !o.IsCurrent)">@(isRtl ? o.Section.NameAr : o.Section.NameEn) — @o.Members/@o.Section.Capacity@(o.IsCurrent ? T(" (current)", " (الحالية)") : "")</option>
+                                }
+                            </select>
+                            <div class="form-text">@T("A full section cannot be chosen (BR-SCN-002).", "الشعبة الممتلئة لا تُختار (BR-SCN-002).")</div>
+                        </div>
+                        <div class="col-md-4">
+                            @* Offered whenever the student already sits somewhere; ignored on a first
+                               seat, where there is no move to give a reason for. *@
+                            <label class="form-label small" for="place-reasonCode">@T("Transfer reason", "سبب النقل") @if (seated) { <span class="text-danger" aria-hidden="true">*</span> }</label>
+                            <select name="reasonCode" id="place-reasonCode" class="form-select form-select-sm" disabled="@(!seated)" required="@seated" aria-required="@(seated ? "true" : "false")">
+                                @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                            </select>
+                            @if (!seated) { <div class="form-text">@T("A first seat needs no reason.", "الإسناد الأول لا يحتاج سبباً.")</div> }
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small" for="place-effectiveDate">@T("Effective", "تاريخ السريان")</label>
+                            <input name="effectiveDate" id="place-effectiveDate" type="date" class="form-control form-control-sm" value="@today" />
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" type="submit"><i class="bi bi-@(seated ? "arrow-left-right" : "box-arrow-in-down") me-1" aria-hidden="true"></i>@(seated ? T("Transfer", "نقل") : T("Seat in section", "إسناد إلى الشعبة"))</button>
+                        </div>
+                    </form>
+                }
+            </div>
+        </div>
+
+        @* --- the grade half. Posts to the file's own enroll action; returnTo brings the reader
+             back here, because the next thing they want is the section picker above. *@
+        <div class="sms-card">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center">
+                <h2 class="h6 mb-0">@T("Grade-year", "الصف السنوي")</h2>
+                <span class="badge @(Model.Enrollment == null ? "text-bg-secondary" : "text-bg-success")">@(Model.Grade == null ? T("Not enrolled", "غير مقيَّد") : $"{Model.Grade.Code} {(isRtl ? Model.Grade.Name.NameAr : Model.Grade.Name.NameEn)} · {(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)}")</span>
+            </div>
+            <div class="p-3">
+                @if (!Model.CanEnroll)
+                {
+                    <p class="text-muted mb-0">@T("You may read this enrollment but not change it.", "يمكنك قراءة هذا القيد لا تغييره.")</p>
+                }
+                else
+                {
+                    <form method="post" asp-action="Enroll" asp-route-id="@s.Id" asp-route-returnTo="placement" class="row g-3 align-items-end">
+                        <div class="col-md-5">
+                            <label class="form-label small" for="place-gradeYearProfileId">@T("Grade-year", "الصف السنوي") <span class="text-danger" aria-hidden="true">*</span></label>
+                            <select name="gradeYearProfileId" id="place-gradeYearProfileId" class="form-select form-select-sm" required aria-required="true">
+                                <option value="">—</option>
+                                @foreach (var p in Model.Profiles) { <option value="@p.ProfileId">@(isRtl ? p.GradeAr : p.GradeEn) · @(isRtl ? p.YearAr : p.YearEn)</option> }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small" for="place-enrollmentDate">@T("Date", "التاريخ")</label>
+                            <input name="enrollmentDate" id="place-enrollmentDate" type="date" class="form-control form-control-sm" value="@today" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small" for="place-sourceType">@T("Source", "المصدر")</label>
+                            <select name="sourceType" id="place-sourceType" class="form-select form-select-sm">
+                                <option value="Admission">@T("Admission", "قبول")</option>
+                                <option value="Reinstatement">@T("Reinstatement", "إعادة قيد")</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-outline-primary w-100" type="submit">@T("Enroll", "قيد")</button>
+                        </div>
+                    </form>
+                    <div class="form-text mt-2">@T("A student holds one open enrollment per year (BR-GLB-024); the rollover is what moves a whole grade between years (BR-GLB-023).", "للطالب قيد مفتوح واحد في العام (BR-GLB-024)؛ والترحيل هو ما ينقل صفاً بأكمله بين الأعوام (BR-GLB-023).")</div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-5">
+        <div class="sms-card">
+            <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Sections of this grade-year", "شعب هذا الصف السنوي")</h2></div>
+            @if (Model.Sections.Count == 0)
+            {
+                <div class="p-3 text-muted small">@T("Nothing to show until the student is enrolled in a grade-year with open sections.", "لا شيء لعرضه حتى يُقيَّد الطالب في صف سنوي له شعب مفتوحة.")</div>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <caption class="visually-hidden">@T("Sections of this grade-year", "شعب هذا الصف السنوي")</caption>
+                    <thead><tr><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Seats", "المقاعد")</th><th scope="col">@T("Gender", "الجنس")</th></tr></thead>
+                    <tbody>
+                    @foreach (var o in Model.Sections)
+                    {
+                        var pct = o.Section.Capacity == 0 ? 0 : Math.Min(100, (int)Math.Round(100.0 * o.Members / o.Section.Capacity));
+                        <tr class="@(o.IsCurrent ? "table-active" : "")">
+                            <td><a asp-controller="Sections" asp-action="Details" asp-route-id="@o.Section.Id">@(isRtl ? o.Section.NameAr : o.Section.NameEn)</a>@if (o.IsCurrent) { <i class="bi bi-check2 ms-1 text-success" aria-label="@T("current section", "الشعبة الحالية")"></i> }</td>
+                            <td><div class="d-flex align-items-center gap-2"><span dir="ltr">@o.Members/@o.Section.Capacity</span><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Capacity", "السعة")" style="width:4rem"><span style="width:@(pct)%"></span></div></div></td>
+                            <td class="small text-muted">@Labels.Gender(o.Section.GenderPolicy, isRtl)</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </div>
+</div>

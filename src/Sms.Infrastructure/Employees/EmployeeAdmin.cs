@@ -33,7 +33,7 @@ namespace Sms.Infrastructure.Employees
             string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
             Gender gender, DateTime dateOfBirth, int nationalityLookupId, int? userAccountId = null,
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
-            CancellationToken cancellationToken = default)
+            string? mobile = null, string? whatsAppNumber = null, CancellationToken cancellationToken = default)
         {
             var employeeNo = await _numberIssuer.IssueAsync("EMP", cancellationToken);
 
@@ -55,6 +55,8 @@ namespace Sms.Infrastructure.Employees
                 PrimaryIdTypeLookupId = primaryIdTypeLookupId,
                 PrimaryIdNo = primaryIdNo,
                 PrimaryIdExpiry = primaryIdExpiry,
+                Mobile = Blank(mobile),
+                WhatsAppNumber = Blank(whatsAppNumber),
             };
             _db.Employees.Add(employee);
 
@@ -144,8 +146,12 @@ namespace Sms.Infrastructure.Employees
 
         public async Task<Qualification> AddQualificationAsync(
             int employeeId, string titleAr, string titleEn, DateTime dateAwarded, bool isTeachingRelevant,
-            string? institutionName = null, int? documentAttachmentId = null, CancellationToken cancellationToken = default)
+            string? institutionName = null, int? documentAttachmentId = null,
+            int? educationLookupId = null, int? universityLookupId = null, int? specializationLookupId = null,
+            int? academicGradeLookupId = null, decimal? gpa = null, CancellationToken cancellationToken = default)
         {
+            RequireIdentifiableQualification(titleAr, titleEn, educationLookupId);
+
             var qualification = new Qualification
             {
                 EmployeeId = employeeId,
@@ -155,6 +161,11 @@ namespace Sms.Infrastructure.Employees
                 DateAwarded = dateAwarded,
                 IsTeachingRelevant = isTeachingRelevant,
                 DocumentAttachmentId = documentAttachmentId,
+                EducationLookupId = educationLookupId,
+                UniversityLookupId = universityLookupId,
+                SpecializationLookupId = specializationLookupId,
+                AcademicGradeLookupId = academicGradeLookupId,
+                Gpa = gpa,
             };
             _db.Qualifications.Add(qualification);
 
@@ -162,12 +173,66 @@ namespace Sms.Infrastructure.Employees
             return qualification;
         }
 
+        public async Task<Qualification> UpdateQualificationAsync(
+            int qualificationId, string titleAr, string titleEn, DateTime dateAwarded, bool isTeachingRelevant,
+            string? institutionName, int? educationLookupId, int? universityLookupId, int? specializationLookupId,
+            int? academicGradeLookupId, decimal? gpa, CancellationToken cancellationToken = default)
+        {
+            RequireIdentifiableQualification(titleAr, titleEn, educationLookupId);
+
+            var qualification = await _db.Qualifications.SingleAsync(q => q.Id == qualificationId, cancellationToken);
+
+            qualification.TitleAr = titleAr;
+            qualification.TitleEn = titleEn;
+            qualification.InstitutionName = institutionName;
+            qualification.DateAwarded = dateAwarded;
+            qualification.IsTeachingRelevant = isTeachingRelevant;
+            qualification.EducationLookupId = educationLookupId;
+            qualification.UniversityLookupId = universityLookupId;
+            qualification.SpecializationLookupId = specializationLookupId;
+            qualification.AcademicGradeLookupId = academicGradeLookupId;
+            qualification.Gpa = gpa;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return qualification;
+        }
+
+        public async Task DeleteQualificationAsync(int qualificationId, CancellationToken cancellationToken = default)
+        {
+            // SingleOrDefault, not Single: the tenant filter is what makes another school's
+            // qualification invisible here, and it should read as "no such row" rather than throw
+            // the InvalidOperationException the screen words as a refusal.
+            var qualification = await _db.Qualifications.SingleOrDefaultAsync(q => q.Id == qualificationId, cancellationToken);
+            if (qualification == null)
+            {
+                throw new QualificationNotFoundException(qualificationId);
+            }
+
+            _db.Qualifications.Remove(qualification);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// BR-EMP-004: an entry has to say what it is. The catalogued qualification satisfies that
+        /// on its own — the screen leaves the titles empty when one is picked — and so does a
+        /// written title, which is how a licence with no place in the catalogue gets recorded.
+        /// English is thrown here rather than in the reader's language on purpose: the Web boundary
+        /// translates it (<c>UserMessage</c>), and the seeder and the import have no reader.
+        /// </summary>
+        private static void RequireIdentifiableQualification(string titleAr, string titleEn, int? educationLookupId)
+        {
+            if (educationLookupId == null && string.IsNullOrWhiteSpace(titleAr) && string.IsNullOrWhiteSpace(titleEn))
+            {
+                throw new InvalidOperationException("A qualification needs either a catalogued qualification or a written title (BR-EMP-004).");
+            }
+        }
+
         public async Task<Employee> UpdateEmployeeAsync(
             int employeeId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,
             string firstNameEn, string fatherNameEn, string grandfatherNameEn, string familyNameEn,
             Gender gender, DateTime dateOfBirth, int nationalityLookupId, int? userAccountId = null,
             int? primaryIdTypeLookupId = null, string? primaryIdNo = null, DateTime? primaryIdExpiry = null,
-            CancellationToken cancellationToken = default)
+            string? mobile = null, string? whatsAppNumber = null, CancellationToken cancellationToken = default)
         {
             var employee = await _db.Employees.SingleAsync(e => e.Id == employeeId, cancellationToken);
 
@@ -187,12 +252,19 @@ namespace Sms.Infrastructure.Employees
             employee.PrimaryIdNo = primaryIdNo;
             employee.PrimaryIdExpiry = primaryIdExpiry;
 
+            // Blank clears the number rather than storing "", the same rule the bank fields follow:
+            // an empty string reads as a recorded answer everywhere afterwards.
+            employee.Mobile = Blank(mobile);
+            employee.WhatsAppNumber = Blank(whatsAppNumber);
+
             await _db.SaveChangesAsync(cancellationToken);
             return employee;
         }
 
         public async Task<Employee> UpdatePersonalDetailsAsync(
-            int employeeId, MaritalStatus? maritalStatus, string? bankName, string? bankAccountNo,
+            int employeeId, MaritalStatus? maritalStatus, int? bankLookupId, string? bankName, string? bankAccountNo,
+            string? address, string? originTown, int? spouseIdTypeLookupId, string? spouseIdNo,
+            string? palPayWalletNo, string? jawwalPayWalletNo,
             CancellationToken cancellationToken = default)
         {
             var employee = await _db.Employees.SingleAsync(e => e.Id == employeeId, cancellationToken);
@@ -201,12 +273,26 @@ namespace Sms.Infrastructure.Employees
             // out should leave the field null rather than storing an empty string that reads as an
             // answer in every report and picker afterwards.
             employee.MaritalStatus = maritalStatus;
-            employee.BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim();
-            employee.BankAccountNo = string.IsNullOrWhiteSpace(bankAccountNo) ? null : bankAccountNo.Trim();
+            employee.BankLookupId = bankLookupId;
+
+            // The catalogue answer wins outright rather than sitting beside the typed one: the
+            // payroll transfer list reads the lookup and falls back to this column, so a row
+            // holding both would name one bank on screen and another in the export.
+            employee.BankName = bankLookupId == null ? Blank(bankName) : null;
+            employee.BankAccountNo = Blank(bankAccountNo);
+            employee.Address = Blank(address);
+            employee.OriginTown = Blank(originTown);
+            employee.SpouseIdTypeLookupId = spouseIdTypeLookupId;
+            employee.SpouseIdNo = Blank(spouseIdNo);
+            employee.PalPayWalletNo = Blank(palPayWalletNo);
+            employee.JawwalPayWalletNo = Blank(jawwalPayWalletNo);
 
             await _db.SaveChangesAsync(cancellationToken);
             return employee;
         }
+
+        /// <summary>Whitespace in, null out — the rule every optional text field on this record follows.</summary>
+        private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
         public async Task<Contract> UpdateContractAsync(
             int contractId, ContractType type, DateTime startDate, DateTime endDate, decimal salaryBasic,

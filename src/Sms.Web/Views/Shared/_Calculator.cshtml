@@ -1,0 +1,75 @@
+@using System.Globalization
+@*
+    The calculator dialog that `data-sms-calc` buttons open. Rendered once per screen, whatever the
+    number of fields that use it — it takes its target from the button that opened it, so one dialog
+    serves every cell of a grid.
+
+    Self-contained: the script comes with it, so adopting the calculator on a screen is one
+    `<partial name="_Calculator" />` and a button, not two lines that can be half-remembered into a
+    dialog whose keys do nothing. calculator.js guards against being loaded twice.
+
+    All the wording lives here rather than in calculator.js: a string in a static .js file is a
+    string outside the bilingual rule, and this dialog is read in Arabic.
+
+    The pad is Latin-digit and left-to-right on an Arabic page on purpose. It fills `type="number"`
+    fields, which accept Latin digits only, and a pad that showed ٥ while writing 5 would be a
+    calculator whose display disagreed with its answer.
+*@
+@{
+    var calcRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string TC(string en, string ar) => calcRtl ? ar : en;
+}
+<div class="modal fade" id="smsCalculator" tabindex="-1" aria-labelledby="smsCalculatorTitle" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h2 class="modal-title h6 mb-0" id="smsCalculatorTitle">
+                    <i class="bi bi-calculator me-1" aria-hidden="true"></i>@TC("Calculator", "الآلة الحاسبة")
+                </h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@TC("Close", "إغلاق")"></button>
+            </div>
+
+            <div class="modal-body">
+                @* The pending operand and operator above the display, so a half-typed sum is visible
+                   rather than remembered — 12 × is on screen while the 5 is being typed. *@
+                <div class="border rounded px-2 py-1 mb-2 text-end bg-body-tertiary" dir="ltr">
+                    <div class="small text-muted" style="min-height:1.2em;" data-sms-calc-expression aria-hidden="true">&nbsp;</div>
+                    <div class="fs-4 fw-bold text-truncate" data-sms-calc-display role="status" aria-live="polite">0</div>
+                </div>
+
+                <div class="d-grid gap-1" style="grid-template-columns: repeat(4, 1fr);" dir="ltr">
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="clear" aria-label="@TC("Clear", "مسح")">C</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="back" aria-label="@TC("Backspace", "تراجع")">&#9003;</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="/" aria-label="@TC("Divide", "قسمة")">&#247;</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="*" aria-label="@TC("Multiply", "ضرب")">&#215;</button>
+
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="7">7</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="8">8</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="9">9</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="-" aria-label="@TC("Minus", "طرح")">&#8722;</button>
+
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="4">4</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="5">5</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="6">6</button>
+                    <button type="button" class="btn btn-outline-secondary" data-sms-calc-key="+" aria-label="@TC("Plus", "جمع")">+</button>
+
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="1">1</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="2">2</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="3">3</button>
+                    <button type="button" class="btn btn-secondary" style="grid-row: span 2;" data-sms-calc-key="=" aria-label="@TC("Equals", "يساوي")">=</button>
+
+                    <button type="button" class="btn btn-light border" style="grid-column: span 2;" data-sms-calc-key="0">0</button>
+                    <button type="button" class="btn btn-light border" data-sms-calc-key="." aria-label="@TC("Decimal point", "الفاصلة العشرية")">.</button>
+                </div>
+            </div>
+
+            @* OK finishes a half-typed sum before writing, so 12 × 5 then OK puts 60 in the field and
+               not 5 — the button means "use this answer", and the answer is the whole sum. *@
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">@TC("Cancel", "إلغاء")</button>
+                <button type="button" class="btn btn-sm btn-primary" data-sms-calc-accept>@TC("OK", "موافق")</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="~/js/calculator.js" asp-append-version="true"></script>

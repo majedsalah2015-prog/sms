@@ -742,11 +742,65 @@ namespace Sms.Web.Controllers
 
         [HttpGet("documents")]
         [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Documents, ActionVerb.View)]
-        public async Task<IActionResult> Documents(string? module = null, bool includeInactive = false)
+        public async Task<IActionResult> Documents(string? module = null, bool includeInactive = false, int? edit = null)
         {
-            var m = new DocumentTypeCatalogViewModel { ModuleFilter = module, IncludeInactive = includeInactive };
+            var m = new DocumentTypeCatalogViewModel { ModuleFilter = module, IncludeInactive = includeInactive, EditId = edit };
             await FillDocumentsAsync(m);
+
+            // Editing is the same upsert the Add form runs — the code is the identity, so
+            // loading the row into that form and locking the code is the whole of it. The
+            // screen could previously only append: a type filed against the wrong module
+            // stayed there, and a second one under a corrected code left the school with both.
+            // Read the row itself rather than picking it out of m.Rows: that list is narrowed by
+            // the module filter and drops retired types, so editing either would silently load
+            // an empty form and the save would create a second type instead of correcting one.
+            var editing = edit is int id
+                ? await _db.DocumentTypes.IgnoreQueryFilters().AsNoTracking()
+                    .SingleOrDefaultAsync(x => x.Id == id && x.SchoolId == _db.CurrentSchoolId, Ct)
+                : null;
+            if (editing is DocumentType t)
+            {
+                m.Code = t.Code;
+                m.ModuleCode = t.ModuleCode;
+                m.NameAr = t.Name.NameAr;
+                m.NameEn = t.Name.NameEn;
+                m.AllowPdf = t.AllowedFormats.HasFlag(DocumentFormat.Pdf);
+                m.AllowJpg = t.AllowedFormats.HasFlag(DocumentFormat.Jpg);
+                m.AllowPng = t.AllowedFormats.HasFlag(DocumentFormat.Png);
+                m.AllowDocx = t.AllowedFormats.HasFlag(DocumentFormat.Docx);
+                m.AllowXlsx = t.AllowedFormats.HasFlag(DocumentFormat.Xlsx);
+                m.MaxSizeMb = t.MaxSizeBytes is int b ? b / 1024 / 1024 : null;
+                m.IsMandatoryByDefault = t.IsMandatoryByDefault;
+                m.IsExpiryTracked = t.IsExpiryTracked;
+                m.IsRestricted = t.IsRestricted;
+            }
+
             return View(m);
+        }
+
+        /// <summary>
+        /// BR-GLB-005 / doc 10 §5: retires a document type or puts it back. Files already filed
+        /// under it stay readable and stay attached — retiring only stops it being offered for
+        /// the next upload, which is why the screen offers the way back too.
+        /// </summary>
+        [HttpPost("documents/{id:int}/active")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Documents, ActionVerb.Deactivate)]
+        public async Task<IActionResult> SetDocumentTypeActive(int id, bool active, string? module = null, bool includeInactive = false)
+        {
+            try
+            {
+                await _documentTypes.SetDocumentTypeActiveAsync(id, active);
+                TempData["Flash"] = active
+                    ? T("Document type reactivated.", "أُعيد تفعيل نوع المستند.")
+                    : T("Document type retired — the files already filed under it are untouched (BR-GLB-005: never deleted).", "أُوقف نوع المستند — والملفات المحفوظة تحته لم تُمس (BR-GLB-005: لا حذف).");
+            }
+            catch (InvalidOperationException ex)
+            {
+                TempData["Error"] = UserMessage.For(ex, IsArabic);
+            }
+
+            return RedirectToAction(nameof(Documents), new { module, includeInactive });
         }
 
         [HttpPost("documents")]
@@ -851,6 +905,16 @@ namespace Sms.Web.Controllers
             return View(await BuildLookupsAsync(category));
         }
 
+        /// <summary>
+        /// Adds a value to the open list, or overwrites the name and order of the one already
+        /// holding the code (doc/Modules/01 §8.2).
+        /// <para>
+        /// The code may be left blank and is then derived from the English name
+        /// (<see cref="GenerateCode"/>) — the same bargain the quick-add already makes. Demanding
+        /// one made the person cataloguing eighty specializations invent eighty stable keys, which
+        /// is how a catalogue ends up keyed 1, 2, 3.
+        /// </para>
+        /// </summary>
         [HttpPost("lookups/value")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Setup, ScreenCatalog.Setup.Lookups, ActionVerb.Create)]
@@ -858,11 +922,25 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await RequireSchoolManagedAsync(category);
-                Require(form.Code, "Code", "الرمز");
+                var cat = await RequireEditableAsync(category);
                 Require(form.NameAr, "Name (Arabic)", "الاسم (عربي)");
                 Require(form.NameEn, "Name (English)", "الاسم (إنجليزي)");
-                await _lookups.DefineValueAsync(category, form.Code!.Trim(), form.NameAr!, form.NameEn!, form.SortOrder ?? 0);
+
+                // Active and inactive both: a retired value still owns its key, so a generated one
+                // must not collide with it and a typed one must be refused against it.
+                var existing = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking()
+                    .Where(v => v.LookupCategoryId == cat.Id && v.SchoolId == _tenant.SchoolId)
+                    .Select(v => new { v.Code, v.SortOrder }).ToListAsync();
+
+                var typed = form.Code?.Trim().ToUpperInvariant();
+                var finalCode = string.IsNullOrWhiteSpace(typed)
+                    ? GenerateCode(form.NameEn!, existing.Select(v => v.Code))
+                    : typed!;
+
+                // Blank sort order appends rather than landing on 0, so a list authored by someone
+                // who never touches the box still comes back in the order they typed it.
+                var sort = form.SortOrder ?? (existing.Count == 0 ? 1 : existing.Max(v => v.SortOrder) + 1);
+                await _lookups.DefineValueAsync(category, finalCode, form.NameAr!.Trim(), form.NameEn!.Trim(), sort);
                 TempData["Flash"] = T("Value saved.", "تم حفظ القيمة.");
             }
             catch (InvalidOperationException ex)
@@ -901,7 +979,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await RequireSchoolManagedAsync(category);
+                await RequireEditableAsync(category);
                 await _lookups.DeactivateValueAsync(id);
                 TempData["Flash"] = T("Value deactivated (BR-SET-002: never deleted).", "تم إلغاء تفعيل القيمة (BR-SET-002: لا حذف).");
             }
@@ -930,7 +1008,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await RequireSchoolManagedAsync(category);
+                await RequireEditableAsync(category);
                 Require(nameAr, "Name (Arabic)", "الاسم (عربي)");
                 Require(nameEn, "Name (English)", "الاسم (إنجليزي)");
                 var value = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(v => v.Id == id && v.SchoolId == _tenant.SchoolId);
@@ -963,7 +1041,7 @@ namespace Sms.Web.Controllers
         {
             try
             {
-                await RequireSchoolManagedAsync(category);
+                await RequireEditableAsync(category);
                 var value = await _db.LookupValues.IgnoreQueryFilters().AsNoTracking().SingleOrDefaultAsync(v => v.Id == id && v.SchoolId == _tenant.SchoolId);
                 if (value == null)
                 {
@@ -982,14 +1060,17 @@ namespace Sms.Web.Controllers
         }
 
         /// <summary>
-        /// BR-SET-001: a product-seeded list is updated by product releases, not by a school.
+        /// BR-SET-001: a product-owned list is updated by product releases, not by a school — with
+        /// the exception <see cref="SchoolAuthoredLookups"/> spells out, for the product-tier lists
+        /// whose values only the school can write.
         /// <para>
-        /// Also the only place that answers "no such category" in a sentence. The three call sites
-        /// each used <c>SingleAsync</c>, which for an unknown code throws "Sequence contains no
+        /// Also the only place that answers "no such category" in a sentence. The call sites each
+        /// used <c>SingleAsync</c>, which for an unknown code throws "Sequence contains no
         /// elements" — a message from the query provider, in English, shown to an administrator.
         /// </para>
         /// </summary>
-        private async Task RequireSchoolManagedAsync(string categoryCode)
+        /// <returns>The category, so a caller needing its id does not read it twice.</returns>
+        private async Task<LookupCategory> RequireEditableAsync(string categoryCode)
         {
             var category = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == categoryCode);
             if (category == null)
@@ -999,12 +1080,14 @@ namespace Sms.Web.Controllers
                     $"لا توجد قائمة مرجعية بالرمز «{categoryCode}»."));
             }
 
-            if (category.Tier == LookupCategoryTier.ProductSeeded)
+            if (!SchoolAuthoredLookups.IsEditableBySchool(category))
             {
                 throw new InvalidOperationException(T(
                     "Product-seeded lists are updated by product releases, not by schools (BR-SET-001).",
                     "القوائم المزوَّدة من المنتج تُحدَّث بإصدارات المنتج وليس من المدرسة (BR-SET-001)."));
             }
+
+            return category;
         }
 
         // ------------------------------------------------------------------
@@ -1080,11 +1163,10 @@ namespace Sms.Web.Controllers
         // ------------------------------------------------------------------
         // Quick-add from any form (➕ next to a lookup drop-down). Returns JSON so
         // the page can insert the new option without losing what was typed.
-        // Allowed for school-managed categories plus the product-seeded lists
-        // schools legitimately extend (nationalities, job titles).
+        // Allowed for exactly what the lookup screen itself allows — SchoolAuthoredLookups.
+        // It used to carry its own two-code allowlist, which is how the product came to
+        // answer "may I add to this list?" differently depending on which screen asked.
         // ------------------------------------------------------------------
-
-        private static readonly string[] QuickAddSeededAllowlist = { NationalityCategory, "JobTitle" };
 
         [HttpPost("lookups/quick-add")]
         [ValidateAntiForgeryToken]
@@ -1098,7 +1180,7 @@ namespace Sms.Web.Controllers
                 Require(nameEn, "Name (English)", "الاسم بالإنجليزية");
                 var cat = await _db.LookupCategories.AsNoTracking().SingleOrDefaultAsync(c => c.Code == category);
                 if (cat == null) throw new InvalidOperationException(T("Unknown lookup category.", "فئة غير معروفة."));
-                if (cat.Tier == LookupCategoryTier.ProductSeeded && !QuickAddSeededAllowlist.Contains(cat.Code))
+                if (!SchoolAuthoredLookups.IsEditableBySchool(cat))
                 {
                     throw new InvalidOperationException(T("Product-seeded lists are updated by product releases, not by schools (BR-SET-001).", "القوائم المزوَّدة من المنتج تُحدَّث بإصدارات المنتج وليس من المدرسة (BR-SET-001)."));
                 }
@@ -1120,6 +1202,13 @@ namespace Sms.Web.Controllers
             }
         }
 
+        /// <summary>
+        /// The stable key for a value whose author did not supply one. <c>LookupValue.Code</c> is an
+        /// identity other rows point at (BR-SET-002), while the person cataloguing eighty
+        /// specializations has no view about what any of them should be called internally; made to
+        /// type one, they type "1", "2", "3". Derived from the English name, it reads back.
+        /// <para>ASCII only: the code travels into exports, import mappings and URLs.</para>
+        /// </summary>
         private static string GenerateCode(string nameEn, IEnumerable<string> taken)
         {
             var baseCode = new string(nameEn.ToUpperInvariant().Where(ch => char.IsLetterOrDigit(ch)).ToArray());
@@ -1156,6 +1245,7 @@ namespace Sms.Web.Controllers
             {
                 Categories = categories, Selected = selected, Values = values,
                 Usage = usage, SortOrder = values.Count + 1,
+                CanEdit = SchoolAuthoredLookups.IsEditableBySchool(selected),
             };
         }
 

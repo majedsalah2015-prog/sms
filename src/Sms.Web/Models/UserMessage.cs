@@ -22,21 +22,45 @@ namespace Sms.Web.Models
     /// printing <c>ex.Message</c> themselves.
     /// </para>
     /// <para>
-    /// <b>Coverage is the setup circle, the workflow engine, and the cross-cutting guards.</b> The
-    /// product defines 224 exception types and the rest still fall through to English; that is a
-    /// tracked list, not a finished job, and the test above names which controllers are already
-    /// migrated so the remainder stays countable instead of invisible.
+    /// <b>Coverage is now every refusal the product can raise.</b> It began as the setup circle and
+    /// the cross-cutting guards while the other two hundred exception types still fell through to
+    /// English; the tables below finish that list, and <c>RefusalCoverageTests</c> keeps it closed —
+    /// a new exception type with no sentence here fails the build rather than reaching a school in a
+    /// language its administrator may not read.
     /// </para>
     /// <para>
-    /// Where an exception embeds a clause the engine composed in English — "invalid because
-    /// <em>the end date precedes the start date</em>" — the frame is translated and the clause is
-    /// kept. Half a sentence in the reader's language beats none, and inventing a translation for
-    /// text this class cannot see would be worse than either.
+    /// Some exceptions used to embed a clause the engine had composed in English — "invalid
+    /// because <em>the end date precedes the start date</em>" — and this class translated the frame
+    /// around it and kept the clause, which left a half-Arabic sentence on an Arabic screen. Those
+    /// engines now carry the reason as a value (an enum, a count, a bilingual
+    /// <c>UsageReport</c>) instead of as a sentence, so the whole thing can be said in either
+    /// language. That is the pattern for any new refusal that has a "because": put the case in the
+    /// exception, put the words here.
     /// </para>
     /// </summary>
-    public static class UserMessage
+    public static partial class UserMessage
     {
-        public static string For(Exception exception, bool arabic) => exception switch
+        /// <summary>
+        /// The sentence to show, in the reader's language.
+        /// <para>
+        /// Two tables answer in turn. This file holds the refusals that were translated first — the
+        /// setup circle, the workflow engine, the cross-cutting guards — and the module tables in
+        /// <c>UserMessage.*.cs</c> hold the rest, one file per product area so that adding a module's
+        /// refusals does not mean editing a thousand-line switch shared with every other module.
+        /// </para>
+        /// <para>
+        /// The fallback is still the engine's own English sentence, because a wrong-language sentence
+        /// beats an empty one. It is no longer expected to be reached: <c>RefusalCoverageTests</c>
+        /// fails the build when the product grows an exception type no table names.
+        /// </para>
+        /// </summary>
+        public static string For(Exception exception, bool arabic)
+            => Established(exception, arabic)
+            ?? ByModule(exception, arabic)
+            ?? exception.Message;
+
+        /// <summary>The refusals translated before the tables were split by module.</summary>
+        private static string? Established(Exception exception, bool arabic) => exception switch
         {
             // ---------------------------------------------------------------- cross-cutting guards
 
@@ -117,16 +141,30 @@ namespace Sms.Web.Models
                 : "A year is already in Preparation — finish or cancel it before creating another (BR-AYR-002).",
 
             InvalidAcademicYearDatesException e => arabic
-                ? $"تواريخ العام الدراسي غير صالحة: {Clause(e.Message)} (BR-AYR-001)."
-                : e.Message,
+                ? (e.Fault == AcademicYearDateFault.OverlapsAnotherYear
+                    ? "هذه التواريخ تتداخل مع عام دراسي قائم في المدرسة — غيّرها، أو عدّل تواريخ العام الآخر أولاً (BR-AYR-001)."
+                    : "مدة العام الدراسي يجب أن تكون بين ستة أشهر وأربعة عشر شهراً، وأن ينتهي بعد أن يبدأ — راجع تاريخي البداية والنهاية (BR-AYR-001).")
+                : (e.Fault == AcademicYearDateFault.OverlapsAnotherYear
+                    ? "These dates overlap an academic year the school already has — change them, or move the other year's dates first (BR-AYR-001)."
+                    : "An academic year runs between six and fourteen months and ends after it begins — check the start and end dates (BR-AYR-001)."),
 
             InvalidPeriodDatesException e => arabic
-                ? $"تواريخ الفترة غير صالحة: {Clause(e.Message)} (BR-AYR-007)."
-                : e.Message,
+                ? e.Fault switch
+                {
+                    PeriodDateFault.EndsBeforeItStarts => $"{PeriodName(e.Kind, true)} يجب أن ينتهي بعد أن يبدأ — راجع تاريخي البداية والنهاية (BR-AYR-007).",
+                    PeriodDateFault.NotInsideItsParent => $"{PeriodName(e.Kind, true)} يجب أن يقع داخل المدة التي تحويه — {(e.Kind == SchoolPeriodKind.Term ? "الفترة داخل فصلها" : "الفصل داخل عامه")} (BR-AYR-007).",
+                    _ => $"{PeriodName(e.Kind, true)} يتداخل مع غيره من {(e.Kind == SchoolPeriodKind.Term ? "الفترات" : "الفصول")} — لا تتداخل مدتان في التقويم الدراسي (BR-AYR-007).",
+                }
+                : e.Fault switch
+                {
+                    PeriodDateFault.EndsBeforeItStarts => $"The {PeriodName(e.Kind, false)} has to end after it begins — check its start and end dates (BR-AYR-007).",
+                    PeriodDateFault.NotInsideItsParent => $"The {PeriodName(e.Kind, false)} has to sit inside the span that holds it — {(e.Kind == SchoolPeriodKind.Term ? "a term inside its semester" : "a semester inside its year")} (BR-AYR-007).",
+                    _ => $"This {PeriodName(e.Kind, false)} overlaps another one — two spans of the school calendar do not sit on top of each other (BR-AYR-007).",
+                },
 
             AcademicYearInUseException e => arabic
-                ? $"العام الدراسي مستخدَم: {Clause(e.Message)}"
-                : e.Message,
+                ? $"لا يمكن تعديل هذا العام الدراسي أو حذفه: ما زال مرتبطاً بـ {e.Usage.Describe(arabic: true)} — عالِج ما سبق أولاً."
+                : $"This academic year cannot be changed or removed: {e.Usage.Describe(arabic: false)} still depend on it — clear those first.",
 
             // ---------------------------------------------------------------- M06 sections
 
@@ -163,8 +201,18 @@ namespace Sms.Web.Models
             // language beats none, and inventing a translation for text this class
             // cannot see would be worse than either.
             SectionInUseException e => arabic
-                ? $"الشعبة مستخدَمة: {e.Reason}."
-                : e.Message,
+                ? e.Reason switch
+                {
+                    SectionInUseReason.CapacityBelowAssigned => $"السعة المطلوبة {Count(e.Requested)} أقل من عدد الطلاب المسنَدين إلى الشعبة وهو {Count(e.Existing)} — انقل بعضهم أولاً، أو ارفع السعة (BR-SCN-002).",
+                    SectionInUseReason.HasHistory => $"للشعبة سجل قائم ({Count(e.Existing)} قيد أو إسناد ريادة) — الشعبة تُغلق ولا تُحذف، حتى يبقى سجل من درس فيها (BR-SCN-007).",
+                    _ => "ما زالت سجلات أخرى تشير إلى هذه الشعبة — أغلقها بدل حذفها (BR-SCN-007).",
+                }
+                : e.Reason switch
+                {
+                    SectionInUseReason.CapacityBelowAssigned => $"A capacity of {Count(e.Requested)} is below the {Count(e.Existing)} student(s) already in the section — move some of them out first, or raise the capacity (BR-SCN-002).",
+                    SectionInUseReason.HasHistory => $"The section has history behind it ({Count(e.Existing)} membership or homeroom record(s)) — a section is closed rather than deleted, so the record of who sat in it survives (BR-SCN-007).",
+                    _ => "Other records still point at this section — close it instead of deleting it (BR-SCN-007).",
+                },
 
             // ---------------------------------------------------------------- M36 roles and permissions
 
@@ -232,6 +280,34 @@ namespace Sms.Web.Models
                 ? "لا تُتاح هذه الحركة من حالة السعر الحالية: المسودة تُعتمد، والمعتمد يُسحب، ولا طريق عائد إلى المسودة (BR-FEE-002)."
                 : "That move is not available from the price's current state: a draft is approved, an approved price is withdrawn, and there is no way back to draft (BR-FEE-002).",
 
+            // ---------------------------------------------------------------- M20 installment plans
+            //
+            // Every refusal the assignment console can produce. They were reaching Arabic-speaking
+            // collection officers in English, and "Student 1 already has a plan assignment for this
+            // year and category" is not a sentence that tells an Arabic reader what to do next.
+            // The exceptions carry no typed properties, so these translate by type: the reader knows
+            // which student they picked, and the id in the English text was never for them.
+
+            PlanTemplateNotApprovedException => arabic
+                ? "هذا القالب غير معتمد، ولا يُسنَد إلا قالب معتمد — اعتمده في مصمّم القوالب أولاً (BR-INS-001)."
+                : "This template is not approved, and only an approved template can be assigned — approve it in the template designer first (BR-INS-001).",
+
+            NoChargesToScheduleException => arabic
+                ? "لا رسوم مرحّلة لهذا الطالب في هذا العام، ولا شيء يُقسَّم قبل وجود رسوم — رحّل رسومه أولاً (BR-INS-002)."
+                : "This student has no posted charges for the year, and there is nothing to split until charges exist — post their fees first (BR-INS-002).",
+
+            PlanAssignmentExistsException => arabic
+                ? "لهذا الطالب خطة تقسيط لهذا العام ولهذه الفئة بالفعل — الخطة واحدة لكل طالب في العام الواحد؛ افتح القائمة وأعد جدولتها بدل إنشاء خطة ثانية (BR-INS-002)."
+                : "This student already has an installment plan for this year and category — one plan per student per year; open the existing one and reschedule it instead of creating a second (BR-INS-002).",
+
+            ExceptionAssignmentReasonRequiredException => arabic
+                ? "الإسناد الاستثنائي يتطلب سبباً مكتوباً، ويُحفظ السبب على الإسناد (BR-INS-002)."
+                : "An exception assignment requires a written reason, and the reason is kept on the assignment (BR-INS-002).",
+
+            TemplateCategoryNotMandatoryException => arabic
+                ? "إسناد صف كامل يجدول الرسوم الإلزامية فقط، وهذا القالب مقصور على فئة رسوم غير إلزامية فلن يجدول شيئاً — اختر قالباً عاماً أو قالباً على فئة إلزامية (BR-INS-002)."
+                : "A grade-wide assignment schedules mandatory fees only, and this template is scoped to a non-mandatory fee category, so it would schedule nothing — choose a general template or one scoped to a mandatory category (BR-INS-002).",
+
             // ---------------------------------------------------------------- M12 employees · M13 teachers
             //
             // Every refusal these two modules' screens can produce. They were reachable and
@@ -261,6 +337,10 @@ namespace Sms.Web.Models
                 ? "الوحدة التنظيمية ما زالت مرتبطة بغيرها — انقل الوحدات التابعة لها وأعد إسناد من شغلوا مناصب فيها أولاً، فسجل المناصب لا يُحذف معها (BR-EMP-002)."
                 : "The org unit is still referenced — move its child units and reassign anyone who has held a position in it first; the position history is not deleted along with it (BR-EMP-002).",
 
+            QualificationNotFoundException => arabic
+                ? "لم يعد هذا المؤهل على الملف — يُرجَّح أنه حُذف من نافذة أخرى. أعِد تحميل الصفحة لترى ما بقي منها."
+                : "That qualification is no longer on the file — most likely it was removed from another window. Reload the page to see what remains.",
+
             EmployeeNotEligibleForTeachingException => arabic
                 ? "لا عقد سارياً لهذا الموظف اليوم، ومن لا عقد له لا يحمل صفة معلم ولا إسناداً تدريسياً — فعّل عقده أولاً (BR-TCH-001)."
                 : "This employee has no contract in force today, and without one they can hold neither a teaching designation nor a teaching assignment — activate a contract first (BR-TCH-001).",
@@ -273,13 +353,7 @@ namespace Sms.Web.Models
                 ? "هذا الإسناد يتجاوز الحد الأسبوعي لنصاب المعلم — أنقص نصابه أو أسند الحصة لغيره؛ والتجاوز ممكن لكنه قرار صريح يُسجَّل (BR-TCH-004)."
                 : "This assignment would take the teacher past their weekly maximum — reduce their load or give the class to someone else; exceeding it is possible, but it is an explicit choice and it is logged (BR-TCH-004).",
 
-            // ---------------------------------------------------------------- M20 installment plans
-
-            TemplateCategoryNotMandatoryException => arabic
-                ? "إسناد صف كامل يجدول الرسوم الإلزامية فقط، وهذا القالب مقصور على فئة رسوم غير إلزامية فلن يجدول شيئاً — اختر قالباً عاماً أو قالباً على فئة إلزامية (BR-INS-002)."
-                : "A grade-wide assignment schedules mandatory fees only, and this template is scoped to a non-mandatory fee category, so it would schedule nothing — choose a general template or one scoped to a mandatory category (BR-INS-002).",
-
-            _ => exception.Message,
+            _ => null,
         };
 
         /// <summary>
@@ -300,43 +374,112 @@ namespace Sms.Web.Models
                 SetupWizardSteps.TryGet(code, out var step) ? (arabic ? step.TitleAr : step.TitleEn) : code));
 
         /// <summary>
-        /// The engine's own explanatory clause, kept as it was written. These exceptions are
-        /// composed as "frame: clause (BR-x)", so the clause is what sits between the first colon
-        /// and the rule reference — translated frame, untranslated detail, which is the honest
-        /// halfway house until the engines carry structured reasons instead of sentences.
-        /// </summary>
-        private static string Clause(string message)
-        {
-            var start = message.IndexOf(": ", StringComparison.Ordinal);
-            if (start < 0)
-            {
-                return message;
-            }
-
-            var clause = message[(start + 2)..];
-            var rule = clause.LastIndexOf(" (BR-", StringComparison.Ordinal);
-            return (rule < 0 ? clause : clause[..rule]).TrimEnd('.');
-        }
-
-        /// <summary>
         /// The field's name as the screen calls it. Only the fields a user actually meets are
         /// listed; anything else falls back to the entity and field as the model names them, which
         /// is still more use than nothing when a new T1 field appears before this table is updated.
         /// </summary>
-        private static string FieldName(string entityType, string field, bool arabic) => (entityType, field) switch
+        /// <summary>
+        /// What the reader calls the field an engine refused to change without a reason.
+        /// <para>
+        /// The list is closed and complete: exactly the properties carrying
+        /// <c>[RequiresAuditReason]</c>, which is the only way to reach this sentence, and
+        /// <c>AuditReasonFieldNameTests</c> fails the build when the domain grows one this file
+        /// does not name. It has to be complete rather than best-effort, because the fallback used
+        /// to print <c>Parent.PrimaryIdNo</c> at an administrator — a class name and a property name,
+        /// meaningless in Arabic and barely better in English, on a screen whose whole job at that
+        /// moment is to say what needs a justification.
+        /// </para>
+        /// </summary>
+        public static string FieldName(string entityType, string field, bool arabic) => (entityType, field) switch
         {
-            ("SchoolSetting", "Value") => arabic ? "قيمة الإعداد" : "the setting's value",
+            // ---------------------------------------------------------------- people: identity
+
             ("Student", "FirstNameAr") or ("Student", "FirstNameEn") => arabic ? "اسم الطالب" : "the student's name",
+            ("Student", "FatherNameAr") or ("Student", "FatherNameEn") => arabic ? "اسم أب الطالب" : "the student's father's name",
+            ("Student", "GrandfatherNameAr") or ("Student", "GrandfatherNameEn") => arabic ? "اسم جد الطالب" : "the student's grandfather's name",
             ("Student", "FamilyNameAr") or ("Student", "FamilyNameEn") => arabic ? "اسم عائلة الطالب" : "the student's family name",
             ("Student", "PrimaryIdNo") => arabic ? "رقم هوية الطالب" : "the student's ID number",
             ("Student", "DateOfBirth") => arabic ? "تاريخ ميلاد الطالب" : "the student's date of birth",
+            ("Student", "Gender") => arabic ? "جنس الطالب" : "the student's gender",
+            ("Student", "Status") => arabic ? "حالة الطالب" : "the student's status",
+
             ("Parent", "NameAr") or ("Parent", "NameEn") => arabic ? "اسم ولي الأمر" : "the parent's name",
+            ("Parent", "PrimaryIdNo") => arabic ? "رقم هوية ولي الأمر" : "the parent's ID number",
+
             ("Employee", "FirstNameAr") or ("Employee", "FirstNameEn") => arabic ? "اسم الموظف" : "the employee's name",
-            ("AttendanceDay", "Status") => arabic ? "حالة الحضور" : "the attendance status",
-            ("School", "NameAr") or ("School", "NameEn") => arabic ? "اسم المدرسة" : "the school's name",
+            ("Employee", "FatherNameAr") or ("Employee", "FatherNameEn") => arabic ? "اسم أب الموظف" : "the employee's father's name",
+            ("Employee", "GrandfatherNameAr") or ("Employee", "GrandfatherNameEn") => arabic ? "اسم جد الموظف" : "the employee's grandfather's name",
+            ("Employee", "FamilyNameAr") or ("Employee", "FamilyNameEn") => arabic ? "اسم عائلة الموظف" : "the employee's family name",
+            ("Employee", "MaritalStatus") => arabic ? "الحالة الاجتماعية للموظف" : "the employee's marital status",
+            ("Employee", "BankLookupId") or ("Employee", "BankName") => arabic ? "بنك الموظف" : "the employee's bank",
+            ("Employee", "BankAccountNo") => arabic ? "رقم حساب الموظف البنكي" : "the employee's bank account number",
+            ("Employee", "PalPayWalletNo") => arabic ? "رقم محفظة بالي بي للموظف" : "the employee's PalPay wallet number",
+            ("Employee", "JawwalPayWalletNo") => arabic ? "رقم محفظة جوال بي للموظف" : "the employee's JawwalPay wallet number",
+
+            // ---------------------------------------------------------------- the family's circumstances
+
+            // The father's and mother's life status left the student on 2026-08-24 (owner request):
+            // it is Parent.LifeStatus now, one row per person. Parent is T1 but that property is not
+            // [RequiresAuditReason], so no entry replaces these two here.
+            ("Student", "Religion") => arabic ? "ديانة الطالب" : "the student's religion",
+            ("Student", "ResidencyStatus") => arabic ? "حالة إقامة الطالب" : "the student's residency status",
+            ("Student", "FinancialStatus") => arabic ? "الحالة المالية للأسرة" : "the family's financial standing",
+            ("Student", "RationCardNo") => arabic ? "رقم بطاقة التموين" : "the ration card number",
+
+            // ---------------------------------------------------------------- custody and access
+
+            ("StudentGuardianLink", "IsPrimaryContact") => arabic ? "جهة الاتصال الأساسية للطالب" : "which guardian is the student's primary contact",
+            ("StudentGuardianLink", "IsFinanciallyResponsible") => arabic ? "المسؤولية المالية عن الطالب" : "who is financially responsible for the student",
+            ("StudentGuardianLink", "IsPickupAuthorized") => arabic ? "تفويض استلام الطالب" : "who may collect the student",
+            ("StudentGuardianLink", "IsPortalVisible") => arabic ? "ظهور الطالب في بوابة ولي الأمر" : "whether the student appears in the parent portal",
+            ("GateEvent", "IsAuthorizedPickupOverride") => arabic ? "تجاوز تفويض الاستلام عند البوابة" : "the pickup authorisation override at the gate",
+
+            // ---------------------------------------------------------------- money
+
+            ("Contract", "SalaryBasic") => arabic ? "الراتب الأساسي" : "the basic salary",
+            ("Contract", "SalaryAllowances") => arabic ? "البدلات" : "the salary allowances",
+
+            // Staff advances (owner request, 2026-08-28). Both are T1 with a mandatory reason for
+            // the same reason the salary above is: they decide what leaves somebody's pay.
+            ("SalaryAdvance", "Amount") => arabic ? "مبلغ السلفة" : "the advance amount",
+            ("SalaryAdvance", "InstallmentCount") => arabic ? "عدد أقساط السلفة" : "the advance's instalment count",
+            ("FeeStructureLine", "Amount") => arabic ? "قيمة بند الرسوم" : "the fee line's amount",
             ("DiscountGrant", "RevokedEffectiveDate") => arabic ? "تاريخ سحب الخصم" : "the discount's revocation date",
+            ("Installment", "IsWrittenOff") => arabic ? "إعدام القسط" : "writing the instalment off",
+            ("GlExportBatch", "VoidReason") => arabic ? "سبب إلغاء دفعة الترحيل المحاسبي" : "the export batch's void reason",
+            ("Sale", "VoidReason") => arabic ? "سبب إلغاء عملية المقصف" : "the cafeteria sale's void reason",
+            ("StoreSale", "VoidReason") => arabic ? "سبب إلغاء عملية المتجر" : "the store sale's void reason",
+            ("TransportSubscription", "SuspendedEffectiveDate") => arabic ? "تاريخ إيقاف اشتراك النقل" : "the transport subscription's suspension date",
+
+            // ---------------------------------------------------------------- what the school decides about itself
+
+            ("School", "NameAr") or ("School", "NameEn") => arabic ? "اسم المدرسة" : "the school's name",
+            ("School", "LicenseNumber") => arabic ? "رقم ترخيص المدرسة" : "the school's licence number",
+            ("School", "MinistryCode") => arabic ? "الرمز الوزاري للمدرسة" : "the school's ministry code",
+            ("School", "Status") => arabic ? "حالة المدرسة" : "the school's status",
+            ("SchoolSetting", "Value") => arabic ? "قيمة الإعداد" : "the setting's value",
+            ("FeatureToggle", "IsEnabled") => arabic ? "تفعيل الميزة" : "whether the feature is enabled",
+            ("NumberingSeries", "FormatTemplate") => arabic ? "قالب صيغة الترقيم" : "the numbering series' format",
             ("CountryPack", "Code") => arabic ? "رمز حزمة الدولة" : "the country pack's code",
-            _ => arabic ? $"{entityType}.{field}" : $"{entityType}.{field}",
+
+            // ---------------------------------------------------------------- academic and pastoral judgements
+
+            ("GradingScale", "NameAr") or ("GradingScale", "NameEn") => arabic ? "اسم سلّم التقدير" : "the grading scale's name",
+            ("PromotionCriteria", "OverallPassMark") => arabic ? "درجة النجاح العامة" : "the overall pass mark",
+            ("PromotionCriteria", "MaxFailedSubjectsForPromotion") => arabic ? "أقصى عدد مواد راسبة يسمح بالترفيع" : "the number of failed subjects promotion still allows",
+            ("AttendanceDay", "Status") => arabic ? "حالة الحضور" : "the attendance status",
+            ("CertificateRequest", "ClearanceOverridden") => arabic ? "تجاوز إخلاء الطرف" : "the clearance override",
+            ("DisciplineCase", "DeviationReason") => arabic ? "سبب الخروج عن لائحة الانضباط" : "the reason for departing from the discipline policy",
+            ("SafetyEvent", "ResolvedAtUtc") => arabic ? "تاريخ معالجة حادثة السلامة" : "when the safety event was resolved",
+
+            // A field nobody has named yet. Never reached for anything the domain actually audits —
+            // the test above sees to that — but if it ever is, "this field" is still a sentence a
+            // person can read, which "Parent.PrimaryIdNo" was not.
+            _ => arabic ? "هذا الحقل" : Humanise(field),
         };
+
+        /// <summary>"PrimaryIdNo" → "primary id no". Not a translation, just not a class name.</summary>
+        private static string Humanise(string field) =>
+            string.Concat(field.Select((c, i) => i > 0 && char.IsUpper(c) ? " " + char.ToLowerInvariant(c) : char.ToLowerInvariant(c).ToString()));
     }
 }

@@ -14,6 +14,7 @@
     {
         ("personal", "Personal", "الشخصية", null), ("guardians", "Parents & guardians", "أولياء الأمور", Model.Guardians.Count.ToString()), ("emergency", "Emergency contacts", "جهات الطوارئ", Model.EmergencyContacts.Count.ToString()),
         ("academic", "Academic history", "السجل الأكاديمي", Model.Enrollments.Count.ToString()), ("status", "Status", "الحالة", null), ("audit", "Audit", "التدقيق", Model.Audit.Count.ToString()),
+        ("documents", "Documents", "المستندات", Model.Documents.Rows.Count.ToString()),
         ("attendance", "Attendance", "الحضور", Model.ReadThroughCounts.TryGetValue("attendance", out var at) ? at.ToString() : "0"), ("fees", "Fees", "الرسوم", Model.ReadThroughCounts.TryGetValue("charges", out var ch) ? ch.ToString() : "0"), ("certificates", "Certificates", "الشهادات", Model.ReadThroughCounts.TryGetValue("certificates", out var ce) ? ce.ToString() : "0"),
         ("more", "More…", "المزيد…", null),
     };
@@ -24,6 +25,9 @@
         tabs.Insert(3, ("social", "Social profile", "البيانات الاجتماعية", null));
     }
     string Show(string k) => Model.ActiveTab == k ? "show active" : "";
+    // A guardian's qualification is read here and written on the parent file — one place, so a
+    // correction reaches every child at once instead of once per sibling.
+    string? Education(int? id) => id == null ? null : Model.EducationLevels.Where(e => e.Id == id.Value).Select(e => isRtl ? e.Ar : e.En).FirstOrDefault();
     string Badge(StudentStatus st) => st switch { StudentStatus.Enrolled => "text-bg-success", StudentStatus.Suspended => "text-bg-warning", StudentStatus.Graduated or StudentStatus.Alumni => "text-bg-primary", _ => "text-bg-secondary" };
     var help = new HelpPanelViewModel
     {
@@ -68,9 +72,13 @@
             </div>
             <div class="col-md-9 col-lg-10">
             <form method="post" asp-action="Edit" asp-route-id="@s.Id">
-                <div class="sms-bilingual mb-3">
-                    <div><label class="form-label small" for="stu-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="stu-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
-                    <div><label class="form-label small" for="stu-FirstNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameEn" id="stu-FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FirstNameEn" aria-label="@T("First name (English)", "الاسم الأول (إنجليزي)")" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FatherNameEn" aria-label="@T("Father name (English)", "اسم الأب (إنجليزي)")" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@s.GrandfatherNameEn" aria-label="@T("Grandfather name (English)", "اسم الجد (إنجليزي)")" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FamilyNameEn" aria-label="@T("Family name (English)", "اسم العائلة (إنجليزي)")" /></div></div></div>
+                @* The English quad name is filled from the Arabic one by the helper button of
+                   docs/UI/01 §"Bilingual entry pattern" — assist only. Imported students carry the
+                   register's own Arabic text in both columns on purpose (see Import's help panel),
+                   so this screen is where that gets turned into a name an English report can use. *@
+                <div class="sms-bilingual mb-3" id="stu-name-block">
+                    <div><label class="form-label small" for="stu-FirstNameAr">@T("Name (Arabic)", "الاسم (عربي)")</label><div class="row g-1"><div class="col-3"><input name="FirstNameAr" id="stu-FirstNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FirstNameAr" aria-label="@T("First name (Arabic)", "الاسم الأول (عربي)")" /></div><div class="col-3"><input name="FatherNameAr" id="stu-FatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FatherNameAr" aria-label="@T("Father name (Arabic)", "اسم الأب (عربي)")" /></div><div class="col-3"><input name="GrandfatherNameAr" id="stu-GrandfatherNameAr" class="form-control form-control-sm" dir="rtl" value="@s.GrandfatherNameAr" aria-label="@T("Grandfather name (Arabic)", "اسم الجد (عربي)")" /></div><div class="col-3"><input name="FamilyNameAr" id="stu-FamilyNameAr" class="form-control form-control-sm" dir="rtl" value="@s.FamilyNameAr" aria-label="@T("Family name (Arabic)", "اسم العائلة (عربي)")" /></div></div></div>
+                    <div><div class="d-flex align-items-center justify-content-between gap-2"><label class="form-label small mb-1" for="stu-FirstNameEn">@T("Name (English)", "الاسم (إنجليزي)")</label><button type="button" class="btn btn-link btn-sm p-0 mb-1 text-decoration-none" data-translit-fill="#stu-name-block" title="@T("Transliterate the four Arabic names into the English boxes. Check the result before saving — it is a starting point, not an authority.", "نقحرة الأسماء العربية الأربعة إلى الخانات الإنجليزية. راجع الناتج قبل الحفظ — فهو نقطة بداية لا مرجع.")">@T("Fill from Arabic", "تعبئة من العربي")</button></div><div class="row g-1"><div class="col-3"><input name="FirstNameEn" id="stu-FirstNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FirstNameEn" data-translit-from="#stu-FirstNameAr" aria-label="@T("First name (English)", "الاسم الأول (إنجليزي)")" /></div><div class="col-3"><input name="FatherNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FatherNameEn" data-translit-from="#stu-FatherNameAr" aria-label="@T("Father name (English)", "اسم الأب (إنجليزي)")" /></div><div class="col-3"><input name="GrandfatherNameEn" class="form-control form-control-sm" dir="ltr" value="@s.GrandfatherNameEn" data-translit-from="#stu-GrandfatherNameAr" aria-label="@T("Grandfather name (English)", "اسم الجد (إنجليزي)")" /></div><div class="col-3"><input name="FamilyNameEn" class="form-control form-control-sm" dir="ltr" value="@s.FamilyNameEn" data-translit-from="#stu-FamilyNameAr" aria-label="@T("Family name (English)", "اسم العائلة (إنجليزي)")" /></div></div></div>
                 </div>
                 <div class="row g-3 mb-3">
                     <div class="col-md-2"><label class="form-label small" for="stu-Gender">@T("Gender", "الجنس")</label><select name="Gender" id="stu-Gender" class="form-select form-select-sm"><option value="Male" selected="@(s.Gender == Sms.Domain.Common.Gender.Male)">@T("Male", "ذكر")</option><option value="Female" selected="@(s.Gender == Sms.Domain.Common.Gender.Female)">@T("Female", "أنثى")</option></select></div>
@@ -87,7 +95,37 @@
         </div>
         <div class="tab-pane fade @Show("guardians")" id="tab-guardians">
             <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Parents & guardians", "أولياء الأمور")</caption><thead><tr><th scope="col">@T("Parent", "ولي الأمر")</th><th scope="col">@T("Relationship", "القرابة")</th><th scope="col">@T("Primary", "أساسي")</th><th scope="col">@T("Financial", "مالي")</th><th scope="col">@T("Pickup", "استلام")</th><th scope="col">@T("Portal", "بوابة")</th><th scope="col">@T("Since", "منذ")</th><th scope="col"></th></tr></thead>
-                <tbody>@foreach (var g in Model.Guardians) { <tr><td><a asp-controller="Parents" asp-action="File" asp-route-id="@g.Parent.Id">@g.Parent.ParentFileNo · @(isRtl ? g.Parent.NameAr : g.Parent.NameEn)</a> <span class="small text-muted" dir="ltr">@g.Parent.PrimaryMobile</span></td><td>@g.Relationship</td><td><span aria-hidden="true">@(g.Link.IsPrimaryContact ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPrimaryContact ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsFinanciallyResponsible ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsFinanciallyResponsible ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsPickupAuthorized ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPickupAuthorized ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsPortalVisible ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPortalVisible ? T("yes", "نعم") : T("no", "لا"))</span></td><td>@g.Link.EffectiveFromUtc.ToString("yyyy-MM-dd")</td>
+                <tbody>@foreach (var g in Model.Guardians) { <tr><td>
+                    @* Four different facts about one person used to arrive as one dot-separated
+                       string — a number, a job and a degree with nothing to say which was which, and
+                       an ID that read as a phone number until you counted the digits. Each fact now
+                       carries its own icon and its own label, so the row is scanned rather than
+                       parsed. The label is read out loud and drawn as a tooltip; the icon alone
+                       would leave a screen reader with a bare string again. *@
+                    <div class="fw-semibold"><a asp-controller="Parents" asp-action="File" asp-route-id="@g.Parent.Id">@(isRtl ? g.Parent.NameAr : g.Parent.NameEn)</a>
+                        <span class="text-muted small ms-1"><code>@g.Parent.ParentFileNo</code></span>
+                        @* The parent's life status is shown here rather than on the social tab: it is one fact
+                           about one person, so it belongs on the row that is that person. Only when it is not
+                           Alive — the cases that carry an entitlement are the ones worth a glance on a list. *@
+                        @if (g.Parent.LifeStatus != ParentLifeStatus.Alive) { <span class="badge @SocialProfileLabels.ParentStatusBadge(g.Parent.LifeStatus)">@SocialProfileLabels.ParentStatus(g.Parent.LifeStatus, isRtl)</span> }
+                    </div>
+                    @{
+                        // Icon, label, value, and whether the value is a number that stays LTR in
+                        // both directions. Blank facts are dropped rather than shown empty.
+                        var facts = new (string Icon, string Label, string? Value, bool Ltr)[]
+                        {
+                            ("bi-telephone", T("Mobile", "الجوال"), g.Parent.PrimaryMobile, true),
+                            ("bi-person-vcard", T("ID number", "رقم الهوية"), g.Parent.PrimaryIdNo, true),
+                            ("bi-briefcase", T("Occupation", "المهنة"), g.Parent.OccupationEmployer, false),
+                            ("bi-mortarboard", T("Qualification", "المؤهل العلمي"), Education(g.Parent.EducationLookupId), false),
+                        };
+                    }
+                    <div class="sms-facts small text-muted">
+                        @foreach (var f in facts.Where(f => !string.IsNullOrWhiteSpace(f.Value)))
+                        {
+                            <span class="sms-fact" title="@f.Label"><i class="bi @f.Icon" aria-hidden="true"></i><span class="visually-hidden">@f.Label:</span><span dir="@(f.Ltr ? "ltr" : null)">@f.Value</span></span>
+                        }
+                    </div></td><td>@g.Relationship</td><td><span aria-hidden="true">@(g.Link.IsPrimaryContact ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPrimaryContact ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsFinanciallyResponsible ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsFinanciallyResponsible ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsPickupAuthorized ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPickupAuthorized ? T("yes", "نعم") : T("no", "لا"))</span></td><td><span aria-hidden="true">@(g.Link.IsPortalVisible ? "✓" : "—")</span><span class="visually-hidden">@(g.Link.IsPortalVisible ? T("yes", "نعم") : T("no", "لا"))</span></td><td>@g.Link.EffectiveFromUtc.ToString("yyyy-MM-dd")</td>
                     <td class="text-end"><form method="post" asp-action="UnlinkGuardian" asp-route-id="@s.Id" asp-route-linkId="@g.Link.Id" class="d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" value="@today" style="width:9.5rem" aria-label="@T("Link end date", "تاريخ إنهاء الربط")" /><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("End link", "إنهاء الربط")" aria-label="@T("End link", "إنهاء الربط")"><i class="bi bi-person-dash" aria-hidden="true"></i></button></form></td></tr> }
                 @if (Model.Guardians.Count == 0) { <tr><td colspan="8" class="text-center text-warning-emphasis py-3">@T("No guardian linked — at least one financially-responsible parent is required (BR-GLB-004).", "لا ولي أمر مرتبط — يلزم ولي أمر مسؤول مالياً واحد على الأقل (BR-GLB-004).")</td></tr> }</tbody></table>
             @if (Model.PastGuardians.Count > 0) { <div class="small text-muted mb-3">@T("Past links:", "روابط سابقة:") @string.Join(" · ", Model.PastGuardians.Select(g => $"{(isRtl ? g.Parent.NameAr : g.Parent.NameEn)} ({g.Link.EffectiveFromUtc:yyyy-MM-dd} → {g.Link.EffectiveToUtc:yyyy-MM-dd})"))</div> }
@@ -108,38 +146,15 @@
             <fieldset disabled="@(!Model.CanEditSocialProfile)">
             <form method="post" asp-action="UpdateSocialProfile" asp-route-id="@s.Id">
                 <p class="text-muted small">@T("Recorded as the documents arrive — nothing here is required to register a student. Every field is audited with a reason, because each one supports a decision the school has to defend.", "تُسجَّل مع وصول المستندات — لا شيء هنا مطلوب لتسجيل الطالب. وكل حقل مدقَّق بسبب، لأن كلاً منها يسند قراراً على المدرسة أن تدافع عنه.")</p>
-
-                <h3 class="h6 mt-3">@T("Mother's particulars", "بيانات الأم")</h3>
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4"><label class="form-label small" for="so-MotherName">@T("Mother's name", "اسم الأم")</label><input name="MotherName" id="so-MotherName" class="form-control form-control-sm" value="@s.MotherName" /></div>
-                    <div class="col-md-3"><label class="form-label small" for="so-MotherNationalId">@T("Mother's ID number", "رقم هوية الأم")</label><input name="MotherNationalId" id="so-MotherNationalId" class="form-control form-control-sm" dir="ltr" value="@s.MotherNationalId" /></div>
-                    <div class="col-md-3"><label class="form-label small" for="so-MotherMobile">@T("Mother's mobile", "جوال الأم")</label><input name="MotherMobile" id="so-MotherMobile" type="tel" class="form-control form-control-sm" dir="ltr" value="@s.MotherMobile" /></div>
-                    <div class="col-md-2"><label class="form-label small" for="so-MotherOccupation">@T("Occupation", "المهنة")</label><input name="MotherOccupation" id="so-MotherOccupation" class="form-control form-control-sm" value="@s.MotherOccupation" /></div>
-                    <div class="col-md-4"><label class="form-label small" for="so-MotherEducationLookupId">@T("Education level", "المؤهل العلمي")</label>
-                        <select name="MotherEducationLookupId" id="so-MotherEducationLookupId" class="form-select form-select-sm">
-                            <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
-                            @foreach (var e in Model.EducationLevels) { <option value="@e.Id" selected="@(s.MotherEducationLookupId == e.Id)">@(isRtl ? e.Ar : e.En)</option> }
-                        </select>
-                    </div>
-                </div>
+                <p class="small"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Nothing about a parent is entered here. Each one's name, ID number, mobile, occupation, qualification and status — alive, deceased, martyr, missing — is on their own file, reached from the Parents & guardians tab, where one correction reaches every one of their children at once.", "لا تُدخَل هنا أي بيانات عن ولي الأمر. فاسم كلٍّ منهما ورقم هويته وجواله ومهنته ومؤهله العلمي وحالته — على قيد الحياة أو متوفى أو شهيد أو مفقود — في ملفه هو، تصل إليه من تبويب أولياء الأمور، حيث يبلغ التعديل الواحد كل أبنائه دفعة واحدة.")</p>
 
                 <h3 class="h6 mt-3">@T("Family", "الأسرة")</h3>
                 <div class="row g-3 mb-3">
-                    <div class="col-md-3"><label class="form-label small" for="so-FatherStatus">@T("Father's status", "حالة الأب")</label>
-                        <select name="FatherStatus" id="so-FatherStatus" class="form-select form-select-sm">
-                            <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
-                            @foreach (var v in Enum.GetValues<ParentLifeStatus>()) { <option value="@v" selected="@(s.FatherStatus == v)">@SocialProfileLabels.ParentStatus(v, isRtl)</option> }
-                        </select>
-                    </div>
-                    <div class="col-md-3"><label class="form-label small" for="so-MotherStatus">@T("Mother's status", "حالة الأم")</label>
-                        <select name="MotherStatus" id="so-MotherStatus" class="form-select form-select-sm">
-                            <option value="">@T("— not recorded —", "— غير مسجَّل —")</option>
-                            @foreach (var v in Enum.GetValues<ParentLifeStatus>()) { <option value="@v" selected="@(s.MotherStatus == v)">@SocialProfileLabels.ParentStatus(v, isRtl)</option> }
-                        </select>
-                    </div>
                     <div class="col-md-2"><label class="form-label small" for="so-FamilySize">@T("Family size", "عدد أفراد الأسرة")</label><input name="FamilySize" id="so-FamilySize" type="number" min="1" max="40" class="form-control form-control-sm" value="@s.FamilySize" /></div>
                     <div class="col-md-2"><label class="form-label small" for="so-BirthOrder">@T("Birth order", "ترتيب الطالب")</label><input name="BirthOrder" id="so-BirthOrder" type="number" min="1" max="40" class="form-control form-control-sm" value="@s.BirthOrder" /></div>
-                    <div class="col-md-2"><label class="form-label small" for="so-PlaceOfBirth">@T("Place of birth", "مكان الميلاد")</label><input name="PlaceOfBirth" id="so-PlaceOfBirth" class="form-control form-control-sm" value="@s.PlaceOfBirth" /></div>
+                    <div class="col-md-2"><label class="form-label small" for="so-SiblingCount">@T("Siblings", "عدد الأخوة")</label><input name="SiblingCount" id="so-SiblingCount" type="number" min="0" max="40" class="form-control form-control-sm" value="@s.SiblingCount" /></div>
+                    <div class="col-md-4"><label class="form-label small" for="so-PlaceOfBirth">@T("Place of birth", "مكان الميلاد")</label><input name="PlaceOfBirth" id="so-PlaceOfBirth" class="form-control form-control-sm" value="@s.PlaceOfBirth" /></div>
+                    <div class="col-md-3"><label class="form-label small" for="so-Mobile">@T("Student's mobile", "جوال الطالب")</label><input name="Mobile" id="so-Mobile" type="tel" dir="ltr" maxlength="20" class="form-control form-control-sm" value="@s.Mobile" /></div>
                 </div>
 
                 <h3 class="h6 mt-3">@T("Standing", "الوضع")</h3>
@@ -187,6 +202,9 @@
             <div class="form-text">@T("Withdrawal wizard with clearance board (finance veto) arrives with Fees screens; today Withdrawn is a plain transition.", "معالج الانسحاب مع لوحة إخلاء الطرف يأتي مع شاشات الرسوم؛ حالياً الانسحاب انتقال بسيط.")</div>
         </div>
         <div class="tab-pane fade @Show("audit")" id="tab-audit"><table class="table table-sm sms-table mb-0 small"><caption class="visually-hidden">@T("Audit trail", "سجل التدقيق")</caption><thead><tr><th scope="col">@T("When", "متى")</th><th scope="col">@T("Action", "الإجراء")</th><th scope="col">@T("Field", "الحقل")</th><th scope="col">@T("Old", "قبل")</th><th scope="col">@T("New", "بعد")</th><th scope="col">@T("Reason", "السبب")</th><th scope="col">@T("Actor", "المنفذ")</th></tr></thead><tbody>@foreach (var a in Model.Audit) { <tr><td>@a.At.ToString("yyyy-MM-dd HH:mm")</td><td>@a.Action</td><td>@a.Field</td><td>@a.Old</td><td>@a.New</td><td>@a.Reason</td><td>#@a.Actor</td></tr> }</tbody></table></div>
+        @* doc 10 §5: everything filed against this student, and the one box the whole product uses
+           to add another. The photograph on the Personal tab is the same mechanism with one slot. *@
+        <div class="tab-pane fade @Show("documents")" id="tab-documents"><partial name="_EntityDocuments" model="Model.Documents" /></div>
         <div class="tab-pane fade @Show("attendance")" id="tab-attendance"><p class="text-muted small mb-0">@T("Read-through to Attendance (Module 14): summaries and patterns appear with its screens.", "قراءة من الحضور (الوحدة 14): الملخصات والأنماط مع شاشاتها.")</p></div>
         <div class="tab-pane fade @Show("fees")" id="tab-fees"><p class="text-muted small mb-0">@T("Read-through to Fees/Payments (Modules 19–21): statement, aging and plans appear with their screens.", "قراءة من الرسوم/المدفوعات (19–21): كشف الحساب والأعمار والخطط مع شاشاتها.")</p></div>
         <div class="tab-pane fade @Show("certificates")" id="tab-certificates"><p class="text-muted small mb-0">@T("Read-through to Certificates (Module 18).", "قراءة من الشهادات (الوحدة 18).")</p></div>

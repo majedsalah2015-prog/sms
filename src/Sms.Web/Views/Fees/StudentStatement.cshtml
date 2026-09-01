@@ -1,0 +1,160 @@
+@using System.Globalization
+@using Sms.Application.ReadModels
+@using Sms.Application.Statements
+@model StudentStatementViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Student statement of account", "كشف حساب الطالب");
+    ViewData["Breadcrumb"] = T("Fees / Student finance / Statement", "الرسوم / مالية الطلاب / كشف الحساب");
+    var s = Model.Student;
+    var st = Model.Statement;
+
+    string KindLabel(StatementLineKind k) => k switch
+    {
+        StatementLineKind.Charge => T("Invoice", "فاتورة"),
+        StatementLineKind.CreditNote => T("Credit note", "إشعار دائن"),
+        StatementLineKind.Discount => T("Discount", "خصم"),
+        StatementLineKind.Payment => T("Payment", "دفعة"),
+        StatementLineKind.Refund => T("Refund", "استرداد"),
+        _ => k.ToString(),
+    };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "stustmt-help", Title = T("Statement — help", "كشف الحساب — مساعدة"),
+        Intro = T("This child's account across every year they have been billed for, in date order with a running balance (BR-FEE-008). Gross, discounts and net are always separate figures — never netted invisibly (BR-DIS-010).", "حساب هذا الطالب عبر كل الأعوام التي فُوتِر فيها، بترتيب التاريخ مع رصيد جارٍ (BR-FEE-008). الإجمالي والخصومات والصافي أرقام منفصلة دائماً — ولا تُدمج خفيةً (BR-DIS-010)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Payments are allocations", "المدفوعات تخصيصات"), T("A receipt belongs to the guardian, and BR-PAY-003 spreads it oldest-first across whichever children it lands on. What appears here is the share allocated to this child's invoices — a receipt still unallocated is family money and shows on no child's statement. The family total is on the payer statement.", "السند يخص ولي الأمر، ويوزّعه BR-PAY-003 على الأقدم أولاً بين الأبناء الذين يقع عليهم. ما يظهر هنا هو الحصة المخصّصة لفواتير هذا الطالب — والسند غير المخصّص مال أسرة لا يظهر في كشف أي طالب. وإجمالي الأسرة في كشف الدافع.")),
+            new HelpPanelViewModel.Item(T("Refunds", "الاستردادات"), T("A refund voucher names a guardian and no child, so it cannot be attributed here. A refunded family reconciles on the payer statement.", "سند الاسترداد يُسمّي ولي الأمر لا الطالب، فلا يمكن نسبته هنا. والأسرة المستردّة تُطابَق في كشف الدافع.")),
+            new HelpPanelViewModel.Item(T("As-of date", "حتى تاريخ"), T("Rebuilds the statement as it stood at the end of that day (BR-GLB-064).", "يعيد بناء الكشف كما كان في نهاية ذلك اليوم (BR-GLB-064).")),
+            new HelpPanelViewModel.Item(T("Aging", "الأعمار"), T("Open remainders bucketed by days since posting, as of today — charges carry no due date; installment due dates live in Module 20.", "المتبقيات المفتوحة مصنّفة بالأيام منذ الترحيل، حتى اليوم — الفواتير بلا تاريخ استحقاق؛ واستحقاقات الأقساط في الوحدة 20.")),
+        },
+    };
+}
+
+@* The layout renders no Styles section, so the print rule lives inline — the same shape Receipt.cshtml uses. *@
+<style>
+    @@media print { body * { visibility: hidden; } .st-print, .st-print * { visibility: visible; } .st-print { position: absolute; left: 0; top: 0; width: 100%; } .st-print .sms-card { border: 0; } }
+</style>
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Every invoice, credit note, discount and allocated payment for this child, in date order.", "كل فاتورة وإشعار دائن وخصم ودفعة مخصّصة لهذا الطالب، بترتيب التاريخ.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-1 align-items-center">
+            <input type="hidden" name="id" value="@s.Id" />
+            <label class="small text-muted" for="asOf">@T("as of", "حتى")</label>
+            <input id="asOf" type="date" name="asOf" class="form-control form-control-sm" value="@Model.AsOf?.ToString("yyyy-MM-dd")" onchange="this.form.submit()" />
+            @if (Model.AsOf != null) { <a class="btn btn-sm btn-outline-secondary" asp-action="StudentStatement" asp-route-id="@s.Id">@T("now", "الآن")</a> }
+        </form>
+        <button class="btn btn-primary btn-sm" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <a class="btn btn-outline-secondary btn-sm" asp-action="StudentFinance"><i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to roll", "عودة للقائمة")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="st-print">
+    <div class="sms-card p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 border-bottom pb-2 mb-3">
+            <div dir="rtl" class="text-end"><div class="fw-bold fs-5">@Model.SchoolNameAr</div><div class="small text-muted">كشف حساب طالب</div></div>
+            <div dir="ltr" class="text-start"><div class="fw-bold fs-5">@Model.SchoolNameEn</div><div class="small text-muted">Student statement of account</div></div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <dl class="row mb-0 small">
+                    <dt class="col-5">@T("Student", "الطالب")</dt><dd class="col-7">@FinanceLabels.StudentName(s, isRtl)</dd>
+                    <dt class="col-5">@T("Student no.", "رقم الطالب")</dt><dd class="col-7"><bdi dir="ltr" class="font-monospace">@s.StudentNo</bdi></dd>
+                    <dt class="col-5">@T("Grade / section", "الصف / الشعبة")</dt><dd class="col-7">@(Model.GradeName ?? "—")@if (Model.SectionName != null) { <span> · @Model.SectionName</span> }</dd>
+                </dl>
+            </div>
+            <div class="col-md-6">
+                <dl class="row mb-0 small">
+                    <dt class="col-5">@T("Guardian(s)", "ولي/أولياء الأمر")</dt>
+                    <dd class="col-7">@(Model.Guardians.Count == 0 ? T("none linked", "لا ولي أمر مرتبط") : string.Join(" · ", Model.Guardians.Select(p => FinanceLabels.ParentName(p, isRtl))))</dd>
+                    <dt class="col-5">@T("As of", "حتى تاريخ")</dt>
+                    <dd class="col-7"><bdi dir="ltr">@(Model.AsOf?.ToString("yyyy-MM-dd") ?? Model.PrintedAtUtc.ToString("yyyy-MM-dd"))</bdi></dd>
+                    <dt class="col-5">@T("Printed", "تاريخ الطباعة")</dt>
+                    <dd class="col-7"><bdi dir="ltr">@Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm")</bdi></dd>
+                </dl>
+            </div>
+        </div>
+
+        @* BR-DIS-010: gross, discounts and net stay three figures, never one. *@
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">@st.GrossCharges.ToString("N2")</span><span class="sms-tile__label">@T("gross invoices", "إجمالي الفواتير")</span></div></div>
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value"><bdi dir="ltr">−@st.Discounts.ToString("N2")</bdi></span><span class="sms-tile__label">@T("discounts", "الخصومات")</span></div></div>
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value"><bdi dir="ltr">−@st.CreditNotes.ToString("N2")</bdi></span><span class="sms-tile__label">@T("credit notes", "الإشعارات الدائنة")</span></div></div>
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value">@st.NetCharges.ToString("N2")</span><span class="sms-tile__label">@T("net charges", "صافي الرسوم")</span></div></div>
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value text-success"><bdi dir="ltr">−@st.Payments.ToString("N2")</bdi></span><span class="sms-tile__label">@T("paid", "المدفوع")</span></div></div>
+            <div class="col-6 col-md-2"><div class="sms-tile"><span class="sms-tile__value @(st.ClosingBalance > 0 ? "text-danger" : "text-success")">@st.ClosingBalance.ToString("N2")<span class="visually-hidden"> @(st.ClosingBalance > 0 ? T("due", "مستحق") : st.ClosingBalance < 0 ? T("credit", "دائن") : T("settled", "مسدّد"))</span></span><span class="sms-tile__label">@T("closing balance", "الرصيد الختامي")</span></div></div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm sms-table mb-0">
+                <caption class="visually-hidden">@T("Statement lines in date order with a running balance", "سطور الكشف بترتيب التاريخ مع رصيد جارٍ")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Date", "التاريخ")</th>
+                    <th scope="col">@T("Type", "النوع")</th>
+                    <th scope="col">@T("Document", "المستند")</th>
+                    <th scope="col" class="text-end">@T("Debit", "مدين")</th>
+                    <th scope="col" class="text-end">@T("Credit", "دائن")</th>
+                    <th scope="col" class="text-end">@T("Balance", "الرصيد")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var line in st.Lines)
+                {
+                    <tr>
+                        <td class="small"><bdi dir="ltr">@line.DateUtc.ToString("yyyy-MM-dd")</bdi></td>
+                        <td class="small">@KindLabel(line.Kind)</td>
+                        <td class="small font-monospace"><bdi dir="ltr">@line.DocumentNo</bdi></td>
+                        <td class="text-end">@(line.Debit == 0m ? "—" : line.Debit.ToString("N2"))</td>
+                        <td class="text-end text-success">@(line.Credit == 0m ? "—" : line.Credit.ToString("N2"))</td>
+                        <td class="text-end fw-semibold">@line.RunningBalance.ToString("N2")</td>
+                    </tr>
+                }
+                @if (st.Lines.Count == 0)
+                {
+                    <tr><td colspan="6" class="text-center text-muted py-4">@T("Nothing has been billed to this student yet, so the statement is empty.", "لم يُفوتَر شيء على هذا الطالب بعد، فالكشف فارغ.")</td></tr>
+                }
+                </tbody>
+                @if (st.Lines.Count > 0)
+                {
+                    <tfoot><tr class="fw-semibold">
+                        <td colspan="3" class="text-end">@T("Closing balance", "الرصيد الختامي")</td>
+                        <td class="text-end">@st.GrossCharges.ToString("N2")</td>
+                        <td class="text-end">@((st.Discounts + st.CreditNotes + st.Payments).ToString("N2"))</td>
+                        <td class="text-end @(st.ClosingBalance > 0 ? "text-danger" : "")">@st.ClosingBalance.ToString("N2")</td>
+                    </tr></tfoot>
+                }
+            </table>
+        </div>
+
+        <p class="small text-muted mt-3 mb-0">
+            @T("Payments shown are the amounts allocated to this student's invoices. A guardian paying for more than one child settles a single family balance — see the payer statement for the family total.", "المدفوعات المعروضة هي المبالغ المخصّصة لفواتير هذا الطالب. وولي الأمر الذي يدفع عن أكثر من ابن يسدّد رصيد أسرة واحداً — راجع كشف الدافع لإجمالي الأسرة.")
+        </p>
+    </div>
+</div>
+
+@if (Model.OpenCharges.Count > 0)
+{
+    <div class="sms-card d-print-none">
+        <div class="p-2 border-bottom small fw-semibold">@T("Aging of this student's open invoices (as of today)", "أعمار فواتير هذا الطالب المفتوحة (حتى اليوم)")</div>
+        <div class="table-responsive"><table class="table table-sm sms-table mb-0">
+            <caption class="visually-hidden">@T("Aging of open invoices", "أعمار الفواتير المفتوحة")</caption>
+            <thead><tr>@foreach (var b in Enum.GetValues<AgingBucket>()) { <th scope="col" class="text-end">@FinanceLabels.Aging(b, isRtl)</th> }<th scope="col" class="text-end">@T("Total", "المجموع")</th></tr></thead>
+            <tbody><tr>
+                @foreach (var b in Enum.GetValues<AgingBucket>())
+                {
+                    var v = Model.Aging.GetValueOrDefault(b);
+                    <td class="text-end @(v > 0m && b >= AgingBucket.Days31To60 ? "text-danger" : "")">@v.ToString("N2")@if (v > 0m && b >= AgingBucket.Days31To60) { <span class="visually-hidden"> @T("overdue", "متأخر")</span> }</td>
+                }
+                <td class="text-end fw-semibold">@Model.OpenTotal.ToString("N2")</td>
+            </tr></tbody>
+        </table></div>
+    </div>
+}

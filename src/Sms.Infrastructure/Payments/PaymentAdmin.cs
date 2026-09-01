@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,12 +27,40 @@ namespace Sms.Infrastructure.Payments
             _clock = clock;
         }
 
-        public async Task<TillSession> OpenTillSessionAsync(int cashierUserId, string tillCode, decimal floatAmount, CancellationToken cancellationToken = default)
+        public async Task<TillSession> OpenTillSessionAsync(int cashierUserId, string? tillCode, decimal floatAmount, CancellationToken cancellationToken = default)
         {
+            // Both guards live here rather than on the screen: the console and the mobile API open
+            // the same drawer, and a rule that only one of them applies is not a rule. They read
+            // the whole open set once, which the assignment below needs anyway.
+            var openSessions = await _db.TillSessions.AsNoTracking()
+                .Where(s => s.Status == TillSessionStatus.Open)
+                .Select(s => new { s.CashierUserId, s.TillCode })
+                .ToListAsync(cancellationToken);
+
+            var alreadyMine = openSessions.FirstOrDefault(s => s.CashierUserId == cashierUserId);
+            if (alreadyMine != null)
+            {
+                throw new CashierAlreadyHasOpenTillException(cashierUserId, alreadyMine.TillCode);
+            }
+
+            var openCodes = openSessions.Select(s => s.TillCode).ToList();
+            var requested = tillCode?.Trim();
+
+            if (string.IsNullOrEmpty(requested))
+            {
+                requested = await ResolveTillCodeAsync(cashierUserId, openCodes, cancellationToken);
+            }
+            else if (openCodes.Contains(requested, StringComparer.OrdinalIgnoreCase))
+            {
+                // Ordinal-insensitive, not the provider's collation: on Sqlite "TILL-1" and "till-1"
+                // are two drawers and the guard would wave the second cashier through.
+                throw new TillAlreadyOpenException(requested);
+            }
+
             var session = new TillSession
             {
                 CashierUserId = cashierUserId,
-                TillCode = tillCode,
+                TillCode = requested,
                 FloatAmount = floatAmount,
                 OpenedAtUtc = _clock.UtcNow,
                 Status = TillSessionStatus.Open,
@@ -40,6 +69,33 @@ namespace Sms.Infrastructure.Payments
 
             await _db.SaveChangesAsync(cancellationToken);
             return session;
+        }
+
+        public async Task<string> NextTillCodeForAsync(int cashierUserId, CancellationToken cancellationToken = default)
+        {
+            var openCodes = await _db.TillSessions.AsNoTracking()
+                .Where(s => s.Status == TillSessionStatus.Open)
+                .Select(s => s.TillCode)
+                .ToListAsync(cancellationToken);
+
+            return await ResolveTillCodeAsync(cashierUserId, openCodes, cancellationToken);
+        }
+
+        private async Task<string> ResolveTillCodeAsync(int cashierUserId, IReadOnlyCollection<string> openCodes, CancellationToken cancellationToken)
+        {
+            // Their last drawer, open or closed — so a cashier stays on one code across days and the
+            // by-till reports keep meaning something (doc/Modules/21 §8.2).
+            var lastOwn = await _db.TillSessions.AsNoTracking()
+                .Where(s => s.CashierUserId == cashierUserId)
+                .OrderByDescending(s => s.OpenedAtUtc).ThenByDescending(s => s.Id)
+                .Select(s => s.TillCode)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            // Every code the school has recorded, not just the open ones: a minted code must not
+            // land on a closed session's till and inherit its variance history.
+            var everUsed = await _db.TillSessions.AsNoTracking().Select(s => s.TillCode).Distinct().ToListAsync(cancellationToken);
+
+            return TillCodeGenerator.Resolve(lastOwn, openCodes, everUsed);
         }
 
         public async Task CloseTillSessionAsync(int tillSessionId, decimal countedTotal, string? varianceReason = null, CancellationToken cancellationToken = default)

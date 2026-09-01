@@ -1,0 +1,125 @@
+@using System.Globalization
+@model PortalWorkViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My work", "واجباتي");
+    var today = DateTime.UtcNow.Date;
+    var upcoming = Model.Upcoming(today).ToList();
+    var overdue = Model.Overdue(today).ToList();
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-work-help",
+        Title = T("My work — help", "واجباتي — مساعدة"),
+        Intro = T("Everything the school has set to your class, soonest due first. One page for the whole family, because a parent of three wants Sunday's work in one list rather than three.",
+            "كل ما كلّفت به المدرسة صفّك، الأقرب موعداً أولاً. صفحة واحدة للأسرة كلها، لأن وليّ أمر ثلاثة أبناء يريد واجبات الأحد في قائمة واحدة لا في ثلاث."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Only work the teacher has issued appears", "لا يظهر إلا ما كلّف به المعلّم فعلاً"),
+                T("A teacher drafts work before setting it, and a draft is invisible here (BR-LRN-003). Work you have not seen yet is not work being hidden from you — it is work not yet set.",
+                  "يُسوّد المعلّم الواجب قبل التكليف به، والمسوّدة غير مرئية هنا (BR-LRN-003). فما لم ترَه بعد ليس واجباً مخفياً عنك، بل واجباً لم يُكلَّف به بعد.")),
+            new HelpPanelViewModel.Item(
+                T("Withdrawn work disappears, and that is deliberate", "الواجب المسحوب يختفي، وذلك مقصود"),
+                T("A teacher can take work back, and must state why when they do (BR-LRN-016). If something you saw yesterday is gone, it was withdrawn — ask the teacher rather than assuming a fault here.",
+                  "يستطيع المعلّم سحب الواجب، وعليه بيان السبب حين يفعل (BR-LRN-016). فإن اختفى ما رأيته أمس فقد سُحب — اسأل المعلّم ولا تفترض خللاً هنا.")),
+            new HelpPanelViewModel.Item(
+                T("Late work is accepted", "العمل المتأخر مقبول"),
+                T("Passing a due date does not close the door (BR-LRN-005). Where the teacher set a late penalty it is shown on the row, before the date rather than after it. Overdue work stays listed for that reason.",
+                  "تجاوز الموعد لا يغلق الباب (BR-LRN-005). وحيث وضع المعلّم خصماً للتأخير يظهر في السطر، قبل الموعد لا بعده. ولهذا يبقى المتأخر معروضاً.")),
+            new HelpPanelViewModel.Item(
+                T("Submitting here is not available yet", "التسليم من هنا غير متاح بعد"),
+                T("This page shows what is set and when it is due. Handing work in through the portal is not built yet — submit it the way your teacher asks. Marks are not shown here either; they reach you through results once the school publishes them.",
+                  "تعرض هذه الصفحة ما كُلِّفت به وموعده. أما تسليم العمل عبر البوابة فلم يُبنَ بعد — سلّمه بالطريقة التي يطلبها معلّمك. والدرجات لا تظهر هنا أيضاً؛ إنما تصلك في النتائج بعد أن تعلنها المدرسة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("What has been set, and when it is due. Issued work only (BR-LRN-003).", "ما كُلِّفتم به وموعد تسليمه. الواجبات المُكلَّف بها فقط (BR-LRN-003).")</p>
+    </div>
+    <div class="d-flex align-items-center gap-2 d-print-none">
+        <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (Model.Students.Count == 0)
+{
+    <div class="sms-card p-4 text-center text-muted">@T("No students are linked to this account.", "لا طلاب مرتبطون بهذا الحساب.")</div>
+}
+else if (Model.HasStudentsButNoWork)
+{
+    <div class="sms-card p-4 text-center text-muted">
+        @T("No work has been set yet.", "لم يُكلَّف بأي واجب بعد.")
+        <div class="small mt-1">@T("Work appears here the moment a teacher issues it — nothing is waiting behind this page.", "يظهر الواجب هنا لحظة تكليف المعلّم به — ولا شيء ينتظر خلف هذه الصفحة.")</div>
+    </div>
+}
+else
+{
+    WorkTable(T("Due next", "القادم"), upcoming, false);
+    WorkTable(T("Past due", "فات موعدها"), overdue, true);
+}
+
+@functions {
+    void WorkTable(string heading, List<(PortalWorkViewModel.StudentWork Student, Sms.Application.Portal.PortalSetWork Work)> rows, bool isOverdue)
+    {
+        var isRtlLocal = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+        string TT(string en, string ar) => isRtlLocal ? ar : en;
+        if (rows.Count == 0) { return; }
+        var multiLocal = Model.Students.Count > 1;
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex align-items-center gap-2">
+                <h2 class="h6 mb-0">@heading</h2>
+                <span class="badge bg-secondary">@rows.Count</span>
+            </div>
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@heading — @TT("work set to this family", "الواجبات المكلَّف بها هذه الأسرة")</caption>
+                <thead><tr>
+                    @if (multiLocal) { <th scope="col">@TT("Student", "الطالب")</th> }
+                    <th scope="col">@TT("Subject", "المادة")</th>
+                    <th scope="col">@TT("Work", "الواجب")</th>
+                    <th scope="col">@TT("Due", "موعد التسليم")</th>
+                    <th scope="col">@TT("Marks", "الدرجة")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var (student, work) in rows)
+                {
+                    var s = student.Student;
+                    var name = isRtlLocal ? $"{s.FirstNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FamilyNameEn}";
+                    var title = isRtlLocal ? work.TitleAr : work.TitleEn;
+                    var subject = isRtlLocal ? work.SubjectNameAr : work.SubjectNameEn;
+                    var instructions = isRtlLocal ? work.InstructionsAr : work.InstructionsEn;
+                    <tr>
+                        @if (multiLocal) { <td>@name</td> }
+                        <td>@(string.IsNullOrWhiteSpace(subject) ? TT("—", "—") : subject)</td>
+                        <td>
+                            <div class="fw-semibold">@title</div>
+                            @if (!string.IsNullOrWhiteSpace(instructions)) { <div class="small text-muted">@instructions</div> }
+                            @if (work.LatePenaltyApplies)
+                            {
+                                <div class="small text-warning-emphasis">
+                                    <i class="bi bi-clock-history me-1" aria-hidden="true"></i>
+                                    @if (work.LatePenaltyPercent.HasValue)
+                                    {
+                                        @string.Format(TT("Late work accepted, {0}% penalty", "يُقبل المتأخر بخصم {0}%"), work.LatePenaltyPercent.Value.ToString("0.##"))
+                                    }
+                                    else
+                                    {
+                                        @TT("Late work accepted with a penalty", "يُقبل المتأخر مع خصم")
+                                    }
+                                </div>
+                            }
+                        </td>
+                        <td dir="ltr" class="@(isOverdue ? "text-danger" : "")">@work.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(work.MaxMarks.HasValue ? work.MaxMarks.Value.ToString("0.##") : TT("Practice", "تدريب"))</td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+    }
+}

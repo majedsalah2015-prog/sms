@@ -15,6 +15,7 @@
         {
             new HelpPanelViewModel.Item(T("Deny by default", "المنع افتراضاً"), T("Once a panel is registered, only users holding its permission see it — everyone else gets a dashboard without it, not an error. Register against a permission your dashboard audience actually has.", "بمجرد تسجيل اللوحة، لا يراها إلا من يملك صلاحيتها — ويحصل الباقون على لوحة بدونها، لا على خطأ. فسجّل مقابل صلاحية يملكها جمهور اللوحة فعلاً.")),
             new HelpPanelViewModel.Item(T("Portal eligible", "متاح للبوابة"), T("Leave this off for staff widgets: a widget that is not portal-eligible can never appear on a parent or student home, whatever a layout template says (BR-DSH-006).", "اتركه مطفأً لعناصر الموظفين: العنصر غير المتاح للبوابة لا يظهر أبداً في صفحة ولي الأمر أو الطالب مهما قال قالب التخطيط (BR-DSH-006).")),
+            new HelpPanelViewModel.Item(T("Edit ✎ / Retire / Reactivate", "تعديل ✎ / إيقاف / إعادة تفعيل"), T("Edit corrects a row in place — the permission most of all, since registering against the wrong one is what makes a panel invisible to the audience it was built for. The code never changes: templates and personalizations point at it. Retiring stops the widget being offered to new layouts and leaves the ones already carrying it untouched (BR-GLB-005), and retired rows stay listed so they can be put back.", "التعديل يصحّح الصف في مكانه — وأهمه الصلاحية، إذ إن تسجيلها خاطئة هو ما يجعل اللوحة غير مرئية لمن بُنيت لهم. والرمز لا يتغير أبداً: القوالب وتخصيصات المستخدمين تشير إليه. والإيقاف يمنع ظهور العنصر للتخطيطات الجديدة ويترك ما يحمله على حاله (BR-GLB-005)، وتبقى الصفوف الموقوفة معروضة ليمكن إعادتها.")),
             new HelpPanelViewModel.Item(T("Widget content", "محتوى العنصر"), T("The registry describes widgets; it does not compute them. The overview's panels are wired to their modules' own calculators, and the consolidated widget-to-data-source catalog is a later deliverable.", "السجل يصف العناصر ولا يحتسبها. لوحات النظرة العامة موصولة بحاسبات وحداتها، وكتالوج ربط العناصر بمصادر البيانات تسليم لاحق.")),
         },
     };
@@ -50,29 +51,84 @@
                     <th scope="col">@T("Refresh", "التحديث")</th>
                     <th scope="col">@T("Drill target", "وجهة الفتح")</th>
                     <th scope="col" class="text-end">@T("In use", "قيد الاستخدام")</th>
+                    <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
                 </tr></thead>
                 <tbody>
                 @foreach (var r in Model.Rows)
                 {
-                    <tr>
-                        <td>
-                            <code>@r.Widget.Code</code>
-                            @if (r.BuiltIn != null) { <span class="badge text-bg-light border ms-1" title="@T("Drives a built-in overview panel", "تُشغّل لوحة مدمجة في النظرة العامة")"><i class="bi bi-speedometer2" aria-hidden="true"></i></span> }
-                            @if (r.Widget.IsPortalEligible) { <span class="badge text-bg-info ms-1">@T("portal", "بوابة")</span> }
-                        </td>
-                        <td>@(isRtl ? r.Widget.TitleAr : r.Widget.TitleEn)</td>
-                        <td class="small text-muted">@r.Widget.OwningModuleCode</td>
-                        <td class="small @(r.Permission == null ? "text-danger" : "")">@DashboardLabels.PermissionLabel(r.Permission, isRtl)</td>
-                        <td><span class="badge @DashboardLabels.RefreshBadge(r.Widget.RefreshClass)">@DashboardLabels.RefreshClass(r.Widget.RefreshClass, isRtl)</span></td>
-                        <td class="small text-muted">@(string.IsNullOrWhiteSpace(r.Widget.DrillTargetCode) ? "—" : r.Widget.DrillTargetCode)</td>
-                        <td class="text-end small text-nowrap">
-                            @string.Format(T("{0} templates · {1} users", "{0} قالب · {1} مستخدم"), r.TemplateCount, r.PersonalizationCount)
-                        </td>
-                    </tr>
+                    if (Model.EditId == r.Widget.Id)
+                    {
+                        @* The form sits in the actions cell and the inputs reach it by form="…" —
+                           a <form> cannot span <td>s. The code is not among them: templates and
+                           personalizations point at this row, so it is the one thing that stays. *@
+                        var fid = $"edit-widget-{r.Widget.Id}";
+                        <tr class="table-warning">
+                            <td><code>@r.Widget.Code</code><div class="small text-muted">@T("the code stays", "الرمز يبقى")</div></td>
+                            <td>
+                                <input form="@fid" name="titleAr" class="form-control form-control-sm mb-1" dir="rtl" lang="ar" maxlength="100" value="@r.Widget.TitleAr" required aria-label="@T("Title (Arabic)", "العنوان (بالعربية)")" />
+                                <input form="@fid" name="titleEn" class="form-control form-control-sm" dir="ltr" lang="en" maxlength="100" value="@r.Widget.TitleEn" required aria-label="@T("Title (English)", "العنوان (بالإنجليزية)")" />
+                                <label class="small mt-1 d-block"><input form="@fid" type="checkbox" name="isPortalEligible" value="true" class="form-check-input" checked="@r.Widget.IsPortalEligible" /> @T("portal eligible", "متاح للبوابة")</label>
+                            </td>
+                            <td><input form="@fid" name="owningModuleCode" class="form-control form-control-sm" maxlength="20" value="@r.Widget.OwningModuleCode" required aria-label="@T("Owning module", "الوحدة المالكة")" /></td>
+                            <td>
+                                <select form="@fid" name="requiredPermissionId" class="form-select form-select-sm" required aria-label="@T("Required permission", "الصلاحية المطلوبة")">
+                                    @foreach (var p in Model.Permissions) { <option value="@p.Id" selected="@(p.Id == r.Widget.RequiredPermissionId)">@DashboardLabels.PermissionLabel(p, isRtl)</option> }
+                                </select>
+                            </td>
+                            <td>
+                                <select form="@fid" name="refreshClass" class="form-select form-select-sm" aria-label="@T("Refresh class", "دورية التحديث")">
+                                    @foreach (var c in Enum.GetValues<WidgetRefreshClass>()) { <option value="@c" selected="@(c == r.Widget.RefreshClass)">@DashboardLabels.RefreshClass(c, isRtl)</option> }
+                                </select>
+                            </td>
+                            <td><input form="@fid" name="drillTargetCode" class="form-control form-control-sm" maxlength="100" value="@r.Widget.DrillTargetCode" placeholder="Attendance/Index" aria-label="@T("Drill target", "وجهة الفتح")" /></td>
+                            <td class="text-end small text-nowrap">@string.Format(T("{0} templates · {1} users", "{0} قالب · {1} مستخدم"), r.TemplateCount, r.PersonalizationCount)</td>
+                            <td class="text-end text-nowrap">
+                                <form id="@fid" method="post" asp-action="EditWidget" asp-route-id="@r.Widget.Id" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Widgets" title="@T("Cancel", "إلغاء")" aria-label="@T("Cancel", "إلغاء")"><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr class="@(r.Widget.IsActive ? "" : "text-muted")">
+                            <td>
+                                <code>@r.Widget.Code</code>
+                                @if (r.BuiltIn != null) { <span class="badge text-bg-light border ms-1" title="@T("Drives a built-in overview panel", "تُشغّل لوحة مدمجة في النظرة العامة")"><i class="bi bi-speedometer2" aria-hidden="true"></i></span> }
+                                @if (r.Widget.IsPortalEligible) { <span class="badge text-bg-info ms-1">@T("portal", "بوابة")</span> }
+                                @if (!r.Widget.IsActive) { <span class="badge text-bg-secondary ms-1">@T("retired", "موقوف")</span> }
+                            </td>
+                            <td>@(isRtl ? r.Widget.TitleAr : r.Widget.TitleEn)</td>
+                            <td class="small text-muted">@r.Widget.OwningModuleCode</td>
+                            <td class="small @(r.Permission == null ? "text-danger" : "")">@DashboardLabels.PermissionLabel(r.Permission, isRtl)</td>
+                            <td><span class="badge @DashboardLabels.RefreshBadge(r.Widget.RefreshClass)">@DashboardLabels.RefreshClass(r.Widget.RefreshClass, isRtl)</span></td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(r.Widget.DrillTargetCode) ? "—" : r.Widget.DrillTargetCode)</td>
+                            <td class="text-end small text-nowrap">
+                                @string.Format(T("{0} templates · {1} users", "{0} قالب · {1} مستخدم"), r.TemplateCount, r.PersonalizationCount)
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Widgets" asp-route-edit="@r.Widget.Id" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                @if (r.Widget.IsActive)
+                                {
+                                    @* What already carries the widget is said before the click, not
+                                       discovered after it: retiring leaves those rows alone. *@
+                                    var uses = r.TemplateCount + r.PersonalizationCount;
+                                    var stopText = uses == 0
+                                        ? T("Retire this widget? Nothing carries it, so it simply stops being offered to layouts.", "إيقاف هذا العنصر؟ لا شيء يحمله، فلن يتغير سوى أنه يتوقف عن الظهور للتخطيطات.")
+                                        : T($"Retire this widget? {r.TemplateCount} template(s) and {r.PersonalizationCount} personalization(s) carry it. Those keep it — it only stops being offered to new layouts (BR-GLB-005).",
+                                            $"إيقاف هذا العنصر؟ يحمله {r.TemplateCount} قالب و{r.PersonalizationCount} تخصيص مستخدم، وهي تحتفظ به — وإنما يتوقف عن الظهور للتخطيطات الجديدة (BR-GLB-005).");
+                                    <form method="post" asp-action="SetWidgetActive" asp-route-id="@r.Widget.Id" asp-route-active="false" class="d-inline" onsubmit="return confirm('@Html.Raw(stopText.Replace("'", "\\'"))');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Retire", "إيقاف")" aria-label="@T("Retire", "إيقاف")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button></form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="SetWidgetActive" asp-route-id="@r.Widget.Id" asp-route-active="true" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")" aria-label="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button></form>
+                                }
+                            </td>
+                        </tr>
+                    }
                 }
                 @if (Model.Rows.Count == 0)
                 {
-                    <tr><td colspan="7" class="text-center text-muted py-4">@T("No widget is registered. The overview still works — its panels simply show for everyone.", "لا عنصر مسجَّل. والنظرة العامة تعمل رغم ذلك — لوحاتها تظهر للجميع فحسب.")</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">@T("No widget is registered. The overview still works — its panels simply show for everyone.", "لا عنصر مسجَّل. والنظرة العامة تعمل رغم ذلك — لوحاتها تظهر للجميع فحسب.")</td></tr>
                 }
                 </tbody>
             </table></div>

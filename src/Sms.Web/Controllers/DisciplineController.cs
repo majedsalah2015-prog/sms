@@ -953,43 +953,15 @@ namespace Sms.Web.Controllers
 
         /// <summary>
         /// BR-GLB-001: an engine refusal is English by construction, and a parent-facing module is
-        /// exactly where raw English must not surface. Every exception the port documents is named
-        /// here; anything else falls back to the engine's own text rather than being swallowed.
+        /// exactly where raw English must not surface.
+        /// <para>
+        /// The ten discipline sentences used to be written out here, because at the time this was
+        /// the only module that had them. They now live in <c>UserMessage.Services.cs</c> beside
+        /// every other module's, so one table can be held to covering all of them; this stays as the
+        /// module's own way in.
+        /// </para>
         /// </summary>
-        private static string Translate(Exception ex) => ex switch
-        {
-            StatementsRequiredException =>
-                T("A serious case cannot be decided before the student or a parent has given a statement (BR-DCP-003).",
-                  "لا يُبتّ في قضية جسيمة قبل أخذ إفادة الطالب أو ولي الأمر (BR-DCP-003)."),
-            DecisionArticleRequiredException =>
-                T("The decision must cite an article of the behaviour code (BR-DCP-003).",
-                  "يجب أن يستند القرار إلى مادة من لائحة السلوك (BR-DCP-003)."),
-            DecisionDeviationReasonRequiredException =>
-                T("This decision is lighter than the code proposes — say why (BR-DCP-005).",
-                  "هذا القرار أخفّ ممّا تقترحه اللائحة — اذكر السبب (BR-DCP-005)."),
-            PrincipalApprovalRequiredException =>
-                T("This decision needs the Principal: it is harsher than the proposal, a suspension, or a gravest-level case (BR-DCP-004).",
-                  "هذا القرار يحتاج اعتماد المدير: فهو أشدّ من المقترح، أو فصل، أو قضية بالغة (BR-DCP-004)."),
-            SuspensionExceedsPackLimitException =>
-                T("The suspension is longer than the regulation allows (BR-DCP-004).",
-                  "مدّة الفصل تتجاوز ما تسمح به اللائحة النظامية (BR-DCP-004)."),
-            AppealNotAllowedException =>
-                T("No appeal is possible here — minor cases cannot be appealed, the window has closed, or one was already filed (BR-DCP-006).",
-                  "لا تظلّم هنا — القضايا البسيطة لا يُتظلَّم عليها، أو انقضت المهلة، أو قُدِّم تظلّم من قبل (BR-DCP-006)."),
-            AppealReviewerNotIndependentException =>
-                T("An appeal cannot be reviewed by the person who took the decision (BR-DCP-006).",
-                  "لا يراجع التظلّم من أصدر القرار نفسه (BR-DCP-006)."),
-            CaseNotClosableException =>
-                T("The case cannot close yet — the appeal window is open or an appeal is undecided (BR-DCP-006).",
-                  "لا يمكن إغلاق القضية بعد — مهلة التظلّم مفتوحة أو هناك تظلّم لم يُبتّ فيه (BR-DCP-006)."),
-            InvalidCaseStatusTransitionException =>
-                T("That step is not the case's next one (BR-DCP-003).",
-                  "هذه الخطوة ليست التالية في مسار القضية (BR-DCP-003)."),
-            MeritPointsOutOfBoundsException =>
-                T("That many points is outside what this merit may award (BR-DCP-002).",
-                  "هذا العدد من النقاط خارج ما يمنحه هذا التميّز (BR-DCP-002)."),
-            _ => UserMessage.For(ex, IsArabic),
-        };
+        private static string Translate(Exception ex) => UserMessage.For(ex, IsArabic);
 
         // ================================================================== code-form binding
 

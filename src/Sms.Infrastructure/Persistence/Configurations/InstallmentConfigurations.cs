@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Sms.Domain.Fees;
 using Sms.Domain.Installments;
 using Sms.Domain.Payments;
+using Sms.Domain.Students;
 
 namespace Sms.Infrastructure.Persistence.Configurations
 {
@@ -116,6 +117,35 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.ToTable("DunningEvent", "ppl");
             builder.HasOne<Installment>().WithMany().HasForeignKey(x => x.InstallmentId);
             builder.HasIndex(x => new { x.InstallmentId, x.Step }).IsUnique();
+        }
+    }
+
+    /// <summary>
+    /// ppl.CollectionNotice — doc/Modules/20 §8.5's human-issued arrears notices.
+    /// <para>
+    /// No unique index over (student, channel): unlike a ladder step, a school
+    /// chases the same family again next month, and the whole point of the log is
+    /// that both letters are in it. The notice number carries the uniqueness
+    /// instead, which is where doc 08 puts it.
+    /// </para>
+    /// </summary>
+    public class CollectionNoticeConfiguration : IEntityTypeConfiguration<CollectionNotice>
+    {
+        public void Configure(EntityTypeBuilder<CollectionNotice> builder)
+        {
+            builder.ToTable("CollectionNotice", "ppl");
+            builder.Property(x => x.NoticeNo).HasMaxLength(40).IsRequired();
+            builder.Property(x => x.AmountDue).HasColumnType("decimal(18,2)");
+            builder.HasOne<Student>().WithMany().HasForeignKey(x => x.StudentId);
+            builder.HasOne<Payer>().WithMany().HasForeignKey(x => x.PayerId);
+
+            // Strict per doc 08: a number that can repeat is not a document reference. Scoped to the
+            // school because the series is (BR-GLB-002) — two tenants each issuing DUN-2026-00001 is
+            // correct, and a global unique index would make the second one fail.
+            builder.HasIndex(x => new { x.SchoolId, x.NoticeNo }).IsUnique();
+
+            // The roll's "already written to" column reads this per student, newest first.
+            builder.HasIndex(x => new { x.SchoolId, x.StudentId, x.IssuedAtUtc }, "IX_CollectionNotice_School_Student_Issued");
         }
     }
 }

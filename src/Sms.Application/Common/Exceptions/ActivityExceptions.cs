@@ -45,6 +45,14 @@ namespace Sms.Application.Common.Exceptions
         public TripHeadcountMismatchException(int departedCount, int returnedCount)
             : base($"Trip headcount mismatch: {departedCount} departed, {returnedCount} confirmed on return (BR-ACT-004/BR-TRN-005).")
         {
+            DepartedCount = departedCount;
+            ReturnedCount = returnedCount;
         }
+
+        /// <summary>How many children left the school.</summary>
+        public int DepartedCount { get; }
+
+        /// <summary>How many have been confirmed back — the number that has to match.</summary>
+        public int ReturnedCount { get; }
     }
 }

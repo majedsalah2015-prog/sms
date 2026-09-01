@@ -1,0 +1,122 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Web.Models
+@model NotificationCentreViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("My notifications", "إشعاراتي");
+    ViewData["Breadcrumb"] = T("Notifications / My notifications", "الإشعارات / إشعاراتي");
+    // Both audiences open this one; a parent must not be shown the staff shell (BR-SEC-010).
+    // Same shape Help/Index uses, and for the same reason.
+    Layout = Model.ForPortal ? "_PortalLayout" : "_Layout";
+
+    string EventName(string code)
+        => NotificationEventCatalog.TryGet(code, out var e) ? (isRtl ? e.TitleAr : e.TitleEn)
+            : code == "MessagingAnnouncement" ? T("Announcement", "إعلان")
+            : code;
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "ntf-centre-help",
+        Title = T("My notifications — help", "إشعاراتي — مساعدة"),
+        Intro = T("Everything the system has told you, in the language you signed in with. This list is yours alone — nobody else's notifications appear here, and yours appear nowhere else.",
+                  "كل ما أبلغك به النظام، باللغة التي دخلت بها. وهذه القائمة لك وحدك — لا تظهر فيها إشعارات غيرك، ولا تظهر إشعاراتك في مكان آخر."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Why something might be missing", "لماذا قد لا يظهر شيء هنا"),
+                T("A notification arrives only if the school subscribed to that event on the in-app channel and somebody wrote the template behind it. Both are set on the subscriptions and template studio screens; an event with no template is skipped silently by design (BR-NOT-003).",
+                  "لا يصل الإشعار إلا إذا اشتركت المدرسة في ذلك الحدث على قناة «داخل النظام» وكتب أحدهم القالب الذي خلفه. وكلاهما يُضبط من شاشتي الاشتراكات واستوديو القوالب؛ والحدث بلا قالب يُتجاوز بصمت عن قصد (BR-NOT-003).")),
+            new HelpPanelViewModel.Item(
+                T("Read is not the same as deleted", "المقروء ليس محذوفاً"),
+                T("Marking a notification read hides it from this list and nothing more. The record of what you were told, and when, stays for at least two years — it is the evidence behind a later \"we notified you on the fourth\" (BR-NTF-006).",
+                  "وسم الإشعار كمقروء يخفيه من هذه القائمة فحسب. أما سجل ما أُبلغت به ومتى فيبقى سنتين على الأقل — وهو الدليل خلف قولٍ لاحق: «أبلغناك في الرابع» (BR-NTF-006).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @(Model.UnreadCount == 0
+                ? T("Nothing unread.", "لا يوجد غير مقروء.")
+                : T($"{Model.UnreadCount} unread.", $"{Model.UnreadCount} غير مقروء."))
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+@* Staff tabs only. Every other tab in that partial is a notification-administration screen over
+   every family's messages, and a portal account may reach none of them — offering the tabs would
+   put four not-found links in front of a parent and name four screens BR-SEC-010 hides. *@
+@if (!Model.ForPortal)
+{
+    <partial name="_NotificationsNav" />
+}
+
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <a class="btn btn-sm @(Model.IncludeRead ? "btn-outline-secondary" : "btn-secondary")"
+       asp-action="Index" asp-route-includeRead="false">@T("Unread", "غير المقروء")</a>
+    <a class="btn btn-sm @(Model.IncludeRead ? "btn-secondary" : "btn-outline-secondary")"
+       asp-action="Index" asp-route-includeRead="true">@T("All", "الكل")</a>
+
+    @if (Model.UnreadCount > 0)
+    {
+        <form asp-action="MarkAllRead" method="post" class="ms-auto">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-check2-all me-1" aria-hidden="true"></i>@T("Mark all read", "وسم الكل كمقروء")
+            </button>
+        </form>
+    }
+</div>
+
+<div class="sms-card">
+    @if (Model.Items.Count == 0)
+    {
+        <p class="p-3 text-muted mb-0">
+            @(Model.IncludeRead
+                ? T("You have never been notified of anything.", "لم يبلغك النظام بشيء بعد.")
+                : T("Nothing unread. Switch to \"All\" to see what you have already read.", "لا يوجد غير مقروء. انتقل إلى «الكل» لترى ما قرأته."))
+        </p>
+    }
+    else
+    {
+        <ul class="list-group list-group-flush">
+            @foreach (var item in Model.Items)
+            {
+                <li class="list-group-item @(item.IsRead ? "text-muted" : "")">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                @if (!item.IsRead)
+                                {
+                                    <span class="badge bg-primary rounded-pill">@T("New", "جديد")</span>
+                                }
+                                <strong>@(string.IsNullOrWhiteSpace(item.Subject) ? EventName(item.EventCode) : item.Subject)</strong>
+                            </div>
+                            <div style="white-space: pre-wrap;">@item.Body</div>
+                            <small class="text-muted d-block mt-1">
+                                @EventName(item.EventCode) ·
+                                <span dir="ltr">@item.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</span>
+                            </small>
+                        </div>
+                        @if (!item.IsRead)
+                        {
+                            <form asp-action="MarkRead" asp-route-deliveryId="@item.DeliveryId"
+                                  asp-route-includeRead="@Model.IncludeRead" method="post">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                        aria-label="@T("Mark read", "وسم كمقروء")">
+                                    <i class="bi bi-check2" aria-hidden="true"></i>
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </li>
+            }
+        </ul>
+    }
+</div>

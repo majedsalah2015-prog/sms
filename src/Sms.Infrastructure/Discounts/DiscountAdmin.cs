@@ -69,6 +69,52 @@ namespace Sms.Infrastructure.Discounts
             return type;
         }
 
+        public async Task UpdateTypeAsync(
+            int discountTypeId, string nameAr, string nameEn, DiscountBasis basis, DiscountEligibilityMode eligibilityMode,
+            int? feeCategoryId = null, DiscountComputationStage stage = DiscountComputationStage.BeforeVat, decimal? capAmountPerStudent = null,
+            bool isStackable = true, decimal maxCombinedPercent = 100m, DiscountRenewalMode renewalMode = DiscountRenewalMode.ManualRegrant,
+            bool requiresHardshipDocumentation = false, IReadOnlyList<EligibilityRuleInput>? rules = null, CancellationToken cancellationToken = default)
+        {
+            // IgnoreQueryFilters: a retired type is still editable — correcting its name is
+            // exactly what someone does before putting it back in the catalog.
+            var type = await _db.DiscountTypes.IgnoreQueryFilters().Include(t => t.EligibilityRules)
+                .SingleOrDefaultAsync(t => t.Id == discountTypeId, cancellationToken)
+                ?? throw new DiscountTypeNotFoundException(discountTypeId);
+
+            type.NameAr = nameAr;
+            type.NameEn = nameEn;
+            type.Basis = basis;
+            type.EligibilityMode = eligibilityMode;
+            type.FeeCategoryId = feeCategoryId;
+            type.ComputationStage = stage;
+            type.CapAmountPerStudent = capAmountPerStudent;
+            type.IsStackable = isStackable;
+            type.MaxCombinedPercent = Math.Min(maxCombinedPercent, 100m);
+            type.RenewalMode = renewalMode;
+            type.RequiresHardshipDocumentation = requiresHardshipDocumentation;
+
+            // RemoveRange, not Clear(): EligibilityRule is a separate table with a required
+            // DiscountTypeId, so clearing the navigation makes EF try to null that FK and the
+            // save dies on a conceptual null rather than deleting the rungs being replaced.
+            _db.EligibilityRules.RemoveRange(type.EligibilityRules);
+            foreach (var rule in rules ?? Array.Empty<EligibilityRuleInput>())
+            {
+                type.EligibilityRules.Add(new EligibilityRule { Kind = rule.Kind, Percent = rule.Percent, ChildOrdinal = rule.ChildOrdinal });
+            }
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task SetTypeActiveAsync(int discountTypeId, bool isActive, CancellationToken cancellationToken = default)
+        {
+            var type = await _db.DiscountTypes.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(t => t.Id == discountTypeId, cancellationToken)
+                ?? throw new DiscountTypeNotFoundException(discountTypeId);
+
+            type.IsActive = isActive;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         // ------------------------------------------------------------------ charge inputs (shared)
 
         private async Task<IReadOnlyList<DiscountAmountCalculator.ChargeInput>> LoadChargeInputsAsync(int studentId, int academicYearId, int? feeCategoryId, CancellationToken cancellationToken)
@@ -272,7 +318,7 @@ namespace Sms.Infrastructure.Discounts
             var grant = await _db.DiscountGrants.SingleAsync(g => g.Id == discountGrantId, cancellationToken);
             if (grant.Status != DiscountGrantStatus.Proposed)
             {
-                throw new InvalidDiscountGrantStateException(discountGrantId, "Proposed");
+                throw new InvalidDiscountGrantStateException(discountGrantId, DiscountGrantStatus.Proposed);
             }
 
             var type = await _db.DiscountTypes.SingleAsync(t => t.Id == grant.DiscountTypeId, cancellationToken);
@@ -344,7 +390,7 @@ namespace Sms.Infrastructure.Discounts
             var grant = await _db.DiscountGrants.SingleAsync(g => g.Id == discountGrantId, cancellationToken);
             if (grant.Status != DiscountGrantStatus.Proposed)
             {
-                throw new InvalidDiscountGrantStateException(discountGrantId, "Proposed");
+                throw new InvalidDiscountGrantStateException(discountGrantId, DiscountGrantStatus.Proposed);
             }
 
             _audit.Reason = reason;
@@ -374,7 +420,7 @@ namespace Sms.Infrastructure.Discounts
             var grant = await _db.DiscountGrants.SingleAsync(g => g.Id == discountGrantId, cancellationToken);
             if (grant.Status != DiscountGrantStatus.Approved)
             {
-                throw new InvalidDiscountGrantStateException(discountGrantId, "Approved");
+                throw new InvalidDiscountGrantStateException(discountGrantId, DiscountGrantStatus.Approved);
             }
 
             if (effectiveDate.Date < _clock.UtcNow.Date)

@@ -114,17 +114,17 @@ namespace Sms.Infrastructure.Timetable
 
             if (PlacementConflictDetector.HasTeacherConflict(periodSlotId, teacherProfileId, existingConflicts))
             {
-                throw new PlacementConflictException("teacher");
+                throw new PlacementConflictException(PlacementConflictKind.Teacher);
             }
 
             if (PlacementConflictDetector.HasSectionConflict(periodSlotId, sectionId, existingConflicts))
             {
-                throw new PlacementConflictException("section");
+                throw new PlacementConflictException(PlacementConflictKind.Section);
             }
 
             if (PlacementConflictDetector.HasRoomConflict(periodSlotId, roomId, existingConflicts))
             {
-                throw new PlacementConflictException("room");
+                throw new PlacementConflictException(PlacementConflictKind.Room);
             }
 
             var placement = new Placement

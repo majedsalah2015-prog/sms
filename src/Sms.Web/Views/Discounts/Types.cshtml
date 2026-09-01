@@ -14,6 +14,7 @@
         {
             new HelpPanelViewModel.Item(T("Automatic eligibility rules", "قواعد الاستحقاق التلقائي"), T("Sibling ladder: \"the Nth enrolled child and up gets X%\", ranked eldest-first within the family. Staff: an active employee's child gets X%. Both are evaluated on demand from the Grant desk (BR-DIS-002).", "سلّم الإخوة: \"الابن رقم N فما فوق يحصل على X%\"، مرتّبين من الأكبر سناً ضمن الأسرة. الموظفون: ابن موظف نشط يحصل على X%. يُقيَّمان عند الطلب من مكتب المنح (BR-DIS-002).")),
             new HelpPanelViewModel.Item(T("Hardship documentation", "مستندات الضائقة"), T("If ticked, a manual grant of this type is refused unless the proposer confirms documentation is on file (BR-DIS-003) — the confirmation itself, not an attachment link, which is deferred.", "إن فُعِّلت، تُرفض المنحة اليدوية من هذا النوع ما لم يؤكد المقترِح وجود مستندات (BR-DIS-003) — التأكيد نفسه، لا رابط مرفق، وهو مؤجَّل.")),
+            new HelpPanelViewModel.Item(T("Edit ✎ / Retire / Reactivate", "تعديل ✎ / إيقاف / إعادة تفعيل"), T("Edit corrects the type in place — the ladder is replaced whole, so re-enter every rung you want kept. Retiring only stops the type being offered: grants already made keep their terms and keep renewing (BR-GLB-005), and reactivating puts it back in the grant desk's picker.", "التعديل يصحّح النوع في مكانه — ويُستبدل سلّم الإخوة بالكامل، فأعد إدخال كل درجة تريد بقاءها. والإيقاف يمنع ظهور النوع للجديد فقط: المنح القائمة تحتفظ بشروطها وتستمر في التجديد (BR-GLB-005)، وإعادة التفعيل تعيده إلى قائمة مكتب المنح.")),
         },
     };
 }
@@ -31,22 +32,90 @@
                     <th scope="col">@T("Name", "الاسم")</th><th scope="col">@T("Basis", "الأساس")</th><th scope="col">@T("Category", "الفئة")</th>
                     <th scope="col">@T("Eligibility", "الاستحقاق")</th><th scope="col">@T("Stacking", "التكديس")</th><th scope="col">@T("Renewal", "التجديد")</th>
                     <th scope="col" class="text-end">@T("Grants", "المنح")</th>
+                    <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
                 </tr></thead>
                 <tbody>
                 @foreach (var r in Model.Rows)
                 {
                     var t = r.Type;
-                    <tr class="@(t.IsActive ? "" : "text-muted")">
-                        <td>@(isRtl ? t.NameAr : t.NameEn) @if (t.RequiresHardshipDocumentation) { <i class="bi bi-file-earmark-medical text-warning ms-1" title="@T("Requires hardship documentation", "يتطلب مستندات ضائقة")" aria-hidden="true"></i><span class="visually-hidden">@T("requires hardship documentation", "يتطلب مستندات ضائقة")</span> } @if (!t.IsActive) { <span class="badge text-bg-secondary ms-1">@T("inactive", "غير مفعّل")</span> }</td>
-                        <td class="small">@DiscountLabels.Basis(t.Basis, isRtl)@(t.Basis == DiscountBasis.FixedAmount ? $" ({DiscountLabels.Stage(t.ComputationStage, isRtl)})" : "")@(t.CapAmountPerStudent != null ? $" · {T("cap", "سقف")} {t.CapAmountPerStudent:N2}" : "")</td>
-                        <td class="small">@(r.Category == null ? T("All categories", "كل الفئات") : (isRtl ? r.Category.NameAr : r.Category.NameEn))</td>
-                        <td class="small">@DiscountLabels.EligibilityMode(t.EligibilityMode, isRtl)</td>
-                        <td class="small">@(t.IsStackable ? T($"stackable, ≤{t.MaxCombinedPercent:0.##}%", $"قابل للتكديس، حتى {t.MaxCombinedPercent:0.##}%") : T("non-stackable", "غير قابل للتكديس"))</td>
-                        <td class="small">@DiscountLabels.RenewalMode(t.RenewalMode, isRtl)</td>
-                        <td class="text-end">@r.GrantCount</td>
-                    </tr>
+                    if (Model.EditId == t.Id)
+                    {
+                        @* The form element sits in the actions cell and the inputs reach it by
+                           form="…" — a <form> cannot span <td>s, and this row is too wide to
+                           edit in a side panel that hides the rest of the catalog. *@
+                        var fid = $"edit-type-{t.Id}";
+                        decimal? Rung(int ordinal) => t.EligibilityRules.FirstOrDefault(x => x.Kind == EligibilityRuleKind.SiblingLadder && x.ChildOrdinal == ordinal)?.Percent;
+                        var staff = t.EligibilityRules.FirstOrDefault(x => x.Kind == EligibilityRuleKind.Staff)?.Percent;
+                        <tr class="table-warning">
+                            <td>
+                                <input id="ty-ar-@t.Id" form="@fid" name="nameAr" class="form-control form-control-sm mb-1" dir="rtl" value="@t.NameAr" required aria-label="@T("Name (Arabic)", "الاسم بالعربية")" />
+                                @* The English half never auto-fills over an existing name — the school
+                                   already chose one, and retyping the Arabic must not overwrite it. *@
+                                <input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@t.NameEn" required aria-label="@T("Name (English)", "الاسم بالإنجليزية")" data-translit-from="#ty-ar-@t.Id" data-translit-mode="term" />
+                                <label class="small mt-1 d-block"><input form="@fid" type="checkbox" name="requiresHardshipDocumentation" value="true" class="form-check-input" checked="@t.RequiresHardshipDocumentation" /> @T("hardship docs", "مستندات ضائقة")</label>
+                            </td>
+                            <td>
+                                <select form="@fid" name="basis" class="form-select form-select-sm mb-1" aria-label="@T("Basis", "الأساس")">@foreach (var b in Enum.GetValues<DiscountBasis>()) { <option value="@b" selected="@(b == t.Basis)">@DiscountLabels.Basis(b, isRtl)</option> }</select>
+                                <select form="@fid" name="stage" class="form-select form-select-sm mb-1" aria-label="@T("Stage (fixed amount)", "المرحلة (مبلغ ثابت)")">@foreach (var s in Enum.GetValues<DiscountComputationStage>()) { <option value="@s" selected="@(s == t.ComputationStage)">@DiscountLabels.Stage(s, isRtl)</option> }</select>
+                                <input form="@fid" name="capAmountPerStudent" type="number" step="0.01" min="0" class="form-control form-control-sm" value="@(t.CapAmountPerStudent?.ToString("0.##", CultureInfo.InvariantCulture))" placeholder="@T("cap / student", "سقف / طالب")" aria-label="@T("Cap per student", "السقف لكل طالب")" />
+                            </td>
+                            <td>
+                                <select form="@fid" name="feeCategoryId" class="form-select form-select-sm" aria-label="@T("Applicable category", "الفئة المطبَّقة")"><option value="">@T("All categories", "كل الفئات")</option>@foreach (var c in Model.Categories) { <option value="@c.Id" selected="@(c.Id == t.FeeCategoryId)">@(isRtl ? c.NameAr : c.NameEn)</option> }</select>
+                            </td>
+                            <td>
+                                <select form="@fid" name="eligibilityMode" class="form-select form-select-sm mb-1" aria-label="@T("Eligibility mode", "نمط الاستحقاق")">@foreach (var e in Enum.GetValues<DiscountEligibilityMode>()) { <option value="@e" selected="@(e == t.EligibilityMode)">@DiscountLabels.EligibilityMode(e, isRtl)</option> }</select>
+                                <div class="row g-1">
+                                    <div class="col-6"><input form="@fid" name="ladder2" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" value="@(Rung(2)?.ToString("0.##", CultureInfo.InvariantCulture))" placeholder="@T("2nd %", "الثاني %")" aria-label="@T("2nd child %", "الابن الثاني %")" /></div>
+                                    <div class="col-6"><input form="@fid" name="ladder3" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" value="@(Rung(3)?.ToString("0.##", CultureInfo.InvariantCulture))" placeholder="@T("3rd %", "الثالث %")" aria-label="@T("3rd child %", "الابن الثالث %")" /></div>
+                                    <div class="col-6"><input form="@fid" name="ladder4Plus" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" value="@(Rung(4)?.ToString("0.##", CultureInfo.InvariantCulture))" placeholder="@T("4th+ %", "الرابع+ %")" aria-label="@T("4th child and up %", "الرابع فأكثر %")" /></div>
+                                    <div class="col-6"><input form="@fid" name="staffPercent" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" value="@(staff?.ToString("0.##", CultureInfo.InvariantCulture))" placeholder="@T("staff %", "موظف %")" aria-label="@T("Staff child %", "ابن الموظف %")" /></div>
+                                </div>
+                            </td>
+                            <td>
+                                <label class="small d-block"><input form="@fid" type="checkbox" name="isStackable" value="true" class="form-check-input" checked="@t.IsStackable" /> @T("stackable", "قابل للتكديس")</label>
+                                <input form="@fid" name="maxCombinedPercent" type="number" step="0.01" min="0" max="100" class="form-control form-control-sm" value="@t.MaxCombinedPercent.ToString("0.##", CultureInfo.InvariantCulture)" aria-label="@T("Max combined %", "أقصى نسبة مجمّعة")" />
+                            </td>
+                            <td>
+                                <select form="@fid" name="renewalMode" class="form-select form-select-sm" aria-label="@T("Renewal mode", "نمط التجديد")">@foreach (var rm in Enum.GetValues<DiscountRenewalMode>()) { <option value="@rm" selected="@(rm == t.RenewalMode)">@DiscountLabels.RenewalMode(rm, isRtl)</option> }</select>
+                            </td>
+                            <td class="text-end">@r.GrantCount</td>
+                            <td class="text-end text-nowrap">
+                                <form id="@fid" method="post" asp-action="EditType" asp-route-id="@t.Id" class="d-inline"><button class="btn btn-sm btn-primary" type="submit" title="@T("Save", "حفظ")" aria-label="@T("Save", "حفظ")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></form>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Types" title="@T("Cancel", "إلغاء")" aria-label="@T("Cancel", "إلغاء")"><i class="bi bi-x-lg" aria-hidden="true"></i></a>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr class="@(t.IsActive ? "" : "text-muted")">
+                            <td>@(isRtl ? t.NameAr : t.NameEn) @if (t.RequiresHardshipDocumentation) { <i class="bi bi-file-earmark-medical text-warning ms-1" title="@T("Requires hardship documentation", "يتطلب مستندات ضائقة")" aria-hidden="true"></i><span class="visually-hidden">@T("requires hardship documentation", "يتطلب مستندات ضائقة")</span> } @if (!t.IsActive) { <span class="badge text-bg-secondary ms-1">@T("inactive", "غير مفعّل")</span> }</td>
+                            <td class="small">@DiscountLabels.Basis(t.Basis, isRtl)@(t.Basis == DiscountBasis.FixedAmount ? $" ({DiscountLabels.Stage(t.ComputationStage, isRtl)})" : "")@(t.CapAmountPerStudent != null ? $" · {T("cap", "سقف")} {t.CapAmountPerStudent:N2}" : "")</td>
+                            <td class="small">@(r.Category == null ? T("All categories", "كل الفئات") : (isRtl ? r.Category.NameAr : r.Category.NameEn))</td>
+                            <td class="small">@DiscountLabels.EligibilityMode(t.EligibilityMode, isRtl)</td>
+                            <td class="small">@(t.IsStackable ? T($"stackable, ≤{t.MaxCombinedPercent:0.##}%", $"قابل للتكديس، حتى {t.MaxCombinedPercent:0.##}%") : T("non-stackable", "غير قابل للتكديس"))</td>
+                            <td class="small">@DiscountLabels.RenewalMode(t.RenewalMode, isRtl)</td>
+                            <td class="text-end">@r.GrantCount</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-outline-primary" asp-action="Types" asp-route-edit="@t.Id" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                @if (t.IsActive)
+                                {
+                                    @* The grant count is said before the click, not discovered after it:
+                                       retiring a type never touches the grants already carrying it. *@
+                                    var stopText = r.GrantCount == 0
+                                        ? T("Retire this discount type? Nothing has been granted under it, so it simply stops being offered.", "إيقاف نوع الخصم هذا؟ لم يُمنح أحد بموجبه، فلن يتغير سوى أنه يتوقف عن الظهور في الخيارات.")
+                                        : T($"Retire this discount type? {r.GrantCount} grant(s) already carry it. Those keep it — it only stops being offered to new ones (BR-GLB-005).",
+                                            $"إيقاف نوع الخصم هذا؟ يحمله بالفعل {r.GrantCount} من المنح، وهي تحتفظ به — وإنما يتوقف عن الظهور للمنح الجديدة (BR-GLB-005).");
+                                    <form method="post" asp-action="DeactivateType" asp-route-id="@t.Id" class="d-inline" onsubmit="return confirm('@Html.Raw(stopText.Replace("'", "\\'"))');"><button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Retire", "إيقاف")" aria-label="@T("Retire", "إيقاف")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button></form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="ActivateType" asp-route-id="@t.Id" class="d-inline"><button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")" aria-label="@T("Reactivate", "إعادة التفعيل")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button></form>
+                                }
+                            </td>
+                        </tr>
+                    }
                 }
-                @if (Model.Rows.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No discount types yet — define the first one.", "لا أنواع خصم بعد — عرّف الأول.")</td></tr> }
+                @if (Model.Rows.Count == 0) { <tr><td colspan="8" class="text-center text-muted py-4">@T("No discount types yet — define the first one.", "لا أنواع خصم بعد — عرّف الأول.")</td></tr> }
                 </tbody>
             </table></div>
         </div>

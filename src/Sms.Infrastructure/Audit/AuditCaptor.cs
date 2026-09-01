@@ -135,8 +135,22 @@ namespace Sms.Infrastructure.Audit
 
                 var auditEntry = BuildEntry(entry, audit, currentUser, clock, correlationId, action);
                 auditEntry.FieldName = property.Metadata.Name;
-                auditEntry.OldValue = ToRawValue(property.OriginalValue);
-                auditEntry.NewValue = ToRawValue(property.CurrentValue);
+
+                // A credential's value never reaches the trail — see SecretFieldAttribute for why
+                // storing the ciphertext here would not count as protecting it. The entry itself
+                // still goes in: knowing a school's gateway token was rotated, by whom and when, is
+                // most of what auditing the provider row is for.
+                if (IsSecret(property))
+                {
+                    auditEntry.OldValue = property.OriginalValue == null ? null : SecretFieldAttribute.Redaction;
+                    auditEntry.NewValue = property.CurrentValue == null ? null : SecretFieldAttribute.Redaction;
+                }
+                else
+                {
+                    auditEntry.OldValue = ToRawValue(property.OriginalValue);
+                    auditEntry.NewValue = ToRawValue(property.CurrentValue);
+                }
+
                 pending.Add(new PendingAuditEntry(auditEntry, deferredIdSource: null));
             }
         }
@@ -171,6 +185,11 @@ namespace Sms.Infrastructure.Audit
         private static bool RequiresReason(PropertyEntry property)
         {
             return property.Metadata.PropertyInfo?.GetCustomAttribute<RequiresAuditReasonAttribute>(inherit: true) != null;
+        }
+
+        private static bool IsSecret(PropertyEntry property)
+        {
+            return property.Metadata.PropertyInfo?.GetCustomAttribute<SecretFieldAttribute>(inherit: true) != null;
         }
 
         private static long? ReadEntityId(EntityEntry entry)

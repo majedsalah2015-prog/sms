@@ -1,0 +1,164 @@
+@using System.Globalization
+@using Sms.Application.Lookups
+@model StaffReferenceViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var listTitle = isRtl ? Model.Selected.TitleAr : Model.Selected.TitleEn;
+    ViewData["Title"] = T("Staff reference lists", "ثوابت الموظفين");
+    ViewData["Breadcrumb"] = T($"Employees / Reference lists / {listTitle}", $"الموظفون / الثوابت / {listTitle}");
+    var help = new HelpPanelViewModel
+    {
+        Id = "staffref-help",
+        Title = T("Reference lists — help", "الثوابت — مساعدة"),
+        Intro = T("The four lists the employee file picks from instead of typing. Entering them once means two spellings of one university stop being two universities (BR-SET-001).", "القوائم الأربع التي يختار منها ملف الموظف بدل الكتابة. إدخالها مرة واحدة يمنع أن تصبح جامعة واحدة جامعتين باختلاف الإملاء (BR-SET-001)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Both languages", "اللغتان"), T("Every value carries an Arabic and an English name — the screen that shows it may be in either (BR-GLB-001).", "كل قيمة تحمل اسماً عربياً وآخر إنجليزياً — فالشاشة التي تعرضها قد تكون بأي منهما (BR-GLB-001).")),
+            new HelpPanelViewModel.Item(T("The code", "الرمز"), T("The stable key other records point at. Leave it blank and it is derived from the English name; once saved it cannot be changed (BR-SET-002).", "المفتاح الثابت الذي تشير إليه السجلات الأخرى. اتركه فارغاً ليُشتق من الاسم الإنجليزي؛ ولا يتغير بعد الحفظ (BR-SET-002).")),
+            new HelpPanelViewModel.Item(T("Nothing is deleted", "لا حذف"), T("A value is deactivated, never deleted (BR-GLB-005). It disappears from the drop-downs and stays on every record already holding it — the number beside the button says how many those are.", "القيمة تُعطَّل ولا تُحذف (BR-GLB-005). تختفي من القوائم المنسدلة وتبقى في كل سجل يحملها — والرقم بجوار الزر يبيّن عددها.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("The lists the staff file picks from — enter them once, pick them everywhere.", "القوائم التي يختار منها ملف الموظف — تُدخَل مرة وتُختار في كل مكان.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+<partial name="_StaffNav" />
+
+<div class="row g-3">
+    <div class="col-lg-3">
+        <div class="sms-card">
+            <div class="p-2 border-bottom small text-muted fw-semibold">@T("Lists", "القوائم")</div>
+            <div class="list-group list-group-flush">
+                @foreach (var l in Model.Lists)
+                {
+                    var isOpen = l.CategoryCode == Model.Selected.CategoryCode;
+                    var count = Model.Counts.TryGetValue(l.CategoryCode, out var c) ? c : 0;
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center @(isOpen ? "active" : "")"
+                       aria-current="@(isOpen ? "true" : null)"
+                       asp-action="Reference" asp-route-list="@l.CategoryCode">
+                        <span><i class="bi @l.Icon me-1" aria-hidden="true"></i>@(isRtl ? l.TitleAr : l.TitleEn)</span>
+                        <span class="badge rounded-pill @(count == 0 ? "text-bg-warning" : isOpen ? "text-bg-light" : "text-bg-secondary")"
+                              title="@(count == 0 ? T("Empty — nothing to pick from yet", "فارغة — لا شيء للاختيار منه بعد") : T($"{count} active", $"{count} فعّالة"))">@count</span>
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-9">
+        <div class="sms-card">
+            <div class="p-3 border-bottom">
+                <h2 class="h6 mb-1"><i class="bi @Model.Selected.Icon me-1" aria-hidden="true"></i>@listTitle <code class="small text-muted">@Model.Selected.CategoryCode</code></h2>
+                <p class="text-muted small mb-0">@(isRtl ? Model.Selected.NoteAr : Model.Selected.NoteEn)</p>
+            </div>
+
+            <div class="table-responsive"><table class="table sms-table mb-0 align-middle">
+                <caption class="visually-hidden">@listTitle</caption>
+                <thead><tr>
+                    <th scope="col" style="width:5rem">#</th>
+                    <th scope="col" style="width:9rem">@T("Code", "الرمز")</th>
+                    <th scope="col">@T("Arabic name", "الاسم بالعربية")</th>
+                    <th scope="col">@T("English name", "الاسم بالإنجليزية")</th>
+                    <th scope="col" class="text-end" style="width:15rem"></th>
+                </tr></thead>
+                <tbody>
+                @foreach (var v in Model.Values)
+                {
+                    var fid = $"ref-{v.Id}";
+                    var uses = Model.Usage.TryGetValue(v.Id, out var u) ? u : (IReadOnlyList<LookupUsage>)Array.Empty<LookupUsage>();
+                    var total = uses.TotalCount();
+                    var summary = LookupUsageLabels.Summarize(uses, isRtl);
+                    if (v.IsActive)
+                    {
+                        <tr>
+                            <td><input form="@fid" name="sortOrder" type="number" min="0" class="form-control form-control-sm" value="@v.SortOrder" aria-label="@T($"Sort order — {v.Code}", $"الترتيب — {v.Code}")" /></td>
+                            <td><code dir="ltr">@v.Code</code><input form="@fid" type="hidden" name="code" value="@v.Code" /></td>
+                            <td><input form="@fid" name="nameAr" class="form-control form-control-sm" dir="rtl" value="@v.Name.NameAr" required aria-label="@T($"Arabic name — {v.Code}", $"الاسم بالعربية — {v.Code}")" /></td>
+                            <td><input form="@fid" name="nameEn" class="form-control form-control-sm" dir="ltr" value="@v.Name.NameEn" required aria-label="@T($"English name — {v.Code}", $"الاسم بالإنجليزية — {v.Code}")" /></td>
+                            <td class="text-end text-nowrap">
+                                @if (total > 0)
+                                {
+                                    <span class="badge text-bg-light border" title="@summary"><i class="bi bi-link-45deg me-1" aria-hidden="true"></i>@total</span>
+                                }
+                                <form id="@fid" method="post" asp-action="SaveReferenceValue" class="d-inline">
+                                    <input type="hidden" name="list" value="@Model.Selected.CategoryCode" />
+                                    <button class="btn btn-sm btn-outline-primary" type="submit" title="@T("Save changes", "حفظ التعديلات")"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button>
+                                </form>
+                                @{
+                                    // doc/Modules/01 §9 — what already points at this value, said before the click.
+                                    var confirmText = total == 0
+                                        ? T("Deactivate this value? Nothing refers to it, so it only stops being offered.", "إلغاء تفعيل هذه القيمة؟ لا شيء يشير إليها، فهي تتوقف عن الظهور فقط.")
+                                        : T($"Deactivate this value? {summary} already refer to it. Those records keep it — it only stops being offered to new ones (BR-SET-002).",
+                                            $"إلغاء تفعيل هذه القيمة؟ يشير إليها بالفعل: {summary}. وتلك السجلات تحتفظ بها — وإنما تتوقف عن الظهور للسجلات الجديدة (BR-SET-002).");
+                                }
+                                <form method="post" asp-action="DeactivateReferenceValue" asp-route-id="@v.Id" class="d-inline" onsubmit="return confirm('@Html.Raw(confirmText.Replace("'", "\\'"))');">
+                                    <input type="hidden" name="list" value="@Model.Selected.CategoryCode" />
+                                    <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Deactivate", "إلغاء التفعيل")" aria-label="@T($"Deactivate {v.Code}", $"إلغاء تفعيل {v.Code}")"><i class="bi bi-slash-circle" aria-hidden="true"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @* A retired value is shown, not offered for editing: saving one through the
+                           row form would put it back into every picker as a side effect of a typo fix. *@
+                        <tr class="table-light text-muted">
+                            <td>@v.SortOrder</td>
+                            <td><code dir="ltr">@v.Code</code></td>
+                            <td dir="rtl">@v.Name.NameAr</td>
+                            <td dir="ltr">@v.Name.NameEn</td>
+                            <td class="text-end text-nowrap">
+                                @if (total > 0)
+                                {
+                                    <span class="badge text-bg-secondary" title="@summary"><i class="bi bi-link-45deg me-1" aria-hidden="true"></i>@total</span>
+                                }
+                                <span class="badge text-bg-secondary">@T("inactive", "معطَّلة")</span>
+                                <form method="post" asp-action="ActivateReferenceValue" asp-route-id="@v.Id" class="d-inline">
+                                    <input type="hidden" name="list" value="@Model.Selected.CategoryCode" />
+                                    <button class="btn btn-sm btn-outline-success" type="submit" title="@T("Reactivate", "إعادة التفعيل")" aria-label="@T($"Reactivate {v.Code}", $"إعادة تفعيل {v.Code}")"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                }
+                @if (Model.Values.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-4">@T("This list is empty — add the first value below. Until then the employee file has nothing to offer for it.", "هذه القائمة فارغة — أضف أول قيمة أدناه. وحتى ذلك الحين لا يجد ملف الموظف ما يعرضه فيها.")</td></tr>
+                }
+                </tbody>
+            </table></div>
+
+            <form id="ref-add" method="post" asp-action="SaveReferenceValue" class="p-3 border-top">
+                <input type="hidden" name="list" value="@Model.Selected.CategoryCode" />
+                <div class="small fw-semibold mb-2"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T($"Add to {listTitle}", $"إضافة إلى «{listTitle}»")</div>
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small" for="NewRefAr">@T("Arabic name", "الاسم بالعربية")</label>
+                        <input id="NewRefAr" name="nameAr" class="form-control form-control-sm" dir="rtl" placeholder="@Model.Selected.PlaceholderAr" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small" for="NewRefEn">@T("English name", "الاسم بالإنجليزية")</label>
+                        <input id="NewRefEn" name="nameEn" class="form-control form-control-sm" dir="ltr" placeholder="@Model.Selected.PlaceholderEn" data-translit-from="#NewRefAr" required />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small" for="NewRefCode">@T("Code", "الرمز")</label>
+                        <input id="NewRefCode" name="code" class="form-control form-control-sm" dir="ltr" maxlength="16" placeholder="@T("auto", "تلقائي")" title="@T("Leave blank to derive it from the English name.", "اتركه فارغاً ليُشتق من الاسم الإنجليزي.")" />
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label small" for="NewRefSort">#</label>
+                        <input id="NewRefSort" name="sortOrder" class="form-control form-control-sm" type="number" min="0" value="@Model.NextSortOrder" aria-label="@T("Sort order", "الترتيب")" />
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-sm btn-primary w-100" type="submit" title="@T("Add", "إضافة")"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

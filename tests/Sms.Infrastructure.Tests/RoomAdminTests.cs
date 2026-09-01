@@ -151,6 +151,65 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(room.Id, db.RoomFeatures.Single(f => f.Id == feature.Id).RoomId);
         }
 
+        // --- BR-ROM-001 the code the screen fills in --------------------------------
+
+        [Fact]
+        [BusinessRule("BR-ROM-001")]
+        public async Task The_suggested_code_names_every_floor_and_starts_at_one()
+        {
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+
+            var suggestions = await admin.SuggestRoomCodesAsync();
+
+            Assert.Equal("A-001", suggestions[_floorId]);
+        }
+
+        [Fact]
+        [BusinessRule("BR-ROM-001")]
+        public async Task The_suggested_code_moves_on_once_it_is_used()
+        {
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+            var first = (await admin.SuggestRoomCodesAsync())[_floorId];
+            await admin.DefineRoomAsync(_floorId, first, "فصل", "Room", 1, 30, 28, GenderPolicy.Mixed);
+
+            var second = (await admin.SuggestRoomCodesAsync())[_floorId];
+
+            Assert.NotEqual(first, second);
+            Assert.Equal("A-002", second);
+        }
+
+        [Fact]
+        [BusinessRule("BR-ROM-001")]
+        public async Task A_deactivated_rooms_code_is_never_suggested_again()
+        {
+            // The unique index does not forget a retired room's code. Reading the
+            // taken codes through the soft-active filter would hand it out a second
+            // time and turn the next save into a raw DbUpdateException.
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+            var room = await admin.DefineRoomAsync(_floorId, "A-001", "فصل", "Room", 1, 30, 28, GenderPolicy.Mixed);
+            await admin.DeactivateRoomAsync(room.Id);
+
+            var suggested = (await admin.SuggestRoomCodesAsync())[_floorId];
+
+            Assert.Equal("A-002", suggested);
+        }
+
+        [Fact]
+        [BusinessRule("BR-ROM-001")]
+        public async Task A_deactivated_rooms_code_cannot_be_taken_by_a_new_room()
+        {
+            using var db = CreateContext();
+            var admin = new RoomAdmin(db);
+            var room = await admin.DefineRoomAsync(_floorId, "A-001", "فصل", "Room", 1, 30, 28, GenderPolicy.Mixed);
+            await admin.DeactivateRoomAsync(room.Id);
+
+            await Assert.ThrowsAsync<DuplicateRoomCodeException>(() =>
+                admin.DefineRoomAsync(_floorId, "A-001", "فصل آخر", "Another Room", 1, 25, 22, GenderPolicy.Mixed));
+        }
+
         // --- edit / soft-delete of the building → floor → room tree ------------------
 
         [Fact]

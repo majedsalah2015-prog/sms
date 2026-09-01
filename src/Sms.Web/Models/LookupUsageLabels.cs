@@ -11,7 +11,7 @@ namespace Sms.Web.Models
     /// The usage query returns CLR names — "Student", "NationalityLookupId" —
     /// deliberately, so the wording stays a Web-boundary decision. Keyed on the
     /// <em>pair</em>, because one entity references several lookups for different
-    /// reasons: a student's nationality, their ID type and their mother's education
+    /// reasons: a student's nationality, their ID type and a parent's education
     /// are three different sentences and only one of them is "students".
     /// </para>
     /// <para>
@@ -28,10 +28,12 @@ namespace Sms.Web.Models
         {
             ["Student/NationalityLookupId"] = ("students (nationality)", "طلاب (الجنسية)"),
             ["Student/PrimaryIdTypeLookupId"] = ("students (ID type)", "طلاب (نوع الهوية)"),
-            ["Student/MotherEducationLookupId"] = ("students (mother's education)", "طلاب (تعليم الأم)"),
+            ["Parent/PrimaryIdTypeLookupId"] = ("parents (ID type)", "أولياء أمور (نوع الهوية)"),
+            ["Parent/EducationLookupId"] = ("parents (education level)", "أولياء أمور (المؤهل العلمي)"),
             ["StudentGuardianLink/RelationshipLookupId"] = ("guardian links (relationship)", "روابط أولياء الأمر (صلة القرابة)"),
             ["Employee/NationalityLookupId"] = ("employees (nationality)", "موظفون (الجنسية)"),
             ["Employee/PrimaryIdTypeLookupId"] = ("employees (ID type)", "موظفون (نوع الهوية)"),
+            ["Employee/BankLookupId"] = ("employees (bank)", "موظفون (البنك)"),
             ["EmployeeAssignment/PositionLookupId"] = ("job postings (position)", "تعيينات (المسمى الوظيفي)"),
             ["Application/NationalityLookupId"] = ("admission applications (nationality)", "طلبات التحاق (الجنسية)"),
             ["EmergencyContact/RelationshipLookupId"] = ("emergency contacts (relationship)", "جهات اتصال للطوارئ (صلة القرابة)"),

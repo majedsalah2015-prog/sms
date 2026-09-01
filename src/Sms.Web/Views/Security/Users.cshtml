@@ -1,8 +1,19 @@
 @using System.Globalization
+@using Sms.Application.Security
 @model Sms.Web.Models.UserRoleListViewModel
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     string T(string en, string ar) => isRtl ? ar : en;
+
+    // The reading language first, the other one when it is empty. A school that has only typed its
+    // Arabic names should still see names on the English screen rather than a column of dashes.
+    string PersonOf(UserRoleSummary user)
+    {
+        var preferred = isRtl ? user.PersonNameAr : user.PersonNameEn;
+        var fallback = isRtl ? user.PersonNameEn : user.PersonNameAr;
+        return string.IsNullOrWhiteSpace(preferred) ? fallback ?? string.Empty : preferred;
+    }
+
     ViewData["Title"] = T("User role assignments", "إسناد الأدوار للمستخدمين");
     ViewData["Breadcrumb"] = T("System administration / User roles", "إدارة النظام / أدوار المستخدمين");
     var help = new HelpPanelViewModel
@@ -15,6 +26,8 @@
             new HelpPanelViewModel.Item(T("An account with no role reaches nothing", "الحساب بلا دور لا يصل إلى شيء"), T("It can sign in successfully and then find every screen answering 404. That is working as designed, not a broken account — but it is also the single most common \"the system is broken\" report after a new hire starts, so check here first.", "يستطيع الدخول بنجاح ثم يجد كل شاشة تردّ 404. وهذا عمل صحيح لا حساب معطوب — لكنه أيضاً أكثر بلاغات «النظام لا يعمل» شيوعاً بعد التحاق موظف جديد، فابدأ التحقق من هنا.")),
             new HelpPanelViewModel.Item(T("Roles add up", "الأدوار تتراكم"), T("Holding two roles gives the union of their permissions, never the intersection. There is no deny that overrides a grant, so a narrow role cannot be used to take something away — remove the wider role instead.", "حمل دورين يمنح اتحاد صلاحياتهما لا تقاطعهما. ولا يوجد منع يتغلب على منح، فلا يمكن استخدام دور ضيّق لسحب شيء — بل احذف الدور الأوسع.")),
             new HelpPanelViewModel.Item(T("Changes land on the next request", "التغييرات تسري في الطلب التالي"), T("Assigning or removing a role does not wait for the person to sign out. Their next page load is evaluated against the new set — which matters most when you are removing access from someone who is currently signed in.", "إسناد دور أو نزعه لا ينتظر خروج الشخص. فتحميل صفحته التالي يُقيَّم بالمجموعة الجديدة — وهذا أهم ما يكون حين تنزع وصولاً عن شخص متصل الآن.")),
+            new HelpPanelViewModel.Item(T("Search by the person, not only the login", "ابحث بالشخص لا باسم الدخول وحده"), T("The box matches the employee, parent or student name in either language and the file number they are registered under — emp-1042, 2311 — as well as the user name itself. Somebody who does not appear at all has no account yet: create one from \"New user\".", "يطابق الصندوق اسم الموظف أو ولي الأمر أو الطالب بأي من اللغتين، ورقم الملف المسجّل به — emp-1042 و2311 — كما يطابق اسم المستخدم نفسه. ومن لا يظهر إطلاقاً فلا حساب له بعد: أنشئ له حساباً من «مستخدم جديد».")),
+            new HelpPanelViewModel.Item(T("Deactivated accounts are hidden, not gone", "الحسابات المعطّلة مخفية لا محذوفة"), T("Nothing is ever deleted here (BR-GLB-005), so a closed account keeps its name and its history. \"Show deactivated accounts\" brings them into the list to be read: they carry no controls, because a role handed to an account that cannot sign in changes nothing.", "لا يُحذف شيء هنا (BR-GLB-005)، فالحساب المغلق يحتفظ باسمه وتاريخه. و«إظهار الحسابات المعطّلة» يُدخلها في القائمة للاطلاع فقط: فلا أزرار عليها، لأن دوراً يُمنح لحساب لا يستطيع الدخول لا يغيّر شيئاً.")),
             new HelpPanelViewModel.Item(T("Staff and portal accounts are different animals", "حسابات الموظفين والبوابة نوعان مختلفان"), T("Parent and student accounts live in the portal and are redirected there; staff URLs answer 404 for them by design (BR-SEC-010). Do not try to fix a parent's access by granting them a staff role — the account type, not the role, is what routes them.", "حسابات أولياء الأمور والطلاب في البوابة ويُحوَّلون إليها؛ وروابط الموظفين تردّ لهم 404 بالتصميم (BR-SEC-010). فلا تحاول إصلاح وصول ولي أمر بمنحه دور موظف — فنوع الحساب لا الدور هو ما يوجّهه.")),
         },
     };
@@ -75,17 +88,29 @@
     </div>
 }
 
-<form method="get" class="mb-3 d-flex gap-2" style="max-width:26rem">
-    <label class="visually-hidden" for="q">@T("Search accounts", "بحث في الحسابات")</label>
-    <input id="q" name="q" value="@Model.Search" class="form-control" placeholder="@T("Search by user name", "بحث باسم المستخدم")" />
-    <button type="submit" class="btn btn-outline-secondary">@T("Search", "بحث")</button>
-</form>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex gap-2" style="max-width:26rem">
+        <label class="visually-hidden" for="q">@T("Search accounts", "بحث في الحسابات")</label>
+        <input id="q" name="q" value="@Model.Search" class="form-control" placeholder="@T("Name, file number or user name", "الاسم أو رقم الملف أو اسم المستخدم")" />
+        @if (Model.IncludeInactive)
+        {
+            <input type="hidden" name="includeInactive" value="true" />
+        }
+        <button type="submit" class="btn btn-outline-secondary">@T("Search", "بحث")</button>
+    </form>
+    <a class="sms-inline-link" asp-action="Users" asp-route-q="@Model.Search" asp-route-includeInactive="@(!Model.IncludeInactive)">
+        @(Model.IncludeInactive
+            ? T("Hide deactivated accounts", "إخفاء الحسابات المعطّلة")
+            : T("Show deactivated accounts", "إظهار الحسابات المعطّلة"))
+    </a>
+</div>
 
 <div class="sms-card">
     <div class="table-responsive"><table class="table sms-table mb-0">
         <caption class="visually-hidden">@ViewData["Title"]</caption>
         <thead>
         <tr>
+            <th scope="col">@T("Person", "الشخص")</th>
             <th scope="col">@T("Account", "الحساب")</th>
             <th scope="col">@T("Type", "النوع")</th>
             <th scope="col">@T("Roles", "الأدوار")</th>
@@ -101,7 +126,24 @@
         {
             <tr class="@(user.IsActive ? "" : "text-muted")">
                 <td class="fw-semibold">
-                    @user.UserName
+                    @{ var personName = PersonOf(user); }
+                    @if (string.IsNullOrWhiteSpace(personName))
+                    {
+                        @* A system account belongs to nobody by design; a person-linked one with no
+                           name is a row somebody wrote outside this product. *@
+                        <span class="text-muted">—</span>
+                    }
+                    else
+                    {
+                        @personName
+                    }
+                    @if (!string.IsNullOrWhiteSpace(user.PersonReference))
+                    {
+                        <div class="small text-muted fw-normal" dir="ltr">@user.PersonReference</div>
+                    }
+                </td>
+                <td>
+                    <span dir="ltr">@user.UserName</span>
                     @if (!user.IsActive)
                     {
                         <span class="badge text-bg-secondary ms-1">@T("inactive", "معطّل")</span>
@@ -118,30 +160,48 @@
                         <div class="d-flex flex-wrap gap-1">
                             @foreach (var role in user.Roles)
                             {
-                                <form method="post" asp-action="Revoke" asp-route-userAccountId="@user.UserAccountId" asp-route-roleId="@role.RoleId" asp-route-q="@Model.Search" class="d-inline">
-                                    <span class="badge @(role.CanAdministerPermissions ? "text-bg-warning" : "text-bg-light border") d-inline-flex align-items-center gap-1">
-                                        @(isRtl ? role.NameAr : role.NameEn)
-                                        <button type="submit" class="btn btn-link btn-sm p-0 lh-1 text-reset"
-                                                title="@T("Revoke", "سحب")" aria-label="@T($"Revoke {role.Code}", $"سحب {role.Code}")">
-                                            <i class="bi bi-x" aria-hidden="true"></i>
-                                        </button>
-                                    </span>
-                                </form>
+                                var badge = role.CanAdministerPermissions ? "text-bg-warning" : "text-bg-light border";
+                                @* A deactivated account is shown, not edited: nothing granted to an
+                                   account that cannot sign in takes effect, so the row states what it
+                                   holds and offers no controls that would change nothing. *@
+                                if (!user.IsActive)
+                                {
+                                    <span class="badge @badge">@(isRtl ? role.NameAr : role.NameEn)</span>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-action="Revoke" asp-route-userAccountId="@user.UserAccountId" asp-route-roleId="@role.RoleId" asp-route-q="@Model.Search" asp-route-includeInactive="@Model.IncludeInactive" class="d-inline">
+                                        <span class="badge @badge d-inline-flex align-items-center gap-1">
+                                            @(isRtl ? role.NameAr : role.NameEn)
+                                            <button type="submit" class="btn btn-link btn-sm p-0 lh-1 text-reset"
+                                                    title="@T("Revoke", "سحب")" aria-label="@T($"Revoke {role.Code}", $"سحب {role.Code}")">
+                                                <i class="bi bi-x" aria-hidden="true"></i>
+                                            </button>
+                                        </span>
+                                    </form>
+                                }
                             }
                         </div>
                     }
                 </td>
                 <td>
-                    <form method="post" asp-action="Assign" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search" class="d-flex gap-1">
-                        <label class="visually-hidden" for="role-@user.UserAccountId">@T("Role", "الدور")</label>
-                        <select id="role-@user.UserAccountId" name="roleId" class="form-select form-select-sm" style="width:14rem">
-                            @foreach (var role in Model.Roles.Where(r => r.IsActive && user.Roles.All(h => h.RoleId != r.Id)))
-                            {
-                                <option value="@role.Id">@(isRtl ? role.NameAr : role.NameEn)</option>
-                            }
-                        </select>
-                        <button type="submit" class="btn btn-sm btn-outline-primary">@T("Assign", "إسناد")</button>
-                    </form>
+                    @if (user.IsActive)
+                    {
+                        <form method="post" asp-action="Assign" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search" asp-route-includeInactive="@Model.IncludeInactive" class="d-flex gap-1">
+                            <label class="visually-hidden" for="role-@user.UserAccountId">@T("Role", "الدور")</label>
+                            <select id="role-@user.UserAccountId" name="roleId" class="form-select form-select-sm" style="width:14rem">
+                                @foreach (var role in Model.Roles.Where(r => r.IsActive && user.Roles.All(h => h.RoleId != r.Id)))
+                                {
+                                    <option value="@role.Id">@(isRtl ? role.NameAr : role.NameEn)</option>
+                                }
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">@T("Assign", "إسناد")</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <span class="text-muted small">—</span>
+                    }
                 </td>
                 @if (Model.CanResetPassword)
                 {
@@ -150,7 +210,7 @@
                            a new password to be used at, and the port refuses it (BR-SEC-005). *@
                         @if (user.IsActive)
                         {
-                            <form method="post" asp-action="ResetPassword" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search"
+                            <form method="post" asp-action="ResetPassword" asp-route-userAccountId="@user.UserAccountId" asp-route-q="@Model.Search" asp-route-includeInactive="@Model.IncludeInactive"
                                   class="d-inline"
                                   onsubmit="return confirm('@T($"Issue a new one-time password for {user.UserName}? The current one stops working immediately.", $"إصدار كلمة مرور جديدة لمرة واحدة لـ {user.UserName}؟ الحالية تتوقف فوراً.")');">
                                 <button type="submit" class="btn btn-sm btn-outline-secondary">

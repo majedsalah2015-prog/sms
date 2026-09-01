@@ -1,0 +1,160 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model LessonResourcesViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Resource library", "مكتبة المصادر");
+    ViewData["Breadcrumb"] = T("E-Learning / Lesson planner / Material", "التعليم الإلكتروني / مخطط الدروس / المواد");
+    var help = new HelpPanelViewModel
+    {
+        Id = "learning-resources-help",
+        Title = T("Resource library — help", "مكتبة المصادر — مساعدة"),
+        Intro = T("Teaching material hangs on a lesson through the same document pipeline the rest of the product uses: typed, size-limited and virus-scanned before anyone can open it.", "تُعلَّق مواد التدريس على الدرس عبر مسار المستندات نفسه المستخدم في بقية النظام: مصنّفة ومحدودة الحجم ومفحوصة قبل أن يفتحها أحد."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("One document of each kind", "مستند واحد من كل نوع"), T("The library holds one live document per kind per lesson. Uploading the same kind again does not add a second file — it files a new version of that document, and the previous one stays in its history.", "تحفظ المكتبة مستنداً حياً واحداً من كل نوع لكل درس. وإعادة رفع النوع نفسه لا تضيف ملفاً ثانياً بل تُنشئ نسخة جديدة منه، وتبقى السابقة في سجله.")),
+            new HelpPanelViewModel.Item(T("The scan gate", "بوابة الفحص"), T("A file is listed as soon as it is uploaded but is handed to nobody — staff or student — until the virus scan clears it (BR-LRN-006). A row that says the scan is pending is not an error; wait and refresh.", "يُدرج الملف فور رفعه لكنه لا يُسلَّم لأحد — موظفاً كان أو طالباً — حتى يجتاز الفحص (BR-LRN-006). وسطر يقول إن الفحص جارٍ ليس خطأ؛ انتظر ثم حدّث الصفحة.")),
+            new HelpPanelViewModel.Item(T("Withdrawing material", "سحب مادة"), T("Withdrawing removes the material from the lesson without deleting anything (BR-GLB-005). The document and its versions stay filed.", "السحب يزيل المادة من الدرس دون حذف شيء (BR-GLB-005)، ويبقى المستند ونسخه محفوظة.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @Model.LessonTitle
+            <span class="badge @LearningLabels.LessonStatusChip(Model.LessonStatus) ms-1">@LearningLabels.LessonStatusName(Model.LessonStatus, isRtl)</span>
+        </p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <a class="btn btn-outline-secondary" asp-action="Index" asp-route-offeringId="@Model.OfferingId">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to planner", "عودة إلى المخطط")
+        </a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+@if (TempData["Flash"] is string flash)
+{
+    <div class="alert alert-success" role="status">@flash</div>
+}
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (Model.LessonStatus == LessonStatus.Retired)
+{
+    <div class="alert alert-warning" role="status">
+        @T("This lesson is withdrawn. Its material is kept as history and no new material can be added (BR-LRN-016).",
+           "هذا الدرس مسحوب. تُحفظ مواده في السجل ولا يمكن إضافة مواد جديدة (BR-LRN-016).")
+    </div>
+}
+else if (Model.CanUpload)
+{
+    <div class="sms-card p-3 mb-3">
+        <h2 class="h6 mb-3">@T("Add material", "إضافة مادة")</h2>
+        <form method="post" asp-action="UploadResource" asp-route-id="@Model.LessonId" enctype="multipart/form-data" class="row g-2">
+            @Html.AntiForgeryToken()
+            <div class="col-md-3">
+                <label class="form-label" for="typeCode">@T("Kind", "النوع")</label>
+                <select class="form-select" id="typeCode" name="typeCode" required>
+                    @foreach (var t in Model.Types)
+                    {
+                        <option value="@t.Code">@t.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="titleAr">@T("Title (Arabic)", "العنوان (عربي)")</label>
+                <input class="form-control" id="titleAr" name="titleAr" dir="rtl" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="titleEn">@T("Title (English)", "العنوان (إنجليزي)")</label>
+                <input class="form-control" id="titleEn" name="titleEn" dir="ltr" required />
+            </div>
+            <div class="col-md-1">
+                <label class="form-label" for="displayOrder">@T("Order", "الترتيب")</label>
+                <input class="form-control" id="displayOrder" name="displayOrder" type="number" min="0" value="0" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="file">@T("File", "الملف")</label>
+                <input class="form-control" id="file" name="file" type="file" required />
+            </div>
+            <div class="col-12">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-upload me-1" aria-hidden="true"></i>@T("Upload", "رفع")</button>
+                <span class="text-muted small ms-2">@T("PDF, Word, Excel or an image, up to 20 MB. Served once the scan clears it.", "PDF أو Word أو Excel أو صورة، حتى 20 ميغابايت. تُتاح بعد اجتياز الفحص.")</span>
+            </div>
+        </form>
+    </div>
+}
+
+<div class="sms-card">
+    <div class="table-responsive">
+        <table class="table sms-table mb-0">
+            <caption class="visually-hidden">@T("Material filed against this lesson", "المواد المرفقة بهذا الدرس")</caption>
+            <thead>
+                <tr>
+                    <th scope="col">@T("Order", "الترتيب")</th>
+                    <th scope="col">@T("Title", "العنوان")</th>
+                    <th scope="col">@T("Kind", "النوع")</th>
+                    <th scope="col">@T("File state", "حالة الملف")</th>
+                    <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Resources.Count == 0)
+                {
+                    <tr>
+                        <td colspan="5" class="text-muted p-4">
+                            @T("No material yet. A lesson can be published without any — the material is what students open, not what makes the lesson real.",
+                               "لا مواد بعد. ويمكن نشر الدرس بلا مواد — فالمواد ما يفتحه الطالب، لا ما يجعل الدرس قائماً.")
+                        </td>
+                    </tr>
+                }
+                @foreach (var r in Model.Resources)
+                {
+                    <tr>
+                        <td>@r.DisplayOrder</td>
+                        <td class="fw-semibold">@r.Title</td>
+                        <td>@r.TypeLabel</td>
+                        <td>
+                            @if (r.IsServable)
+                            {
+                                <span class="badge bg-success">@r.ScanStateLabel</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">@r.ScanStateLabel</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1">
+                                @if (r.IsServable)
+                                {
+                                    <a class="btn btn-sm btn-outline-secondary" asp-action="DownloadResource" asp-route-resourceId="@r.Id">
+                                        <i class="bi bi-download me-1" aria-hidden="true"></i>@T("Open", "فتح")
+                                    </a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted small">@T("Not available yet", "غير متاح بعد")</span>
+                                }
+                                @if (Model.CanWithdraw)
+                                {
+                                    <form method="post" asp-action="WithdrawResource" asp-route-resourceId="@r.Id" class="d-inline">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@Model.LessonId" />
+                                        <button class="btn btn-sm btn-outline-danger" type="submit">@T("Withdraw", "سحب")</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

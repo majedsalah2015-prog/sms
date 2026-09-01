@@ -62,41 +62,131 @@ namespace Sms.Infrastructure.Seeding
                 return; // demo tenant not seeded — nothing to bridge
             }
 
-            if (parent.UserAccountId == null
-                && !await _db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.UserName == UserName, cancellationToken))
+            var parentAccount = await _db.UserAccounts.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.UserName == UserName, cancellationToken);
+
+            if (parentAccount == null && parent.UserAccountId == null)
             {
-                var account = new UserAccount { UserName = UserName, AccountType = AccountType.Parent };
-                _db.UserAccounts.Add(account);
+                parentAccount = new UserAccount
+                {
+                    UserName = UserName,
+                    AccountType = AccountType.Parent,
+                    PersonId = parent.Id,
+                };
+                _db.UserAccounts.Add(parentAccount);
                 await _db.SaveChangesAsync(cancellationToken);
 
-                parent.UserAccountId = account.Id;
+                parent.UserAccountId = parentAccount.Id;
                 await _db.SaveChangesAsync(cancellationToken);
 
-                await _auth.SetTemporaryPasswordAsync(account.Id, TemporaryPassword, cancellationToken);
+                await _auth.SetTemporaryPasswordAsync(parentAccount.Id, TemporaryPassword, cancellationToken);
             }
 
+            Link(parentAccount, parent.UserAccountId, parent.Id);
+
             // Student self-access half: bridge the demo parent's portal-visible child the same way.
-            if (!await _db.UserAccounts.IgnoreQueryFilters().AnyAsync(u => u.UserName == StudentUserName, cancellationToken))
+            var studentAccount = await _db.UserAccounts.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(u => u.UserName == StudentUserName, cancellationToken);
+
+            var childId = await _db.StudentGuardianLinks
+                .Where(l => l.ParentId == parent.Id && l.EffectiveToUtc == null && l.IsPortalVisible)
+                .OrderBy(l => l.StudentId)
+                .Select(l => (int?)l.StudentId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (studentAccount == null)
             {
-                var childId = await _db.StudentGuardianLinks
-                    .Where(l => l.ParentId == parent.Id && l.EffectiveToUtc == null && l.IsPortalVisible)
-                    .OrderBy(l => l.StudentId)
-                    .Select(l => (int?)l.StudentId)
-                    .FirstOrDefaultAsync(cancellationToken);
                 var child = childId == null
                     ? null
                     : await _db.Students.Where(s => s.Id == childId.Value && s.UserAccountId == null).FirstOrDefaultAsync(cancellationToken);
                 if (child != null)
                 {
-                    var account = new UserAccount { UserName = StudentUserName, AccountType = AccountType.Student };
-                    _db.UserAccounts.Add(account);
+                    studentAccount = new UserAccount
+                    {
+                        UserName = StudentUserName,
+                        AccountType = AccountType.Student,
+                        PersonId = child.Id,
+                    };
+                    _db.UserAccounts.Add(studentAccount);
                     await _db.SaveChangesAsync(cancellationToken);
 
-                    child.UserAccountId = account.Id;
+                    child.UserAccountId = studentAccount.Id;
                     await _db.SaveChangesAsync(cancellationToken);
 
-                    await _auth.SetTemporaryPasswordAsync(account.Id, StudentTemporaryPassword, cancellationToken);
+                    await _auth.SetTemporaryPasswordAsync(studentAccount.Id, StudentTemporaryPassword, cancellationToken);
                 }
+            }
+            else if (childId != null)
+            {
+                var child = await _db.Students
+                    .Where(s => s.Id == childId.Value)
+                    .Select(s => new { s.Id, s.UserAccountId })
+                    .FirstOrDefaultAsync(cancellationToken);
+                Link(studentAccount, child?.UserAccountId, child?.Id ?? 0);
+            }
+
+            // Restated on every run, like the person link below: a demo database seeded before the
+            // portal role was granted heals itself the next time the seeder runs, instead of keeping
+            // two accounts that sign in successfully and then meet a bare not-found at /portal.
+            await GrantPortalRoleAsync(parentAccount, cancellationToken);
+            await GrantPortalRoleAsync(studentAccount, cancellationToken);
+
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gives a demo portal account the role its account type already implies
+        /// (<see cref="RoleTemplates.ForPortalAccount"/>). The seeded templates and their default
+        /// grants are in place well before this contributor runs (orders 20 and 21), so the role is
+        /// there to be granted; a school that retired it is left alone.
+        /// </summary>
+        private async Task GrantPortalRoleAsync(UserAccount? account, CancellationToken cancellationToken)
+        {
+            if (account == null)
+            {
+                return;
+            }
+
+            var roleCode = RoleTemplates.ForPortalAccount(account.AccountType);
+            if (roleCode == null)
+            {
+                return;
+            }
+
+            var roleId = await _db.Roles
+                .Where(r => r.Code == roleCode)
+                .Select(r => (int?)r.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+            if (roleId == null)
+            {
+                return;
+            }
+
+            var held = await _db.RoleAssignments.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(a => a.UserAccountId == account.Id && a.RoleId == roleId.Value, cancellationToken);
+            if (held == null)
+            {
+                _db.RoleAssignments.Add(new RoleAssignment { UserAccountId = account.Id, RoleId = roleId.Value, IsActive = true });
+            }
+        }
+
+        /// <summary>
+        /// Writes the half of the link this seeder used to leave out. The person's own
+        /// <c>UserAccountId</c> alone is not the relationship: <c>sec.UserAccount.PersonId</c> is what
+        /// everything starting from an account reads to name who it belongs to, and with it null the
+        /// account directory shows a login and no human being (BR-GLB-002, doc/Modules/06 §2).
+        /// <para>
+        /// Restated on every run rather than only at creation, so a database seeded before this was
+        /// fixed heals itself the next time the seeder is run. Only ever set when the person already
+        /// points back at this account — a disagreement between the two directions is repaired, never
+        /// invented.
+        /// </para>
+        /// </summary>
+        private static void Link(UserAccount? account, int? personsAccountId, int personId)
+        {
+            if (account != null && account.PersonId == null && personsAccountId == account.Id)
+            {
+                account.PersonId = personId;
             }
         }
     }

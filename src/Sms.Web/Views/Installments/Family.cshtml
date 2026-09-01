@@ -43,7 +43,7 @@
                     <li class="list-group-item @(active ? "active" : "")">
                         <a class="d-block text-decoration-none @(active ? "text-white" : "")" asp-action="Family" asp-route-payerId="@p.Payer.Id" asp-route-q="@Model.Q">
                             @p.Label(isRtl)
-                            <span class="d-block small @(active ? "text-white-50" : "text-muted")">@string.Join("، ", p.Children.Select(c => FinanceLabels.StudentName(c, isRtl)))</span>
+                            <span class="d-block small @(active ? "text-white-50" : "text-muted")">@string.Join("، ", p.Students.Select(c => FinanceLabels.StudentName(c, isRtl)))</span>
                         </a>
                     </li>
                 }

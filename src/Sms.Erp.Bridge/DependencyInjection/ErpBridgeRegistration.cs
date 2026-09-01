@@ -52,6 +52,24 @@ namespace Sms.Erp.Bridge.DependencyInjection
             // an administrator transcribing account codes. Registered here and resolved by the seeder.
             services.AddScoped<IGlAccountProvisioner, ErpGlAccountProvisioner>();
 
+            // The same chart, read rather than provisioned, so a finance screen can offer the real
+            // accounts where it used to accept any string at all. Not registering it is still a
+            // supported way to run: the screens fall back to free text (IGlAccountDirectory).
+            services.AddScoped<IGlAccountDirectory, ErpGlAccountDirectory>();
+
+            // What the school spent — the one figure the school system does not hold itself, because
+            // it bills and collects but never records a salary or a supplier invoice. Not registering
+            // it is a supported way to run: the statistics screen shows its other four sections and
+            // says no ledger is attached, rather than reporting expenses of zero (IGlLedgerSummary).
+            services.AddScoped<IGlLedgerSummary, ErpLedgerSummary>();
+
+            // The accountant's read of the same ledger — the chart, the trial balance headline,
+            // the entries lately posted and the ones still in draft. Behind a finance permission
+            // and read-only; the mobile API is its only caller today. Not registering it is a
+            // supported way to run: the accounting endpoints say no ledger is attached rather
+            // than reporting an empty set of books (IGlLedgerInsight).
+            services.AddScoped<IGlLedgerInsight, ErpLedgerInsight>();
+
             return services;
         }
 

@@ -27,12 +27,13 @@ namespace Sms.Infrastructure.Persistence.Configurations
 
             builder.Property(x => x.PrimaryIdNo).HasMaxLength(30);
 
-            builder.Property(x => x.MotherName).HasMaxLength(120);
-            builder.Property(x => x.MotherNationalId).HasMaxLength(30);
-            builder.Property(x => x.MotherOccupation).HasMaxLength(100);
-            builder.Property(x => x.MotherMobile).HasMaxLength(20);
             builder.Property(x => x.PlaceOfBirth).HasMaxLength(100);
             builder.Property(x => x.RationCardNo).HasMaxLength(30);
+
+            // 20 to match ppl.Parent.PrimaryMobile: the same number is often typed into both, and a
+            // column that silently truncated on one side of the family would be worse than one
+            // that refuses.
+            builder.Property(x => x.Mobile).HasMaxLength(20);
 
             // BR-GLB-003: unique per (school, id type, id number) when a primary ID is recorded.
             builder.HasIndex(x => new { x.SchoolId, x.PrimaryIdTypeLookupId, x.PrimaryIdNo })

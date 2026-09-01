@@ -323,6 +323,9 @@ namespace Sms.Web.Models
 
         /// <summary>Built-in overview panels with no WidgetDefinition yet — the one-click registration list.</summary>
         public IReadOnlyList<DashboardPanel> Unregistered { get; set; } = Array.Empty<DashboardPanel>();
+
+        /// <summary>The row the registry is editing in place, if any — the ?edit= on the URL.</summary>
+        public int? EditId { get; set; }
     }
 
     // ---- §8.2 Layout administrator — role template editor with preview-as-role (BR-DSH-003) ----

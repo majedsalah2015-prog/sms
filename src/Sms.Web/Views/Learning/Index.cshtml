@@ -1,0 +1,272 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model LessonPlannerViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Lesson planner", "مخطط الدروس");
+    ViewData["Breadcrumb"] = T("E-Learning / Lesson planner", "التعليم الإلكتروني / مخطط الدروس");
+    var help = new HelpPanelViewModel
+    {
+        Id = "learning-help",
+        Title = T("Lesson planner — help", "مخطط الدروس — مساعدة"),
+        Intro = T("Lessons are planned per curriculum offering, week by week. A lesson is a draft until you publish it, and only a published lesson reaches families through the portal.", "تُخطَّط الدروس لكل مقرر أسبوعاً بأسبوع. والدرس مسوّدة حتى تنشره، ولا يصل الأسر عبر البوابة إلا المنشور."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("What you can plan for", "ما الذي تخطط له"), T("The subject list offers only offerings you hold a placement on in the published timetable, plus every offering of a department you head (BR-LRN-002). There is no all-sections path below Vice-Principal.", "قائمة المواد تعرض ما لك عليه إسناد في الجدول المنشور فقط، إضافةً إلى مواد القسم الذي ترأسه (BR-LRN-002). ولا يوجد طريق «كل الشعب» دون وكيل المدرسة.")),
+            new HelpPanelViewModel.Item(T("Draft, then publish", "مسوّدة ثم نشر"), T("A draft affects nothing and is invisible in the portal (BR-LRN-003). Publishing is the event families see and the event that raises notifications — so it is a separate permission from editing.", "المسوّدة لا تؤثر في شيء ولا تظهر في البوابة (BR-LRN-003). والنشر هو الحدث الذي تراه الأسر ويُطلق الإشعارات، ولذلك صلاحيته منفصلة عن التعديل.")),
+            new HelpPanelViewModel.Item(T("Withdrawing a lesson", "سحب الدرس"), T("There is no un-publish and no delete (BR-LRN-016). A published lesson is withdrawn with a stated reason and stays readable as history — because a student who read it yesterday will ask where it went.", "لا إلغاء للنشر ولا حذف (BR-LRN-016). المنشور يُسحب بسبب مذكور ويبقى مقروءاً في السجل — لأن الطالب الذي قرأه أمس سيسأل أين ذهب.")),
+            new HelpPanelViewModel.Item(T("Binding to a period", "الربط بحصة"), T("Left unbound, a lesson is a syllabus entry for its week. Bound to a dated period it becomes the record of what happened in that period — and it may only bind to a period that teaches this same offering (BR-LRN-001).", "بلا ربط يكون الدرس خطة أسبوعية. وبربطه بحصة مؤرخة يصير سجل ما جرى فيها — ولا يُربط إلا بحصة تُدرّس المقرر نفسه (BR-LRN-001).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Plan teaching material per offering, week by week. Drafts stay private; publishing is what families see (BR-LRN-001/002/003).", "خطّط مادة التدريس لكل مقرر أسبوعاً بأسبوع. المسوّدات خاصة، والنشر هو ما تراه الأسر (BR-LRN-001/002/003).")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (TempData["Flash"] is string flash)
+{
+    <div class="alert alert-success" role="status">@flash</div>
+}
+@if (TempData["Error"] is string error)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (Model.HasNoReach)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("Nothing to plan for yet", "لا يوجد ما تخطط له بعد")</h2>
+        <p class="text-muted mb-0">
+            @T("You hold no placement in the published timetable and head no department, so there is no offering you may author against (BR-LRN-002). Ask the timetable officer to place you, or a department head to publish on your behalf.",
+               "ليس لك إسناد في الجدول المنشور ولا ترأس قسماً، فلا يوجد مقرر تؤلّف له (BR-LRN-002). اطلب من مسؤول الجدول إسنادك، أو من رئيس القسم النشر نيابةً عنك.")
+        </p>
+    </div>
+}
+else
+{
+    <div class="sms-card p-3 mb-3">
+        <form method="get" asp-action="Index" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label" for="offeringId">@T("Subject offering", "المقرر")</label>
+                <select class="form-select" id="offeringId" name="offeringId" onchange="this.form.submit()">
+                    <option value="">@T("— choose —", "— اختر —")</option>
+                    @foreach (var o in Model.Offerings)
+                    {
+                        <option value="@o.Id" selected="@(Model.SelectedOfferingId == o.Id)">@o.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <noscript><button class="btn btn-outline-primary" type="submit">@T("Show", "عرض")</button></noscript>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.SelectedOfferingId == null)
+    {
+        <div class="sms-card p-4">
+            <p class="text-muted mb-0">@T("Choose a subject above to see its weeks.", "اختر مقرراً أعلاه لعرض أسابيعه.")</p>
+        </div>
+    }
+    else
+    {
+        @if (Model.CanCreate)
+        {
+            <div class="sms-card p-3 mb-3">
+                <h2 class="h6 mb-3">@T("New lesson", "درس جديد")</h2>
+                <form method="post" asp-action="Create" class="row g-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="offeringId" value="@Model.SelectedOfferingId" />
+                    <div class="col-md-2">
+                        <label class="form-label" for="weekNumber">@T("Week", "الأسبوع")</label>
+                        <input class="form-control" id="weekNumber" name="weekNumber" type="number" min="1" max="52" value="1" required />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="titleAr">@T("Title (Arabic)", "العنوان (عربي)")</label>
+                        <input class="form-control" id="titleAr" name="titleAr" dir="rtl" required />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="titleEn">@T("Title (English)", "العنوان (إنجليزي)")</label>
+                        <input class="form-control" id="titleEn" name="titleEn" dir="ltr" required />
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="objectivesAr">@T("Objectives (Arabic)", "الأهداف (عربي)")</label>
+                        <textarea class="form-control" id="objectivesAr" name="objectivesAr" rows="2" dir="rtl"></textarea>
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label" for="objectivesEn">@T("Objectives (English)", "الأهداف (إنجليزي)")</label>
+                        <textarea class="form-control" id="objectivesEn" name="objectivesEn" rows="2" dir="ltr"></textarea>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label" for="sessionId">@T("Period (optional)", "الحصة (اختياري)")</label>
+                        <select class="form-select" id="sessionId" name="sessionId">
+                            <option value="">@T("Not bound", "بلا ربط")</option>
+                            @foreach (var s in Model.Sessions)
+                            {
+                                <option value="@s.Id">@s.Label</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Save draft", "حفظ المسوّدة")</button>
+                        <span class="text-muted small ms-2">@T("Saved as a draft — families see nothing until you publish.", "يُحفظ مسوّدةً — لا ترى الأسر شيئاً حتى تنشر.")</span>
+                    </div>
+                </form>
+            </div>
+        }
+
+        @if (Model.Weeks.Count == 0)
+        {
+            <div class="sms-card p-4">
+                <h2 class="h6">@T("No lessons planned yet", "لا دروس مخططة بعد")</h2>
+                <p class="text-muted mb-0">@T("Add the first lesson above. It will be saved as a draft.", "أضف أول درس أعلاه، وسيُحفظ مسوّدةً.")</p>
+            </div>
+        }
+        else
+        {
+            foreach (var week in Model.Weeks)
+            {
+                <div class="sms-card mb-3">
+                    <div class="p-3 border-bottom">
+                        <h2 class="h6 mb-0"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>@T("Week", "الأسبوع") @week.WeekNumber</h2>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table sms-table mb-0">
+                            <caption class="visually-hidden">@T("Lessons planned for week", "الدروس المخططة للأسبوع") @week.WeekNumber</caption>
+                            <thead>
+                                <tr>
+                                    <th scope="col">@T("Lesson", "الدرس")</th>
+                                    <th scope="col">@T("Status", "الحالة")</th>
+                                    <th scope="col">@T("Period", "الحصة")</th>
+                                    <th scope="col">@T("Material", "المواد")</th>
+                                    <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var lesson in week.Lessons)
+                                {
+                                    <tr>
+                                        <td>
+                                            <div class="fw-semibold">@lesson.Title</div>
+                                            @if (!string.IsNullOrWhiteSpace(lesson.Objectives))
+                                            {
+                                                <div class="small text-muted">@lesson.Objectives</div>
+                                            }
+                                            @if (lesson.Status == LessonStatus.Retired && !string.IsNullOrWhiteSpace(lesson.RetiredReason))
+                                            {
+                                                <div class="small text-danger">@T("Withdrawn:", "سُحب:") @lesson.RetiredReason</div>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @LearningLabels.LessonStatusChip(lesson.Status)">@LearningLabels.LessonStatusName(lesson.Status, isRtl)</span>
+                                        </td>
+                                        <td>
+                                            @if (lesson.SessionDate is DateTime bound)
+                                            {
+                                                <span dir="ltr">@bound.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">@T("Syllabus entry", "خطة أسبوعية")</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <a asp-action="Resources" asp-route-id="@lesson.Id" class="text-decoration-none">
+                                                <i class="bi bi-paperclip me-1" aria-hidden="true"></i>@lesson.ResourceCount
+                                            </a>
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="d-inline-flex gap-1">
+                                                <a class="btn btn-sm btn-outline-secondary" asp-action="Resources" asp-route-id="@lesson.Id">@T("Material", "المواد")</a>
+                                                @if (Model.CanEdit && lesson.Status != LessonStatus.Retired)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#edit-@lesson.Id">@T("Edit", "تعديل")</button>
+                                                }
+                                                @if (Model.CanPublish && lesson.Status == LessonStatus.Draft)
+                                                {
+                                                    <form method="post" asp-action="Publish" asp-route-id="@lesson.Id" class="d-inline">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="offeringId" value="@Model.SelectedOfferingId" />
+                                                        <button class="btn btn-sm btn-primary" type="submit">@T("Publish", "نشر")</button>
+                                                    </form>
+                                                }
+                                                @if (Model.CanRetire && lesson.Status != LessonStatus.Retired)
+                                                {
+                                                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#retire-@lesson.Id">@T("Withdraw", "سحب")</button>
+                                                }
+                                            </div>
+                                            @if (Model.CanEdit && lesson.Status != LessonStatus.Retired)
+                                            {
+                                                <div class="collapse mt-2" id="edit-@lesson.Id">
+                                                    <form method="post" asp-action="Edit" asp-route-id="@lesson.Id" class="row g-1 text-start">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="offeringId" value="@Model.SelectedOfferingId" />
+                                                        <div class="col-2">
+                                                            <input class="form-control form-control-sm" name="weekNumber" type="number" min="1" max="52" value="@lesson.WeekNumber"
+                                                                   aria-label="@T("Week", "الأسبوع")" required />
+                                                        </div>
+                                                        <div class="col-5">
+                                                            <input class="form-control form-control-sm" name="titleAr" dir="rtl" value="@lesson.TitleAr"
+                                                                   aria-label="@T("Title (Arabic)", "العنوان (عربي)")" required />
+                                                        </div>
+                                                        <div class="col-5">
+                                                            <input class="form-control form-control-sm" name="titleEn" dir="ltr" value="@lesson.TitleEn"
+                                                                   aria-label="@T("Title (English)", "العنوان (إنجليزي)")" required />
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <textarea class="form-control form-control-sm" name="objectivesAr" rows="2" dir="rtl"
+                                                                      aria-label="@T("Objectives (Arabic)", "الأهداف (عربي)")">@lesson.ObjectivesAr</textarea>
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <textarea class="form-control form-control-sm" name="objectivesEn" rows="2" dir="ltr"
+                                                                      aria-label="@T("Objectives (English)", "الأهداف (إنجليزي)")">@lesson.ObjectivesEn</textarea>
+                                                        </div>
+                                                        <div class="col-8">
+                                                            <select class="form-select form-select-sm" name="sessionId" aria-label="@T("Period (optional)", "الحصة (اختياري)")">
+                                                                <option value="">@T("Not bound", "بلا ربط")</option>
+                                                                @foreach (var s in Model.Sessions)
+                                                                {
+                                                                    <option value="@s.Id" selected="@(lesson.SessionId == s.Id)">@s.Label</option>
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <button class="btn btn-sm btn-primary w-100" type="submit">@T("Save", "حفظ")</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            }
+                                            @if (Model.CanRetire && lesson.Status != LessonStatus.Retired)
+                                            {
+                                                <div class="collapse mt-2" id="retire-@lesson.Id">
+                                                    <form method="post" asp-action="Retire" asp-route-id="@lesson.Id" class="d-flex gap-1 justify-content-end">
+                                                        @Html.AntiForgeryToken()
+                                                        <input type="hidden" name="offeringId" value="@Model.SelectedOfferingId" />
+                                                        <input class="form-control form-control-sm" name="reason" required
+                                                               placeholder="@T("Why is it being withdrawn?", "ما سبب السحب؟")"
+                                                               aria-label="@T("Reason for withdrawal", "سبب السحب")" />
+                                                        <button class="btn btn-sm btn-danger" type="submit">@T("Confirm", "تأكيد")</button>
+                                                    </form>
+                                                </div>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        }
+    }
+}

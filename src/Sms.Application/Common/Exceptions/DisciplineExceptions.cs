@@ -18,7 +18,11 @@ namespace Sms.Application.Common.Exceptions
         public MeritPointsOutOfBoundsException(int meritTypeId, int points)
             : base($"Merit type {meritTypeId} does not allow {points} points (BR-DCP-002).")
         {
+            Points = points;
         }
+
+        /// <summary>The number that was entered, shown back so the teacher sees what was rejected.</summary>
+        public int Points { get; }
     }
 
     /// <summary>BR-DCP-003: decisions cite the code article — no free-form punishments.</summary>
@@ -63,7 +67,15 @@ namespace Sms.Application.Common.Exceptions
         public SuspensionExceedsPackLimitException(int days, int max)
             : base($"Suspension of {days} days exceeds the country-pack limit of {max} (BR-DCP-004).")
         {
+            Days = days;
+            Max = max;
         }
+
+        /// <summary>The suspension that was proposed.</summary>
+        public int Days { get; }
+
+        /// <summary>The longest the regulation allows — the number the decision has to come down to.</summary>
+        public int Max { get; }
     }
 
     /// <summary>BR-DCP-006: appeal outside the window, below severity 2, or already filed.</summary>

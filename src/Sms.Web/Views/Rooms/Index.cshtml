@@ -65,12 +65,37 @@
                 <div class="row g-2 mb-2"><div class="col-5"><label asp-for="FloorNameAr" class="form-label small mb-1">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="FloorNameAr" class="form-control form-control-sm" dir="rtl" placeholder="الطابق الأول" required aria-required="true" /></div><div class="col-5"><label asp-for="FloorNameEn" class="form-label small mb-1">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="FloorNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#FloorNameAr" data-translit-mode="term" placeholder="Floor 1" required aria-required="true" /></div><div class="col-2"><label asp-for="FloorOrder" class="form-label small mb-1">@T("Order", "الترتيب")</label><input asp-for="FloorOrder" class="form-control form-control-sm" type="number" min="0" /></div></div><button class="btn btn-sm btn-outline-primary w-100" type="submit">@T("Create floor", "إنشاء طابق")</button></form></div>
         <div class="sms-card p-3"><h2 class="h6">@T("New room", "قاعة جديدة")</h2>
             <form method="post" asp-action="DefineRoom">
-                <div class="mb-2"><label asp-for="RoomFloorId" class="form-label small mb-1">@T("Floor", "الطابق") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="RoomFloorId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— floor —", "— الطابق —")</option>@foreach (var f in Model.Floors) { <option value="@f.Id">@(isRtl ? f.BuildingAr : f.BuildingEn) / @(isRtl ? f.Ar : f.En)</option> }</select></div>
-                <div class="row g-2 mb-2"><div class="col-4"><label asp-for="RoomCode" class="form-label small mb-1">@T("Code", "الرمز") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="RoomCode" class="form-control form-control-sm" dir="ltr" placeholder="A-101" required aria-required="true" /></div><div class="col-8"><label asp-for="RoomTypeId" class="form-label small mb-1">@T("Type", "النوع") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="RoomTypeId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— type —", "— النوع —")</option>@foreach (var t in Model.RoomTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }</select></div></div>
+                <div class="mb-2"><label asp-for="RoomFloorId" class="form-label small mb-1">@T("Floor", "الطابق") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="RoomFloorId" id="RoomFloorId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— floor —", "— الطابق —")</option>@foreach (var f in Model.Floors) { <option value="@f.Id" data-next-code="@(Model.NextRoomCodes.TryGetValue(f.Id, out var nc) ? nc : "")">@(isRtl ? f.BuildingAr : f.BuildingEn) / @(isRtl ? f.Ar : f.En)</option> }</select></div>
+                <div class="row g-2 mb-2"><div class="col-4"><label asp-for="RoomCode" class="form-label small mb-1">@T("Code", "الرمز")</label><input asp-for="RoomCode" id="RoomCode" class="form-control form-control-sm" dir="ltr" placeholder="@T("automatic", "تلقائي")" aria-describedby="roomCodeHelp" /></div><div class="col-8"><label asp-for="RoomTypeId" class="form-label small mb-1">@T("Type", "النوع") <span class="text-danger" aria-hidden="true">*</span></label><select asp-for="RoomTypeId" class="form-select form-select-sm" required aria-required="true"><option value="">@T("— type —", "— النوع —")</option>@foreach (var t in Model.RoomTypes) { <option value="@t.Id">@(isRtl ? t.Ar : t.En)</option> }</select></div></div>
                 <div class="row g-2 mb-2"><div class="col-6"><label asp-for="RoomNameAr" class="form-label small mb-1">@T("Name (Arabic)", "الاسم (عربي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="RoomNameAr" class="form-control form-control-sm" dir="rtl" placeholder="قاعة 101" required aria-required="true" /></div><div class="col-6"><label asp-for="RoomNameEn" class="form-label small mb-1">@T("Name (English)", "الاسم (إنجليزي)") <span class="text-danger" aria-hidden="true">*</span></label><input asp-for="RoomNameEn" class="form-control form-control-sm" dir="ltr" data-translit-from="#RoomNameAr" data-translit-mode="term" placeholder="Room 101" required aria-required="true" /></div></div>
                 <div class="row g-2 mb-2"><div class="col-4"><label asp-for="StandardCapacity" class="form-label small">@T("Std cap.", "سعة")</label><input asp-for="StandardCapacity" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-4"><label asp-for="ExamCapacity" class="form-label small">@T("Exam cap.", "اختبار")</label><input asp-for="ExamCapacity" class="form-control form-control-sm" type="number" min="1" /></div><div class="col-4"><label asp-for="WingTag" class="form-label small">@T("Wing", "الجناح")</label><select asp-for="WingTag" class="form-select form-select-sm">@foreach (GenderPolicy g in Enum.GetValues(typeof(GenderPolicy))) { <option value="@g">@Gender(g)</option> }</select></div></div>
                 <button class="btn btn-sm btn-primary w-100" type="submit">@T("Create room", "إنشاء قاعة")</button>
-                <div class="form-text">@T("Exam capacity ≤ standard capacity (BR-ROM-002).", "سعة الاختبار ≤ السعة العادية (BR-ROM-002).")</div>
+                <div class="form-text" id="roomCodeHelp">@T("The code is filled in automatically from the floor — change it only if you need a particular one. Exam capacity ≤ standard capacity (BR-ROM-002).", "يُملأ الرمز تلقائياً حسب الطابق — لا تغيّره إلا إذا أردت رمزاً بعينه. سعة الاختبار ≤ السعة العادية (BR-ROM-002).")</div>
             </form></div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+(function () {
+    // BR-ROM-001: the code is unique per school and nobody should have to invent it.
+    // Every floor option carries the next free code the server worked out; picking a
+    // floor drops it into the box. Typing over it wins — the field is still the user's.
+    var floor = document.getElementById('RoomFloorId');
+    var code = document.getElementById('RoomCode');
+    if (!floor || !code) { return; }
+
+    var edited = false;
+    code.addEventListener('input', function () { edited = code.value.trim() !== ''; });
+
+    function fill() {
+        if (edited) { return; }
+        var option = floor.options[floor.selectedIndex];
+        code.value = (option && option.getAttribute('data-next-code')) || '';
+    }
+
+    floor.addEventListener('change', fill);
+    if (!code.value) { fill(); }
+})();
+</script>
+}

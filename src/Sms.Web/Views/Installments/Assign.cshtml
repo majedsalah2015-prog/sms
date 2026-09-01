@@ -52,10 +52,18 @@
                 }
             </select>
         </div>
-        <div>
+        @* The name box is the picker. Typing in it opens the matches underneath — the officer
+           reads the name they are typing and picks it there, instead of typing here and then
+           hunting the same name again in the list below. Enter with nothing highlighted still
+           submits, which is what reaches past the picker's cap into the rest of the register. *@
+        <div class="position-relative">
             <label for="q" class="form-label small text-muted mb-0">@T("Student", "الطالب")</label>
             <input type="search" id="q" name="q" value="@Model.Q" class="form-control form-control-sm" style="min-width:12rem"
+                   autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="q-suggest"
                    placeholder="@T("Student no / name…", "رقم الطالب / الاسم…")" aria-label="@T("Filter by student", "فلترة بالطالب")" />
+            <div id="q-suggest" class="list-group shadow position-absolute start-0 d-none" role="listbox"
+                 aria-label="@T("Matching students", "الطلاب المطابقون")"
+                 style="z-index:1056; max-height:16rem; overflow-y:auto; min-width:22rem;"></div>
         </div>
         <div>
             <label for="payerQ" class="form-label small text-muted mb-0">@T("Payer", "الدافع")</label>
@@ -112,26 +120,194 @@
                 }
             </span>
         </label>
+        @* Two speeds, one box. The Student box above narrows this list as it is typed — no round
+           trip, so the name appears while it is still being typed — and pressing Filter sends the
+           same term to the server, which is what reaches past the picker's cap into the rest of
+           the register. *@
         <select id="student-pick" name="studentId" class="form-select form-select-sm" style="max-width:32rem" onchange="this.form.submit()">
             <option value="">@T("— choose a student —", "— اختر طالباً —")</option>
             @if (selectedOutsideFilter && Model.Selected != null)
             {
                 var outside = Model.Selected;
-                <option value="@outside.Id" selected>@outside.StudentNo · @FinanceLabels.StudentName(outside, isRtl) @T("(outside the current filter)", "(خارج الفلتر الحالي)")</option>
+                var outsideKey = string.Join(" ", new[] { outside.StudentNo, outside.FirstNameAr, outside.FatherNameAr, outside.GrandfatherNameAr, outside.FamilyNameAr, outside.FirstNameEn, outside.FatherNameEn, outside.GrandfatherNameEn, outside.FamilyNameEn });
+                <option value="@outside.Id" data-search="@outsideKey" selected>@outside.StudentNo · @FinanceLabels.StudentName(outside, isRtl) @T("(outside the current filter)", "(خارج الفلتر الحالي)")</option>
             }
             @foreach (var s in Model.Students)
             {
-                var name = FinanceLabels.StudentName(s.Student, isRtl);
+                var st = s.Student;
+                var name = FinanceLabels.StudentName(st, isRtl);
                 var grade = s.Grade == null ? "" : " — " + (isRtl ? s.Grade.Name.NameAr : s.Grade.Name.NameEn);
-                <option value="@s.Student.Id" selected="@(Model.Selected?.Id == s.Student.Id)">@s.Student.StudentNo · @name@grade</option>
+                // The option prints three of the four identity name parts in one language only, so
+                // matching on its caption alone tells the clerk "no results" for the father's name
+                // they can read on the student's own file. Every part, both languages, plus the
+                // number and the grade — the same fields the server searches (BR-STU-001).
+                var key = string.Join(" ", new[] { st.StudentNo, st.FirstNameAr, st.FatherNameAr, st.GrandfatherNameAr, st.FamilyNameAr, st.FirstNameEn, st.FatherNameEn, st.GrandfatherNameEn, st.FamilyNameEn })
+                    + (s.Grade == null ? "" : " " + s.Grade.Name.NameAr + " " + s.Grade.Name.NameEn);
+                <option value="@st.Id" data-search="@key" selected="@(Model.Selected?.Id == st.Id)">@st.StudentNo · @name@grade</option>
             }
         </select>
+        <div class="form-text d-none" id="student-pick-count"></div>
         @if (Model.Truncated)
         {
             <div class="form-text">@T("Narrow the filter to reach the rest of the register.", "ضيّق الفلتر للوصول إلى بقية السجل.")</div>
         }
     </div>
 </form>
+
+@* The name box drives both the suggestion panel under it and the picker below, off one snapshot
+   of the loaded options taken once. Options are rebuilt rather than hidden: a hidden option is
+   still selectable by keyboard in several browsers. Arabic is folded before matching — a clerk
+   who types "احمد" means "أحمد", and one who types ١٨ means the student numbered 18. *@
+<script>
+(function () {
+    var select = document.getElementById('student-pick');
+    var filter = document.getElementById('q');
+    var panel = document.getElementById('q-suggest');
+    var count = document.getElementById('student-pick-count');
+    if (!select || !filter || !panel || !count || select.dataset.wired) { return; }
+    select.dataset.wired = '1';
+
+    var MAX_SUGGESTIONS = 12;
+    var NONE_TEXT = @Html.Raw(Json.Serialize(T("Nobody in the loaded list matches — press Filter to search the whole register.", "لا أحد في القائمة المحمّلة يطابق — اضغط فلترة للبحث في السجل كاملاً.")));
+    var MATCHING_TEXT = @Html.Raw(Json.Serialize(T("matching", "مطابق")));
+    var MORE_TEXT = @Html.Raw(Json.Serialize(T("more…", "المزيد…")));
+
+    function fold(text) {
+        return String(text || '')
+            .replace(/[ً-ْـ]/g, '')            // harakat and tatweel: decoration, never meaning
+            .replace(/[أإآٱ]/g, 'ا') // every hamza carrier folds onto plain alef
+            .replace(/ى/g, 'ي')                     // alef maqsura reads as ya
+            .replace(/ة/g, 'ه')                     // ta marbuta reads as ha
+            .replace(/ؤ/g, 'و')
+            .replace(/ئ/g, 'ي')
+            .replace(/[٠-٩]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48); })
+            .replace(/[۰-۹]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48); })
+            .toLowerCase();
+    }
+
+    var all = Array.prototype.slice.call(select.options).map(function (o) {
+        return { value: o.value, text: o.textContent.trim(), search: fold((o.dataset.search || '') + ' ' + o.textContent) };
+    });
+    var placeholder = all.length && all[0].value === '' ? all.shift() : null;
+    var shown = [];
+    var active = -1;
+
+    // Each word narrows further rather than starting over, the same reading the server gives the
+    // term — so what appears while typing cannot disagree with what Filter returns.
+    function matchesFor(term) {
+        var words = fold(term).split(' ').filter(function (w) { return w.length > 0; });
+        if (words.length === 0) { return null; }
+        return all.filter(function (o) {
+            return words.every(function (w) { return o.search.indexOf(w) >= 0; });
+        });
+    }
+
+    function closePanel() {
+        panel.classList.add('d-none');
+        panel.innerHTML = '';
+        filter.setAttribute('aria-expanded', 'false');
+        filter.removeAttribute('aria-activedescendant');
+        shown = [];
+        active = -1;
+    }
+
+    function highlight(index) {
+        var items = panel.querySelectorAll('[role="option"]');
+        for (var i = 0; i < items.length; i++) {
+            var on = i === index;
+            items[i].classList.toggle('active', on);
+            items[i].setAttribute('aria-selected', on ? 'true' : 'false');
+        }
+        active = index;
+        if (index >= 0 && items[index]) {
+            filter.setAttribute('aria-activedescendant', items[index].id);
+            items[index].scrollIntoView({ block: 'nearest' });
+        } else {
+            filter.removeAttribute('aria-activedescendant');
+        }
+    }
+
+    // Choosing from the panel is choosing in the picker: the select is what the form posts, and
+    // submitting is what opens the student's panel — the same gesture as picking from the list.
+    function choose(value) {
+        select.value = value;
+        closePanel();
+        if (select.form) { select.form.submit(); }
+    }
+
+    function openPanel(matches) {
+        panel.innerHTML = '';
+        shown = matches.slice(0, MAX_SUGGESTIONS);
+        shown.forEach(function (o, i) {
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.id = 'q-suggest-' + i;
+            item.className = 'list-group-item list-group-item-action py-1 small text-start';
+            item.setAttribute('role', 'option');
+            item.setAttribute('aria-selected', 'false');
+            item.textContent = o.text;
+            item.addEventListener('mousedown', function (e) { e.preventDefault(); choose(o.value); });
+            item.addEventListener('mouseenter', function () { highlight(i); });
+            panel.appendChild(item);
+        });
+        if (matches.length > shown.length) {
+            var more = document.createElement('div');
+            more.className = 'list-group-item py-1 small text-muted';
+            more.textContent = '+' + (matches.length - shown.length) + ' ' + MORE_TEXT;
+            panel.appendChild(more);
+        }
+        panel.classList.remove('d-none');
+        filter.setAttribute('aria-expanded', 'true');
+        highlight(-1);
+    }
+
+    function render(showPanel) {
+        var matches = matchesFor(filter.value);
+        var chosen = select.value;
+        var list = matches === null ? all : matches;
+
+        select.innerHTML = '';
+        if (placeholder) { select.appendChild(new Option(placeholder.text, '')); }
+        list.forEach(function (o) { select.appendChild(new Option(o.text, o.value)); });
+
+        // Dropping the chosen student would post someone other than the panel open on screen, so
+        // the choice stays in the list whether or not it matches.
+        if (chosen && !list.some(function (o) { return o.value === chosen; })) {
+            var kept = all.filter(function (o) { return o.value === chosen; })[0];
+            if (kept) { select.appendChild(new Option(kept.text, kept.value)); }
+        }
+        select.value = chosen;
+
+        if (matches === null) {
+            count.textContent = '';
+            count.classList.add('d-none');
+            closePanel();
+            return;
+        }
+
+        count.textContent = matches.length === 0 ? NONE_TEXT : MATCHING_TEXT + ': ' + matches.length + ' / ' + all.length;
+        count.classList.remove('d-none');
+        if (showPanel && matches.length > 0) { openPanel(matches); } else { closePanel(); }
+    }
+
+    filter.addEventListener('input', function () { render(true); });
+    filter.addEventListener('focus', function () { render(true); });
+    filter.addEventListener('blur', function () { window.setTimeout(closePanel, 150); });
+
+    filter.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closePanel(); return; }
+        if (shown.length === 0) { return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); highlight((active + 1) % shown.length); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); highlight(active <= 0 ? shown.length - 1 : active - 1); }
+        else if (e.key === 'Enter' && active >= 0) {
+            // Only a highlighted suggestion is taken here. With none highlighted the key keeps its
+            // ordinary meaning and submits, which is the search across the whole register.
+            e.preventDefault();
+            choose(shown[active].value);
+        }
+    });
+})();
+</script>
 
 @* doc/Modules/20 §8.2 "defaults per grade" (BR-INS-002). One template over a whole grade, mandatory
    fees only — the fees the school bills every child of the grade, as opposed to the optional

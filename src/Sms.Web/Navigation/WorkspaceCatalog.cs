@@ -74,6 +74,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Fees,         Sc.Fees.Structure,         "Fee structure",      "هيكل الرسوم",         "bi-diagram-3",           "Fees",         "Structure"),
                     new(Sc.Modules.Fees,         Sc.Fees.Categories,        "Fee categories",     "فئات الرسوم",         "bi-tags",                "Fees",         "Categories"),
                     new(Sc.Modules.Fees,         Sc.Fees.Position,          "Financial position", "الموقف المالي",       "bi-clipboard-data",      "Fees",         "Position"),
+                    new(Sc.Modules.Fees,         Sc.Fees.StudentFinance,    "Student finance",    "مالية الطلاب",        "bi-person-vcard",        "Fees",         "StudentFinance"),
                     new(Sc.Modules.Payments,     Sc.Payments.Cashier,       "Cashier",            "الصندوق",             "bi-cash-coin",           "Payments",     "Index"),
                     new(Sc.Modules.Payments,     Sc.Payments.Till,          "Till session",       "وردية الصندوق",       "bi-safe",                "Payments",     "Till"),
                     new(Sc.Modules.Payments,     Sc.Payments.Pdc,           "Post-dated cheques", "الشيكات الآجلة",      "bi-calendar-check",      "Payments",     "Pdc"),
@@ -82,6 +83,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Installments, Sc.Installments.Templates, "Instalment plans",   "خطط التقسيط",         "bi-calendar-range",      "Installments", "Index"),
                     new(Sc.Modules.Installments, Sc.Installments.Cases,     "Reschedule cases",   "حالات إعادة الجدولة", "bi-exclamation-triangle","Installments", "Cases"),
                     new(Sc.Modules.Installments, Sc.Installments.Dunning,   "Dunning",            "المطالبات",           "bi-envelope-exclamation","Installments", "Dunning"),
+                    new(Sc.Modules.Installments, Sc.Installments.Collection,"Collection follow-up","متابعة التحصيل",     "bi-cash-stack",          "Installments", "Collection"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Grants,       "Discounts",          "الخصومات",            "bi-percent",             "Discounts",    "Index"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Scholarships, "Scholarships",       "المنح الدراسية",      "bi-award",               "Discounts",    "Scholarships"),
                     new(Sc.Modules.Discounts,    Sc.Discounts.Types,        "Discount types",     "أنواع الخصم",         "bi-tag",                 "Discounts",    "Types"),
@@ -98,6 +100,7 @@ namespace Sms.Web.Navigation
                 new WorkspaceLink[]
                 {
                     new(Sc.Modules.Students,   Sc.Students.Directory,        "Student directory",    "دليل الطلاب",         "bi-mortarboard",       "Students",   "Index"),
+                    new(Sc.Modules.Students,   Sc.Students.Enrollment,       "Bulk placement",       "الإسناد الجماعي",     "bi-people-fill",       "Students",   "BulkPlacement"),
                     new(Sc.Modules.Parents,    Sc.Parents.Directory,         "Parent directory",     "دليل أولياء الأمور",  "bi-people",            "Parents",    "Index"),
                     new(Sc.Modules.Sections,   Sc.Sections.Sections_,        "Sections",             "الشعب",               "bi-grid-3x3-gap",      "Sections",   "Index"),
                     new(Sc.Modules.Sections,   Sc.Sections.Board,            "Assignment board",     "لوحة توزيع الطلاب",   "bi-columns-gap",       "Sections",   "Board"),
@@ -123,13 +126,6 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Calendar,      Sc.Calendar.Calendar_,      "Academic calendar",   "التقويم الدراسي",     "bi-calendar-event",  "Calendar",      "Index"),
                     new(Sc.Modules.Classrooms,    Sc.Classrooms.Rooms,        "Classrooms",          "القاعات الدراسية",    "bi-door-closed",     "Rooms",         "Index"),
                     new(Sc.Modules.Setup,         Sc.Setup.Settings,          "System settings",     "إعدادات النظام",      "bi-sliders",         "Setup",         "Settings"),
-
-                    // Module 36's role designer. Here rather than in a department of its own: the
-                    // owner named seven departments and this is the back office that already holds
-                    // the system's own record and its settings. Both screens are gated on their own
-                    // permission, so an ordinary secretary sees neither.
-                    new(Sc.Modules.SystemAdministration, Sc.SystemAdministration.Roles,     "Roles and permissions", "الأدوار والصلاحيات", "bi-shield-lock", "Security", "Index"),
-                    new(Sc.Modules.SystemAdministration, Sc.SystemAdministration.UserRoles, "User role assignments", "إسناد الأدوار",      "bi-person-gear", "Security", "Users"),
                 }),
 
             new("teachers", "Teaching staff", "المدرسون", "bi-person-workspace",
@@ -140,9 +136,16 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Teachers,  Sc.Teachers.Teachers_,      "Teachers",              "المعلمون",         "bi-person-workspace",  "Teachers",  "Index"),
                     new(Sc.Modules.Teachers,  Sc.Teachers.Assignments,    "Teaching assignments",  "الإسنادات",        "bi-grid",              "Teachers",  "Matrix"),
                     new(Sc.Modules.Teachers,  Sc.Teachers.Load,           "Teaching load",         "النصاب",           "bi-speedometer",       "Teachers",  "Load"),
+                    // Module 37 §8.1. The resource library has no tile of its own —
+                    // it is reached from a lesson, and a tile that opens a page
+                    // asking "which lesson?" is a worse door than no tile.
+                    new(Sc.Modules.Learning,  Sc.Learning.Planner,        "Lesson planner",        "مخطط الدروس",      "bi-journal-text",      "Learning",  "Index"),
+                    new(Sc.Modules.Learning,  Sc.Learning.Homework,       "Homework desk",         "مكتب الواجبات",     "bi-journal-check",     "Learning",  "Homework"),
                     new(Sc.Modules.Employees, Sc.Employees.Directory,     "Employees",             "الموظفون",         "bi-person-badge",      "Employees", "Index"),
                     new(Sc.Modules.Employees, Sc.Employees.OrgChart,      "Organization chart",    "الهيكل التنظيمي",  "bi-diagram-3",         "Employees", "Org"),
                     new(Sc.Modules.Employees, Sc.Employees.Contracts,     "Contracts",             "العقود",           "bi-file-earmark-text", "Employees", "Contracts"),
+                    new(Sc.Modules.Employees, Sc.Employees.Payroll,       "Payroll",               "مسير الرواتب",     "bi-calendar3",         "Payroll",   "Index"),
+                    new(Sc.Modules.Employees, Sc.Employees.Advances,      "Salary advances",       "سلف الموظفين",     "bi-cash-coin",         "Payroll",   "Advances"),
                     new(Sc.Modules.Subjects,  Sc.Subjects.Subjects_,      "Subjects",              "المواد الدراسية",  "bi-journal-bookmark",  "Subjects",  "Index"),
                     new(Sc.Modules.Subjects,  Sc.Subjects.CurriculumPlan, "Curriculum plan",       "الخطة الدراسية",   "bi-journals",          "Subjects",  "Plan"),
                     new(Sc.Modules.Grading,   Sc.Grading.Marksheets,      "Marksheets",            "كشوف الدرجات",     "bi-bar-chart-line",    "Grading",   "Index"),
@@ -161,6 +164,7 @@ namespace Sms.Web.Navigation
                     new(Sc.Modules.Reports,    Sc.Reports.Executions,    "Execution log",    "سجل التشغيل",     "bi-clock-history", "Reports",    "Log"),
                     new(Sc.Modules.Reports,    Sc.Reports.Subscriptions, "Subscriptions",    "الاشتراكات",      "bi-bell",          "Reports",    "Subscriptions"),
                     new(Sc.Modules.Dashboards, Sc.Dashboards.Dashboard,  "Dashboards",       "لوحات المعلومات", "bi-speedometer2",  "Dashboards", "Index"),
+                    new(Sc.Modules.Dashboards, Sc.Dashboards.Statistics, "Statistics",       "الإحصائيات",      "bi-bar-chart-line", "Dashboards", "Statistics"),
                     new(Sc.Modules.Dashboards, Sc.Dashboards.Layouts,    "Layouts",          "تخطيطات اللوحات", "bi-columns-gap",   "Dashboards", "Layouts"),
                     new(Sc.Modules.Dashboards, Sc.Dashboards.Widgets,    "Widgets",          "عناصر اللوحات",   "bi-grid-1x2",      "Dashboards", "Widgets"),
                 }),
@@ -201,6 +205,22 @@ namespace Sms.Web.Navigation
                 new WorkspaceLink[]
                 {
                     new(Sc.Modules.Timetable, Sc.Timetable.Cover, "Cover and substitution", "التغطية والمناوبات", "bi-person-check", "Timetable", "Cover"),
+                }),
+
+            // The system's own users. These two screens were the last cards of the secretariat's
+            // department, on the reading that the back office holding the school's record and its
+            // settings also holds its accounts. The owner asked for users, roles and permissions to
+            // be findable as one named thing instead — the same ask that gave them a section in the
+            // sidebar, and the launcher has to agree with the sidebar about where a screen lives or
+            // neither is worth reading. Both are gated on their own permission, so a secretary who
+            // held neither has lost nothing: they were never shown these cards.
+            new("security", "Users & permissions", "المستخدمون والصلاحيات", "bi-shield-lock",
+                "Who may sign in, which role each one holds, and what that role can reach.",
+                "من يدخل النظام، وأي دور يحمله، وما الذي يبلغه ذلك الدور.",
+                new WorkspaceLink[]
+                {
+                    new(Sc.Modules.SystemAdministration, Sc.SystemAdministration.UserRoles, "Users and roles",       "المستخدمون وأدوارهم", "bi-person-gear", "Security", "Users"),
+                    new(Sc.Modules.SystemAdministration, Sc.SystemAdministration.Roles,     "Roles and permissions", "الأدوار والصلاحيات",  "bi-shield-lock", "Security", "Index"),
                 }),
         };
 

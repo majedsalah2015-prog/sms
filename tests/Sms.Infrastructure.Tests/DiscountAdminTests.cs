@@ -172,7 +172,7 @@ namespace Sms.Infrastructure.Tests
 
         private PaymentAdmin CreatePaymentAdmin(AppDbContext db) => new(db, Issuer(db), _clock);
 
-        private InstallmentAdmin CreateInstallmentAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db), CreateFeeAdmin(db));
+        private InstallmentAdmin CreateInstallmentAdmin(AppDbContext db) => new(db, _clock, _audit, _tenant, new NotificationPublisher(db, new TestAddressBook()), CreateFeeAdmin(db));
 
         private DiscountAdmin CreateAdmin(AppDbContext db) => new(db, Issuer(db), _clock, _audit, _tenant, CreateFeeAdmin(db), CreateInstallmentAdmin(db));
 
@@ -755,6 +755,90 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal(submitted.Id, instance.CurrentStateId);
             Assert.False(instance.IsClosed);
             Assert.DoesNotContain(after.WorkflowSteps, s => s.WorkflowInstanceId == instanceId && s.Action == WorkflowActionType.Approve);
+        }
+
+        // --- doc/Modules/22 §8.2 type catalog: correct in place, retire, put back --------------
+
+        [Fact]
+        public async Task A_type_is_corrected_in_place_and_its_ladder_is_replaced_whole()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var type = await admin.DefineTypeAsync(
+                "خطأ", "Mistyped", DiscountBasis.Percentage, DiscountEligibilityMode.Automatic, maxCombinedPercent: 40m,
+                rules: new[] { new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, 10m, 2), new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, 20m, 3) });
+
+            await admin.UpdateTypeAsync(
+                type.Id, "إخوة", "Sibling", DiscountBasis.FixedAmount, DiscountEligibilityMode.Manual,
+                stage: DiscountComputationStage.AfterVat, capAmountPerStudent: 500m, isStackable: false, maxCombinedPercent: 25m,
+                renewalMode: DiscountRenewalMode.AutoReevaluate, requiresHardshipDocumentation: true,
+                rules: new[] { new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, 15m, 2) });
+
+            using var after = CreateContext();
+            var saved = await after.DiscountTypes.IgnoreQueryFilters().Include(t => t.EligibilityRules).SingleAsync(t => t.Id == type.Id);
+            Assert.Equal("إخوة", saved.NameAr);
+            Assert.Equal("Sibling", saved.NameEn);
+            Assert.Equal(DiscountBasis.FixedAmount, saved.Basis);
+            Assert.Equal(DiscountComputationStage.AfterVat, saved.ComputationStage);
+            Assert.Equal(500m, saved.CapAmountPerStudent);
+            Assert.False(saved.IsStackable);
+            Assert.Equal(25m, saved.MaxCombinedPercent);
+            Assert.Equal(DiscountRenewalMode.AutoReevaluate, saved.RenewalMode);
+            Assert.True(saved.RequiresHardshipDocumentation);
+
+            // Replaced whole, not merged: the 3rd-child rung the caller left out is gone.
+            var rung = Assert.Single(saved.EligibilityRules);
+            Assert.Equal(15m, rung.Percent);
+            Assert.Equal(2, rung.ChildOrdinal);
+        }
+
+        [Fact]
+        public async Task The_combined_cap_is_still_held_to_a_hundred_when_a_type_is_edited()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var type = await admin.DefineTypeAsync("أ", "A", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+
+            await admin.UpdateTypeAsync(type.Id, "أ", "A", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, maxCombinedPercent: 250m);
+
+            using var after = CreateContext();
+            Assert.Equal(100m, (await after.DiscountTypes.IgnoreQueryFilters().SingleAsync(t => t.Id == type.Id)).MaxCombinedPercent);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task A_retired_type_keeps_its_grants_and_can_be_put_back()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var type = await admin.DefineTypeAsync("منح", "Grantable", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 10m, "before retirement", 1);
+
+            await admin.SetTypeActiveAsync(type.Id, false);
+
+            using var retired = CreateContext();
+            // Retired, not deleted: the row is still there and the grant still points at it.
+            Assert.False((await retired.DiscountTypes.IgnoreQueryFilters().SingleAsync(t => t.Id == type.Id)).IsActive);
+            Assert.Equal(type.Id, (await retired.DiscountGrants.SingleAsync(g => g.Id == grant.Id)).DiscountTypeId);
+            // The soft-active filter is what takes it out of the pickers.
+            Assert.Empty(await retired.DiscountTypes.Where(t => t.Id == type.Id).ToListAsync());
+
+            await CreateAdmin(retired).SetTypeActiveAsync(type.Id, true);
+
+            using var back = CreateContext();
+            Assert.Single(await back.DiscountTypes.Where(t => t.Id == type.Id).ToListAsync());
+        }
+
+        [Fact]
+        public async Task Editing_a_type_that_is_not_there_is_refused_in_a_sentence()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+
+            await Assert.ThrowsAsync<DiscountTypeNotFoundException>(
+                () => admin.UpdateTypeAsync(4242, "أ", "A", DiscountBasis.Percentage, DiscountEligibilityMode.Manual));
+            await Assert.ThrowsAsync<DiscountTypeNotFoundException>(() => admin.SetTypeActiveAsync(4242, false));
         }
     }
 }

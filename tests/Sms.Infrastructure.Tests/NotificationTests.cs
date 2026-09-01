@@ -82,7 +82,7 @@ namespace Sms.Infrastructure.Tests
 
         private static NotificationConfigAdmin Admin(AppDbContext db) => new(db);
 
-        private static NotificationPublisher Publisher(AppDbContext db) => new(db);
+        private static NotificationPublisher Publisher(AppDbContext db) => new(db, new TestAddressBook());
 
         private NotificationDispatcher Dispatcher(AppDbContext db, params IChannelSender[] senders)
             => new(db, _clock, senders.Length > 0 ? senders : new IChannelSender[] { new InAppChannelSender() });

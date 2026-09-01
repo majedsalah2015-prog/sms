@@ -1,4 +1,5 @@
 using System;
+using Sms.Application.Common.Guards;
 
 namespace Sms.Application.Common.Exceptions
 {
@@ -12,12 +13,20 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>A subject/department can only be removed (deactivated) while nothing current references it.</summary>
+    /// <remarks>
+    /// The blocking references travel as a bilingual <see cref="UsageReport"/>, not as an English
+    /// clause — see <see cref="GradeStructureInUseException"/> for why.
+    /// </remarks>
     public class SubjectInUseException : InvalidOperationException
     {
-        public SubjectInUseException(string reason)
-            : base($"Cannot remove: {reason}.")
+        public SubjectInUseException(UsageReport usage)
+            : base($"Cannot remove: {usage.Describe(arabic: false)}.")
         {
+            Usage = usage;
         }
+
+        /// <summary>Everything that still references the subject or department.</summary>
+        public UsageReport Usage { get; }
     }
 
     /// <summary>BR-SUB §9: offering uniqueness is (grade-year profile, subject).</summary>

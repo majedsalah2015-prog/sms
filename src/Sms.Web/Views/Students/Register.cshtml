@@ -58,61 +58,22 @@
                 <h2 class="h6 mb-3">@T("Photograph", "الصورة الشخصية")</h2>
                 @* Not _PhotoPanel: that partial posts an upload form of its own, and the student it
                    would post about does not exist until this form is submitted. Here the file rides
-                   the registration itself, so one submission makes the record and its photograph. *@
-                <div class="sms-photo-panel text-center" id="student-register-photo">
-                    <div class="sms-photo-frame mx-auto mb-2">
-                        <img data-photo-preview class="d-none" alt="@T("Chosen photo", "الصورة المختارة")" />
-                        <span class="sms-photo-empty" data-photo-placeholder aria-hidden="true"><i class="bi bi-person"></i></span>
-                    </div>
-                    <label class="form-label small" for="student-register-photo-file">@T("Photo file", "ملف الصورة")</label>
-                    <input id="student-register-photo-file" name="photo" type="file" accept="image/jpeg,image/png" class="form-control form-control-sm" />
-                    <button type="button" class="btn btn-sm btn-link text-danger p-0 mt-1 d-none" data-photo-clear>@T("Remove", "إزالة")</button>
-                    <div class="form-text">@T("JPEG or PNG, up to 2 MB. Optional — it can also be added from the student's file later.", "JPEG أو PNG، حتى 2 ميغابايت. اختيارية — ويمكن إضافتها لاحقاً من ملف الطالب.")</div>
-                    @* A browser never re-sends a file after a failed post, so the box comes back
-                       empty even though the registrar chose something. Saying so beats letting them
-                       submit twice and wonder why the file is still missing. *@
-                    @if (!ViewData.ModelState.IsValid) { <div class="form-text fw-semibold">@T("Choose the photo again — a browser does not resend it after an error.", "اختر الصورة مرة أخرى — فالمتصفح لا يعيد إرسالها بعد الخطأ.")</div> }
-                </div>
+                   the registration itself, so one submission makes the record and its photograph —
+                   but it is the same upload box, with the same preview, as every other file in the
+                   product. *@
+                <partial name="_FileUploadField" model="@(new FileUploadFieldViewModel {
+                    Id = "student-register-photo-file", Name = "photo",
+                    AllowedFormats = Sms.Web.Services.PersonPhotoService.PhotoFormats,
+                    MaxBytes = Sms.Web.Services.PersonPhotoService.MaxPhotoBytes,
+                    Shape = FileUploadShape.Portrait,
+                    Hint = T("Optional — it can also be added from the student's file later.", "اختيارية — ويمكن إضافتها لاحقاً من ملف الطالب.") })" />
+                @* A browser never re-sends a file after a failed post, so the box comes back
+                   empty even though the registrar chose something. Saying so beats letting them
+                   submit twice and wonder why the file is still missing. *@
+                @if (!ViewData.ModelState.IsValid) { <div class="form-text fw-semibold">@T("Choose the photo again — a browser does not resend it after an error.", "اختر الصورة مرة أخرى — فالمتصفح لا يعيد إرسالها بعد الخطأ.")</div> }
             </div>
             <div class="sms-card p-4"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>@T("Register", "تسجيل")</button><a class="btn btn-outline-secondary w-100 mt-2" asp-action="Index">@T("Cancel", "إلغاء")</a></div>
         </div>
     </div>
 </form>
 
-@section Scripts {
-<script>
-    // Local preview only: the registrar sees the chosen file back before it is posted, so nobody
-    // registers a child with somebody else's photograph attached. Nothing leaves the page here —
-    // the file is uploaded by this form's own submission, and the server checks it there.
-    (function () {
-        var panel = document.getElementById('student-register-photo');
-        if (!panel) { return; }
-        var input = panel.querySelector('input[type=file]');
-        var image = panel.querySelector('[data-photo-preview]');
-        var empty = panel.querySelector('[data-photo-placeholder]');
-        var clear = panel.querySelector('[data-photo-clear]');
-
-        function show(file) {
-            if (image.src) { URL.revokeObjectURL(image.src); }
-            image.src = URL.createObjectURL(file);
-            image.classList.remove('d-none');
-            empty.classList.add('d-none');
-            clear.classList.remove('d-none');
-        }
-
-        function reset() {
-            input.value = '';
-            if (image.src) { URL.revokeObjectURL(image.src); }
-            image.removeAttribute('src');
-            image.classList.add('d-none');
-            empty.classList.remove('d-none');
-            clear.classList.add('d-none');
-        }
-
-        input.addEventListener('change', function () {
-            if (input.files && input.files.length > 0) { show(input.files[0]); } else { reset(); }
-        });
-        clear.addEventListener('click', reset);
-    })();
-</script>
-}

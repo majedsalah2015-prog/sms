@@ -8,7 +8,11 @@ namespace Sms.Application.Common.Exceptions
         public CalendarPastDateEditException(DateTime date)
             : base($"Cannot edit the calendar for {date:yyyy-MM-dd} — it is in the past (BR-CAL-004).")
         {
+            Date = date;
         }
+
+        /// <summary>The day that was refused.</summary>
+        public DateTime Date { get; }
     }
 
     /// <summary>BR-GLB-051: every calendar day/event must fall within its academic year.</summary>
@@ -17,6 +21,10 @@ namespace Sms.Application.Common.Exceptions
         public CalendarDateOutsideYearException(DateTime date)
             : base($"{date:yyyy-MM-dd} falls outside the academic year's date range (BR-GLB-051).")
         {
+            Date = date;
         }
+
+        /// <summary>The day that fell outside the year.</summary>
+        public DateTime Date { get; }
     }
 }

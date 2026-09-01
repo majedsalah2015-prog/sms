@@ -1,0 +1,245 @@
+@using System.Globalization
+@using Sms.Application.Notifications
+@using Sms.Domain.Notifications
+@using Sms.Web.Models
+@model ProviderConsoleViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Gateways", "البوابات");
+    ViewData["Breadcrumb"] = T("Notifications / Gateways", "الإشعارات / البوابات");
+
+    string Channel(NotificationChannel c) => c switch
+    {
+        NotificationChannel.InApp => T("In-app", "داخل النظام"),
+        NotificationChannel.Email => T("Email", "البريد الإلكتروني"),
+        NotificationChannel.Sms => T("SMS", "رسالة نصية"),
+        _ => "WhatsApp",
+    };
+
+    string Outcome(ProviderTestOutcome o) => o switch
+    {
+        ProviderTestOutcome.Passed => T("Credentials accepted", "قُبلت الاعتمادات"),
+        ProviderTestOutcome.Failed => T("Rejected", "مرفوضة"),
+        _ => T("Never tested", "لم تُختبر"),
+    };
+
+    string OutcomeBadge(ProviderTestOutcome o) => o switch
+    {
+        ProviderTestOutcome.Passed => "bg-success",
+        ProviderTestOutcome.Failed => "bg-danger",
+        _ => "bg-secondary",
+    };
+
+    // Only the channels a gateway can serve. In-app writes a database row and email is still
+    // stubbed pending doc 09 §9 Q1's SMTP decision — neither has anything to register.
+    var channels = new[] { NotificationChannel.WhatsApp, NotificationChannel.Sms };
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "prv-help",
+        Title = T("Gateways — help", "البوابات — مساعدة"),
+        Intro = T("WhatsApp and SMS leave this system through a gateway you hold an account with. Nothing is sent on either channel until one is registered here, configured, and tested (BR-NTF-003).",
+                  "يخرج واتساب والرسائل النصية من هذا النظام عبر بوابة تملك أنت حساباً لديها. ولا يُرسل شيء على أي من القناتين قبل تسجيل بوابة هنا وتهيئتها واختبارها (BR-NTF-003)."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("The token is stored encrypted and never shown again", "الرمز يُخزَّن مشفَّراً ولا يُعرض ثانية"),
+                T("Once saved, no screen in this product can print it back — not this one, not an export, not the audit trail, which records that a token was rotated and never what it was. Leave the field blank to change anything else about a gateway without retyping it.",
+                  "بعد الحفظ لا تستطيع أي شاشة في هذا النظام طباعته ثانية — لا هذه، ولا تصدير، ولا سجل التدقيق، الذي يسجّل أن الرمز بُدِّل ولا يسجّل ما كان. واترك الحقل فارغاً لتغيير أي شيء آخر في البوابة دون إعادة كتابته.")),
+            new HelpPanelViewModel.Item(
+                T("Test before a parent tests it for you", "اختبر قبل أن يختبرها ولي أمر بدلاً عنك"),
+                T("The test asks the gateway to identify the account. It sends no message and costs nothing, and it separates a wrong token from a wrong sender number from a network that cannot be reached — three failures that look identical in a delivery log.",
+                  "يطلب الاختبار من البوابة أن تعرّف بالحساب. ولا يرسل رسالة ولا يكلّف شيئاً، ويفصل بين الرمز الخاطئ ورقم المرسِل الخاطئ والشبكة التي لا تُبلَغ — وهي ثلاثة إخفاقات تتشابه تماماً في سجل التسليم.")),
+            new HelpPanelViewModel.Item(
+                T("WhatsApp's 24-hour window", "نافذة الأربع والعشرين ساعة في واتساب"),
+                T("Outside a conversation a parent started, WhatsApp only delivers a message template you registered and Meta approved — free text is refused by the gateway, visibly, in the delivery log. Registering those templates with Meta is done in their Business Manager and is not yet reflected in this screen; until it is, treat WhatsApp as reliable for replies and provisional for the first message.",
+                  "خارج محادثة بدأها ولي الأمر، لا يوصل واتساب إلا قالب رسالة سجّلته أنت واعتمدته Meta — والنص الحر ترفضه البوابة، ظاهراً في سجل التسليم. وتسجيل هذه القوالب لدى Meta يتم في Business Manager الخاص بهم ولا تعكسه هذه الشاشة بعد؛ وحتى ذلك عامِل واتساب كقناة موثوقة للردود ومؤقتة للرسالة الأولى.")),
+            new HelpPanelViewModel.Item(
+                T("Failover order", "ترتيب التحويل"),
+                T("Two gateways on one channel means the lower number is tried and the other is the spare. A gateway cannot be switched off while it is the only active one on a channel a school is still subscribed to — that would stop the messages without saying so.",
+                  "بوابتان على قناة واحدة تعني أن الأدنى رقماً هو المُجرَّب والأخرى احتياط. ولا تُعطَّل بوابة وهي الفعّالة الوحيدة على قناة ما زالت المدرسة مشتركة فيها — فذلك يوقف الرسائل دون أن يقول ذلك.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @T("The accounts this school reaches families through on WhatsApp and SMS.",
+               "الحسابات التي تصل بها هذه المدرسة إلى الأسر عبر واتساب والرسائل النصية.")
+        </p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+<partial name="_NotificationsNav" />
+
+@if (string.IsNullOrWhiteSpace(Model.DiallingCode))
+{
+    <div class="alert alert-warning">
+        <strong>@T("No country dialling code is set.", "لم يُضبط رمز الاتصال الدولي.")</strong>
+        @T("Most parents' mobiles are stored in national format — 0599 123 456 — and a gateway will not accept one. Without a dialling code to complete them, those numbers are treated as no number at all and their messages fail before they are sent. Set it under System Setup / Settings.",
+           "جوالات أغلب أولياء الأمور مخزّنة بالصيغة المحلية — 0599 123 456 — والبوابة لا تقبلها. وبغير رمز اتصال يُكمِلها تُعامَل هذه الأرقام كأن لا رقم لها، وتفشل رسائلها قبل إرسالها. اضبطه من «إعداد النظام / الإعدادات».")
+    </div>
+}
+
+@foreach (var channel in channels)
+{
+    var registered = Model.For(channel);
+    <div class="sms-card mb-4">
+        <div class="p-3 pb-0">
+            <h2 class="h5 mb-0">
+                <i class="bi @(channel == NotificationChannel.WhatsApp ? "bi-whatsapp" : "bi-chat-left-text") me-1" aria-hidden="true"></i>
+                @Channel(channel)
+            </h2>
+        </div>
+
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@Channel(channel)</caption>
+            <thead><tr>
+                <th scope="col">@T("Gateway", "البوابة")</th>
+                <th scope="col">@T("Account", "الحساب")</th>
+                <th scope="col">@T("Sends from", "يُرسل من")</th>
+                <th scope="col">@T("Order", "الترتيب")</th>
+                <th scope="col">@T("Last test", "آخر اختبار")</th>
+                <th scope="col"></th>
+            </tr></thead>
+            <tbody>
+            @if (registered.Count == 0)
+            {
+                <tr><td colspan="6" class="p-3 text-muted">
+                    @T("No gateway is registered, so nothing is delivered on this channel — messages queued for it fail with that reason rather than disappearing.",
+                       "لا توجد بوابة مسجّلة، فلا يُسلَّم شيء على هذه القناة — والرسائل المنتظرة لها تفشل بهذا السبب بدل أن تختفي.")
+                </td></tr>
+            }
+            else
+            {
+                @foreach (var p in registered)
+                {
+                    <tr class="@(p.IsActive ? "" : "text-muted")">
+                        <td>
+                            <strong>@p.DisplayName</strong>
+                            <small class="d-block text-muted"><code>@p.ProviderCode</code></small>
+                            @if (!p.IsActive)
+                            {
+                                <span class="badge bg-secondary">@T("inactive", "معطّلة")</span>
+                            }
+                        </td>
+                        <td dir="ltr">@(p.AccountIdentifier ?? "—")</td>
+                        <td dir="ltr">@(p.SenderId ?? "—")</td>
+                        <td>@p.FailoverOrder</td>
+                        <td>
+                            <span class="badge @OutcomeBadge(p.LastTestOutcome)">@Outcome(p.LastTestOutcome)</span>
+                            @if (p.LastTestedAtUtc is { } tested)
+                            {
+                                <small class="d-block text-muted" dir="ltr">@tested.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</small>
+                            }
+                            @if (p.LastTestOutcome == ProviderTestOutcome.Failed && !string.IsNullOrWhiteSpace(p.LastTestDetail))
+                            {
+                                <small class="d-block text-danger" dir="ltr" style="word-break: break-all;">@p.LastTestDetail</small>
+                            }
+                            @if (!p.IsConfigured)
+                            {
+                                <small class="d-block text-warning">
+                                    @T("Incomplete — needs an account, a token and a sender number.",
+                                       "ناقصة — تحتاج حساباً ورمزاً ورقم مُرسِل.")
+                                </small>
+                            }
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex gap-1 justify-content-end">
+                                <form asp-action="TestProvider" asp-route-id="@p.Id" method="post">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">@T("Test", "اختبار")</button>
+                                </form>
+                                @if (p.IsActive)
+                                {
+                                    <form asp-action="DeactivateProvider" asp-route-id="@p.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="reason" value="@T("Retired from the provider console.", "أُخرجت من الخدمة من كونسول المزوّدين.")" />
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Switch off", "تعطيل")</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form asp-action="ReactivateProvider" asp-route-id="@p.Id" method="post">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">@T("Switch on", "تفعيل")</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            }
+            </tbody>
+        </table></div>
+
+        <div class="p-3 border-top">
+            <details>
+                <summary class="fw-semibold">@T("Register a gateway for this channel", "تسجيل بوابة لهذه القناة")</summary>
+                <form asp-action="SaveProvider" method="post" class="mt-3" autocomplete="off">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="channel" value="@((int)channel)" />
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" for="code-@channel">@T("Gateway", "البوابة")</label>
+                            <select class="form-select" id="code-@channel" name="providerCode" required>
+                                @foreach (var g in ProviderCatalog.For(channel))
+                                {
+                                    <option value="@g.Code">@(isRtl ? g.NameAr : g.NameEn)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="name-@channel">@T("Name it", "سمِّها")</label>
+                            <input class="form-control" id="name-@channel" name="displayName" maxlength="100"
+                                   placeholder="@T("e.g. Main WhatsApp line", "مثلاً: خط واتساب الرئيسي")" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="order-@channel">@T("Failover order", "ترتيب التحويل")</label>
+                            <input class="form-control" id="order-@channel" name="failoverOrder" type="number" min="1"
+                                   value="@Model.NextFailoverOrder(channel)" dir="ltr" />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label" for="acct-@channel">@T("Account identifier", "معرّف الحساب")</label>
+                            <input class="form-control" id="acct-@channel" name="accountIdentifier" dir="ltr" maxlength="200" />
+                            <div class="form-text">@T("Twilio calls this the Account SID; 360dialog calls it the Channel ID.", "تسميه Twilio ‏Account SID، ويسميه 360dialog ‏Channel ID.")</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="secret-@channel">@T("Token", "الرمز")</label>
+                            <input class="form-control" id="secret-@channel" name="secret" type="password"
+                                   dir="ltr" autocomplete="new-password" />
+                            <div class="form-text">@T("Stored encrypted. Leave blank when editing to keep the one already stored.", "يُخزَّن مشفَّراً. اتركه فارغاً عند التعديل للإبقاء على المخزَّن.")</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="sender-@channel">@T("Sender number", "رقم المُرسِل")</label>
+                            <input class="form-control" id="sender-@channel" name="senderId" dir="ltr" maxlength="32"
+                                   placeholder="+970591234567" />
+                            <div class="form-text">@T("International format, with the plus.", "بالصيغة الدولية مع علامة الزائد.")</div>
+                        </div>
+
+                        <div class="col-md-8">
+                            <label class="form-label" for="url-@channel">@T("API address (optional)", "عنوان الواجهة (اختياري)")</label>
+                            <input class="form-control" id="url-@channel" name="apiBaseUrl" dir="ltr" maxlength="300"
+                                   placeholder="@T("leave blank for the gateway's own", "اتركه فارغاً لاستخدام عنوان البوابة نفسه")" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="reason-@channel">@T("Reason", "السبب")</label>
+                            <input class="form-control" id="reason-@channel" name="reason" maxlength="200" />
+                            <div class="form-text">@T("Recorded in the audit trail (BR-NTF-006).", "يُسجَّل في أثر التدقيق (BR-NTF-006).")</div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary mt-3">
+                        <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Register", "تسجيل")
+                    </button>
+                </form>
+            </details>
+        </div>
+    </div>
+}

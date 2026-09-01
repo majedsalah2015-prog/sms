@@ -56,21 +56,94 @@ namespace Sms.Erp.Bridge.GlPosting
             _calendar = calendar;
         }
 
-        public Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, CancellationToken cancellationToken = default)
+        public Task<GlPostingOutcome> PostBatchAsync(GlExportBatch batch, GlBatchPayer payer, CancellationToken cancellationToken = default)
             => PostAsync(
                 batch,
                 BatchDocumentType,
-                $"School fee journal {batch.BatchNo}",
+                Truncate(Describe(batch, payer), 500),
                 reverse: false,
                 cancellationToken);
 
+        /// <summary>
+        /// The reversal carries no payer clause, and that is deliberate rather
+        /// than an omission. It is written from a batch loaded back out of the
+        /// database, and the payer would have to be re-derived — but an allocation
+        /// made <b>after</b> the batch was posted belongs to its own later period
+        /// (gap G-10), so a fresh derivation can name a student the original entry
+        /// never mentioned. A correction that describes more than the thing it
+        /// corrects is worse than a plain one; the batch number ties the pair
+        /// together, and that is what an auditor follows.
+        /// </summary>
         public Task<GlPostingOutcome> ReverseBatchAsync(GlExportBatch batch, string reason, CancellationToken cancellationToken = default)
             => PostAsync(
                 batch,
                 ReversalDocumentType,
-                Truncate($"Reversal of school fee journal {batch.BatchNo}: {reason}", 500),
+                Truncate($"عكس {Describe(batch, GlBatchPayer.None)}: {reason}", 500),
                 reverse: true,
                 cancellationToken);
+
+        /// <summary>
+        /// What an accountant reads in the ledger's description column.
+        /// <para>
+        /// <b>Arabic, because the ledger is.</b> ERP 2028's own chart of accounts
+        /// is Arabic throughout — <c>النقدية بالصندوق</c>, <c>أوراق القبض</c>, and
+        /// the school accounts <see cref="ErpGlAccountProvisioner"/> creates
+        /// beside them — so an English sentence here was the one line of the entry
+        /// that did not match the book it was written in. This is a stored string,
+        /// not a rendered one: it is written once at posting and read for ever
+        /// after, so it cannot follow the reader's culture the way a screen does,
+        /// and it has to be written in the language of the ledger that keeps it.
+        /// </para>
+        /// <para>
+        /// The payer clause is the point of the change. A period is a summary and
+        /// its <i>lines</i> stay anonymous (rule 9), but the entry as a whole
+        /// usually has one family behind it, and "a payment from Ahmad" is what
+        /// lets an accountant recognise it without opening the batch. Several
+        /// families are counted rather than listed; none named at all leaves the
+        /// plain description, which is what a period of charges and no collection
+        /// honestly is.
+        /// </para>
+        /// </summary>
+        private static string Describe(GlExportBatch batch, GlBatchPayer payer)
+        {
+            var clause = PayerClause(payer);
+            return clause == null
+                ? $"قيد رسوم مدرسية {batch.BatchNo}"
+                : $"قيد رسوم مدرسية {batch.BatchNo} — {clause}";
+        }
+
+        /// <summary>
+        /// Arabic counts the thing it counts differently at two, at three-to-ten,
+        /// and above — <c>طالبين</c>, <c>3 طلاب</c>, <c>12 طالباً</c> — and getting
+        /// it wrong is the kind of mistake that tells a reader the sentence was
+        /// written by a machine that does not speak their language.
+        /// <para>
+        /// Digits are invariant on purpose. The posting culture is whatever thread
+        /// ran the generate, and a ledger reference that came out in Arabic-Indic
+        /// digits one month and Western the next would not match itself.
+        /// </para>
+        /// </summary>
+        private static string? PayerClause(GlBatchPayer payer)
+        {
+            var name = payer.StudentNameAr?.Trim();
+            if (!string.IsNullOrEmpty(name))
+            {
+                return $"دفعة من الطالب {name}";
+            }
+
+            // A single payer whose name did not come through is left unsaid rather than counted as
+            // "one student": the count is a fallback for the plural case, not a way to say less about
+            // a case we were supposed to be able to say more about.
+            var count = payer.StudentCount;
+            var number = count.ToString(CultureInfo.InvariantCulture);
+            return count switch
+            {
+                <= 1 => null,
+                2 => "دفعات من طالبين",
+                <= 10 => $"دفعات من {number} طلاب",
+                _ => $"دفعات من {number} طالباً",
+            };
+        }
 
         private async Task<GlPostingOutcome> PostAsync(
             GlExportBatch batch, string documentType, string description, bool reverse, CancellationToken cancellationToken)

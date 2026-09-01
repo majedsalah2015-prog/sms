@@ -27,9 +27,9 @@ namespace Sms.Domain.Students
     // حالة الوالد moved to Sms.Domain.Parents.ParentLifeStatus when the parent
     // register grew a status of its own: two module namespaces cannot both declare
     // the name without CS0104 in the first file that imports both, and the concept
-    // belongs to the parent rather than to the student's profile of them. The
-    // numbers are unchanged — Student.FatherStatus and MotherStatus are persisted
-    // against them.
+    // belongs to the parent rather than to the student's profile of them. On
+    // 2026-08-24 the student's copy of it went as well (owner request) — a status is
+    // recorded once, on the parent's file, and read from the guardians tab.
 
     /// <summary>الديانة. Kept coarse on purpose — the school records what it needs for religious-education streaming and nothing finer.</summary>
     public enum Religion : short
