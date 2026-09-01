@@ -12,7 +12,24 @@ namespace Sms.Application.Payments
     /// </summary>
     public interface IPaymentAdmin
     {
-        Task<TillSession> OpenTillSessionAsync(int cashierUserId, string tillCode, decimal floatAmount, CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Opens a cashier's session (BR-PAY-001). Leave <paramref name="tillCode"/> null or blank
+        /// and the drawer is assigned by <see cref="TillCodeGenerator"/> — the cashier's own till if
+        /// they have one, otherwise the next unused code.
+        /// <para>
+        /// Enforces both halves of cashier × till: throws
+        /// <see cref="Common.Exceptions.CashierAlreadyHasOpenTillException"/> when this cashier is
+        /// already at a drawer, and <see cref="Common.Exceptions.TillAlreadyOpenException"/> when an
+        /// explicitly named till is in someone else's hands.
+        /// </para>
+        /// </summary>
+        Task<TillSession> OpenTillSessionAsync(int cashierUserId, string? tillCode, decimal floatAmount, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// The code <see cref="OpenTillSessionAsync"/> would assign this cashier — so the console can
+        /// show the drawer before it is opened instead of a box nobody knows what to type into.
+        /// </summary>
+        Task<string> NextTillCodeForAsync(int cashierUserId, CancellationToken cancellationToken = default);
 
         /// <summary>Sums this session's receipts as the system total. Throws if the session isn't Open.</summary>
         Task CloseTillSessionAsync(int tillSessionId, decimal countedTotal, string? varianceReason = null, CancellationToken cancellationToken = default);

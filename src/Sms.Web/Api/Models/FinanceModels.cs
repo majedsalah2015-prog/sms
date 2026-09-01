@@ -240,8 +240,12 @@ namespace Sms.Web.Api.Models
     /// <summary>Open a till session for a cashier.</summary>
     public sealed class ApiOpenTillRequest
     {
-        [RequiredField("till code", "رمز الصندوق")]
-        public string TillCode { get; set; } = string.Empty;
+        /// <summary>
+        /// Optional, and normally omitted: leave it out and the server assigns the drawer
+        /// (BR-PAY-001) — the cashier's own till, or the next unused one. Send a code only to put a
+        /// cashier on a specific drawer, which is refused if it is already open elsewhere.
+        /// </summary>
+        public string? TillCode { get; set; }
 
         public decimal FloatAmount { get; set; }
 

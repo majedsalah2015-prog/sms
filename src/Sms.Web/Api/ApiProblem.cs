@@ -293,6 +293,20 @@ namespace Sms.Web.Api
                         T("No till session is open for this cashier.", "لا توجد وردية صندوق مفتوحة لهذا الصراف."));
                     return true;
 
+                case CashierAlreadyHasOpenTillException cashierTill:
+                    status = StatusCodes.Status409Conflict;
+                    error = new ApiError("cashier_till_already_open",
+                        T($"You already have till {cashierTill.TillCode} open — close it first.",
+                          $"لديك وردية مفتوحة على الصندوق {cashierTill.TillCode} — أغلقها أولاً."));
+                    return true;
+
+                case TillAlreadyOpenException openTill:
+                    status = StatusCodes.Status409Conflict;
+                    error = new ApiError("till_already_open",
+                        T($"Till {openTill.TillCode} is already open for another cashier.",
+                          $"الصندوق {openTill.TillCode} مفتوح لأمين آخر."));
+                    return true;
+
                 case InvalidPdcStatusTransitionException:
                     status = StatusCodes.Status409Conflict;
                     error = new ApiError("invalid_pdc_status_transition",

@@ -418,15 +418,19 @@ namespace Sms.Web.Api.Controllers
             return Page<ApiReceipt>(rows, p, size, total);
         }
 
-        /// <summary>Opens a till session. Defaults the cashier to the caller — a cashier opens their own drawer.</summary>
+        /// <summary>
+        /// Opens a till session. Defaults the cashier to the caller — a cashier opens their own
+        /// drawer — and the till to the one the server assigns when the request names none
+        /// (BR-PAY-001). Refuses a cashier who is already at a drawer, or a named till that is.
+        /// </summary>
         [HttpPost("till/open")]
         [RequirePermission(ScreenCatalog.Modules.Payments, ScreenCatalog.Payments.Till, ActionVerb.Create)]
         public async Task<IActionResult> OpenTill([FromBody] ApiOpenTillRequest request)
         {
             var session = await _payments.OpenTillSessionAsync(
-                request.CashierUserId ?? CurrentUserAccountId, request.TillCode.Trim(), request.FloatAmount, Ct);
+                request.CashierUserId ?? CurrentUserAccountId, request.TillCode, request.FloatAmount, Ct);
 
-            return Ok(new { tillSessionId = session.Id });
+            return Ok(new { tillSessionId = session.Id, tillCode = session.TillCode });
         }
 
         /// <summary>Closes a till against a counted total. The system total is this session's receipts.</summary>

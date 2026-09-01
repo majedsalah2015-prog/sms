@@ -418,6 +418,15 @@ namespace Sms.Web.Models
         public int CurrentUserId { get; set; }
 
         public SessionRow? Closing { get; set; }
+
+        /// <summary>
+        /// The drawer the cashier will be given when they press Open — shown rather than asked for,
+        /// because a till code is the system's own key and never a cashier's decision (BR-PAY-001).
+        /// </summary>
+        public string NextTillCode { get; set; } = string.Empty;
+
+        /// <summary>True once this cashier has held a till before, so the screen can say "your till" rather than "a new till".</summary>
+        public bool NextTillIsReturning { get; set; }
     }
 
     // ---- 21 §8.3 PDC registry ----

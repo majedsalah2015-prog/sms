@@ -13,6 +13,7 @@
         Intro = T("A cashier opens a session with a float, cash receipts reference it, and closing records the system total vs the counted total with a mandatory variance reason (BR-PAY-002).", "يفتح أمين الصندوق جلسة بعهدة، تشير سندات النقد إليها، والإغلاق يسجّل إجمالي النظام مقابل المعدود بسبب إلزامي للفرق (BR-PAY-002)."),
         Items = new[]
         {
+            new HelpPanelViewModel.Item(T("The till is assigned", "الصندوق يُسنَد إليك"), T("You do not type a till code — the system gives you your usual drawer, or a new one the first time, so your collections and variances accumulate under one till.", "لا تكتب رمز الصندوق — يمنحك النظام درجك المعتاد، أو درجاً جديداً في أول مرة، لتتجمّع تحصيلاتك وفروقك تحت صندوق واحد.")),
             new HelpPanelViewModel.Item(T("Live totals", "الإجماليات الحية"), T("Totals by method refresh on every page load; expected cash = float + cash receipts.", "الإجماليات بالطريقة تتحدث مع كل تحميل؛ النقد المتوقع = العهدة + سندات النقد.")),
             new HelpPanelViewModel.Item(T("One per cashier", "واحدة لكل أمين"), T("You cannot open a second session while yours is open, nor reuse a till that is open elsewhere.", "لا يمكن فتح جلسة ثانية وجلستك مفتوحة ولا استخدام صندوق مفتوح لدى غيرك.")),
         },
@@ -88,7 +89,13 @@
             else
             {
                 <form method="post" asp-action="OpenTill" class="d-grid gap-2">
-                    <input name="tillCode" class="form-control form-control-sm" aria-label="@T("Till code", "رمز الصندوق")" placeholder="@T("Till code (e.g. TILL-1)", "رمز الصندوق (مثل TILL-1)")" required aria-required="true" />
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text" id="till-code-lbl">@T("Till", "الصندوق")</span>
+                        <span class="form-control bg-light fw-semibold" role="status" aria-labelledby="till-code-lbl"><bdi dir="ltr">@Model.NextTillCode</bdi></span>
+                    </div>
+                    <div class="small text-muted">@(Model.NextTillIsReturning
+                        ? T("Your usual till — assigned automatically, so your day stays on one drawer.", "صندوقك المعتاد — يُسنَد تلقائياً لتبقى يوميتك على درج واحد.")
+                        : T("A new till, assigned automatically; it stays yours from now on.", "صندوق جديد يُسنَد تلقائياً، ويبقى لك بعد اليوم."))</div>
                     <div class="input-group input-group-sm"><span class="input-group-text" id="till-float-lbl">@T("Float", "العهدة")</span><input name="floatAmount" type="number" step="0.01" min="0" class="form-control text-end" value="0" aria-labelledby="till-float-lbl" /></div>
                     <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-unlock me-1" aria-hidden="true"></i>@T("Open", "فتح")</button>
                 </form>

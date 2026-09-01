@@ -181,6 +181,88 @@ namespace Sms.Infrastructure.Tests
                 payments.CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 100m, session.Id));
         }
 
+        // --- BR-PAY-001 the till code is assigned, never typed ----------------------
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_session_opened_without_a_code_is_given_the_first_till()
+        {
+            using var db = CreateContext();
+            var payments = CreatePaymentAdmin(db);
+
+            var session = await payments.OpenTillSessionAsync(cashierUserId: 7, tillCode: null, floatAmount: 200m);
+
+            Assert.Equal("TILL-1", session.TillCode);
+            Assert.Equal("TILL-1", db.TillSessions.Single(s => s.Id == session.Id).TillCode);
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_cashier_comes_back_to_the_same_drawer_the_next_day()
+        {
+            using var db = CreateContext();
+            var payments = CreatePaymentAdmin(db);
+            var first = await payments.OpenTillSessionAsync(7, null, 200m);
+            await payments.CloseTillSessionAsync(first.Id, 200m);
+
+            // A second cashier in between, so "the same drawer" is not just "the only drawer".
+            var other = await payments.OpenTillSessionAsync(8, null, 0m);
+            _clock.UtcNow = _clock.UtcNow.AddDays(1);
+            var second = await payments.OpenTillSessionAsync(7, null, 300m);
+
+            Assert.Equal("TILL-2", other.TillCode);
+            Assert.Equal(first.TillCode, second.TillCode);
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_cashier_cannot_be_handed_a_second_drawer()
+        {
+            using var db = CreateContext();
+            var payments = CreatePaymentAdmin(db);
+            await payments.OpenTillSessionAsync(7, null, 200m);
+
+            // Without this the auto-assignment would silently mint TILL-2 and split the
+            // cashier's day across two variance records.
+            var refusal = await Assert.ThrowsAsync<CashierAlreadyHasOpenTillException>(() =>
+                payments.OpenTillSessionAsync(7, null, 50m));
+
+            Assert.Equal("TILL-1", refusal.TillCode);
+            Assert.Single(db.TillSessions.Where(s => s.CashierUserId == 7));
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task A_named_till_that_is_open_elsewhere_is_refused_whatever_its_casing()
+        {
+            using var db = CreateContext();
+            var payments = CreatePaymentAdmin(db);
+            await payments.OpenTillSessionAsync(7, "TILL-1", 200m);
+
+            // Sqlite compares strings ordinally, so an equality guard in the query would have
+            // let "till-1" through and put two cashiers at one drawer.
+            await Assert.ThrowsAsync<TillAlreadyOpenException>(() =>
+                payments.OpenTillSessionAsync(8, "till-1", 0m));
+        }
+
+        [Fact]
+        [BusinessRule("BR-PAY-001")]
+        public async Task The_console_can_show_the_drawer_before_it_is_opened()
+        {
+            using var db = CreateContext();
+            var payments = CreatePaymentAdmin(db);
+
+            var previewed = await payments.NextTillCodeForAsync(cashierUserId: 7);
+            var opened = await payments.OpenTillSessionAsync(7, null, 0m);
+
+            // The screen prints the preview beside the Open button, so a preview that did not
+            // survive the press would be a lie told to the person pressing it.
+            Assert.Equal(previewed, opened.TillCode);
+
+            // And the next cashier's preview is not the drawer now in cashier 7's hands.
+            Assert.NotEqual(opened.TillCode, await payments.NextTillCodeForAsync(8));
+        }
+
         // --- BR-PAY-002/003 receipts + allocation -----------------------------------
 
         [Fact]

@@ -12,6 +12,36 @@ namespace Sms.Application.Common.Exceptions
         }
     }
 
+    /// <summary>
+    /// BR-PAY-001: a session is cashier × till × day, so a cashier holds one drawer at a time —
+    /// a second open session would split their day's takings across two variance records.
+    /// </summary>
+    public class CashierAlreadyHasOpenTillException : InvalidOperationException
+    {
+        public CashierAlreadyHasOpenTillException(int cashierUserId, string tillCode)
+            : base($"Cashier {cashierUserId} already has till '{tillCode}' open (BR-PAY-001).")
+        {
+            TillCode = tillCode;
+        }
+
+        public string TillCode { get; }
+    }
+
+    /// <summary>
+    /// BR-PAY-001: the other half of cashier × till — two cashiers on one drawer make the
+    /// count at close unattributable, so a till with a live session is not handed out again.
+    /// </summary>
+    public class TillAlreadyOpenException : InvalidOperationException
+    {
+        public TillAlreadyOpenException(string tillCode)
+            : base($"Till '{tillCode}' already has an open session (BR-PAY-001).")
+        {
+            TillCode = tillCode;
+        }
+
+        public string TillCode { get; }
+    }
+
     /// <summary>BR-PAY-004: the requested PDC status pair isn't a legal lifecycle move.</summary>
     public class InvalidPdcStatusTransitionException : InvalidOperationException
     {

@@ -159,6 +159,14 @@ namespace Sms.Web.Models
                 ? "لا سند قبض بغير وردية صندوق مفتوحة — افتح وردية باسمك قبل التحصيل (BR-PAY-001)."
                 : "No receipt is issued without an open cashier session — open one in your name before taking money (BR-PAY-001).",
 
+            CashierAlreadyHasOpenTillException cashierTill => arabic
+                ? $"لديك وردية مفتوحة على الصندوق {cashierTill.TillCode} — أغلقها بالعدّ قبل فتح غيرها، فالوردية أمين واحد وصندوق واحد ويوم واحد (BR-PAY-001)."
+                : $"You already have a session open on till {cashierTill.TillCode} — close it with a count before opening another; a session is one cashier, one till, one day (BR-PAY-001).",
+
+            TillAlreadyOpenException openTill => arabic
+                ? $"الصندوق {openTill.TillCode} بيد أمين آخر الآن — لا يعمل اثنان على درج واحد وإلا تعذّر نسب العدّ عند الإغلاق (BR-PAY-001)."
+                : $"Till {openTill.TillCode} is in another cashier's hands right now — two people on one drawer make the count at close unattributable (BR-PAY-001).",
+
             InvalidPdcStatusTransitionException => arabic
                 ? "لا تُتاح هذه الحركة من حالة الشيك الحالية: المودَع يُصرَف أو يرتدّ، والمرتدّ يُستبدل أو يُلاحَق، ولا رجوع بعد الصرف (BR-PAY-004)."
                 : "That move is not available from the cheque's current state: a lodged cheque clears or bounces, a bounced one is replaced or pursued, and nothing comes back after clearing (BR-PAY-004).",
