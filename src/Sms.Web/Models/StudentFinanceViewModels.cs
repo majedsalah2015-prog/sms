@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sms.Application.Installments;
 using Sms.Application.ReadModels;
 using Sms.Application.Statements;
 using Sms.Domain.Discounts;
@@ -43,7 +44,8 @@ namespace Sms.Web.Models
             decimal Discounts,
             decimal CreditNotes,
             decimal Paid,
-            bool HasDiscount)
+            bool HasDiscount,
+            ScheduledPositionSplitter.ScheduledPosition? Position = null)
         {
             /// <summary>BR-DIS-010: what is actually owed, with the reductions still shown separately beside it.</summary>
             public decimal Net => Gross - Discounts - CreditNotes;
@@ -51,6 +53,16 @@ namespace Sms.Web.Models
             public decimal Remaining => Net - Paid;
 
             public bool IsSettled => Remaining <= 0m;
+
+            /// <summary>
+            /// What the counter may actually ask for today (BR-INS-007 dates over BR-FEE-008's
+            /// balance). Equal to <see cref="Remaining"/> when no schedule stands over it, which
+            /// is what makes this safe to read as the collection figure for every row.
+            /// </summary>
+            public decimal DueNow => Position?.DueNow ?? Remaining;
+
+            /// <summary>True when a plan is holding part of this balance back from today's claim.</summary>
+            public bool HasDeferred => Position?.DefersAnything ?? false;
         }
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
@@ -83,6 +95,12 @@ namespace Sms.Web.Models
         public bool CanPrintStatement { get; set; }
 
         public decimal TotalRemaining => Rows.Sum(r => r.Remaining);
+
+        /// <summary>The listed students' collectible total — what a chase today could actually recover.</summary>
+        public decimal TotalDueNow => Rows.Sum(r => r.DueNow);
+
+        /// <summary>True when any listed student is on a plan that defers part of their balance — the column is pointless otherwise.</summary>
+        public bool AnyDeferred => Rows.Any(r => r.HasDeferred);
 
         public decimal TotalNet => Rows.Sum(r => r.Net);
 
@@ -186,8 +204,16 @@ namespace Sms.Web.Models
 
         public decimal Remaining => Charges.Sum(r => r.Remaining);
 
+        /// <summary>
+        /// <see cref="Remaining"/> cut along the schedule's dates
+        /// (<see cref="ScheduledPositionSplitter"/>): what the counter may ask for today against
+        /// what the plan has moved into the future. Without a plan the whole balance is due now,
+        /// which is the same statement this screen made before plans were reflected at all.
+        /// </summary>
+        public ScheduledPositionSplitter.ScheduledPosition Position { get; set; } = new(0m, 0m, 0m, 0m);
+
         /// <summary>Charges of this year that no installment line claims — payable on demand rather than on a schedule.</summary>
-        public decimal UnscheduledTotal { get; set; }
+        public decimal UnscheduledTotal => Position.Unscheduled;
     }
 
     /// <summary>doc/Modules/19 §8.7 + BR-DIS-010, P-STMT: the printable statement of one child's account.</summary>

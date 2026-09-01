@@ -69,7 +69,18 @@ else
         <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value text-success"><bdi dir="ltr">−@((Model.Discounted + Model.Credited).ToString("N2"))</bdi></span><span class="sms-tile__label">@T("discounts + credit notes", "خصومات + إشعارات دائنة")</span></div></div>
         <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value">@((Model.Gross - Model.Discounted - Model.Credited).ToString("N2"))</span><span class="sms-tile__label">@T("net owed", "الصافي المستحق")</span></div></div>
         <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value text-success"><bdi dir="ltr">−@Model.Allocated.ToString("N2")</bdi></span><span class="sms-tile__label">@T("paid", "المدفوع")</span></div></div>
-        <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value @(Model.Remaining > 0m ? "text-danger" : "text-success")">@Model.Remaining.ToString("N2")</span><span class="sms-tile__label">@T("remaining", "المتبقي")</span></div></div>
+        @* A plan does not reduce the balance, so this tile answers the counter's question instead
+           of the ledger's: what may actually be asked for today. The balance stays beside it —
+           the family is owed both figures, and one without the other is how the schedule below
+           came to be contradicted by the number above it. *@
+        @if (Model.Position.DefersAnything)
+        {
+            <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value @(Model.Position.DueNow > 0m ? "text-danger" : "text-success")">@Model.Position.DueNow.ToString("N2")</span><span class="sms-tile__label">@T("due now", "مستحق الآن")</span><span class="small text-muted">@T("of", "من أصل") <bdi dir="ltr">@Model.Remaining.ToString("N2")</bdi> @T("outstanding", "متبقٍ")</span></div></div>
+        }
+        else
+        {
+            <div class="col-6 col-lg-2"><div class="sms-tile"><span class="sms-tile__value @(Model.Remaining > 0m ? "text-danger" : "text-success")">@Model.Remaining.ToString("N2")</span><span class="sms-tile__label">@T("remaining", "المتبقي")</span></div></div>
+        }
     </div>
 
     @* ==== the basket: items + template + discount, approved as one act (owner request, 2026-08-31) ==== *@
@@ -468,10 +479,22 @@ else
                             <tfoot><tr class="fw-semibold"><td colspan="2" class="text-end">@T("Total", "المجموع")</td><td class="text-end">@p.Total.ToString("N2")</td><td class="text-end">@p.Installments.Sum(i => i.Covered).ToString("N2")</td><td></td></tr></tfoot>
                         </table></div>
                     }
-                    @if (Model.UnscheduledTotal > 0m)
-                    {
-                        <div class="p-2 border-top small d-flex justify-content-between"><span>@T("Not on any schedule — payable on demand", "خارج أي جدول — مستحق عند الطلب")</span><span class="fw-semibold">@Model.UnscheduledTotal.ToString("N2")</span></div>
-                    }
+                    @* What the schedule does to the balance, stated where the schedule is. The three
+                       lines add up to the remaining balance exactly (ScheduledPositionSplitter), so
+                       the family can check the split against the total they were given. *@
+                    <div class="p-2 border-top small">
+                        <div class="d-flex justify-content-between"><span class="fw-semibold">@T("Due now", "مستحق الآن")</span><span class="fw-semibold @(Model.Position.DueNow > 0m ? "text-danger" : "")">@Model.Position.DueNow.ToString("N2")</span></div>
+                        @if (Model.UnscheduledTotal > 0m)
+                        {
+                            <div class="d-flex justify-content-between text-muted"><span class="ps-3 pe-3">@T("of which not on any schedule — payable on demand", "منه خارج أي جدول — مستحق عند الطلب")</span><span>@Model.UnscheduledTotal.ToString("N2")</span></div>
+                        }
+                        <div class="d-flex justify-content-between text-muted"><span>@T("Deferred by the schedule — not payable yet", "مؤجّل بالجدول — غير مستحق بعد")</span><span>@Model.Position.NotYetDue.ToString("N2")</span></div>
+                        @if (Model.Position.WrittenOff > 0m)
+                        {
+                            <div class="d-flex justify-content-between text-muted"><span>@T("Written off", "مشطوب")</span><span>@Model.Position.WrittenOff.ToString("N2")</span></div>
+                        }
+                        <div class="d-flex justify-content-between border-top mt-1 pt-1"><span class="fw-semibold">@T("Outstanding balance", "إجمالي المتبقي")</span><span class="fw-semibold">@Model.Remaining.ToString("N2")</span></div>
+                    </div>
                 }
             </div>
         </div>

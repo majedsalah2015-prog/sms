@@ -158,6 +158,39 @@ namespace Sms.Web.Controllers
             var discountDocs = await _db.DiscountDocuments.AsNoTracking().Where(d => chargeIds.Contains(d.ChargeId)).Select(d => new { d.ChargeId, d.Amount }).ToListAsync();
             var allocations = await _db.PaymentAllocations.AsNoTracking().Where(a => chargeIds.Contains(a.ChargeId)).Select(a => new { a.ChargeId, a.AllocatedAmount }).ToListAsync();
 
+            // The page's schedules in three more queries, not three per student. A plan never
+            // reduces what a family owes, but it decides how much of it may be asked for today —
+            // and a worklist that cannot tell the two apart sends the officer after money the
+            // school itself agreed to wait for.
+            var assignments = await _db.PlanAssignments.AsNoTracking()
+                .Where(a => a.AcademicYearId == yid && pageIds.Contains(a.StudentId))
+                .Select(a => new { a.Id, a.StudentId }).ToListAsync();
+            var studentOfAssignment = assignments.ToDictionary(a => a.Id, a => a.StudentId);
+            var assignmentIds = assignments.Select(a => a.Id).ToList();
+            var installments = await _db.Installments.AsNoTracking()
+                .Where(i => assignmentIds.Contains(i.PlanAssignmentId) && !i.IsSuperseded)
+                .Select(i => new { i.Id, i.PlanAssignmentId, i.SequenceNumber, i.DueDate, i.Amount, i.IsWrittenOff }).ToListAsync();
+            var installmentIds = installments.Select(i => i.Id).ToList();
+            var scheduleLines = await _db.InstallmentChargeLines.AsNoTracking()
+                .Where(l => installmentIds.Contains(l.InstallmentId))
+                .Select(l => new { l.InstallmentId, l.ChargeId, l.Amount }).ToListAsync();
+
+            var allocatedByCharge = allocations.GroupBy(a => a.ChargeId).ToDictionary(g => g.Key, g => g.Sum(a => a.AllocatedAmount));
+            var sequenceOf = installments.ToDictionary(i => i.Id, i => i.SequenceNumber);
+            var coveredById = InstallmentCoverageCalculator.Cover(
+                scheduleLines.Select(l => new InstallmentCoverageCalculator.ScheduleLine(
+                    l.InstallmentId, l.ChargeId, l.Amount, sequenceOf.GetValueOrDefault(l.InstallmentId, int.MaxValue))),
+                allocatedByCharge);
+            var scheduleOfStudent = installments
+                .Where(i => studentOfAssignment.ContainsKey(i.PlanAssignmentId))
+                .GroupBy(i => studentOfAssignment[i.PlanAssignmentId])
+                .ToDictionary(
+                    g => g.Key,
+                    g => (IReadOnlyList<ScheduledPositionSplitter.ScheduledAmount>)g.Select(i =>
+                        new ScheduledPositionSplitter.ScheduledAmount(
+                            i.DueDate, i.Amount, coveredById.TryGetValue(i.Id, out var covered) ? covered : 0m, false, i.IsWrittenOff)).ToList());
+            var today = _clock.UtcNow;
+
             decimal PerStudent<T>(IEnumerable<T> source, Func<T, int> chargeId, Func<T, decimal> amount, int studentId)
                 => source.Where(x => studentOfCharge.TryGetValue(chargeId(x), out var s) && s == studentId).Sum(amount);
 
@@ -186,6 +219,10 @@ namespace Sms.Web.Controllers
                 var credited = PerStudent(credits, x => x.ChargeId, x => x.Amount, student.Id);
                 var paid = PerStudent(allocations, x => x.ChargeId, x => x.AllocatedAmount, student.Id);
 
+                var schedule = scheduleOfStudent.TryGetValue(student.Id, out var theirs)
+                    ? theirs
+                    : Array.Empty<ScheduledPositionSplitter.ScheduledAmount>();
+
                 rows.Add(new StudentFinanceListViewModel.Row(
                     student,
                     gradeLevel == null ? null : (IsArabic ? gradeLevel.Name.NameAr : gradeLevel.Name.NameEn),
@@ -194,7 +231,8 @@ namespace Sms.Web.Controllers
                     chosen?.IsFinanciallyResponsible ?? false,
                     payerId,
                     gross, discounted, credited, paid,
-                    discounted > 0m));
+                    discounted > 0m,
+                    ScheduledPositionSplitter.Split(gross - discounted - credited - paid, schedule, today)));
             }
 
             if (due) rows = rows.Where(r => r.Remaining > 0m).ToList();
@@ -266,8 +304,17 @@ namespace Sms.Web.Controllers
             m.Discounts = await DiscountsOfAsync(id, yid, chargeEntities.Select(c => c.Id).ToList());
             m.Plans = await PlansOfAsync(id, yid, categories);
 
-            var scheduled = m.Plans.SelectMany(p => p.Installments).Sum(i => i.Installment.Amount);
-            m.UnscheduledTotal = Math.Max(0m, m.Gross - m.Discounted - m.Credited - scheduled);
+            // BR-FEE-008 says what is owed and a schedule never changes it — but a family given a
+            // nine-month plan does not owe the year's fee today, and this screen used to print the
+            // whole balance under "المستحق" on the same page as the schedule contradicting it.
+            // BR-INS-007's dates cut the one figure; they do not produce a second one.
+            m.Position = ScheduledPositionSplitter.Split(
+                m.Remaining,
+                m.Plans.SelectMany(p => p.Installments)
+                    .Select(i => new ScheduledPositionSplitter.ScheduledAmount(
+                        i.Installment.DueDate, i.Installment.Amount, i.Covered, i.Installment.IsSuperseded, i.Installment.IsWrittenOff))
+                    .ToList(),
+                _clock.UtcNow);
 
             // Last, deliberately: the basket is built from what the panels above already read —
             // the unbilled half of the price list, the plans, the grants — so the checklist and
@@ -431,6 +478,7 @@ namespace Sms.Web.Controllers
             // charges — so the covered share is the allocation against those charges, capped at the
             // line, not a second ledger of its own.
             var installmentIds = installments.Select(i => i.Id).ToList();
+            var sequenceOf = installments.ToDictionary(i => i.Id, i => i.SequenceNumber);
             var chargeLines = await _db.InstallmentChargeLines.AsNoTracking()
                 .Where(l => installmentIds.Contains(l.InstallmentId))
                 .Select(l => new { l.InstallmentId, l.ChargeId, l.Amount }).ToListAsync();
@@ -439,25 +487,10 @@ namespace Sms.Web.Controllers
                 .Where(a => lineChargeIds.Contains(a.ChargeId))
                 .Select(a => new { a.ChargeId, a.AllocatedAmount }).ToListAsync();
             var allocatedByCharge = allocations.GroupBy(a => a.ChargeId).ToDictionary(g => g.Key, g => g.Sum(a => a.AllocatedAmount));
-
-            decimal CoveredOf(int installmentId)
-            {
-                var covered = 0m;
-                foreach (var line in chargeLines.Where(l => l.InstallmentId == installmentId))
-                {
-                    // Oldest-first allocation fills earlier installments before later ones, so a
-                    // charge's payment is consumed in sequence order rather than shared out evenly.
-                    var already = chargeLines
-                        .Where(l => l.ChargeId == line.ChargeId)
-                        .Where(l => SequenceOf(l.InstallmentId) < SequenceOf(installmentId))
-                        .Sum(l => l.Amount);
-                    var pool = Math.Max(0m, allocatedByCharge.GetValueOrDefault(line.ChargeId) - already);
-                    covered += Math.Min(line.Amount, pool);
-                }
-                return covered;
-            }
-
-            int SequenceOf(int installmentId) => installments.FirstOrDefault(i => i.Id == installmentId)?.SequenceNumber ?? int.MaxValue;
+            var coveredById = InstallmentCoverageCalculator.Cover(
+                chargeLines.Select(l => new InstallmentCoverageCalculator.ScheduleLine(
+                    l.InstallmentId, l.ChargeId, l.Amount, sequenceOf.GetValueOrDefault(l.InstallmentId, int.MaxValue))),
+                allocatedByCharge);
 
             var today = _clock.UtcNow;
             return assignments.Select(a =>
@@ -470,7 +503,7 @@ namespace Sms.Web.Controllers
                         installments.Where(i => i.PlanAssignmentId == a.Id)
                             .Select(i =>
                             {
-                                var covered = CoveredOf(i.Id);
+                                var covered = coveredById.TryGetValue(i.Id, out var c) ? c : 0m;
                                 return new StudentFinanceDetailViewModel.InstallmentRow(i, covered,
                                     InstallmentStatusDeriver.Derive(i.Amount, covered, i.DueDate, template?.GraceDays ?? 0, today, i.IsSuperseded, i.IsWrittenOff));
                             }).ToList());

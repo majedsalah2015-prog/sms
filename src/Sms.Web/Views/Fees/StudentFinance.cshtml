@@ -38,7 +38,7 @@ else
         <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-mortarboard" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.MatchCount</span><span class="sms-tile__label">@T("students matched", "طالب مطابق")</span></div></div>
         <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-cash-stack" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalNet.ToString("N2")</span><span class="sms-tile__label">@T("net billed (listed)", "صافي المستحق (المعروض)")</span></div></div>
         <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-percent" aria-hidden="true"></i></span><span class="sms-tile__value"><bdi dir="ltr">−@Model.TotalDiscounts.ToString("N2")</bdi></span><span class="sms-tile__label">@T("discounts (listed)", "الخصومات (المعروض)")</span></div></div>
-        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-danger"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalRemaining.ToString("N2")</span><span class="sms-tile__label">@T("still due (listed)", "لا يزال مستحقاً (المعروض)")</span></div></div>
+        <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-danger"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalRemaining.ToString("N2")</span><span class="sms-tile__label">@T("still due (listed)", "لا يزال مستحقاً (المعروض)")</span>@if (Model.AnyDeferred) { <span class="small text-muted">@T("collectible now", "القابل للتحصيل الآن") <bdi dir="ltr">@Model.TotalDueNow.ToString("N2")</bdi></span> }</div></div>
     </div>
 
     <div class="sms-card mb-3 p-3">
@@ -81,6 +81,7 @@ else
                 <th scope="col" class="text-end">@T("Net", "الصافي")</th>
                 <th scope="col" class="text-end">@T("Paid", "المدفوع")</th>
                 <th scope="col" class="text-end">@T("Remaining", "المتبقي")</th>
+                @if (Model.AnyDeferred) { <th scope="col" class="text-end">@T("Due now", "مستحق الآن")</th> }
                 <th scope="col"><span class="visually-hidden">@T("Actions", "إجراءات")</span></th>
             </tr></thead>
             <tbody>
@@ -113,6 +114,20 @@ else
                         @r.Remaining.ToString("N2")
                         <span class="visually-hidden">@(r.Remaining > 0m ? T("due", "مستحق") : r.Remaining < 0m ? T("credit", "دائن") : T("settled", "مسدّد"))</span>
                     </td>
+                    @* The collectible half of the balance: what an installment plan has already
+                       fallen due for, plus whatever is on no plan at all. Equal to the column
+                       beside it for a family without a plan. *@
+                    @if (Model.AnyDeferred)
+                    {
+                        <td class="text-end fw-semibold @(r.DueNow > 0m ? "text-danger" : "")">
+                            @r.DueNow.ToString("N2")
+                            @if (r.HasDeferred)
+                            {
+                                <i class="bi bi-calendar3 ms-1 text-muted" aria-hidden="true"></i>
+                                <span class="visually-hidden">@T("on an installment plan", "على خطة تقسيط")</span>
+                            }
+                        </td>
+                    }
                     <td class="text-nowrap d-print-none">
                         <div class="btn-group btn-group-sm" role="group" aria-label="@T("Actions for", "إجراءات") @FinanceLabels.StudentName(r.Student, isRtl)">
                             @if (Model.CanOpenCashier)
@@ -151,6 +166,7 @@ else
                     <td class="text-end">@Model.TotalNet.ToString("N2")</td>
                     <td class="text-end">@Model.Rows.Sum(r => r.Paid).ToString("N2")</td>
                     <td class="text-end @(Model.TotalRemaining > 0m ? "text-danger" : "")">@Model.TotalRemaining.ToString("N2")</td>
+                    @if (Model.AnyDeferred) { <td class="text-end @(Model.TotalDueNow > 0m ? "text-danger" : "")">@Model.TotalDueNow.ToString("N2")</td> }
                     <td></td>
                 </tr></tfoot>
             }
