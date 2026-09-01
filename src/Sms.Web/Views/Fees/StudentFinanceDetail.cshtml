@@ -193,7 +193,17 @@ else
                                     }
                                     else if (ff.HasPlan)
                                     {
-                                        <p class="small text-muted mb-0">@T("This student already has a plan for the year — a second one is not assigned from here (BR-INS-002). Reschedule it from the instalment plans screen.", "لهذا الطالب خطة لهذا العام بالفعل — ولا تُسنَد ثانية من هنا (BR-INS-002). أعد جدولتها من شاشة خطط التقسيط.")</p>
+                                        <p class="small text-muted mb-0">
+                                            @T("This student already has a plan for the year, and a second one is not assigned over the same fees (BR-INS-002).", "لهذا الطالب خطة لهذا العام بالفعل، ولا تُسنَد ثانية على نفس الرسوم (BR-INS-002).")
+                                            @if (Model.PlanChanges.Count > 0)
+                                            {
+                                                <a href="#plan-schedule">@T("Change the template it is on, under the schedule below.", "غيّر القالب الذي هي عليه، أسفل الجدول أدناه.")</a>
+                                            }
+                                            else
+                                            {
+                                                @T("Changing the plan it is on reshapes a live schedule, which is a different right (BR-INS-005).", "تغيير الخطة القائمة يعيد تشكيل جدول قائم، وهي صلاحية أخرى (BR-INS-005).")
+                                            }
+                                        </p>
                                     }
                                     else if (ff.Templates.Count == 0)
                                     {
@@ -442,7 +452,7 @@ else
             </div>
 
             @* ---- how the fee is distributed over time ---- *@
-            <div class="sms-card">
+            <div class="sms-card" id="plan-schedule">
                 <div class="p-2 border-bottom d-flex justify-content-between align-items-center">
                     <span class="small fw-semibold">@T("4 · How it is spread", "٤ · كيف وُزّعت")</span>
                     <span class="small text-muted">@T("Module 20 installments", "أقساط الوحدة 20")</span>
@@ -478,6 +488,56 @@ else
                             </tbody>
                             <tfoot><tr class="fw-semibold"><td colspan="2" class="text-end">@T("Total", "المجموع")</td><td class="text-end">@p.Total.ToString("N2")</td><td class="text-end">@p.Installments.Sum(i => i.Covered).ToString("N2")</td><td></td></tr></tfoot>
                         </table></div>
+
+                        @* ---- move this plan onto a different template (doc/Modules/20 §8.2, BR-INS-003 → BR-INS-005) ----
+                           Offered here rather than in the basket above because this is what it acts on: the
+                           schedule is right there, and what the change re-dates is the unpaid part of it. Its
+                           own form, outside the basket's — one act, one reason, one button. *@
+                        @if (Model.PlanChangeFor(p.Assignment.Id) is PlanTemplateChangePanel change)
+                        {
+                            <div class="p-2 border-bottom d-print-none">
+                                @if (change.IsFullyCollected)
+                                {
+                                    <p class="small text-muted mb-0">@T("Nothing on this schedule is still unpaid, so there is no remainder left to re-date onto another plan (BR-INS-005).", "لا متبقٍّ غير مسدَّد في هذا الجدول، فلا شيء يُعاد تأريخه على خطة أخرى (BR-INS-005).")</p>
+                                }
+                                else if (change.Options.Count == 0)
+                                {
+                                    <p class="small text-muted mb-0">@T("No other approved template of this year fits these fees — approve one in the template designer first (BR-INS-001).", "لا يوجد قالب معتمد آخر في هذا العام يناسب هذه الرسوم — اعتمد قالباً في مصمّم القوالب أولاً (BR-INS-001).")</p>
+                                }
+                                else
+                                {
+                                    <details>
+                                        <summary class="small text-primary" style="cursor:pointer">@T("Change the installment template", "تغيير قالب التقسيط")</summary>
+                                        <form method="post" asp-action="ChangeStudentPlanTemplate" asp-route-id="@s.Id" asp-route-planAssignmentId="@p.Assignment.Id" asp-route-year="@yid" class="row g-2 mt-1">
+                                            @Html.AntiForgeryToken()
+                                            <div class="col-12">
+                                                <p class="small text-muted mb-1">
+                                                    @T("Only the unpaid remainder moves — ", "لا يتحرك إلا المتبقي غير المسدَّد — ")<bdi dir="ltr" class="fw-semibold">@change.Remainder.ToString("N2")</bdi>@T(" — re-dated onto the new template's instalments. Anything already collected stays where it is, and the instalments it replaces are kept in the history (BR-INS-003).", " — يُعاد تأريخه على أقساط القالب الجديد. ويبقى ما سُدِّد في مكانه، وتُحفظ الأقساط المستبدَلة في السجل (BR-INS-003).")
+                                                </p>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="pt-@p.Assignment.Id">@T("Move to", "الانتقال إلى")</label>
+                                                <select class="form-select form-select-sm" id="pt-@p.Assignment.Id" name="planTemplateId" required>
+                                                    <option value="">@T("— choose a template —", "— اختر قالباً —")</option>
+                                                    @foreach (var o in change.Options)
+                                                    {
+                                                        <option value="@o.Template.Id">@(isRtl ? o.Template.NameAr : o.Template.NameEn) — @o.InstallmentCount @T("installments", "قسطاً")</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="pt-reason-@p.Assignment.Id">@T("Reason", "السبب")</label>
+                                                <input class="form-control form-control-sm" id="pt-reason-@p.Assignment.Id" name="reason" maxlength="400" required />
+                                                <div class="form-text">@T("Mandatory — a family put on a different plan from its grade's is a reported exception (BR-INS-002).", "إلزامي — وضع الأسرة على خطة غير خطة صفّها استثناء يُدرَج في التقارير (BR-INS-002).")</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="submit" class="btn btn-sm btn-primary">@T("Change the plan and re-date the remainder", "تغيير الخطة وإعادة تأريخ المتبقي")</button>
+                                            </div>
+                                        </form>
+                                    </details>
+                                }
+                            </div>
+                        }
                     }
                     @* What the schedule does to the balance, stated where the schedule is. The three
                        lines add up to the remaining balance exactly (ScheduledPositionSplitter), so

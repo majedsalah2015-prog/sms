@@ -247,7 +247,8 @@ namespace Sms.Web.Controllers
 
         [HttpGet("students/{id:int}")]
         [RequirePermission(ScreenCatalog.Modules.Fees, ScreenCatalog.Fees.StudentFinance, ActionVerb.View)]
-        public async Task<IActionResult> StudentFinanceDetail(int id, int? year = null)
+        public async Task<IActionResult> StudentFinanceDetail(
+            [FromServices] Sms.Application.Installments.IInstallmentAdmin installments, int id, int? year = null)
         {
             var student = await _db.Students.IgnoreQueryFilters().AsNoTracking()
                 .SingleOrDefaultAsync(s => s.Id == id && s.SchoolId == _db.CurrentSchoolId);
@@ -320,6 +321,10 @@ namespace Sms.Web.Controllers
             // the unbilled half of the price list, the plans, the grants — so the checklist and
             // the breakdown beside it are one query's answer rather than two.
             m.FeeFile = await BuildFeeFilePanelAsync(m, id);
+
+            // Its own right and its own panel: a Finance Manager who never posts charges gets no
+            // basket above and must still be able to move a family onto a different plan.
+            m.PlanChanges = await BuildPlanChangePanelsAsync(installments, m);
             return View(m);
         }
 

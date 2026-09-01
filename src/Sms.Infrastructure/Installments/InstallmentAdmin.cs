@@ -579,6 +579,131 @@ namespace Sms.Infrastructure.Installments
 
         private sealed record ProposedLine(string DueDate, decimal Amount);
 
+        /// <summary>
+        /// BR-INS-005: takes the unpaid remainder off the live instalments so a new shape can
+        /// carry it, and returns the charge portions it came from in the order a new schedule
+        /// should consume them.
+        /// <para>
+        /// A wholly unpaid instalment is superseded and kept in history (it derives to
+        /// Rescheduled); a partly paid one is trimmed to what has actually been collected, so the
+        /// collected part still derives to Paid. BR-INS-003's "paid instalments never mutate"
+        /// lives here, in one place, because both the approved reschedule and the template change
+        /// depend on it holding identically.
+        /// </para>
+        /// </summary>
+        private List<InstallmentScheduleBuilder.ChargePortion> FreeUnpaid(
+            IReadOnlyList<LoadedInstallment> unpaid, IReadOnlyList<InstallmentChargeLine> allLines)
+        {
+            var freed = new List<InstallmentScheduleBuilder.ChargePortion>();
+            foreach (var item in unpaid)
+            {
+                var lines = allLines.Where(l => l.InstallmentId == item.Row.Id).ToList();
+                if (item.Paid == 0m)
+                {
+                    item.Row.IsSuperseded = true;
+                    freed.AddRange(FreeFromLines(lines, item.Row.Amount, _db));
+                }
+                else
+                {
+                    var moving = item.Row.Amount - item.Paid;
+                    item.Row.Amount = item.Paid;
+                    freed.AddRange(FreeFromLines(lines, moving, _db));
+                }
+            }
+
+            return freed;
+        }
+
+        /// <summary>
+        /// Writes the replacement instalments, carrying the freed charge portions onto them so the
+        /// new schedule collects exactly the charges the old one did. Sequence numbers continue
+        /// past the superseded rows rather than restarting — the history stays readable in order.
+        /// </summary>
+        private void MaterializeSchedule(
+            int planAssignmentId, int nextSequence, IReadOnlyList<ProposedInstallment> lines,
+            IReadOnlyList<InstallmentScheduleBuilder.ChargePortion> freed)
+        {
+            var mapped = InstallmentScheduleBuilder.MapChargesToInstallments(freed, lines.Select(l => l.Amount).ToList());
+            for (var i = 0; i < lines.Count; i++)
+            {
+                var installment = new Installment
+                {
+                    PlanAssignmentId = planAssignmentId, SequenceNumber = nextSequence + i,
+                    DueDate = lines[i].DueDate, Amount = lines[i].Amount,
+                };
+                foreach (var line in mapped.Where(m => m.InstallmentIndex == i))
+                {
+                    installment.ChargeLines.Add(new InstallmentChargeLine { ChargeId = line.ChargeId, Amount = line.Amount });
+                }
+
+                _db.Installments.Add(installment);
+            }
+        }
+
+        public async Task<PlanAssignment> ChangePlanTemplateAsync(
+            int planAssignmentId, int planTemplateId, string reason, ISet<DayOfWeek> weekendDays,
+            int maxExtensionMonths = 3, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new ExceptionAssignmentReasonRequiredException();
+            }
+
+            var template = await LoadApprovedTemplateAsync(planTemplateId, cancellationToken);
+            var schedule = await LoadScheduleAsync(planAssignmentId, cancellationToken);
+
+            if (schedule.Assignment.PlanTemplateId == planTemplateId)
+            {
+                throw new PlanTemplateUnchangedException(planTemplateId);
+            }
+
+            // A template that names no category shapes any group; one that names a different
+            // category would date charges this plan does not hold (BR-INS-002).
+            if (template.FeeCategoryId != null && template.FeeCategoryId != schedule.Assignment.FeeCategoryId)
+            {
+                throw new PlanTemplateScopeMismatchException(planTemplateId);
+            }
+
+            var unpaid = schedule.Installments.Where(i => i.IsCollectible && i.Paid < i.Row.Amount).ToList();
+            var remainder = unpaid.Sum(i => i.Row.Amount - i.Paid);
+            if (remainder <= 0m)
+            {
+                throw new ScheduleFullyCollectedException(planAssignmentId);
+            }
+
+            var yearId = schedule.Assignment.AcademicYearId;
+            var dueDates = await DueDatesAsync(template, yearId, weekendDays, cancellationToken);
+            var year = await _db.AcademicYears.SingleAsync(y => y.Id == yearId, cancellationToken);
+            if (RescheduleApprovalRouter.RequiresPrincipal(unpaid.Max(i => i.Row.DueDate), dueDates.Max(), year.EndDate, maxExtensionMonths))
+            {
+                throw new RescheduleNeedsPrincipalException(planAssignmentId, dueDates.Max());
+            }
+
+            // The new template's percentages over the remainder — not over the original total.
+            // What has been collected stays collected; only what is still owed is re-dated.
+            var splits = template.Installments.OrderBy(i => i.SequenceNumber).Select(i => i.SplitPercent).ToList();
+            var scheduled = InstallmentScheduleBuilder.Build(remainder, splits, dueDates);
+
+            var before = Snapshot(schedule.Installments.Select(i => i.Row));
+            var freed = FreeUnpaid(unpaid, schedule.Lines);
+            MaterializeSchedule(
+                planAssignmentId,
+                schedule.Installments.Max(i => i.Row.SequenceNumber) + 1,
+                scheduled.Select(s => new ProposedInstallment(s.DueDate, s.Amount)).ToList(),
+                freed);
+
+            // The plan now *is* the new template: grace days, and the name the family is told,
+            // both read off it from here on (LoadScheduleAsync derives status through it).
+            // FeeCategoryId is deliberately left alone — the plan still covers the group it was
+            // assigned over, which is what BR-INS-002's uniqueness check reads.
+            schedule.Assignment.PlanTemplateId = template.Id;
+            schedule.Assignment.RescheduleCount++;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            await LogRevisionAsync(planAssignmentId, ScheduleRevisionCause.Rescheduled, reason, before, cancellationToken);
+            return schedule.Assignment;
+        }
+
         public async Task<RescheduleCase> ProposeRescheduleAsync(
             int planAssignmentId, int proposedByUserId, string reason, IReadOnlyList<ProposedInstallment> proposal,
             ISet<DayOfWeek> weekendDays, int maxExtensionMonths = 3, CancellationToken cancellationToken = default)
@@ -639,42 +764,14 @@ namespace Sms.Infrastructure.Installments
             }
 
             var before = Snapshot(schedule.Installments.Select(i => i.Row));
-            var freed = new List<InstallmentScheduleBuilder.ChargePortion>();
-            foreach (var item in unpaid)
-            {
-                var lines = schedule.Lines.Where(l => l.InstallmentId == item.Row.Id).ToList();
-                if (item.Paid == 0m)
-                {
-                    // Wholly unpaid: superseded, kept in history; its charge lines move to the new schedule.
-                    item.Row.IsSuperseded = true;
-                    freed.AddRange(FreeFromLines(lines, item.Row.Amount, _db));
-                }
-                else
-                {
-                    // Partially paid: the paid part stays (derives to Paid), only the unpaid remainder moves.
-                    var moving = item.Row.Amount - item.Paid;
-                    item.Row.Amount = item.Paid;
-                    freed.AddRange(FreeFromLines(lines, moving, _db));
-                }
-            }
+            var freed = FreeUnpaid(unpaid, schedule.Lines);
 
             var proposal = JsonSerializer.Deserialize<List<ProposedLine>>(rescheduleCase.ProposedScheduleJson)!;
-            var mapped = InstallmentScheduleBuilder.MapChargesToInstallments(freed, proposal.Select(p => p.Amount).ToList());
-            var nextSeq = schedule.Installments.Max(i => i.Row.SequenceNumber) + 1;
-            for (var i = 0; i < proposal.Count; i++)
-            {
-                var installment = new Installment
-                {
-                    PlanAssignmentId = rescheduleCase.PlanAssignmentId, SequenceNumber = nextSeq + i,
-                    DueDate = DateTime.ParseExact(proposal[i].DueDate, "yyyy-MM-dd", CultureInfo.InvariantCulture), Amount = proposal[i].Amount,
-                };
-                foreach (var line in mapped.Where(m => m.InstallmentIndex == i))
-                {
-                    installment.ChargeLines.Add(new InstallmentChargeLine { ChargeId = line.ChargeId, Amount = line.Amount });
-                }
-
-                _db.Installments.Add(installment);
-            }
+            MaterializeSchedule(
+                rescheduleCase.PlanAssignmentId,
+                schedule.Installments.Max(i => i.Row.SequenceNumber) + 1,
+                proposal.Select(p => new ProposedInstallment(DateTime.ParseExact(p.DueDate, "yyyy-MM-dd", CultureInfo.InvariantCulture), p.Amount)).ToList(),
+                freed);
 
             schedule.Assignment.RescheduleCount++;
             rescheduleCase.Status = RescheduleCaseStatus.Approved;

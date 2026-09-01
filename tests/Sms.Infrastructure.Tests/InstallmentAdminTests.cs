@@ -526,6 +526,128 @@ namespace Sms.Infrastructure.Tests
             await Assert.ThrowsAsync<RescheduleCaseNotPendingException>(() => admin.DecideRescheduleAsync(rescheduleCase.Id, approve: true));
         }
 
+        // --- BR-INS-003 "plan change (§BR-INS-005)" --------------------------------------------
+
+        /// <summary>Two halves in the second half of the year — a shape a quarterly plan can be moved onto without extending past year-end.</summary>
+        private static IReadOnlyList<TemplateSplit> TwoHalves() => new[]
+        {
+            new TemplateSplit(50m, new DateTime(2027, 1, 10)), new TemplateSplit(50m, new DateTime(2027, 3, 14)),
+        };
+
+        [Fact]
+        [BusinessRule("BR-INS-003")]
+        public async Task Changing_the_template_redates_the_unpaid_remainder_and_leaves_what_was_collected()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);                                // 4 × 250
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 400m);   // #1 paid, #2 has 150 of 250
+            var target = await ApprovedTemplateAsync(admin, TwoHalves());
+
+            await admin.ChangePlanTemplateAsync(assignment.Id, target.Id, "family asked for two payments", KsaWeekend);
+
+            var schedule = await admin.GetScheduleAsync(assignment.Id);
+            Assert.Equal(6, schedule.Count);
+            Assert.Equal(InstallmentStatus.Paid, schedule.Single(i => i.SequenceNumber == 1).Status);
+            var trimmed = schedule.Single(i => i.SequenceNumber == 2);
+            Assert.Equal(150m, trimmed.Amount);                                                     // trimmed to what was received
+            Assert.Equal(InstallmentStatus.Paid, trimmed.Status);
+            Assert.All(schedule.Where(i => i.SequenceNumber is 3 or 4), i => Assert.Equal(InstallmentStatus.Rescheduled, i.Status));
+
+            // The 600 still owed, on the new template's two dates — not the original 1000.
+            var replacement = schedule.Where(i => i.SequenceNumber >= 5).OrderBy(i => i.SequenceNumber).ToList();
+            Assert.Equal(new[] { 300m, 300m }, replacement.Select(i => i.Amount));
+            Assert.Equal(new[] { new DateTime(2027, 1, 10), new DateTime(2027, 3, 14) }, replacement.Select(i => i.DueDate));
+
+            // Same money, different dates: the charge lines still add up to what was billed.
+            Assert.Equal(1000m, db.InstallmentChargeLines.ToList().Sum(l => l.Amount));
+
+            var reloaded = db.PlanAssignments.Single();
+            Assert.Equal(target.Id, reloaded.PlanTemplateId);
+            Assert.Equal(1, reloaded.RescheduleCount);
+            var revision = db.ScheduleRevisions.Single(r => r.Cause == ScheduleRevisionCause.Rescheduled);
+            Assert.Equal("family asked for two payments", revision.Reason);
+            Assert.Contains("250", revision.BeforeJson);
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-002")]
+        public async Task A_template_scoped_to_another_fee_category_cannot_carry_the_plan()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m, _categoryId);
+            var tuitionPlan = await ApprovedTemplateAsync(admin, categoryId: _categoryId);
+            var assignment = await admin.AssignPlanAsync(_studentId, _payerId, tuitionPlan.Id, KsaWeekend);
+            var transportPlan = await ApprovedTemplateAsync(admin, TwoHalves(), categoryId: _transportCategoryId);
+
+            await Assert.ThrowsAsync<PlanTemplateScopeMismatchException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, transportPlan.Id, "wrong group", KsaWeekend));
+
+            // A template that names no category applies to any group, so that one is allowed.
+            var anyCategory = await ApprovedTemplateAsync(admin, TwoHalves());
+            await admin.ChangePlanTemplateAsync(assignment.Id, anyCategory.Id, "onto the general plan", KsaWeekend);
+            Assert.Equal(anyCategory.Id, db.PlanAssignments.Single().PlanTemplateId);
+
+            // The plan still covers the group it was assigned over — BR-INS-002's uniqueness reads this column.
+            Assert.Equal(_categoryId, db.PlanAssignments.Single().FeeCategoryId);
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-005")]
+        public async Task A_template_running_past_year_end_is_sent_to_the_reschedule_chain()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);
+            var overrunning = await ApprovedTemplateAsync(admin, new[]
+            {
+                new TemplateSplit(50m, new DateTime(2027, 3, 14)), new TemplateSplit(50m, new DateTime(2027, 8, 1)),
+            });
+
+            var refusal = await Assert.ThrowsAsync<RescheduleNeedsPrincipalException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, overrunning.Id, "stretch it out", KsaWeekend));
+            Assert.Equal(new DateTime(2027, 8, 1), refusal.ProposedLastDueDate);
+
+            // Refused before anything was written: the schedule the family has is untouched.
+            Assert.Equal(4, db.Installments.Count());
+            Assert.All(db.Installments.ToList(), i => Assert.False(i.IsSuperseded));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-005")]
+        public async Task A_fully_collected_schedule_has_no_remainder_to_move()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 1000m);
+            var target = await ApprovedTemplateAsync(admin, TwoHalves());
+
+            await Assert.ThrowsAsync<ScheduleFullyCollectedException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, target.Id, "too late", KsaWeekend));
+        }
+
+        [Fact]
+        [BusinessRule("BR-INS-003")]
+        public async Task A_plan_change_needs_a_different_approved_template_and_a_reason()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var assignment = await StandardScheduleAsync(db, admin);
+            var target = await ApprovedTemplateAsync(admin, TwoHalves());
+            var draft = await admin.DefineTemplateAsync(_yearId, "Draft", "Draft", TwoHalves());
+
+            await Assert.ThrowsAsync<ExceptionAssignmentReasonRequiredException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, target.Id, "   ", KsaWeekend));
+            await Assert.ThrowsAsync<PlanTemplateNotApprovedException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, draft.Id, "onto a draft", KsaWeekend));
+            await Assert.ThrowsAsync<PlanTemplateUnchangedException>(
+                () => admin.ChangePlanTemplateAsync(assignment.Id, db.PlanAssignments.Single().PlanTemplateId, "no change", KsaWeekend));
+
+            Assert.Equal(0, db.PlanAssignments.Single().RescheduleCount);
+        }
+
         // --- BR-INS-006 promises ---------------------------------------------------------------
 
         [Fact]

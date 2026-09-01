@@ -153,6 +153,37 @@ namespace Sms.Application.Installments
         Task<GradeAssignmentRun> AssignPlanToGradeAsync(
             int gradeLevelId, int planTemplateId, ISet<DayOfWeek> weekendDays, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// BR-INS-003 "plan change (§BR-INS-005)": moves a live plan onto a different approved
+        /// template and re-dates the <b>unpaid remainder</b> to that template's splits.
+        /// <para>
+        /// The remainder is the only thing that moves. A wholly unpaid instalment is superseded
+        /// and kept in history; a partly paid one is trimmed to what has actually been collected,
+        /// so the collected part still derives to Paid and never mutates. The charges the old
+        /// instalments claimed are handed to the new ones, so the schedule keeps collecting the
+        /// same money in a different shape — this is a re-dating, not a re-billing.
+        /// </para>
+        /// <para>
+        /// A different template for one family is BR-INS-002's per-family exception and the
+        /// recomputation is BR-INS-005's reschedule, so the caller must hold both ends of that:
+        /// the reason is mandatory, the family's reschedule count goes up, and a before/after
+        /// snapshot is logged. What this deliberately does <b>not</b> do is stand in for the P4
+        /// chain — if the new shape would extend the last due date past
+        /// <paramref name="maxExtensionMonths"/> or beyond year-end it throws
+        /// <see cref="Common.Exceptions.RescheduleNeedsPrincipalException"/> and the change has to
+        /// go through the reschedule wizard, where the Principal is in the chain.
+        /// </para>
+        /// <para>
+        /// Also throws <see cref="Common.Exceptions.PlanTemplateNotApprovedException"/>,
+        /// <see cref="Common.Exceptions.PlanTemplateUnchangedException"/>,
+        /// <see cref="Common.Exceptions.PlanTemplateScopeMismatchException"/> and
+        /// <see cref="Common.Exceptions.ScheduleFullyCollectedException"/>.
+        /// </para>
+        /// </summary>
+        Task<PlanAssignment> ChangePlanTemplateAsync(
+            int planAssignmentId, int planTemplateId, string reason, ISet<DayOfWeek> weekendDays,
+            int maxExtensionMonths = 3, CancellationToken cancellationToken = default);
+
         /// <summary>BR-INS-007: statuses derived as of now from Module 21 allocations.</summary>
         Task<IReadOnlyList<InstallmentView>> GetScheduleAsync(int planAssignmentId, CancellationToken cancellationToken = default);
 

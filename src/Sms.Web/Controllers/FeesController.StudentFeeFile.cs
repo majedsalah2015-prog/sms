@@ -361,10 +361,16 @@ namespace Sms.Web.Controllers
         /// Read from the same <c>Regional.WorkingDays</c> setting the calendar board and the
         /// assignment console use, through the same helper — a second source for the working week
         /// would let a due date land on a day the calendar calls a weekend.
+        /// <para>
+        /// <paramref name="yearId"/> defaults to the working year, which is the only year the
+        /// basket can commit into. A plan being reshaped is read in its own year instead: the
+        /// setting is per year, and shifting a 2026 due date by the 2027 working week would put it
+        /// on a day that year calls a weekend.
+        /// </para>
         /// </summary>
-        private async Task<ISet<DayOfWeek>> FeeFileWeekendDaysAsync()
+        private async Task<ISet<DayOfWeek>> FeeFileWeekendDaysAsync(int? yearId = null)
         {
-            var working = await _setup.GetSettingAsync(SettingKeys.WorkingDays, _workingYear.AcademicYearId)
+            var working = await _setup.GetSettingAsync(SettingKeys.WorkingDays, yearId ?? _workingYear.AcademicYearId)
                 ?? "Sunday,Monday,Tuesday,Wednesday,Thursday";
             return new HashSet<DayOfWeek>(WorkingWeek.WeekendDays(working));
         }

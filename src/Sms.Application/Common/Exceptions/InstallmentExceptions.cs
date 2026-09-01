@@ -170,6 +170,72 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>
+    /// BR-INS-002: a plan covers one fee-category group, and its instalments already claim that
+    /// group's charges.
+    /// <para>
+    /// A template scoped to a different category would date money this schedule does not hold —
+    /// and because the assignment's category is the column BR-INS-002's one-plan-per-group check
+    /// reads, moving it would quietly unblock a second plan over the same charges. A template
+    /// that names no category applies to any group and is therefore allowed.
+    /// </para>
+    /// </summary>
+    public class PlanTemplateScopeMismatchException : InvalidOperationException
+    {
+        public PlanTemplateScopeMismatchException(int planTemplateId)
+            : base($"Plan template {planTemplateId} is scoped to a different fee category from this plan (BR-INS-002).")
+        {
+        }
+    }
+
+    /// <summary>
+    /// BR-INS-003: the schedule is already on this template. Refused rather than performed,
+    /// because a recomputation that changes nothing still supersedes live instalment rows and
+    /// still counts against the family's reschedule tally.
+    /// </summary>
+    public class PlanTemplateUnchangedException : InvalidOperationException
+    {
+        public PlanTemplateUnchangedException(int planTemplateId)
+            : base($"This plan is already on template {planTemplateId} (BR-INS-003).")
+        {
+        }
+    }
+
+    /// <summary>
+    /// BR-INS-005: a reschedule reshapes the unpaid remainder, and there is none — every
+    /// instalment on this schedule is collected, superseded or written off. Nothing can be
+    /// re-dated without touching money that has already changed hands (BR-INS-003).
+    /// </summary>
+    public class ScheduleFullyCollectedException : InvalidOperationException
+    {
+        public ScheduleFullyCollectedException(int planAssignmentId)
+            : base($"Plan assignment {planAssignmentId} has no unpaid remainder left to reschedule (BR-INS-005).")
+        {
+        }
+    }
+
+    /// <summary>
+    /// BR-INS-005 P4: the new shape pushes the last due date beyond the allowed extension or past
+    /// the end of the academic year, which puts the Principal in the approval chain.
+    /// <para>
+    /// A one-click change carries the Finance Manager's authority and no more, so this is refused
+    /// here and sent to the reschedule wizard, where the case is raised, flagged for the
+    /// Principal and decided by the people the rule names. The date travels as a value so the
+    /// Web boundary can say the whole sentence in the reader's language.
+    /// </para>
+    /// </summary>
+    public class RescheduleNeedsPrincipalException : InvalidOperationException
+    {
+        public RescheduleNeedsPrincipalException(int planAssignmentId, DateTime proposedLastDueDate)
+            : base($"Reshaping plan assignment {planAssignmentId} would move the last due date to {proposedLastDueDate:yyyy-MM-dd}, which needs Principal approval (BR-INS-005).")
+        {
+            ProposedLastDueDate = proposedLastDueDate;
+        }
+
+        /// <summary>Where the new template's last instalment would land, so the refusal can show it.</summary>
+        public DateTime ProposedLastDueDate { get; }
+    }
+
+    /// <summary>
     /// doc/Modules/20 §8.5: the collection window runs backwards.
     /// <para>
     /// Refused rather than tolerated because of what tolerating it looks like. An

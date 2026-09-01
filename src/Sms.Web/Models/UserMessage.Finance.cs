@@ -137,6 +137,22 @@ namespace Sms.Web.Models
                 ? "طلب إعادة الجدولة هذا لم يعد معلّقاً، وقد بُتّ فيه بالفعل (BR-INS-005)."
                 : "This reschedule request is no longer pending — it has already been decided (BR-INS-005).",
 
+            PlanTemplateUnchangedException => arabic
+                ? "الخطة على هذا القالب أصلاً — اختر قالباً آخر، فإعادة التوليد على القالب نفسه تستبدل أقساطاً قائمة بلا فائدة (BR-INS-003)."
+                : "The plan is already on this template — choose a different one; regenerating on the same shape supersedes live instalments for nothing (BR-INS-003).",
+
+            PlanTemplateScopeMismatchException => arabic
+                ? "هذا القالب مخصّص لفئة رسوم أخرى — وخطة الطالب تجدوِل فئتها هي؛ اختر قالباً لنفس الفئة أو قالباً عاماً لكل الفئات (BR-INS-002)."
+                : "That template belongs to a different fee category, while this plan schedules its own category's charges — choose a template for the same category, or one that covers all categories (BR-INS-002).",
+
+            ScheduleFullyCollectedException => arabic
+                ? "لا متبقٍّ غير مسدَّد في هذا الجدول — وتغيير القالب لا يعيد تأريخ إلا ما لم يُسدَّد بعد، والمسدَّد لا يُمَسّ (BR-INS-005)."
+                : "Nothing on this schedule is still unpaid — changing the template only re-dates what is still owed, and what has been collected is never touched (BR-INS-005).",
+
+            RescheduleNeedsPrincipalException e => arabic
+                ? $"هذا القالب يدفع آخر قسط إلى {Day(e.ProposedLastDueDate)}، وهو امتداد يستدعي موافقة المدير — قدّمه من معالج إعادة الجدولة ليأخذ مساره في سلسلة الاعتماد (BR-INS-005)."
+                : $"That template pushes the last instalment out to {Day(e.ProposedLastDueDate)}, an extension that needs the Principal's approval — raise it from the reschedule wizard so it goes through the chain (BR-INS-005).",
+
             PromiseDateOutOfRangeException e => arabic
                 ? $"تاريخ الوعد بالسداد {Day(e.PromisedDate)} خارج المهلة المسموحة — الوعد يكون من اليوم إلى نهاية المهلة التي حددتها المدرسة (BR-INS-006)."
                 : $"The promised payment date {Day(e.PromisedDate)} is outside the allowed window — a promise runs from today to the end of the horizon the school set (BR-INS-006).",

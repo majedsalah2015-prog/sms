@@ -214,6 +214,52 @@ namespace Sms.Web.Models
 
         /// <summary>Charges of this year that no installment line claims — payable on demand rather than on a schedule.</summary>
         public decimal UnscheduledTotal => Position.Unscheduled;
+
+        /// <summary>
+        /// One entry per plan whose template this reader may change, matched to its schedule by
+        /// <see cref="PlanTemplateChangePanel.PlanAssignmentId"/>. Empty when nobody may do it
+        /// here — no plan, or a reader without both halves of the right (BR-SEC-010).
+        /// </summary>
+        public IReadOnlyList<PlanTemplateChangePanel> PlanChanges { get; set; } = Array.Empty<PlanTemplateChangePanel>();
+
+        /// <summary>The change panel for one plan row, or null when that plan is not changeable here.</summary>
+        public PlanTemplateChangePanel? PlanChangeFor(int planAssignmentId)
+            => PlanChanges.FirstOrDefault(p => p.PlanAssignmentId == planAssignmentId);
+    }
+
+    /// <summary>
+    /// doc/Modules/20 §8.2 exception assignment reached from the child's own file: swap the
+    /// template a live plan is on and let BR-INS-003's controlled recomputation re-date the unpaid
+    /// remainder (owner request, 2026-09-01).
+    /// <para>
+    /// Separate from <see cref="StudentFeeFilePanel"/> on purpose. That panel is the basket, and
+    /// it exists only for someone who may post charges; this is a different act, held by a
+    /// different pair of permissions, and a Finance Manager who never posts charges must still be
+    /// able to perform it.
+    /// </para>
+    /// </summary>
+    public sealed class PlanTemplateChangePanel
+    {
+        /// <summary>One template this plan could move to, named the way the picker names it.</summary>
+        public sealed record Option(PlanTemplate Template, int InstallmentCount);
+
+        /// <summary>The plan being reshaped. One per fee-category group, so the panel is per plan row.</summary>
+        public int PlanAssignmentId { get; set; }
+
+        /// <summary>The template it is on now — shown so the choice is a change from something stated.</summary>
+        public PlanTemplate? Current { get; set; }
+
+        /// <summary>
+        /// Approved templates of the year that could carry this plan: the same fee-category group
+        /// or none at all, minus the one it is already on (BR-INS-001, BR-INS-002).
+        /// </summary>
+        public IReadOnlyList<Option> Options { get; set; } = Array.Empty<Option>();
+
+        /// <summary>What is still owed on the schedule — the only amount a change re-dates (BR-INS-005).</summary>
+        public decimal Remainder { get; set; }
+
+        /// <summary>Nothing left unpaid: the panel explains that instead of offering a picker it would refuse.</summary>
+        public bool IsFullyCollected => Remainder <= 0m;
     }
 
     /// <summary>doc/Modules/19 §8.7 + BR-DIS-010, P-STMT: the printable statement of one child's account.</summary>
