@@ -1,27 +1,26 @@
 @using System.Globalization
+@using Sms.Web.Navigation
+@inject Sms.Application.Security.IPermissionService Permissions
 @{
     var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
     var action = (ViewContext.RouteData.Values["action"] as string) ?? "";
-    var tabs = new (string Action, string En, string Ar, string Icon)[]
-    {
-        ("Index", "Setup wizard", "معالج الإعداد", "bi-list-check"),
-        ("Settings", "Settings hub", "مركز الإعدادات", "bi-sliders"),
-        ("Features", "Feature toggles", "الميزات", "bi-toggles"),
-        ("Pack", "Country pack", "حزمة الدولة", "bi-globe2"),
-        ("Numbering", "Numbering", "الترقيم", "bi-123"),
-        ("Documents", "Document types", "أنواع المستندات", "bi-paperclip"),
-        ("Notifications", "Notification defaults", "الإشعارات", "bi-bell"),
-        ("Lookups", "Lookup lists", "القوائم المرجعية", "bi-card-list"),
-        ("Nationalities", "Nationalities", "الجنسيات", "bi-flag"),
-    };
+
+    // BR-SEC-010 — the bar drops what this user cannot open, rather than offering a tab whose only
+    // answer is 404. The table and the reasoning live in SetupNavCatalog, where a test can hold
+    // each tab to the [RequirePermission] on the action it links to.
+    var tabs = await SetupNavCatalog.VisibleAsync(Permissions);
+
     bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase) || (a == "Index" && action == "Step");
 }
-<nav aria-label="@(isRtl ? "الإعداد" : "Setup")">
-<ul class="nav nav-pills sms-subnav mb-4">
-    @foreach (var t in tabs)
-    {
-        var isActive = Active(t.Action);
-        <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="Setup" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.Ar : t.En)</a></li>
-    }
-</ul>
-</nav>
+@if (tabs.Count > 0)
+{
+    <nav aria-label="@(isRtl ? "الإعداد" : "Setup")">
+    <ul class="nav nav-pills sms-subnav mb-4">
+        @foreach (var t in tabs)
+        {
+            var isActive = Active(t.Action);
+            <li class="nav-item"><a class="nav-link @(isActive ? "active" : "")" aria-current="@(isActive ? "page" : null)" asp-controller="@SetupNavCatalog.Controller" asp-action="@t.Action"><i class="bi @t.Icon me-1" aria-hidden="true"></i>@(isRtl ? t.TitleAr : t.TitleEn)</a></li>
+        }
+    </ul>
+    </nav>
+}
