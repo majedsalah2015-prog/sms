@@ -1,0 +1,201 @@
+@using System.Globalization
+@model PaymentRegisterViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Payments register", "سجل الدفعات");
+    ViewData["Breadcrumb"] = T("Payments / Register", "المدفوعات / السجل");
+    ViewData["FinanceYear"] = Model.Year?.Id;
+    var yid = Model.Year?.Id;
+
+    // Invariant, always. <input type="date"> accepts one wire format — ISO Gregorian, ASCII digits —
+    // and rejects anything else by rendering the box *empty*, which reads as "the filter lost my
+    // dates" rather than as a formatting fault. Formatting through CurrentCulture makes that depend
+    // on the calendar and digit shapes the reader's culture happens to carry, so the value is pinned
+    // here the way money is pinned in a number box (see CultureTolerantNumberModelBinder).
+    var from = Model.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    var to = Model.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "payreg-help", Title = T("Payments register — help", "سجل الدفعات — مساعدة"),
+        Intro = T("Every receipt issued between the two dates, read from the students the money was allocated to. Both dates are inclusive: a receipt issued at any hour of the end date is in the register.", "كل سند صدر بين التاريخين، معروضاً من جهة الطلاب الذين خُصّص لهم المبلغ. التاريخان شاملان: أي سند صدر في أي ساعة من تاريخ النهاية يظهر في السجل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Why one receipt can be several rows", "لماذا يظهر السند في أكثر من سطر"), T("A receipt is addressed to a payer, not a student (BR-FEE-004), and BR-PAY-003 allocates it oldest-first across everything that payer owes — siblings included. Each row is the part of the receipt that reached one child, and the rows of a receipt add back to its total.", "السند يصدر باسم الدافع لا الطالب (BR-FEE-004)، ويخصّصه BR-PAY-003 للأقدم أولاً على كل ما يستحق على ذلك الدافع بما في ذلك الإخوة. كل سطر هو الجزء الذي وصل إلى طالب واحد، ومجموع أسطر السند يعود إلى إجماليه.")),
+            new HelpPanelViewModel.Item(T("Unallocated rows", "الأسطر غير المخصّصة"), T("Money a receipt left over after the allocation is the family's credit balance (BR-PAY-003). It belongs to no child, so it carries a row with no student rather than being attributed to whichever child happened to be billed first.", "المبلغ المتبقي من السند بعد التخصيص هو رصيد الأسرة الدائن (BR-PAY-003). لا يخص طالباً بعينه، فيظهر في سطر بلا طالب بدل نسبه إلى أول طالب صدرت له فاتورة.")),
+            new HelpPanelViewModel.Item(T("What the filters can and cannot reach", "ما تصل إليه الفلاتر وما لا تصل"), T("Guardian filters the receipt itself, because the receipt is addressed to them. Student, grade and section can only filter allocated money — so narrowing by any of the three drops the unallocated rows, and the total then means \"collected for these students\" rather than \"collected in this period\".", "فلتر ولي الأمر يعمل على السند نفسه لأنه صادر باسمه. أما الطالب والصف والشعبة فلا تصل إلا إلى المبالغ المخصّصة — لذا يُسقِط أيٌّ منها الأسطر غير المخصّصة، ويصبح الإجمالي عندها «المحصّل لهؤلاء الطلاب» لا «المحصّل في هذه الفترة».")),
+            new HelpPanelViewModel.Item(T("Grade and section are read per year", "الصف والشعبة تُقرأ حسب العام"), T("A section only exists inside an academic year, so the grade and section shown are the ones the child held in the selected year — which defaults to the year the end date falls in, not to today's working year.", "الشعبة لا توجد إلا داخل عام دراسي، فالصف والشعبة المعروضان هما ما كان عليه الطالب في العام المحدد — والذي يُضبط تلقائياً على العام الذي يقع فيه تاريخ النهاية، لا على عام العمل الحالي.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("What the school collected between two dates, and for whose children.", "ما حصّلته المدرسة بين تاريخين، ولأي الطلاب.")</p>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <form method="get" class="d-flex gap-2">
+            <input type="hidden" name="from" value="@from" />
+            <input type="hidden" name="to" value="@to" />
+            <input type="hidden" name="q" value="@Model.Q" />
+            <input type="hidden" name="guardian" value="@Model.Guardian" />
+            <select name="year" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="@T("Academic year", "العام الدراسي")">
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </form>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+<partial name="_FinanceNav" />
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-receipt-cutoff" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.ReceiptCount</span><span class="sms-tile__label">@T("receipts", "سند")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon text-success"><i class="bi bi-cash-stack" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalCollected.ToString("N2")</span><span class="sms-tile__label">@(Model.IsStudentFiltered ? T("collected for these students", "المحصّل لهؤلاء الطلاب") : T("collected in this period", "المحصّل في هذه الفترة"))</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-piggy-bank" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.TotalUnallocated.ToString("N2")</span><span class="sms-tile__label">@T("left as family credit", "متبقٍ كرصيد للأسرة")</span></div></div>
+    <div class="col-6 col-lg-3"><div class="sms-tile"><span class="sms-tile__icon"><i class="bi bi-mortarboard" aria-hidden="true"></i></span><span class="sms-tile__value">@Model.StudentCount</span><span class="sms-tile__label">@T("students paid for", "طالب دُفع عنه")</span></div></div>
+</div>
+
+<div class="sms-card mb-3 p-3">
+    <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="year" value="@yid" />
+        <div class="col-6 col-md-2"><label class="form-label small mb-1" for="f-from">@T("From", "من")</label><input type="date" id="f-from" name="from" value="@from" class="form-control form-control-sm" /></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-1" for="f-to">@T("To", "إلى")</label><input type="date" id="f-to" name="to" value="@to" class="form-control form-control-sm" /></div>
+        <div class="col-md-2"><label class="form-label small mb-1" for="f-q">@T("Student", "الطالب")</label><input id="f-q" name="q" value="@Model.Q" class="form-control form-control-sm" placeholder="@T("name / student no.", "الاسم / رقم الطالب")" /></div>
+        <div class="col-md-2"><label class="form-label small mb-1" for="f-guardian">@T("Guardian", "ولي الأمر")</label><input id="f-guardian" name="guardian" value="@Model.Guardian" class="form-control form-control-sm" placeholder="@T("name / file no. / mobile", "الاسم / رقم الملف / الجوال")" /></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-1" for="f-grade">@T("Grade", "الصف")</label>
+            <select id="f-grade" name="grade" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">@T("All grades", "كل الصفوف")</option>
+                @foreach (var g in Model.Grades) { <option value="@g.Id" selected="@(g.Id == Model.GradeId)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }
+            </select>
+        </div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-1" for="f-section">@T("Section", "الشعبة")</label>
+            <select id="f-section" name="section" class="form-select form-select-sm" disabled="@(Model.GradeId == null)">
+                <option value="">@T("All sections", "كل الشعب")</option>
+                @foreach (var s in Model.Sections) { <option value="@s.Id" selected="@(s.Id == Model.SectionId)">@(isRtl ? s.NameAr : s.NameEn)</option> }
+            </select>
+            @if (Model.GradeId == null) { <div class="form-text small">@T("Pick a grade first.", "اختر الصف أولاً.")</div> }
+        </div>
+        <div class="col-12 d-flex gap-2">
+            <button class="btn btn-outline-primary btn-sm" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>@T("Apply", "تطبيق")</button>
+            <a class="btn btn-outline-secondary btn-sm" asp-action="Register"><i class="bi bi-x-lg me-1" aria-hidden="true"></i>@T("Clear", "مسح")</a>
+            @if (Model.CanExport && Model.MatchCount > 0)
+            {
+                <a class="btn btn-outline-success btn-sm ms-auto" asp-action="RegisterCsv" asp-route-year="@yid" asp-route-from="@from" asp-route-to="@to" asp-route-q="@Model.Q" asp-route-guardian="@Model.Guardian" asp-route-grade="@Model.GradeId" asp-route-section="@Model.SectionId">
+                    <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>@T("Export CSV", "تصدير CSV")
+                </a>
+            }
+        </div>
+    </form>
+</div>
+
+@if (Model.IsStudentFiltered && Model.TotalUnallocated == 0m)
+{
+    <div class="alert alert-info py-2 small d-print-none">
+        <i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("Filtered by student, grade or section — the total is what was allocated to those students. Money a family paid in advance is not attributed to a child and is not counted here.", "التصفية بالطالب أو الصف أو الشعبة — الإجمالي هو ما خُصّص لهؤلاء الطلاب. والمبالغ التي دفعتها الأسرة مقدماً لا تُنسب إلى طالب ولا تُحتسب هنا.")
+    </div>
+}
+
+@if (Model.IsTruncated)
+{
+    <div class="alert alert-warning py-2 small d-print-none">
+        <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T($"Showing the first {Model.Rows.Count} of {Model.MatchCount} rows — the totals above cover all of them. Narrow the dates or the filters, or export the file.", $"يُعرض أول {Model.Rows.Count} من {Model.MatchCount} سطراً — والإجماليات أعلاه تشمل الجميع. ضيّق التواريخ أو الفلاتر، أو صدّر الملف.")
+    </div>
+}
+
+<div class="sms-card">
+    <div class="table-responsive"><table class="table table-sm sms-table mb-0 align-middle">
+        <caption class="visually-hidden">@T("Receipts issued in the selected period with the students their allocations paid for", "السندات الصادرة في الفترة المحددة مع الطلاب الذين خُصّصت لهم")</caption>
+        <thead><tr>
+            <th scope="col">@T("Date", "التاريخ")</th>
+            <th scope="col">@T("Receipt no.", "رقم السند")</th>
+            <th scope="col">@T("Method", "طريقة الدفع")</th>
+            <th scope="col">@T("Guardian", "ولي الأمر")</th>
+            <th scope="col">@T("Student", "الطالب")</th>
+            <th scope="col">@T("Grade", "الصف")</th>
+            <th scope="col">@T("Section", "الشعبة")</th>
+            <th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
+            <th scope="col" class="text-end">@T("Receipt total", "إجمالي السند")</th>
+        </tr></thead>
+        <tbody>
+        @foreach (var r in Model.Rows)
+        {
+            <tr class="@(r.IsVoid ? "text-muted" : null)">
+                <td class="text-nowrap"><bdi dir="ltr">@r.Receipt.IssuedAtUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</bdi></td>
+                <td>
+                    @if (Model.CanOpenReceipt)
+                    {
+                        <a asp-action="Receipt" asp-route-id="@r.Receipt.Id" class="font-monospace small">@r.Receipt.ReceiptNo</a>
+                    }
+                    else
+                    {
+                        <span class="font-monospace small">@r.Receipt.ReceiptNo</span>
+                    }
+                    @if (r.IsVoid)
+                    {
+                        <span class="badge bg-danger-subtle text-danger-emphasis ms-1">@T("void", "ملغى")</span>
+                    }
+                </td>
+                <td class="small">
+                    @FinanceLabels.Method(r.Receipt.Method, isRtl)
+                    @if (!string.IsNullOrWhiteSpace(r.Receipt.MethodRefNo))
+                    {
+                        <span class="text-muted font-monospace">· @r.Receipt.MethodRefNo</span>
+                    }
+                </td>
+                <td class="small">@FinanceLabels.ParentName(r.Payer, isRtl)</td>
+                <td class="small">
+                    @if (r.IsUnallocated)
+                    {
+                        <span class="text-muted fst-italic">@T("unallocated — family credit", "غير مخصّص — رصيد الأسرة")</span>
+                    }
+                    else
+                    {
+                        <span>@FinanceLabels.StudentName(r.Student!, isRtl)</span>
+                        <span class="text-muted font-monospace small ms-1">@r.Student!.StudentNo</span>
+                    }
+                </td>
+                <td class="small">@(r.GradeName ?? "—")</td>
+                <td class="small">@(r.SectionName ?? "—")</td>
+                <td class="text-end fw-semibold @(r.IsVoid ? "" : "text-success")">@r.Amount.ToString("N2")</td>
+                <td class="text-end text-muted">@r.Receipt.Amount.ToString("N2")</td>
+            </tr>
+        }
+        </tbody>
+        @if (Model.Rows.Count > 0)
+        {
+            <tfoot>
+                <tr class="fw-semibold">
+                    <td colspan="7" class="text-end">@T("Total (all matching rows)", "الإجمالي (كل الأسطر المطابقة)")</td>
+                    <td class="text-end">@Model.TotalCollected.ToString("N2")</td>
+                    <td></td>
+                </tr>
+                @if (Model.TotalVoided > 0m)
+                {
+                    <tr class="small text-muted">
+                        <td colspan="7" class="text-end">@T("Voided, excluded from the total", "ملغى، خارج الإجمالي")</td>
+                        <td class="text-end"><bdi dir="ltr">@Model.TotalVoided.ToString("N2")</bdi></td>
+                        <td></td>
+                    </tr>
+                }
+            </tfoot>
+        }
+    </table></div>
+
+    @if (Model.Rows.Count == 0)
+    {
+        <div class="p-4 text-center text-muted">
+            <i class="bi bi-inbox fs-3 d-block mb-2" aria-hidden="true"></i>
+            @if (Model.HasAnyFilter)
+            {
+                <p class="mb-1">@T("No payments match these filters in this period.", "لا توجد دفعات مطابقة لهذه الفلاتر في هذه الفترة.")</p>
+                <a class="btn btn-outline-secondary btn-sm" asp-action="Register" asp-route-year="@yid" asp-route-from="@from" asp-route-to="@to">@T("Clear the filters", "مسح الفلاتر")</a>
+            }
+            else
+            {
+                <p class="mb-0">@T("No receipt was issued between these dates. Widen the range, or take a payment on the cashier screen.", "لم يصدر أي سند بين هذين التاريخين. وسّع المدى، أو سجّل دفعة من شاشة الصندوق.")</p>
+            }
+        </div>
+    }
+</div>

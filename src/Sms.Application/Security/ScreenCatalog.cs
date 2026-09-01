@@ -348,6 +348,9 @@ namespace Sms.Application.Security
             public const string Pdc = "Pdc";
             public const string Refunds = "Refunds";
             public const string Allocations = "Allocations";
+
+            /// <summary>doc/Modules/21 §10 "Receipt register" / "Daily collection report" — what was collected between two dates, read from the students the money was allocated to.</summary>
+            public const string Register = "Register";
         }
 
         public static class Discounts
@@ -674,6 +677,11 @@ namespace Sms.Application.Security
             S(Modules.Payments, Payments.Pdc, "PDC registry", "الشيكات الآجلة", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit),
             S(Modules.Payments, Payments.Refunds, "Refunds", "الاستردادات", ActionVerb.View, ActionVerb.Submit, ActionVerb.Approve),
             S(Modules.Payments, Payments.Allocations, "Allocations", "التخصيصات", ReadOnly),
+
+            // Export and not Print: the register leaves the system as a file somebody reconciles
+            // elsewhere, and BR-SEC-021 keeps handing a school's collection out of the building
+            // behind its own right rather than behind View.
+            S(Modules.Payments, Payments.Register, "Payments register", "سجل الدفعات", ActionVerb.View, ActionVerb.Export),
 
             // ---- Discounts
             S(Modules.Discounts, Discounts.Grants, "Discount grants", "منح الخصم", ActionVerb.View, ActionVerb.Submit, ActionVerb.Approve, ActionVerb.Deactivate),
