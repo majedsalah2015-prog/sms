@@ -7,6 +7,8 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Numbering;
 using Sms.Domain.Parents;
+using Sms.Domain.Common;
+using Sms.Domain.Geography;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
@@ -212,6 +214,84 @@ namespace Sms.Infrastructure.Tests
             _audit.Reason = "ID correction";
             Assert.Equal("Ahmad Ali", (await admin.UpdateParentAsync(parent.Id, "أحمد علي", "Ahmad Ali", "0509999999")).NameEn);
             _audit.Reason = null;
+        }
+
+        /// <summary>
+        /// doc/Modules/11 §7: the residence hierarchy is governorate → locality → quarter, and only
+        /// the lower two are stored. Most localities have no quarters recorded at all, so a locality
+        /// on its own is a complete address rather than a half-filled one.
+        /// </summary>
+        [Fact]
+        public async Task A_locality_on_its_own_is_a_complete_residence()
+        {
+            using var db = CreateContext();
+            var admin = new ParentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (areaId, _, _) = SeedResidenceHierarchy(db);
+            var parent = await admin.RegisterParentAsync("سارة", "Sarah", "0502222222");
+
+            await admin.SetResidenceAsync(parent.Id, areaId, neighbourhoodId: null);
+
+            var stored = db.Parents.Single(p => p.Id == parent.Id);
+            Assert.Equal(areaId, stored.ResidenceAreaId);
+            Assert.Null(stored.NeighbourhoodId);
+        }
+
+        /// <summary>
+        /// A quarter with no locality under it is not a place. It was refused before this test
+        /// existed, but as a bare <c>InvalidOperationException</c> whose English sentence went
+        /// straight to the screen — an Arabic-speaking registrar was told nothing they could read.
+        /// </summary>
+        [Fact]
+        public async Task A_quarter_cannot_be_recorded_without_the_locality_it_belongs_to()
+        {
+            using var db = CreateContext();
+            var admin = new ParentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (_, _, hoodId) = SeedResidenceHierarchy(db);
+            var parent = await admin.RegisterParentAsync("منى", "Mona", "0503333331");
+
+            var refusal = await Assert.ThrowsAsync<InvalidResidenceSelectionException>(() =>
+                admin.SetResidenceAsync(parent.Id, residenceAreaId: null, neighbourhoodId: hoodId));
+
+            Assert.Equal(ResidenceSelectionFault.QuarterWithoutLocality, refusal.Fault);
+            Assert.Null(db.Parents.Single(p => p.Id == parent.Id).ResidenceAreaId);
+        }
+
+        /// <summary>
+        /// A quarter belonging to a different locality is a worse record than none: the two levels
+        /// would disagree, and every question asked of either would answer from the wrong place.
+        /// </summary>
+        [Fact]
+        public async Task A_quarter_from_another_locality_is_refused_rather_than_stored()
+        {
+            using var db = CreateContext();
+            var admin = new ParentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (_, otherAreaId, hoodId) = SeedResidenceHierarchy(db);
+            var parent = await admin.RegisterParentAsync("هالة", "Hala", "0503333332");
+
+            var refusal = await Assert.ThrowsAsync<InvalidResidenceSelectionException>(() =>
+                admin.SetResidenceAsync(parent.Id, otherAreaId, hoodId));
+
+            Assert.Equal(ResidenceSelectionFault.QuarterOutsideLocality, refusal.Fault);
+            Assert.Null(db.Parents.Single(p => p.Id == parent.Id).NeighbourhoodId);
+        }
+
+        /// <summary>One governorate, two localities under it, and a quarter inside the first only.</summary>
+        private static (int AreaId, int OtherAreaId, int NeighbourhoodId) SeedResidenceHierarchy(AppDbContext db)
+        {
+            var governorate = new Governorate { Code = "GZ", Name = new LocalizedName("غزة", "Gaza"), SortOrder = 1 };
+            db.Governorates.Add(governorate);
+            db.SaveChanges();
+
+            var area = new ResidenceArea { GovernorateId = governorate.Id, Code = "GZC", Name = new LocalizedName("غزة المدينة", "Gaza City"), SortOrder = 1 };
+            var other = new ResidenceArea { GovernorateId = governorate.Id, Code = "JBL", Name = new LocalizedName("جباليا", "Jabalia"), SortOrder = 2 };
+            db.ResidenceAreas.AddRange(area, other);
+            db.SaveChanges();
+
+            var hood = new Neighbourhood { ResidenceAreaId = area.Id, Code = "RMD", Name = new LocalizedName("الرمال", "Al Rimal"), SortOrder = 1 };
+            db.Neighbourhoods.Add(hood);
+            db.SaveChanges();
+
+            return (area.Id, other.Id, hood.Id);
         }
     }
 }

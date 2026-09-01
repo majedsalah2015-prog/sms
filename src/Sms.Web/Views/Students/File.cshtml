@@ -90,6 +90,62 @@
                 </div>
                 <div class="d-flex gap-2 align-items-end"><div style="max-width:420px" class="flex-grow-1"><label class="form-label small" for="stu-Reason">@T("Reason (required when identity fields change — BR-STU-002, T1)", "السبب (مطلوب عند تغيير حقول الهوية — BR-STU-002)")</label><input name="Reason" id="stu-Reason" class="form-control form-control-sm" /></div><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
             </form>
+
+            @* Where the student lives (owner request, 2026-08-31). A second form rather than three
+               more boxes inside the identity one: the identity form demands a reason on every save
+               because BR-STU-002 makes those fields T1-with-reason, and a family that moved house
+               has nothing to justify. Its own post also means a refused address does not throw away
+               a name correction typed above it. *@
+            @* The three pickers below are filled from constants that used to have no screen behind
+               them, so a quarter the seeded pack never listed could not be recorded at all and the
+               registrar wrote it into the nearest locality instead. The button opens where they are
+               authored, at the level already chosen here, and comes back to this file. Drawn only
+               for a reader who may open that screen (BR-SEC-010). *@
+            <div class="d-flex align-items-center justify-content-between gap-2 mt-4">
+                <h3 class="h6 mb-0">@T("Residence", "السكن")</h3>
+                @if (Model.CanManageResidenceLists)
+                {
+                    <a id="stu-res-manage" class="btn btn-sm btn-outline-secondary"
+                       href="@Url.Action("Residence", "Setup", new { governorateId = Model.CurrentGovernorateId, localityId = Model.CurrentResidenceAreaId })"
+                       title="@T("Governorate, locality and quarter are maintained in System Setup", "المحافظة والمنطقة والحي تُدار في إعداد النظام")">
+                        <i class="bi bi-pencil-square me-1" aria-hidden="true"></i>@T("Add / edit these lists", "إضافة أو تعديل الثوابت")
+                    </a>
+                }
+            </div>
+            <form method="post" asp-action="SaveResidence" asp-route-id="@s.Id">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label small" for="stu-res-gov">@T("Governorate", "المحافظة")</label>
+                        <select id="stu-res-gov" class="form-select form-select-sm" aria-label="@T("Governorate", "المحافظة")">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                            @foreach (var g in Model.Governorates)
+                            {
+                                <option value="@g.Id" selected="@(Model.CurrentGovernorateId == g.Id)">@(isRtl ? g.Name.NameAr : g.Name.NameEn)</option>
+                            }
+                        </select>
+                        <div class="form-text">@T("Not stored — it is walked up to from the locality.", "لا تُخزَّن — بل يُصعَد إليها من المنطقة.")</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" for="stu-res-area">@T("Locality", "المنطقة")</label>
+                        <select id="stu-res-area" name="residenceAreaId" class="form-select form-select-sm">
+                            <option value="">@T("— choose —", "— اختر —")</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small" for="stu-res-hood">@T("Quarter", "الحي")</label>
+                        <select id="stu-res-hood" name="neighbourhoodId" class="form-select form-select-sm">
+                            <option value="">@T("— none recorded —", "— لا يوجد —")</option>
+                        </select>
+                        <div class="form-text">@T("Only some localities have quarters; elsewhere the locality is the address.", "الأحياء مسجَّلة لبعض المناطق فقط؛ وفي غيرها المنطقة هي العنوان.")</div>
+                    </div>
+                    <div class="col-md-3 d-flex flex-column">
+                        <span class="form-label small">@T("Recorded", "المسجَّل")</span>
+                        <span class="small text-truncate" title="@Model.CurrentResidencePath"><i class="bi bi-geo-alt me-1" aria-hidden="true"></i>@(Model.CurrentResidencePath ?? T("not recorded", "غير مسجَّل"))</span>
+                        <button class="btn btn-sm btn-primary mt-2 align-self-start" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save residence", "حفظ السكن")</button>
+                    </div>
+                </div>
+                <div class="form-text">@T("This is the student's own address. The guardian's is on the guardian's file, and the two are independent — correcting one does not correct the other.", "هذا عنوان الطالب نفسه. وعنوان ولي الأمر في ملفه هو، وهما مستقلان — تصحيح أحدهما لا يصحّح الآخر.")</div>
+            </form>
             </div>
             </div>
         </div>
@@ -212,3 +268,73 @@
     </div>
 </div>
 
+
+@section Scripts {
+<script>
+(function () {
+    // The two lower levels of the residence picker are fetched as the one above them changes —
+    // the same three endpoints the parent file uses, against this controller's own routes so the
+    // permission checked is the student file's.
+    var gov = document.getElementById('stu-res-gov');
+    var area = document.getElementById('stu-res-area');
+    var hood = document.getElementById('stu-res-hood');
+    if (!gov || !area || !hood) { return; }
+
+    var isRtl = @Html.Raw(Json.Serialize(isRtl));
+    var labels = {
+        choose: @Html.Raw(Json.Serialize(T("— choose —", "— اختر —"))),
+        none: @Html.Raw(Json.Serialize(T("— none recorded —", "— لا يوجد —")))
+    };
+
+    function fill(select, rows, placeholder, selectedId) {
+        select.innerHTML = '';
+        var blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = placeholder;
+        select.appendChild(blank);
+        rows.forEach(function (r) {
+            var o = document.createElement('option');
+            o.value = r.id;
+            o.textContent = isRtl ? r.ar : r.en;
+            if (selectedId && r.id === selectedId) { o.selected = true; }
+            select.appendChild(o);
+        });
+    }
+
+    async function loadAreas(governorateId, selectAreaId) {
+        if (!governorateId) { fill(area, [], labels.choose); fill(hood, [], labels.none); return; }
+        var rows = await fetch('@Url.Content("~/students/residence/areas")?governorateId=' + governorateId).then(function (r) { return r.json(); });
+        fill(area, rows, labels.choose, selectAreaId);
+        await loadHoods(area.value, currentHood);
+    }
+
+    async function loadHoods(areaId, selectHoodId) {
+        if (!areaId) { fill(hood, [], labels.none); return; }
+        var rows = await fetch('@Url.Content("~/students/residence/neighbourhoods")?areaId=' + areaId).then(function (r) { return r.json(); });
+        fill(hood, rows, labels.none, selectHoodId);
+    }
+
+    // The link to where these lists are authored follows the pickers, so the setup screen opens on
+    // the governorate and locality being looked at rather than on its own first column. Rebuilt from
+    // the base href, not appended to, or a second change would stack a second query string on it.
+    var manage = document.getElementById('stu-res-manage');
+    var manageBase = manage ? manage.getAttribute('href').split('?')[0] : null;
+    function syncManage() {
+        if (!manage) { return; }
+        var query = [];
+        if (gov.value) { query.push('governorateId=' + encodeURIComponent(gov.value)); }
+        if (area.value) { query.push('localityId=' + encodeURIComponent(area.value)); }
+        manage.setAttribute('href', manageBase + (query.length ? '?' + query.join('&') : ''));
+    }
+
+    gov.addEventListener('change', function () { currentHood = null; loadAreas(gov.value, null).then(syncManage); });
+    area.addEventListener('change', function () { currentHood = null; loadHoods(area.value, null).then(syncManage); });
+
+    // Reopen on what is already recorded: all three levels were resolved server-side by walking up
+    // from the stored locality, so the browser restores them rather than guessing.
+    var currentHood = @Html.Raw(Json.Serialize(Model.Student.NeighbourhoodId));
+    var currentArea = @Html.Raw(Json.Serialize(Model.CurrentResidenceAreaId));
+    if (gov.value) { loadAreas(gov.value, currentArea).then(syncManage); }
+})();
+</script>
+}

@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Domain.Common;
+using Sms.Domain.Geography;
 using Sms.Domain.Grades;
 using Sms.Domain.Numbering;
 using Sms.Domain.Schools;
@@ -227,6 +228,141 @@ namespace Sms.Infrastructure.Tests
             Assert.Equal("Renamed", updated.FirstNameEn);
             Assert.Equal("1098765432", db.Students.Single(s => s.Id == student.Id).PrimaryIdNo);
             _audit.Reason = null;
+        }
+
+        // --- residence: محافظة ← منطقة ← حي on the student's own record ---------
+        //
+        // Owner request, 2026-08-31. The same three cases the parent register is held to, asserted
+        // again here rather than assumed from it: the two services share an exception type and
+        // nothing else, so a student that silently stored a quarter belonging to another locality
+        // would pass every parent test in the suite.
+
+        /// <summary>
+        /// Most localities have no quarters recorded at all — 7 across 34 in the seeded hierarchy —
+        /// so a locality on its own is a complete address, not a half-filled one. A student who
+        /// could only be placed by quarter would be unrecordable nearly everywhere.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-STU-001")]
+        public async Task A_locality_on_its_own_is_a_complete_student_residence()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (areaId, _, _) = SeedResidenceHierarchy(db);
+            var student = await Register(admin);
+
+            await admin.SetResidenceAsync(student.Id, areaId, neighbourhoodId: null);
+
+            var stored = db.Students.Single(s => s.Id == student.Id);
+            Assert.Equal(areaId, stored.ResidenceAreaId);
+            Assert.Null(stored.NeighbourhoodId);
+        }
+
+        /// <summary>A quarter with no locality under it is not a place, and is refused rather than stored.</summary>
+        [Fact]
+        [BusinessRule("BR-STU-001")]
+        public async Task A_student_quarter_cannot_be_recorded_without_its_locality()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (_, _, hoodId) = SeedResidenceHierarchy(db);
+            var student = await Register(admin);
+
+            var refusal = await Assert.ThrowsAsync<InvalidResidenceSelectionException>(() =>
+                admin.SetResidenceAsync(student.Id, residenceAreaId: null, neighbourhoodId: hoodId));
+
+            Assert.Equal(ResidenceSelectionFault.QuarterWithoutLocality, refusal.Fault);
+            Assert.Null(db.Students.Single(s => s.Id == student.Id).ResidenceAreaId);
+        }
+
+        /// <summary>
+        /// A quarter belonging to a different locality is a worse record than none: the two levels
+        /// would disagree, and every question asked of either would answer from the wrong place.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-STU-001")]
+        public async Task A_student_quarter_from_another_locality_is_refused_rather_than_stored()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (_, otherAreaId, hoodId) = SeedResidenceHierarchy(db);
+            var student = await Register(admin);
+
+            var refusal = await Assert.ThrowsAsync<InvalidResidenceSelectionException>(() =>
+                admin.SetResidenceAsync(student.Id, otherAreaId, hoodId));
+
+            Assert.Equal(ResidenceSelectionFault.QuarterOutsideLocality, refusal.Fault);
+            Assert.Null(db.Students.Single(s => s.Id == student.Id).NeighbourhoodId);
+        }
+
+        /// <summary>
+        /// Clearing the locality clears the quarter beneath it. Otherwise blanking one box would be
+        /// a back door to the orphaned quarter the refusal above exists to prevent — and there is no
+        /// delete verb to undo it with (BR-GLB-005), so a residence entered by mistake has to be
+        /// removable this way.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task Clearing_a_students_locality_clears_the_quarter_under_it()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (areaId, _, hoodId) = SeedResidenceHierarchy(db);
+            var student = await Register(admin);
+            await admin.SetResidenceAsync(student.Id, areaId, hoodId);
+            Assert.Equal(hoodId, db.Students.Single(s => s.Id == student.Id).NeighbourhoodId);
+
+            await admin.SetResidenceAsync(student.Id, residenceAreaId: null, neighbourhoodId: null);
+
+            var stored = db.Students.Single(s => s.Id == student.Id);
+            Assert.Null(stored.ResidenceAreaId);
+            Assert.Null(stored.NeighbourhoodId);
+        }
+
+        /// <summary>
+        /// The student's address and the guardian's are independent (owner request, 2026-08-31):
+        /// this is the cost the 2026-08-22 move was made to avoid, so it is asserted rather than
+        /// left to be discovered — recording one does not touch the other.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-STU-001")]
+        public async Task A_students_residence_does_not_reach_the_guardians_file()
+        {
+            using var db = CreateContext();
+            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var (areaId, otherAreaId, _) = SeedResidenceHierarchy(db);
+            var student = await Register(admin);
+            var parent = new Sms.Domain.Parents.Parent
+            {
+                ParentFileNo = "PAR-1", NameAr = "أب", NameEn = "Father",
+                PrimaryMobile = "0500000000", ResidenceAreaId = otherAreaId,
+            };
+            db.Parents.Add(parent);
+            db.SaveChanges();
+
+            await admin.SetResidenceAsync(student.Id, areaId, neighbourhoodId: null);
+
+            Assert.Equal(areaId, db.Students.Single(s => s.Id == student.Id).ResidenceAreaId);
+            Assert.Equal(otherAreaId, db.Parents.Single(p => p.Id == parent.Id).ResidenceAreaId);
+        }
+
+        /// <summary>One governorate, two localities under it, and a quarter inside the first only.</summary>
+        private static (int AreaId, int OtherAreaId, int NeighbourhoodId) SeedResidenceHierarchy(AppDbContext db)
+        {
+            var governorate = new Governorate { Code = "GZ", Name = new LocalizedName("غزة", "Gaza"), SortOrder = 1 };
+            db.Governorates.Add(governorate);
+            db.SaveChanges();
+
+            var area = new ResidenceArea { GovernorateId = governorate.Id, Code = "GZC", Name = new LocalizedName("غزة المدينة", "Gaza City"), SortOrder = 1 };
+            var other = new ResidenceArea { GovernorateId = governorate.Id, Code = "JBL", Name = new LocalizedName("جباليا", "Jabalia"), SortOrder = 2 };
+            db.ResidenceAreas.AddRange(area, other);
+            db.SaveChanges();
+
+            var hood = new Neighbourhood { ResidenceAreaId = area.Id, Code = "RMD", Name = new LocalizedName("الرمال", "Al Rimal"), SortOrder = 1 };
+            db.Neighbourhoods.Add(hood);
+            db.SaveChanges();
+
+            return (area.Id, other.Id, hood.Id);
         }
     }
 }

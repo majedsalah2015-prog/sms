@@ -2,6 +2,7 @@ using System.Linq;
 using Microsoft.EntityFrameworkCore;
 using System.Threading;
 using System.Threading.Tasks;
+using Sms.Application.Common.Exceptions;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
 using Sms.Domain.Parents;
@@ -59,13 +60,13 @@ namespace Sms.Infrastructure.Parents
             {
                 if (residenceAreaId is not int areaId)
                 {
-                    throw new System.InvalidOperationException("A neighbourhood cannot be recorded without the locality it belongs to.");
+                    throw new InvalidResidenceSelectionException(ResidenceSelectionFault.QuarterWithoutLocality);
                 }
 
                 var belongs = await _db.Neighbourhoods.AnyAsync(n => n.Id == hoodId && n.ResidenceAreaId == areaId, cancellationToken);
                 if (!belongs)
                 {
-                    throw new System.InvalidOperationException("That neighbourhood does not belong to the chosen locality.");
+                    throw new InvalidResidenceSelectionException(ResidenceSelectionFault.QuarterOutsideLocality);
                 }
             }
 

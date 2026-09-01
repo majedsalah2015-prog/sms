@@ -154,7 +154,33 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<(int Id, string Ar, string En)> EducationLevels { get; set; } = Array.Empty<(int, string, string)>();
 
-        // Residence is the family's, so it is read and edited on the parent file rather than here.
+        // ---- residence (personal tab) ----
+        //
+        // Only the top level is carried into the page. The two beneath it are fetched as the one
+        // above them changes, because 34 localities and their quarters written into every student
+        // file would be a page four times its size, almost none of it looked at.
+
+        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
+
+        /// <summary>Walked up from the stored locality, so the picker opens where the record points.</summary>
+        public int? CurrentGovernorateId { get; set; }
+
+        public int? CurrentResidenceAreaId { get; set; }
+
+        /// <summary>محافظة · منطقة · حي, in the reading culture — null when nothing is recorded.</summary>
+        public string? CurrentResidencePath { get; set; }
+
+        /// <summary>
+        /// Whether this reader may open the screen the three drop-downs are filled from
+        /// (System Setup → Residence areas), which is what decides whether the link beside them is
+        /// drawn at all. BR-SEC-010: unauthorized surface disappears rather than refusing on click.
+        /// <para>
+        /// The link exists because the address a registrar is typing is regularly the first mention
+        /// of a quarter the seeded pack never listed, and a picker with no way to add to it is where
+        /// "أخرى" comes from.
+        /// </para>
+        /// </summary>
+        public bool CanManageResidenceLists { get; set; }
 
         public IReadOnlyList<(int Id, string Ar, string En)> Relationships { get; set; } = Array.Empty<(int, string, string)>();
 

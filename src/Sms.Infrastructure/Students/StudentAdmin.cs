@@ -106,6 +106,36 @@ namespace Sms.Infrastructure.Students
             return student;
         }
 
+        public async Task SetResidenceAsync(int studentId, int? residenceAreaId, int? neighbourhoodId, CancellationToken cancellationToken = default)
+        {
+            var student = await _db.Students.SingleAsync(s => s.Id == studentId, cancellationToken);
+
+            // A quarter without its locality is not a place, and a quarter belonging to a different
+            // locality is a worse record than none: neither is stored. Same two refusals the parent
+            // register makes, sharing its exception so the boundary translates both from one arm.
+            if (neighbourhoodId is int hoodId)
+            {
+                if (residenceAreaId is not int areaId)
+                {
+                    throw new InvalidResidenceSelectionException(ResidenceSelectionFault.QuarterWithoutLocality);
+                }
+
+                var belongs = await _db.Neighbourhoods.AnyAsync(n => n.Id == hoodId && n.ResidenceAreaId == areaId, cancellationToken);
+                if (!belongs)
+                {
+                    throw new InvalidResidenceSelectionException(ResidenceSelectionFault.QuarterOutsideLocality);
+                }
+            }
+
+            student.ResidenceAreaId = residenceAreaId;
+
+            // Clearing the locality clears the quarter under it rather than orphaning it: a quarter
+            // with nothing above it is the very record the refusal above exists to prevent, and it
+            // must not be reachable by the back door of blanking one box.
+            student.NeighbourhoodId = residenceAreaId == null ? null : neighbourhoodId;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
         public async Task ChangeStatusAsync(int studentId, StudentStatus newStatus, CancellationToken cancellationToken = default)

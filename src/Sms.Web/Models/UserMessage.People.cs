@@ -57,6 +57,24 @@ namespace Sms.Web.Models
                 ? "للطالب قيد فعّال في هذا العام الدراسي بالفعل — القيد واحد لكل عام؛ أنهِ القيد القائم أو انقله بدل إنشاء ثانٍ (BR-GLB-024)."
                 : "The student already has an active enrolment for this academic year — there is one per year; end or transfer the existing one rather than creating a second (BR-GLB-024).",
 
+            // ---------------------------------------------------------------- M11 parents
+
+            InvalidResidenceSelectionException e => arabic
+                ? (e.Fault == ResidenceSelectionFault.QuarterWithoutLocality
+                    ? "اختر المنطقة قبل الحي — الحي وحده لا يحدد مكاناً، والسكن يُحفَظ بالمنطقة ولو لم يكن للحي ذكر (doc/Modules/11 §7)."
+                    : "الحي المختار لا يتبع هذه المنطقة — أعد اختيار الحي من قائمة هذه المنطقة، أو صحّح المنطقة أولاً (doc/Modules/11 §7).")
+                : (e.Fault == ResidenceSelectionFault.QuarterWithoutLocality
+                    ? "Choose the locality before the quarter — a quarter on its own does not name a place, and the residence is complete with the locality even when no quarter is recorded (doc/Modules/11 §7)."
+                    : "The chosen quarter does not sit inside that locality — pick the quarter again from this locality's list, or correct the locality first (doc/Modules/11 §7)."),
+
+            DuplicateResidenceCodeException e => arabic
+                ? $"الرمز «{e.Code}» مستعمَل في هذا المستوى بالفعل ({ResidenceLevelName(e.Level, arabic: true)}) — الرموز لا تتكرر تحت الأصل نفسه؛ اترك الخانة فارغة ليُولَّد رمز، أو اكتب رمزاً آخر."
+                : $"Code \"{e.Code}\" is already in use at that level ({ResidenceLevelName(e.Level, arabic: false)}) — codes do not repeat under the same parent; leave the box empty to have one generated, or type another.",
+
+            ResidenceRowNotFoundException e => arabic
+                ? $"لم يعد هذا السجل موجوداً ({ResidenceLevelName(e.Level, arabic: true)}) — قد يكون عُدِّل من شاشة أخرى؛ حدِّث الصفحة وأعد المحاولة."
+                : $"That row is no longer there ({ResidenceLevelName(e.Level, arabic: false)}) — it may have been changed in another screen; reload the page and try again.",
+
             // ---------------------------------------------------------------- M05 grades and the promotion ladder
 
             DuplicateGradeCodeException => arabic
@@ -118,6 +136,18 @@ namespace Sms.Web.Models
                 : $"This cannot go ahead: the record is still referenced by {e.Usage.Describe(arabic: false)} — clear those first.",
 
             _ => null,
+        };
+
+        /// <summary>
+        /// The name of one level of the residence hierarchy, as the maintenance screen labels it.
+        /// The three tables are edited on one page, so a refusal that did not name its level would
+        /// be read against whichever of the three lists the operator was looking at.
+        /// </summary>
+        private static string ResidenceLevelName(ResidenceLevel level, bool arabic) => level switch
+        {
+            ResidenceLevel.Governorate => arabic ? "المحافظة" : "governorate",
+            ResidenceLevel.Locality => arabic ? "المنطقة" : "locality",
+            _ => arabic ? "الحي" : "quarter",
         };
     }
 }

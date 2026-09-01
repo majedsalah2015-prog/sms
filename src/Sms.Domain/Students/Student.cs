@@ -130,8 +130,33 @@ namespace Sms.Domain.Students
         /// </summary>
         public string? Mobile { get; set; }
 
-        // Residence (governorate → locality → quarter) lives on Parent, not here. Where a family
-        // lives is the family's fact: a copy per child let three siblings disagree about one
-        // address, and nothing in the product could say which of them was right.
+        // ---------------------------------------------------------------- residence
+        //
+        // Where this student lives, on the student's own record (owner request, 2026-08-31). It was
+        // here until 2026-08-22, moved to Parent on the argument that an address is the family's
+        // fact, and asked for back because the registrar reads it on the child's file and could not
+        // find it there: a screen that makes you open a second person's file to learn where a pupil
+        // lives is a screen that does not get filled in — 0 of 987 parent files carried a residence
+        // on the day it was asked for.
+        //
+        // The cost of that move is real and is being accepted knowingly: two siblings can now be
+        // recorded at two addresses, and nothing here says which is right. The parent keeps its own
+        // residence (BR-PAR-001's "address") — these are independent, not a cache of it, so neither
+        // silently overwrites the other.
+        //
+        // Two levels stored rather than the single neighbourhood this held before 2026-08-22, for
+        // the reason Parent already gives: most localities have no quarters recorded at all (7
+        // across 34 today), so a record that could only name a quarter would leave nearly every
+        // family with no residence it was able to express.
+        //
+        // Not [RequiresAuditReason]: an address is a fact being recorded, not a decision being
+        // defended, and it changes whenever a family moves. The change is still captured
+        // field-level, because the class is T1.
+
+        /// <summary>منطقة — the locality, referencing <c>core.ResidenceArea</c>. The governorate is walked up from it, never stored, so the two cannot disagree.</summary>
+        public int? ResidenceAreaId { get; set; }
+
+        /// <summary>حي — the quarter inside <see cref="ResidenceAreaId"/>, where that locality has any.</summary>
+        public int? NeighbourhoodId { get; set; }
     }
 }

@@ -608,6 +608,10 @@ namespace Sms.Web.Controllers
                 EducationLevels = await LookupAsync("EducationLevel"),
             };
 
+            // The residence picker's opening state and the one-line address beside it — see
+            // StudentsController.Residence.cs.
+            await FillResidenceAsync(model, s);
+
             return model;
         }
 

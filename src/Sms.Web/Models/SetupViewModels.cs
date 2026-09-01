@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using Sms.Application.Setup;
+using Sms.Domain.Geography;
 using Sms.Domain.Lookups;
 using Sms.Domain.Schools;
 using Sms.Domain.Setup;
@@ -184,6 +185,51 @@ namespace Sms.Web.Models
         public IReadOnlyDictionary<string, bool> States { get; set; } = new Dictionary<string, bool>();
 
         public string? Reason { get; set; }
+    }
+
+    /// <summary>
+    /// The residence constants — محافظة → منطقة → حي — on one page, one level per column.
+    /// <para>
+    /// Three lists rather than three screens because the levels only mean anything together: a
+    /// quarter is added <em>into</em> a locality, and an operator who had to navigate away to see
+    /// where they were adding it would put half of them in the wrong place. The page therefore
+    /// carries a selection at each of the upper two levels, and the columns to its right redraw
+    /// from it.
+    /// </para>
+    /// <para>
+    /// Every list includes the deactivated rows: they are what the operator came to reactivate,
+    /// and hiding them is how a "duplicate code" refusal happens on a row nobody can see.
+    /// </para>
+    /// </summary>
+    public sealed class ResidenceCatalogViewModel
+    {
+        public IReadOnlyList<Governorate> Governorates { get; set; } = Array.Empty<Governorate>();
+
+        /// <summary>The governorate whose localities the middle column is showing; null before any is picked.</summary>
+        public int? SelectedGovernorateId { get; set; }
+
+        public IReadOnlyList<ResidenceArea> Localities { get; set; } = Array.Empty<ResidenceArea>();
+
+        /// <summary>The locality whose quarters the right column is showing.</summary>
+        public int? SelectedLocalityId { get; set; }
+
+        public IReadOnlyList<Neighbourhood> Quarters { get; set; } = Array.Empty<Neighbourhood>();
+
+        /// <summary>
+        /// How many students and parents record each locality as their address, keyed by locality
+        /// id. doc/Modules/01 §9 asks for the usage count before a deactivation, and it is the only
+        /// thing on the page that says whether retiring a row will empty an address somebody reads.
+        /// </summary>
+        public IReadOnlyDictionary<int, int> LocalityUsage { get; set; } = new Dictionary<int, int>();
+
+        /// <summary>The same count for quarters.</summary>
+        public IReadOnlyDictionary<int, int> QuarterUsage { get; set; } = new Dictionary<int, int>();
+
+        public int NextGovernorateSort { get; set; }
+
+        public int NextLocalitySort { get; set; }
+
+        public int NextQuarterSort { get; set; }
     }
 
     /// <summary>doc/Modules/01 §8.2 Lookup management.</summary>

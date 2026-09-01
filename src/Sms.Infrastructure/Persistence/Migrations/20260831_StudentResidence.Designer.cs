@@ -3,15 +3,17 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Sms.Infrastructure.Persistence;
 
 namespace Sms.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260831_StudentResidence")]
+    partial class StudentResidence
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -6949,68 +6951,6 @@ namespace Sms.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("VaccinationScheduleEntry", "svc");
-                });
-
-            modelBuilder.Entity("Sms.Domain.Installments.CollectionNotice", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int")
-                        .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
-
-                    b.Property<decimal>("AmountDue")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<short>("Channel")
-                        .HasColumnType("smallint");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int>("CreatedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("IssuedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ModifiedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<int?>("ModifiedByUserId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("NoticeNo")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<int?>("PayerId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("SchoolId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("StudentId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime?>("WindowFrom")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("WindowTo")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PayerId");
-
-                    b.HasIndex("StudentId");
-
-                    b.HasIndex("SchoolId", "NoticeNo")
-                        .IsUnique();
-
-                    b.HasIndex(new[] { "SchoolId", "StudentId", "IssuedAtUtc" }, "IX_CollectionNotice_School_Student_Issued");
-
-                    b.ToTable("CollectionNotice", "ppl");
                 });
 
             modelBuilder.Entity("Sms.Domain.Installments.DunningEvent", b =>

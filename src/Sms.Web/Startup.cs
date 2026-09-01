@@ -81,6 +81,7 @@ using Sms.Application.Employees;
 using Sms.Application.Payroll;
 using Sms.Application.Examinations;
 using Sms.Application.Fees;
+using Sms.Application.Geography;
 using Sms.Application.GlExport;
 using Sms.Application.Grades;
 using Sms.Application.Discipline;
@@ -133,6 +134,7 @@ using Sms.Infrastructure.Employees;
 using Sms.Infrastructure.Payroll;
 using Sms.Infrastructure.Examinations;
 using Sms.Infrastructure.Fees;
+using Sms.Infrastructure.Geography;
 using Sms.Infrastructure.GlExport;
 using Sms.Infrastructure.Grades;
 using Sms.Infrastructure.Discipline;
@@ -501,6 +503,12 @@ namespace Sms.Web
             // doc/Modules/01 §9: a lookup value is deactivated, never deleted — so the
             // operator has to be told what is already pointing at it first.
             services.AddScoped<ILookupUsageQuery, LookupUsageQuery>();
+
+            // The residence constants a student's and a parent's address are picked from
+            // (محافظة → منطقة → حي). Seeded from PCBS and only ever added to by the seeder, so
+            // every correction after that is the school's — and until this port existed there was
+            // no way to make one but a hand-written INSERT.
+            services.AddScoped<IResidenceAdmin, ResidenceAdmin>();
 
             // E-011 background jobs (doc 02 T-6, Hangfire per IP-02 §2). Every
             // recurring job calls IJobRunner — the single path that records

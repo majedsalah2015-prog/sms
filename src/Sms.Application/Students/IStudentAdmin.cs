@@ -54,6 +54,27 @@ namespace Sms.Application.Students
             string? placeOfBirth, int? familySize, int? birthOrder, int? siblingCount, string? mobile,
             CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Where the student lives (owner request, 2026-08-31): the locality and, where the locality
+        /// has quarters at all, the quarter inside it. The governorate is walked up from the locality
+        /// rather than passed, so a selection cannot name a governorate its locality does not sit in.
+        /// <para>
+        /// Its own method rather than four more parameters on
+        /// <see cref="UpdateSocialProfileAsync"/>: a family moves house without any of its social
+        /// standing changing, and the residence sits on the Personal tab where the social profile is
+        /// permission-gated away from most of the people who record an address.
+        /// </para>
+        /// <para>
+        /// Passing both as null clears the residence — a record that turned out to be wrong has to be
+        /// removable, and there is no delete verb to do it with (BR-GLB-005).
+        /// </para>
+        /// <para>
+        /// Throws <see cref="Common.Exceptions.InvalidResidenceSelectionException"/> for a quarter
+        /// with no locality beside it, or a quarter belonging to some other locality.
+        /// </para>
+        /// </summary>
+        Task SetResidenceAsync(int studentId, int? residenceAreaId, int? neighbourhoodId, CancellationToken cancellationToken = default);
+
         /// <summary>Corrects identity/ID fields; identity edits are T1 with a mandatory audit reason (BR-STU-002).</summary>
         Task<Student> UpdateStudentAsync(
             int studentId, string firstNameAr, string fatherNameAr, string grandfatherNameAr, string familyNameAr,

@@ -35,6 +35,13 @@ namespace Sms.Infrastructure.Persistence.Configurations
             // that refuses.
             builder.Property(x => x.Mobile).HasMaxLength(20);
 
+            // No FK to either residence level, matching ppl.Parent: reference data is soft-deactivated
+            // rather than deleted, and a hard FK would turn retiring a locality into a delete that a
+            // live student row refuses. Indexed on the locality alone — "every student in this area"
+            // is the question asked; the quarter is read one row at a time.
+            builder.HasIndex(x => x.ResidenceAreaId).HasDatabaseName("IX_Student_ResidenceArea")
+                .HasFilter("[ResidenceAreaId] IS NOT NULL");
+
             // BR-GLB-003: unique per (school, id type, id number) when a primary ID is recorded.
             builder.HasIndex(x => new { x.SchoolId, x.PrimaryIdTypeLookupId, x.PrimaryIdNo })
                 .HasDatabaseName("IX_Student_PrimaryId")

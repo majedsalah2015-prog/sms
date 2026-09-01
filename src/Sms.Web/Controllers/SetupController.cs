@@ -38,7 +38,7 @@ namespace Sms.Web.Controllers
     /// use AppDbContext directly (tenant-filtered).
     /// </summary>
     [Route("setup")]
-    public class SetupController : Controller
+    public partial class SetupController : Controller
     {
         private readonly ISystemSetupAdmin _setup;
         private readonly ISchoolAdmin _schools;

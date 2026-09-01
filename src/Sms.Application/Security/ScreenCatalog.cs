@@ -113,6 +113,13 @@ namespace Sms.Application.Security
             public const string Settings = "Settings";
             public const string Lookups = "Lookups";
             public const string Nationalities = "Nationalities";
+
+            /// <summary>
+            /// doc/Modules/01 §8.2's shape applied to the residence hierarchy — محافظة → منطقة → حي.
+            /// Its own screen rather than a lookup category: the three levels are a tree, and the
+            /// generic lookup editor can only maintain a flat list (owner request, 2026-08-31).
+            /// </summary>
+            public const string Residence = "Residence";
             public const string Features = "Features";
             public const string ContentPack = "ContentPack";
 
@@ -514,6 +521,7 @@ namespace Sms.Application.Security
             S(Modules.Setup, Setup.Settings, "System settings", "إعدادات النظام", ActionVerb.View, ActionVerb.Configure),
             S(Modules.Setup, Setup.Lookups, "Lookup lists", "القوائم المرجعية", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
             S(Modules.Setup, Setup.Nationalities, "Nationalities", "الجنسيات", Crud),
+            S(Modules.Setup, Setup.Residence, "Residence areas", "مناطق السكن", Crud),
             S(Modules.Setup, Setup.Features, "Feature toggles", "مفاتيح الميزات", ActionVerb.View, ActionVerb.Configure),
             // Configure, not Edit: changing what a country imposes is the same shape of act as the
             // wizard and the settings hub beside it, and the pack was read-only here only because
