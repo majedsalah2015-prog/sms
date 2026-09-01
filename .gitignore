@@ -91,6 +91,12 @@ StyleCopReport.xml
 # src/Sms.Web/bin, because another session may be running the app from it; ".builds" above
 # is VS boilerplate and does not cover that directory.
 .build/
+# The same private output, when the path is passed wrong. On .NET 5 `dotnet run` reads -p as
+# --project, and a mistyped BaseOutputPath ends up as a directory named after the whole path
+# with its separators eaten — "school2028sms.buildemp-hr 2Release" appeared under
+# tools/Sms.AccessBridge holding a compiled exe. A directory carrying ".build" in its name is
+# always that accident, never source.
+*.build*/
 *.pidb
 *.svclog
 *.scc
