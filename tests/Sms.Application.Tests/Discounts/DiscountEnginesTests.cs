@@ -120,6 +120,41 @@ namespace Sms.Application.Tests.Discounts
             Assert.Equal(10m, SiblingLadderEvaluator.Percent(ordinals[12], ladder));
             Assert.Equal(15m, SiblingLadderEvaluator.Percent(ordinals[13], ladder));
         }
+
+        [Fact]
+        [BusinessRule("BR-DIS-002")]
+        public void A_child_holds_a_position_in_every_family_they_are_linked_to()
+        {
+            // 20 and 21 share a guardian; 21 is also linked to a second guardian, alone.
+            var links = new[]
+            {
+                new SiblingLadderEvaluator.FamilyLink(1, 20, new DateTime(2015, 1, 1)),
+                new SiblingLadderEvaluator.FamilyLink(1, 21, new DateTime(2018, 1, 1)),
+                new SiblingLadderEvaluator.FamilyLink(2, 21, new DateTime(2018, 1, 1)),
+            };
+
+            var positions = SiblingLadderEvaluator.Positions(links);
+
+            Assert.Equal(new[] { (1, 1, 2) }, positions[20].Select(p => (p.ParentId, p.Ordinal, p.SiblingCount)));
+            Assert.Equal(new[] { (1, 2, 2), (2, 1, 1) }, positions[21].Select(p => (p.ParentId, p.Ordinal, p.SiblingCount)).OrderBy(x => x.ParentId));
+        }
+
+        [Fact]
+        [BusinessRule("BR-DIS-002")]
+        public void Two_links_to_the_same_guardian_do_not_make_a_child_its_own_sibling()
+        {
+            var links = new[]
+            {
+                new SiblingLadderEvaluator.FamilyLink(1, 30, new DateTime(2015, 1, 1)),
+                new SiblingLadderEvaluator.FamilyLink(1, 30, new DateTime(2015, 1, 1)),
+            };
+
+            var positions = SiblingLadderEvaluator.Positions(links);
+
+            var only = Assert.Single(positions[30]);
+            Assert.Equal(1, only.Ordinal);
+            Assert.Equal(1, only.SiblingCount);
+        }
     }
 
     public class EnvelopeAndClawbackTests

@@ -10,6 +10,41 @@ namespace Sms.Application.Discounts
     public sealed record EligibilityRuleInput(EligibilityRuleKind Kind, decimal Percent, int? ChildOrdinal = null);
 
     /// <summary>
+    /// BR-DIS-002's answer for one student: where they fall among the siblings they
+    /// share a live guardian link with, and what the type's ladder gives that
+    /// position. The eldest enrolled child is ordinal 1 and a ladder normally starts
+    /// at the second child, so <see cref="LadderPercent"/> = 0 on ordinal 1 is the
+    /// rule working rather than a missing rung — the grant desk has to say so out
+    /// loud, because a manual grant can hand a sibling discount to the very child
+    /// the ladder deliberately skips and nothing downstream would object.
+    /// </summary>
+    public sealed record SiblingPosition(int Ordinal, int SiblingCount, decimal LadderPercent);
+
+    /// <summary>
+    /// doc/Modules/22 §8.3 grant-desk preview — the gross/net position a proposed
+    /// grant would move if it were approved right now, plus the family position
+    /// BR-DIS-002 reads it against.
+    /// <para>
+    /// <see cref="ExpectedAmount"/> is null for any grant that is not Proposed. Once
+    /// a grant is applied its own discount documents are already netted out of the
+    /// charges' remainders, so re-running BR-DIS-005 over them answers a different
+    /// question than the column asks; an approved grant's number is
+    /// <c>DiscountGrant.AppliedAmount</c> and only that.
+    /// </para>
+    /// <para>
+    /// Each preview is computed as though this grant were the only one approved. Two
+    /// proposals sitting on the same student therefore both show their full amount —
+    /// approving the first changes what the second is worth. That is the honest
+    /// reading of "if approved now"; it is not a stacking forecast.
+    /// </para>
+    /// </summary>
+    public sealed record GrantPreview(decimal ApplicableGross, decimal RemainingBefore, decimal? ExpectedAmount, SiblingPosition? Sibling)
+    {
+        /// <summary>What is still owed on the applicable charges once this grant is applied.</summary>
+        public decimal? NetAfter => ExpectedAmount is decimal amount ? RemainingBefore - amount : null;
+    }
+
+    /// <summary>
     /// doc/Modules/22 §8 Type catalog / Grant desk / Scholarship board /
     /// Renewal queue / Waiver desk screens backing (screens deferred, the
     /// operations are core). Every approval chain here is recorded as an
@@ -60,6 +95,15 @@ namespace Sms.Application.Discounts
 
         /// <summary>BR-DIS-002: evaluates the type's automatic rules over the working year (sibling ladder via StudentGuardianLink families; staff via Parent↔Employee UserAccountId bridge) and creates one Proposed grant per eligible student — batch-approved with <see cref="ApproveGrantsAsync"/>.</summary>
         Task<IReadOnlyList<DiscountGrant>> ProposeAutomaticGrantsAsync(int discountTypeId, int proposedByUserId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// doc/Modules/22 §8.3: what each of these grants is worth against today's
+        /// charges, keyed by grant id — the "gross/net preview per proposed discount"
+        /// the grant desk owes its operator. Batched deliberately: the desk shows a
+        /// page of grants at a time and a per-row round trip would be a query storm.
+        /// Ids that name no grant are simply absent from the result.
+        /// </summary>
+        Task<IReadOnlyDictionary<int, GrantPreview>> PreviewGrantsAsync(IReadOnlyList<int> discountGrantIds, CancellationToken cancellationToken = default);
 
         /// <summary>BR-DIS-004: named program with a budget envelope.</summary>
         Task<ScholarshipProgram> DefineScholarshipProgramAsync(string nameAr, string nameEn, int discountTypeId, int? maxAwards, decimal? maxTotalAmount, CancellationToken cancellationToken = default);

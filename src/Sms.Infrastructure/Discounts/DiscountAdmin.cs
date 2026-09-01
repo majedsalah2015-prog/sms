@@ -144,6 +144,77 @@ namespace Sms.Infrastructure.Discounts
             }).ToList();
         }
 
+        /// <summary>
+        /// The same charge inputs as <see cref="LoadChargeInputsAsync(int, int, int?, CancellationToken)"/>,
+        /// for a whole page of students at once and keyed by (student, year). The fee
+        /// category is carried on the row rather than filtered in SQL, because each
+        /// caller filters by a different type's category and one query beats a query
+        /// per grant on a desk that shows five hundred of them.
+        /// </summary>
+        private async Task<Dictionary<(int StudentId, int AcademicYearId), List<CategorisedCharge>>> LoadChargeInputsAsync(
+            IReadOnlyCollection<int> studentIds, IReadOnlyCollection<int> academicYearIds, CancellationToken cancellationToken)
+        {
+            var charges = await _db.Charges.AsNoTracking()
+                .Where(c => studentIds.Contains(c.StudentId) && academicYearIds.Contains(c.AcademicYearId) && c.Status == ChargeStatus.Posted)
+                .OrderBy(c => c.PostedAtUtc).ThenBy(c => c.Id)
+                .ToListAsync(cancellationToken);
+            var ids = charges.Select(c => c.Id).ToList();
+
+            // EF Core's Sqlite provider can't translate Sum() over decimal - materialize then sum in memory.
+            var credits = (await _db.CreditNotes.AsNoTracking().Where(n => ids.Contains(n.ChargeId)).Select(n => new { n.ChargeId, n.Amount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            var discounts = (await _db.DiscountDocuments.AsNoTracking().Where(d => ids.Contains(d.ChargeId)).Select(d => new { d.ChargeId, d.Amount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+            var allocated = (await _db.PaymentAllocations.AsNoTracking().Where(a => ids.Contains(a.ChargeId)).Select(a => new { a.ChargeId, a.AllocatedAmount }).ToListAsync(cancellationToken))
+                .GroupBy(x => x.ChargeId).ToDictionary(g => g.Key, g => g.Sum(x => x.AllocatedAmount));
+
+            var result = new Dictionary<(int, int), List<CategorisedCharge>>();
+            foreach (var charge in charges)
+            {
+                var remaining = charge.GrossAmount
+                    - (credits.TryGetValue(charge.Id, out var cr) ? cr : 0m)
+                    - (discounts.TryGetValue(charge.Id, out var ds) ? ds : 0m)
+                    - (allocated.TryGetValue(charge.Id, out var al) ? al : 0m);
+                var key = (charge.StudentId, charge.AcademicYearId);
+                if (!result.TryGetValue(key, out var list))
+                {
+                    result[key] = list = new List<CategorisedCharge>();
+                }
+
+                list.Add(new CategorisedCharge(
+                    charge.FeeCategoryId,
+                    new DiscountAmountCalculator.ChargeInput(charge.Id, charge.GrossAmount, charge.VatRateSnapshot ?? 0m, remaining)));
+            }
+
+            return result;
+        }
+
+        /// <summary>A charge input plus the category a discount type filters on. Posting order is the list's order.</summary>
+        private sealed record CategorisedCharge(int FeeCategoryId, DiscountAmountCalculator.ChargeInput Input);
+
+        /// <summary>
+        /// BR-DIS-002's family truth in one pass: for each of these students, their
+        /// position among the siblings they share a live guardian link with. Module
+        /// 11's StudentGuardianLink is the single family record in this product,
+        /// which is why the automatic run and the grant desk's preview both read it
+        /// through here — two derivations of a child's ordinal would eventually
+        /// disagree, and the disagreement would be about who gets the discount.
+        /// </summary>
+        private async Task<IReadOnlyDictionary<int, IReadOnlyList<SiblingLadderEvaluator.Position>>> LoadFamilyPositionsAsync(
+            IReadOnlyCollection<int> enrolledStudentIds, CancellationToken cancellationToken)
+        {
+            var links = await _db.StudentGuardianLinks.AsNoTracking()
+                .Where(l => l.EffectiveToUtc == null && enrolledStudentIds.Contains(l.StudentId))
+                .Select(l => new { l.ParentId, l.StudentId }).ToListAsync(cancellationToken);
+            var dobs = await _db.Students.AsNoTracking()
+                .Where(s => enrolledStudentIds.Contains(s.Id))
+                .Select(s => new { s.Id, s.DateOfBirth })
+                .ToDictionaryAsync(s => s.Id, s => s.DateOfBirth, cancellationToken);
+
+            return SiblingLadderEvaluator.Positions(
+                links.Select(l => new SiblingLadderEvaluator.FamilyLink(l.ParentId, l.StudentId, dobs[l.StudentId])).ToList());
+        }
+
         private static decimal PercentEquivalent(DiscountType type, decimal basisValue, IReadOnlyList<DiscountAmountCalculator.ChargeInput> charges)
         {
             if (type.Basis == DiscountBasis.Percentage)
@@ -224,18 +295,12 @@ namespace Sms.Infrastructure.Discounts
                 .Select(r => new SiblingLadderEvaluator.LadderStep(r.ChildOrdinal!.Value, r.Percent)).ToList();
             if (ladder.Count > 0)
             {
-                // Module 11's StudentGuardianLink is the single family truth: siblings = enrolled students sharing a live guardian link.
-                var links = await _db.StudentGuardianLinks
-                    .Where(l => l.EffectiveToUtc == null && enrolledStudentIds.Contains(l.StudentId))
-                    .Select(l => new { l.ParentId, l.StudentId }).ToListAsync(cancellationToken);
-                var dobs = await _db.Students.Where(s => enrolledStudentIds.Contains(s.Id)).Select(s => new { s.Id, s.DateOfBirth }).ToDictionaryAsync(s => s.Id, s => s.DateOfBirth, cancellationToken);
-
-                foreach (var family in links.GroupBy(l => l.ParentId))
+                var positions = await LoadFamilyPositionsAsync(enrolledStudentIds, cancellationToken);
+                foreach (var (studentId, families) in positions)
                 {
-                    var siblings = family.Select(l => l.StudentId).Distinct().Select(id => new SiblingLadderEvaluator.Sibling(id, dobs[id])).ToList();
-                    foreach (var (studentId, ordinal) in SiblingLadderEvaluator.Ordinals(siblings))
+                    foreach (var position in families)
                     {
-                        var percent = SiblingLadderEvaluator.Percent(ordinal, ladder);
+                        var percent = SiblingLadderEvaluator.Percent(position.Ordinal, ladder);
                         if (percent > 0m && (!percentByStudent.TryGetValue(studentId, out var current) || percent > current))
                         {
                             percentByStudent[studentId] = percent;
@@ -281,6 +346,102 @@ namespace Sms.Infrastructure.Discounts
 
             await _db.SaveChangesAsync(cancellationToken);
             return proposed;
+        }
+
+        public async Task<IReadOnlyDictionary<int, GrantPreview>> PreviewGrantsAsync(IReadOnlyList<int> discountGrantIds, CancellationToken cancellationToken = default)
+        {
+            var result = new Dictionary<int, GrantPreview>();
+            if (discountGrantIds.Count == 0)
+            {
+                return result;
+            }
+
+            var grants = await _db.DiscountGrants.AsNoTracking()
+                .Where(g => discountGrantIds.Contains(g.Id)).ToListAsync(cancellationToken);
+            if (grants.Count == 0)
+            {
+                return result;
+            }
+
+            // IgnoreQueryFilters: a grant keeps pointing at its type after the school
+            // retires it, and the desk still has to show what that grant is worth.
+            var typeIds = grants.Select(g => g.DiscountTypeId).Distinct().ToList();
+            var types = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking().Include(t => t.EligibilityRules)
+                .Where(t => t.SchoolId == _db.CurrentSchoolId && typeIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, cancellationToken);
+
+            var studentIds = grants.Select(g => g.StudentId).Distinct().ToList();
+            var yearIds = grants.Select(g => g.AcademicYearId).Distinct().ToList();
+            var chargesByStudentYear = await LoadChargeInputsAsync(studentIds, yearIds, cancellationToken);
+
+            // The family is only loaded when some type on the page actually has a
+            // ladder — the guardian links of a whole year are not worth a query for a
+            // desk showing nothing but hardship grants.
+            var laddered = grants.Any(g => types.TryGetValue(g.DiscountTypeId, out var t)
+                && t.EligibilityRules.Any(r => r.Kind == EligibilityRuleKind.SiblingLadder && r.ChildOrdinal.HasValue));
+            IReadOnlyDictionary<int, IReadOnlyList<SiblingLadderEvaluator.Position>> positions =
+                new Dictionary<int, IReadOnlyList<SiblingLadderEvaluator.Position>>();
+            if (laddered)
+            {
+                var enrolled = await _db.Enrollments.AsNoTracking()
+                    .Where(e => yearIds.Contains(e.AcademicYearId) && e.Status == EnrollmentStatus.Active)
+                    .Select(e => e.StudentId).Distinct().ToListAsync(cancellationToken);
+                positions = await LoadFamilyPositionsAsync(enrolled, cancellationToken);
+            }
+
+            foreach (var grant in grants)
+            {
+                if (!types.TryGetValue(grant.DiscountTypeId, out var type))
+                {
+                    continue;
+                }
+
+                var all = chargesByStudentYear.TryGetValue((grant.StudentId, grant.AcademicYearId), out var rows)
+                    ? rows
+                    : new List<CategorisedCharge>();
+                var applicable = all
+                    .Where(r => type.FeeCategoryId == null || r.FeeCategoryId == type.FeeCategoryId)
+                    .Select(r => r.Input).ToList();
+
+                decimal? expected = grant.Status == DiscountGrantStatus.Proposed
+                    ? DiscountAmountCalculator
+                        .Compute(type.Basis, type.ComputationStage, grant.BasisValue, type.CapAmountPerStudent, applicable)
+                        .Sum(a => a.Amount)
+                    : null;
+
+                result[grant.Id] = new GrantPreview(
+                    applicable.Sum(c => c.GrossAmount),
+                    applicable.Sum(c => c.Remaining),
+                    expected,
+                    SiblingContext(type, grant.StudentId, positions));
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// The ladder's own reading of a student, for the desk to show beside the
+        /// grant: which child of the family they are, and what the rung gives that
+        /// ordinal. Null when the type has no ladder, or when the student sits in no
+        /// family the guardian links know about. A child linked to two guardians is a
+        /// sibling twice over, so the family that pays best wins — the same choice
+        /// <see cref="ProposeAutomaticGrantsAsync"/> makes when it takes the maximum.
+        /// </summary>
+        private static SiblingPosition? SiblingContext(
+            DiscountType type, int studentId, IReadOnlyDictionary<int, IReadOnlyList<SiblingLadderEvaluator.Position>> positions)
+        {
+            var ladder = type.EligibilityRules
+                .Where(r => r.Kind == EligibilityRuleKind.SiblingLadder && r.ChildOrdinal.HasValue)
+                .Select(r => new SiblingLadderEvaluator.LadderStep(r.ChildOrdinal!.Value, r.Percent)).ToList();
+            if (ladder.Count == 0 || !positions.TryGetValue(studentId, out var families) || families.Count == 0)
+            {
+                return null;
+            }
+
+            return families
+                .Select(p => new SiblingPosition(p.Ordinal, p.SiblingCount, SiblingLadderEvaluator.Percent(p.Ordinal, ladder)))
+                .OrderByDescending(p => p.LadderPercent).ThenByDescending(p => p.SiblingCount).ThenBy(p => p.Ordinal)
+                .First();
         }
 
         public async Task<ScholarshipProgram> DefineScholarshipProgramAsync(string nameAr, string nameEn, int discountTypeId, int? maxAwards, decimal? maxTotalAmount, CancellationToken cancellationToken = default)

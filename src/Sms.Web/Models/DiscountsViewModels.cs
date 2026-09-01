@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Sms.Application.Discounts;
 using Sms.Domain.Discounts;
 using Sms.Domain.Fees;
 using Sms.Domain.Schools;
@@ -118,7 +119,13 @@ namespace Sms.Web.Models
 
     public sealed class GrantDeskViewModel : DiscountsPageViewModel
     {
-        public sealed record Row(DiscountGrant Grant, DiscountType Type, Student Student);
+        /// <summary>
+        /// One desk row. <paramref name="Preview"/> is doc/Modules/22 §8.3's gross/net
+        /// preview — what the grant would apply if it were approved now, and the family
+        /// position BR-DIS-002 reads it against. Null only when the grant's type has
+        /// been lost, which the desk renders as a dash rather than a zero.
+        /// </summary>
+        public sealed record Row(DiscountGrant Grant, DiscountType Type, Student Student, GrantPreview? Preview);
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
 

@@ -300,6 +300,98 @@ namespace Sms.Infrastructure.Tests
             Assert.Single(db.ScheduleRevisions.Where(r => r.Cause == ScheduleRevisionCause.Reduced));
         }
 
+        // --- doc/Modules/22 §8.3 grant-desk preview ---------------------------------------------
+
+        [Fact]
+        [BusinessRule("BR-DIS-005")]
+        public async Task A_proposed_grant_previews_the_amount_its_approval_then_applies()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);   // 1150 gross with 15% VAT
+            await CreatePaymentAdmin(db).CaptureReceiptAsync(_payerId, PaymentMethod.Cash, 150m);
+            var type = await admin.DefineTypeAsync("Neg", "Negotiated", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, feeCategoryId: _tuitionId);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 10m, "negotiated", 1);
+
+            var preview = (await admin.PreviewGrantsAsync(new[] { grant.Id }))[grant.Id];
+
+            Assert.Equal(1150m, preview.ApplicableGross);
+            Assert.Equal(1000m, preview.RemainingBefore);
+            Assert.Equal(115m, preview.ExpectedAmount);
+            Assert.Equal(885m, preview.NetAfter);
+
+            // The preview is the promise; approval is the same computation for real.
+            await admin.ApproveGrantAsync(grant.Id, approvedByUserId: 2);
+            Assert.Equal(115m, db.DiscountGrants.Single(g => g.Id == grant.Id).AppliedAmount);
+
+            // ...and it stops being offered once there is a real applied amount to read instead.
+            Assert.Null((await admin.PreviewGrantsAsync(new[] { grant.Id }))[grant.Id].ExpectedAmount);
+        }
+
+        [Fact]
+        [BusinessRule("BR-DIS-005")]
+        public async Task A_grant_with_no_charge_of_its_category_previews_zero_against_zero_gross()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m, categoryId: _transportId);
+            var type = await admin.DefineTypeAsync("Tui", "Tuition only", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, feeCategoryId: _tuitionId);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 50m, "tuition only", 1);
+
+            var preview = (await admin.PreviewGrantsAsync(new[] { grant.Id }))[grant.Id];
+
+            Assert.Equal(0m, preview.ApplicableGross);
+            Assert.Equal(0m, preview.ExpectedAmount);
+        }
+
+        [Fact]
+        [BusinessRule("BR-DIS-002")]
+        public async Task The_preview_names_the_eldest_child_the_sibling_ladder_skips()
+        {
+            using var db = CreateContext();
+            var younger = EnrollChild(db, "STU-2", new DateTime(2018, 1, 1));
+            await PostCharge(db, 1000m, _studentId, _transportId);
+            await PostCharge(db, 1000m, younger, _transportId);
+
+            var admin = CreateAdmin(db);
+            var type = await admin.DefineTypeAsync("Sibling", "Sibling", DiscountBasis.Percentage, DiscountEligibilityMode.Automatic,
+                rules: new[] { new EligibilityRuleInput(EligibilityRuleKind.SiblingLadder, 50m, 2) });
+
+            // Exactly the mistake the desk has to make visible: 50% granted by hand to the
+            // eldest child, whom the ladder does not reach.
+            var onEldest = await admin.ProposeManualGrantAsync(_studentId, type.Id, 50m, "by hand", 1);
+            var onYounger = await admin.ProposeManualGrantAsync(younger, type.Id, 50m, "by hand", 1);
+
+            var previews = await admin.PreviewGrantsAsync(new[] { onEldest.Id, onYounger.Id });
+
+            var eldest = previews[onEldest.Id].Sibling;
+            Assert.NotNull(eldest);
+            Assert.Equal(1, eldest!.Ordinal);
+            Assert.Equal(2, eldest.SiblingCount);
+            Assert.Equal(0m, eldest.LadderPercent);      // the ladder gives the eldest nothing...
+
+            var second = previews[onYounger.Id].Sibling;
+            Assert.Equal(2, second!.Ordinal);
+            Assert.Equal(50m, second.LadderPercent);     // ...the sibling discount is the younger child's
+
+            // The grant itself is unaffected: the desk explains, it does not refuse.
+            Assert.Equal(500m, previews[onEldest.Id].ExpectedAmount);
+        }
+
+        [Fact]
+        [BusinessRule("BR-DIS-002")]
+        public async Task A_type_with_no_ladder_carries_no_family_position()
+        {
+            using var db = CreateContext();
+            EnrollChild(db, "STU-2", new DateTime(2018, 1, 1));
+            await PostCharge(db, 1000m, _studentId, _transportId);
+            var admin = CreateAdmin(db);
+            var type = await admin.DefineTypeAsync("Neg", "Negotiated", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 10m, "negotiated", 1);
+
+            Assert.Null((await admin.PreviewGrantsAsync(new[] { grant.Id }))[grant.Id].Sibling);
+        }
+
         // --- BR-DIS-002 automatic eligibility ---------------------------------------------------
 
         [Fact]

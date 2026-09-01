@@ -133,9 +133,17 @@ namespace Sms.Web.Controllers
             var shownStudentIds = grants.Select(g => g.StudentId).Distinct().ToList();
             var students = await _db.Students.IgnoreQueryFilters().AsNoTracking().Where(s => shownStudentIds.Contains(s.Id)).ToListAsync();
 
+            // doc/Modules/22 §8.3: the desk owes a gross/net preview per proposed
+            // discount. Without it the "applied" column reads 0.00 until somebody
+            // approves, which an operator reasonably reads as "this discount is worth
+            // nothing" — and a sibling grant sitting on the eldest child, whom the
+            // ladder deliberately skips, looks exactly the same as a correct one.
+            var previews = await _discounts.PreviewGrantsAsync(grants.Select(g => g.Id).ToList(), HttpContext.RequestAborted);
+
             m.Rows = grants.Select(g => new GrantDeskViewModel.Row(g,
                 m.Types.FirstOrDefault(t => t.Id == g.DiscountTypeId) ?? new DiscountType { NameAr = "?", NameEn = "?" },
-                students.FirstOrDefault(s => s.Id == g.StudentId) ?? new Student { StudentNo = "?" })).ToList();
+                students.FirstOrDefault(s => s.Id == g.StudentId) ?? new Student { StudentNo = "?" },
+                previews.TryGetValue(g.Id, out var preview) ? preview : null)).ToList();
             m.StudentOptions = await EnrolledStudentOptionsAsync(yid);
             return View(m);
         }
@@ -581,7 +589,11 @@ namespace Sms.Web.Controllers
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
             m.Years = years;
             m.Year = years.FirstOrDefault(y => y.Id == (yearId ?? _workingYear.AcademicYearId)) ?? years.FirstOrDefault(y => y.Status == Sms.Domain.Schools.AcademicYearStatus.Active) ?? years.FirstOrDefault();
-            m.Types = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking().Where(t => t.SchoolId == _db.CurrentSchoolId && t.IsActive).OrderBy(t => t.NameEn).ToListAsync();
+            // The eligibility rules ride along: the grant desk names each automatic
+            // type's ladder rungs before anyone evaluates it, so the operator can see
+            // that "sibling" means the second child onward and not every child.
+            m.Types = await _db.DiscountTypes.IgnoreQueryFilters().AsNoTracking().Include(t => t.EligibilityRules)
+                .Where(t => t.SchoolId == _db.CurrentSchoolId && t.IsActive).OrderBy(t => t.NameEn).ToListAsync();
             m.Categories = await _db.FeeCategories.AsNoTracking().OrderBy(c => c.NameEn).ToListAsync();
         }
 

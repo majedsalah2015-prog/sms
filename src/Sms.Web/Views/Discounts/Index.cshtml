@@ -1,4 +1,5 @@
 @using System.Globalization
+@using Sms.Application.Discounts
 @using Sms.Domain.Discounts
 @model GrantDeskViewModel
 @{
@@ -9,12 +10,47 @@
     var yid = Model.Year?.Id;
     string Badge(DiscountGrantStatus s) => s switch { DiscountGrantStatus.Approved => "text-bg-success", DiscountGrantStatus.Rejected => "text-bg-secondary", DiscountGrantStatus.Revoked => "text-bg-dark", _ => "text-bg-warning" };
     var today = DateTime.UtcNow.Date.ToString("yyyy-MM-dd");
+
+    string Ordinal(int n) => isRtl
+        ? n switch { 1 => "الأول", 2 => "الثاني", 3 => "الثالث", 4 => "الرابع", 5 => "الخامس", 6 => "السادس", _ => $"رقم {n}" }
+        : n switch { 1 => "1st", 2 => "2nd", 3 => "3rd", _ => $"{n}th" };
+
+    // BR-DIS-002 in one sentence, for this child: which of the family's enrolled
+    // children they are, and what the ladder actually gives that position. The eldest
+    // is ordinal 1 and the ladder normally skips them, so a sibling grant sitting on
+    // the eldest is named as such rather than left looking like every other row.
+    string SiblingLine(SiblingPosition s, decimal? grantedPercent)
+    {
+        var who = T($"{Ordinal(s.Ordinal)} of {s.SiblingCount} enrolled children in the family",
+                    $"الابن {Ordinal(s.Ordinal)} من {s.SiblingCount} من أبناء الأسرة المسجَّلين");
+        if (s.LadderPercent <= 0m)
+        {
+            return who + " — " + T("the sibling ladder starts at a later child, so it gives this one nothing.",
+                                   "وسلّم الأخوة يبدأ من ابن لاحق، فلا يمنحه شيئاً.");
+        }
+
+        var rung = T($"the ladder gives this child {s.LadderPercent.ToString("0.##")}%",
+                     $"والسلّم يمنحه {s.LadderPercent.ToString("0.##")}%");
+        if (grantedPercent is decimal granted && granted != s.LadderPercent)
+        {
+            return who + " — " + rung + T($", not the {granted.ToString("0.##")}% granted here.",
+                                          $"، لا {granted.ToString("0.##")}% الممنوحة هنا.");
+        }
+
+        return who + " — " + rung + ".";
+    }
+
+    string PositionTitle(GrantPreview p) => T(
+        $"Applicable charges {p.ApplicableGross.ToString("N2")} · still owed {p.RemainingBefore.ToString("N2")} · after this discount {(p.NetAfter ?? 0m).ToString("N2")}",
+        $"الرسوم الخاضعة {p.ApplicableGross.ToString("N2")} · المتبقي {p.RemainingBefore.ToString("N2")} · بعد هذا الخصم {(p.NetAfter ?? 0m).ToString("N2")}");
     var help = new HelpPanelViewModel
     {
         Id = "gd-help", Title = T("Grant desk — help", "مكتب المنح — مساعدة"),
         Intro = T("Every discount a student receives is a grant: proposed (manually or auto-evaluated from a type's sibling/staff rules), then approved (which issues numbered discount documents, BR-DIS-005) or rejected. Approved grants can later be revoked (BR-DIS-008).", "كل خصم يحصل عليه طالب هو منحة: تُقترح (يدوياً أو بتقييم تلقائي لقواعد الإخوة/الموظفين للنوع)، ثم تُعتمد (فتصدر مستندات خصم مرقّمة، BR-DIS-005) أو تُرفض. يمكن لاحقاً إلغاء المنح المعتمدة (BR-DIS-008)."),
         Items = new[]
         {
+            new HelpPanelViewModel.Item(T("Amount column", "عمود المبلغ"), T("A proposed grant has applied nothing yet, so the column shows what it would apply if approved right now (BR-DIS-005 against today's posted charges) — hover it for the gross, the outstanding, and the net after the discount. Once approved, the column is the real applied amount. Each preview assumes it is the only grant approved: two proposals on one student both show their full value, and approving the first changes the second.", "المنحة المقترحة لم تطبّق شيئاً بعد، فيعرض العمود ما ستطبّقه لو اعتُمدت الآن (BR-DIS-005 على الرسوم المرحَّلة اليوم) — مرِّر المؤشر لترى الإجمالي والمتبقي والصافي بعد الخصم. وبعد الاعتماد يصير العمود هو المبلغ المطبَّق فعلاً. كل تقدير يفترض أنه المنحة الوحيدة المعتمدة: منحتان لطالب واحد تعرضان قيمتيهما كاملتين، واعتماد الأولى يغيّر الثانية.")),
+            new HelpPanelViewModel.Item(T("Sibling ladder", "سلّم الأخوة"), T("A sibling type is a ladder over the family's enrolled children, counted eldest first (BR-DIS-002). The eldest is child 1 and normally earns nothing; the discount belongs to the younger sibling. Rows of a sibling type say which child of the family the student is and what the ladder gives that position, so a hand-entered percentage on the wrong child is visible before it is approved. Use \"Evaluate automatic types\" and the ladder is applied to every family for you.", "نوع الأخوة سلّم على أبناء الأسرة المسجَّلين، ترتيبهم من الأكبر سناً (BR-DIS-002). الابن الأكبر هو الأول ولا يستحق عادةً؛ الخصم للأخ الأصغر. وتُظهر صفوف نوع الأخوة أيّ أبناء الأسرة هو الطالب وما يمنحه السلّم لذلك الترتيب، فتظهر النسبة المُدخلة يدوياً على الابن الخطأ قبل اعتمادها. واستخدام «تقييم الأنواع التلقائية» يطبّق السلّم على كل أسرة نيابةً عنك.")),
             new HelpPanelViewModel.Item(T("Approval tier", "مستوى الاعتماد"), T("Recorded automatically from the percentage (≤10% Finance Manager, ≤25% Principal, otherwise Owner; scholarships always go to the Committee) — a register entry, not routed approval.", "يُسجَّل تلقائياً من النسبة (حتى 10% مدير مالي، حتى 25% مدير مدرسة، وإلا المالك؛ المنح الدراسية تذهب دائماً للجنة) — قيد سجل، لا اعتماد موجَّه.")),
             new HelpPanelViewModel.Item(T("Revoke ↺", "إلغاء ↺"), T("Effective date must be today or later. By default past discount documents stand (the student keeps what they already got); tick claw-back to post a charge for the unconsumed (forward) fraction of the year.", "يجب أن يكون تاريخ السريان اليوم أو بعده. افتراضياً تبقى مستندات الخصم السابقة كما هي؛ فعّل الاسترجاع لترحيل فاتورة عن الجزء غير المستهلك من العام.")),
         },
@@ -48,7 +84,7 @@
                 <thead><tr>
                     <th scope="col"><span class="visually-hidden">@T("Select", "تحديد")</span></th>
                     <th scope="col">@T("Student", "الطالب")</th><th scope="col">@T("Type", "النوع")</th><th scope="col">@T("Source", "المصدر")</th>
-                    <th scope="col" class="text-end">@T("Basis", "الأساس")</th><th scope="col" class="text-end">@T("Applied", "المطبَّق")</th>
+                    <th scope="col" class="text-end">@T("Basis", "الأساس")</th><th scope="col" class="text-end">@T("Amount", "المبلغ")</th>
                     <th scope="col">@T("Tier", "المستوى")</th><th scope="col">@T("Status", "الحالة")</th><th scope="col">@T("Actions", "الإجراءات")</th>
                 </tr></thead>
                 <tbody>
@@ -58,10 +94,37 @@
                     <tr>
                         <td>@if (g.Status == DiscountGrantStatus.Proposed) { <input type="checkbox" form="batchApproveForm" name="ids" value="@g.Id" class="form-check-input" aria-label="@T($"Select grant for {DiscountLabels.StudentName(r.Student, false)}", $"تحديد منحة {DiscountLabels.StudentName(r.Student, true)}")" /> }</td>
                         <td>@DiscountLabels.StudentName(r.Student, isRtl) <span class="text-muted small">· @r.Student.StudentNo</span></td>
-                        <td>@(isRtl ? r.Type.NameAr : r.Type.NameEn)</td>
+                        <td>
+                            @(isRtl ? r.Type.NameAr : r.Type.NameEn)
+                            @if (r.Preview?.Sibling is SiblingPosition sib)
+                            {
+                                var skipped = sib.LadderPercent <= 0m;
+                                <div class="small @(skipped ? "text-danger" : "text-muted")">
+                                    <i class="bi @(skipped ? "bi-exclamation-triangle" : "bi-people") me-1" aria-hidden="true"></i>@SiblingLine(sib, r.Type.Basis == DiscountBasis.Percentage ? g.BasisValue : (decimal?)null)
+                                </div>
+                            }
+                        </td>
                         <td class="small">@DiscountLabels.GrantSource(g.Source, isRtl)</td>
                         <td class="text-end"><bdi dir="ltr">@(r.Type.Basis == DiscountBasis.Percentage ? $"{g.BasisValue:0.##}%" : g.BasisValue.ToString("N2"))</bdi></td>
-                        <td class="text-end"><bdi dir="ltr">@g.AppliedAmount.ToString("N2")</bdi></td>
+                        <td class="text-end">
+                            @if (g.Status == DiscountGrantStatus.Proposed && r.Preview?.ExpectedAmount is decimal expected)
+                            {
+                                <bdi dir="ltr" class="fst-italic" title="@PositionTitle(r.Preview)">≈ @expected.ToString("N2")</bdi>
+                                <div class="small text-muted">@T("expected on approval", "متوقع عند الاعتماد")</div>
+                                @if (expected <= 0m)
+                                {
+                                    <div class="small text-danger">
+                                        @(r.Preview.ApplicableGross <= 0m
+                                            ? T("no charge this type applies to is posted for the student yet", "لا رسوم يسري عليها هذا النوع مرحَّلة للطالب بعد")
+                                            : T("the applicable charges leave nothing to discount", "الرسوم الخاضعة لم يبقَ فيها ما يُخصم"))
+                                    </div>
+                                }
+                            }
+                            else
+                            {
+                                <bdi dir="ltr">@g.AppliedAmount.ToString("N2")</bdi>
+                            }
+                        </td>
                         <td class="small">@DiscountLabels.Tier(g.RequiredTier, isRtl)</td>
                         <td><span class="badge @Badge(g.Status)">@DiscountLabels.GrantStatus(g.Status, isRtl)</span></td>
                         <td class="text-nowrap">
@@ -113,6 +176,7 @@
                 <label class="small"><input type="checkbox" name="hasHardshipDocumentation" value="true" class="form-check-input" /> @T("Hardship documentation on file (required for hardship types)", "مستندات الضائقة مرفقة (مطلوبة للأنواع ذات الطابع الإنساني)")</label>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-send me-1" aria-hidden="true"></i>@T("Propose", "اقتراح")</button>
             </form>
+            <p class="small text-muted mt-2 mb-0"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>@T("A type with automatic eligibility — a sibling ladder or a staff link — is meant to be evaluated rather than granted by hand: evaluating works out each child's position in the family and applies the right rung. Granting one here sets the percentage you typed on the student you picked, whatever the ladder says about them.", "النوع ذو الاستحقاق التلقائي — سلّم أخوة أو رابط موظف — يُقيَّم ولا يُمنح يدوياً: فالتقييم يحسب ترتيب كل ابن في أسرته ويطبّق الدرجة الصحيحة. أما المنح من هنا فيثبّت النسبة التي كتبتها على الطالب الذي اخترته مهما كان ترتيبه في السلّم.")</p>
         </div>
         @if (Model.AutomaticTypes.Count > 0)
         {
@@ -121,11 +185,25 @@
                 <p class="small text-muted">@T("Runs the type's sibling-ladder/staff rules over this year's enrolled students and proposes a grant for every newly eligible one.", "يشغّل قواعد سلّم الإخوة/الموظفين للنوع على طلاب هذا العام ويقترح منحة لكل مستحق جديد.")</p>
                 @foreach (var t in Model.AutomaticTypes)
                 {
+                    var rungs = t.EligibilityRules.Where(x => x.Kind == EligibilityRuleKind.SiblingLadder && x.ChildOrdinal.HasValue).OrderBy(x => x.ChildOrdinal).ToList();
+                    var staffRule = t.EligibilityRules.FirstOrDefault(x => x.Kind == EligibilityRuleKind.Staff);
                     <form method="post" asp-action="ProposeAutomaticGrants" asp-route-year="@yid" class="d-flex justify-content-between align-items-center mb-1">
                         <input type="hidden" name="discountTypeId" value="@t.Id" />
                         <span class="small">@(isRtl ? t.NameAr : t.NameEn)</span>
                         <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-play-fill me-1" aria-hidden="true"></i>@T("Evaluate", "تقييم")</button>
                     </form>
+                    @if (rungs.Count > 0)
+                    {
+                        <p class="small text-muted mb-1">
+                            @T("Sibling ladder", "سلّم الأخوة"):
+                            @string.Join(" · ", rungs.Select(x => T($"{Ordinal(x.ChildOrdinal!.Value)} child {x.Percent.ToString("0.##")}%", $"الابن {Ordinal(x.ChildOrdinal!.Value)} {x.Percent.ToString("0.##")}%")))
+                            — @T("children counted eldest first; the eldest is not on the ladder, so the discount goes to the younger sibling.", "الترتيب من الأكبر سناً، والابن الأكبر ليس على السلّم، فالخصم للأخ الأصغر.")
+                        </p>
+                    }
+                    @if (staffRule != null)
+                    {
+                        <p class="small text-muted mb-1">@T($"Staff link: a child of an active employee gets {staffRule.Percent.ToString("0.##")}%.", $"رابط الموظف: ابن الموظف على رأس العمل يحصل على {staffRule.Percent.ToString("0.##")}%.")</p>
+                    }
                 }
             </div>
         }

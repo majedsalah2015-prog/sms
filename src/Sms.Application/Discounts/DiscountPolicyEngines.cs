@@ -59,10 +59,43 @@ namespace Sms.Application.Discounts
 
         public sealed record LadderStep(int ChildOrdinal, decimal Percent);
 
+        /// <summary>One live guardian link, flattened: which family a child belongs to, and when they were born.</summary>
+        public sealed record FamilyLink(int ParentId, int StudentId, DateTime DateOfBirth);
+
+        /// <summary>Where a child sits in one of their families. The eldest is 1 — the ordinal the ladder normally skips.</summary>
+        public sealed record Position(int ParentId, int Ordinal, int SiblingCount);
+
         public static IReadOnlyDictionary<int, int> Ordinals(IReadOnlyCollection<Sibling> siblings)
             => siblings.OrderBy(s => s.DateOfBirth).ThenBy(s => s.StudentId)
                 .Select((s, i) => (s.StudentId, Ordinal: i + 1))
                 .ToDictionary(x => x.StudentId, x => x.Ordinal);
+
+        /// <summary>
+        /// Every child's position in each family they belong to. Module 11 lets a student
+        /// carry more than one live guardian link, so the same child can be the eldest of
+        /// one family and the second of another; both positions come back and the caller
+        /// decides which rung applies (BR-DIS-002 takes the most generous). Two links to
+        /// the same guardian collapse — a child is one sibling, however many rows say so.
+        /// </summary>
+        public static IReadOnlyDictionary<int, IReadOnlyList<Position>> Positions(IReadOnlyCollection<FamilyLink> links)
+        {
+            var byStudent = new Dictionary<int, List<Position>>();
+            foreach (var family in links.GroupBy(l => l.ParentId))
+            {
+                var siblings = family.GroupBy(l => l.StudentId).Select(g => new Sibling(g.Key, g.First().DateOfBirth)).ToList();
+                foreach (var (studentId, ordinal) in Ordinals(siblings))
+                {
+                    if (!byStudent.TryGetValue(studentId, out var positions))
+                    {
+                        byStudent[studentId] = positions = new List<Position>();
+                    }
+
+                    positions.Add(new Position(family.Key, ordinal, siblings.Count));
+                }
+            }
+
+            return byStudent.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<Position>)kv.Value);
+        }
 
         public static decimal Percent(int ordinal, IReadOnlyCollection<LadderStep> ladder)
             => ladder.Where(s => s.ChildOrdinal <= ordinal).OrderByDescending(s => s.ChildOrdinal).Select(s => s.Percent).FirstOrDefault();
