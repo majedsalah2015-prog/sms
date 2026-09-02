@@ -193,17 +193,17 @@ else
                                     }
                                     else if (ff.HasPlan)
                                     {
-                                        <p class="small text-muted mb-0">
+                                        <p class="small text-muted mb-1">
                                             @T("This student already has a plan for the year, and a second one is not assigned over the same fees (BR-INS-002).", "لهذا الطالب خطة لهذا العام بالفعل، ولا تُسنَد ثانية على نفس الرسوم (BR-INS-002).")
-                                            @if (Model.PlanChanges.Count > 0)
-                                            {
-                                                <a href="#plan-schedule">@T("Change the template it is on, under the schedule below.", "غيّر القالب الذي هي عليه، أسفل الجدول أدناه.")</a>
-                                            }
-                                            else
+                                            @if (Model.PlanChanges.Count == 0)
                                             {
                                                 @T("Changing the plan it is on reshapes a live schedule, which is a different right (BR-INS-005).", "تغيير الخطة القائمة يعيد تشكيل جدول قائم، وهي صلاحية أخرى (BR-INS-005).")
                                             }
                                         </p>
+                                        @if (Model.PlanChanges.Count > 0)
+                                        {
+                                            <a class="btn btn-sm btn-outline-primary" href="#plan-schedule"><i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Change the template it is on", "تغيير القالب الذي هي عليه")</a>
+                                        }
                                     }
                                     else if (ff.Templates.Count == 0)
                                     {
@@ -506,8 +506,11 @@ else
                                 }
                                 else
                                 {
-                                    <details>
-                                        <summary class="small text-primary" style="cursor:pointer">@T("Change the installment template", "تغيير قالب التقسيط")</summary>
+                                    @* Open, not collapsed: this panel is only rendered for someone who holds both
+                                       halves of the right and whose plan has a remainder to move, and a disclosure
+                                       they have to find first reads as the screen not offering it at all. *@
+                                    <details open>
+                                        <summary class="small fw-semibold text-primary" style="cursor:pointer">@T("Change the installment template", "تغيير قالب التقسيط")</summary>
                                         <form method="post" asp-action="ChangeStudentPlanTemplate" asp-route-id="@s.Id" asp-route-planAssignmentId="@p.Assignment.Id" asp-route-year="@yid" class="row g-2 mt-1">
                                             @Html.AntiForgeryToken()
                                             <div class="col-12">
