@@ -12,6 +12,12 @@
     // Edit and remove are offered only on the working year: both issue a credit note, and a
     // correction belongs to the year the charge is being corrected in, not to one being browsed.
     var canEditItems = Model.FeeFile is { CanAdjustItems: true } f && f.Blocker != FeeFileBlocker.NotWorkingYear;
+    // Where the "change the template" picker is drawn (owner request, 2026-09-02: in the basket's
+    // own template field). It goes there whenever the basket is actually drawing its form; when the
+    // basket is absent, blocked or exhausted, the same picker falls back to the schedule panel so a
+    // Finance Manager who never posts charges is not left without it. Never both â one control.
+    var basketHostsPlanChange = Model.FeeFile is { CanCommit: true, CanAssignPlan: true, HasPlan: true } b
+        && b.Blocker == FeeFileBlocker.None && !b.IsExhausted && Model.PlanChanges.Count > 0;
     var help = new HelpPanelViewModel
     {
         Id = "stufin-detail-help", Title = T("Fee breakdown — help", "تفصيل الرسوم — مساعدة"),
@@ -186,10 +192,66 @@ else
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label small fw-semibold mb-1" for="ff-template">@T("Installment template", "قالب التقسيط")</label>
+                                    @* A label only when there is one control to label. With a plan standing this
+                                       field holds a picker and a reason box per plan, each already labelled, so the
+                                       heading is a heading — a `for` pointing at an id that is not rendered is worse
+                                       than no label at all for anyone reading the page with a screen reader. *@
+                                    @if (ff.HasPlan)
+                                    {
+                                        <div class="form-label small fw-semibold mb-1">@T("Installment template", "قالب التقسيط")</div>
+                                    }
+                                    else
+                                    {
+                                        <label class="form-label small fw-semibold mb-1" for="ff-template">@T("Installment template", "قالب التقسيط")</label>
+                                    }
                                     @if (!ff.CanAssignPlan)
                                     {
                                         <p class="small text-muted mb-0">@T("You do not hold the plan-assignment permission, so no template can be chosen here.", "لا تملك صلاحية إسناد الخطط، فلا يمكن اختيار قالب هنا.")</p>
+                                    }
+                                    else if (ff.HasPlan && basketHostsPlanChange)
+                                    {
+                                        @* The plan is standing, so this field changes it rather than assigning a
+                                           second one (BR-INS-002). Its controls post to their own action, not to
+                                           the basket: the form element sits after this one closes and each control
+                                           names it, because a form cannot be nested inside a form. Approving the
+                                           basket and moving a family's plan are two acts, and one button that did
+                                           both would bill items nobody ticked. *@
+                                        @foreach (var change in Model.PlanChanges)
+                                        {
+                                            var fid = $"plan-change-{change.PlanAssignmentId}";
+                                            <div class="border rounded p-2 mb-2">
+                                                <p class="small text-muted mb-2">
+                                                    @T("On", "على"): <span class="fw-semibold">@(change.Current == null ? T("(plan removed)", "(خطة محذوفة)") : (isRtl ? change.Current.NameAr : change.Current.NameEn))</span>@if (Model.Plans.FirstOrDefault(p => p.Assignment.Id == change.PlanAssignmentId)?.Category is { } cat) { <span> · @(isRtl ? cat.NameAr : cat.NameEn)</span> }
+                                                </p>
+                                                @if (change.IsFullyCollected)
+                                                {
+                                                    <p class="small text-muted mb-0">@T("Nothing on this schedule is still unpaid, so there is no remainder left to re-date onto another plan (BR-INS-005).", "لا متبقٍّ غير مسدَّد في هذا الجدول، فلا شيء يُعاد تأريخه على خطة أخرى (BR-INS-005).")</p>
+                                                }
+                                                else if (change.Options.Count == 0)
+                                                {
+                                                    <p class="small text-muted mb-0">@T("No other approved template of this year fits these fees — approve one in the template designer first (BR-INS-001).", "لا يوجد قالب معتمد آخر في هذا العام يناسب هذه الرسوم — اعتمد قالباً في مصمّم القوالب أولاً (BR-INS-001).")</p>
+                                                }
+                                                else
+                                                {
+                                                    <label class="form-label small mb-0" for="pt-@change.PlanAssignmentId">@T("Move to", "الانتقال إلى")</label>
+                                                    <select class="form-select form-select-sm" id="pt-@change.PlanAssignmentId" name="planTemplateId" required form="@fid">
+                                                        <option value="">@T("— keep the current plan —", "— إبقاء الخطة الحالية —")</option>
+                                                        @foreach (var o in change.Options)
+                                                        {
+                                                            <option value="@o.Template.Id">@(isRtl ? o.Template.NameAr : o.Template.NameEn) — @o.InstallmentCount @T("installments", "قسطاً")</option>
+                                                        }
+                                                    </select>
+                                                    <label class="form-label small mb-0 mt-2" for="pt-reason-@change.PlanAssignmentId">@T("Reason", "السبب")</label>
+                                                    <input class="form-control form-control-sm" id="pt-reason-@change.PlanAssignmentId" name="reason" maxlength="400" required form="@fid" />
+                                                    <div class="form-text">
+                                                        @T("Only the unpaid remainder moves — ", "لا يتحرك إلا المتبقي غير المسدَّد — ")<bdi dir="ltr" class="fw-semibold">@change.Remainder.ToString("N2")</bdi>@T(" — re-dated onto the new template's instalments. Anything already collected stays where it is (BR-INS-003). A reason is mandatory: a family put on a different plan from its grade's is a reported exception (BR-INS-002).", " — يُعاد تأريخه على أقساط القالب الجديد. ويبقى ما سُدِّد في مكانه (BR-INS-003). والسبب إلزامي: وضع الأسرة على خطة غير خطة صفّها استثناء يُدرَج في التقارير (BR-INS-002).")
+                                                    </div>
+                                                    <button type="submit" class="btn btn-sm btn-outline-primary mt-2" form="@fid">
+                                                        <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>@T("Change the plan and re-date the remainder", "تغيير الخطة وإعادة تأريخ المتبقي")
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
                                     }
                                     else if (ff.HasPlan)
                                     {
@@ -279,6 +341,19 @@ else
                         </button>
                     </div>
                 </form>
+
+                @* The plan-change forms, carrying nothing but their token: their visible controls are
+                   drawn up in the template field above and reach them by the HTML5 `form` attribute.
+                   They live out here because that field is inside the basket's own form, and nesting
+                   one form in another is not valid markup — the browser would silently drop it. *@
+                @if (basketHostsPlanChange)
+                {
+                    foreach (var change in Model.PlanChanges)
+                    {
+                        <form method="post" id="plan-change-@change.PlanAssignmentId" class="d-none"
+                              asp-action="ChangeStudentPlanTemplate" asp-route-id="@s.Id" asp-route-planAssignmentId="@change.PlanAssignmentId" asp-route-year="@yid"></form>
+                    }
+                }
 
                 @* The running figure is a plain sum of the ticked prices, nothing more. VAT, the
                    discount and the split are computed by the engines that own those rules when the
@@ -493,7 +568,14 @@ else
                            Offered here rather than in the basket above because this is what it acts on: the
                            schedule is right there, and what the change re-dates is the unpaid part of it. Its
                            own form, outside the basket's — one act, one reason, one button. *@
-                        @if (Model.PlanChangeFor(p.Assignment.Id) is PlanTemplateChangePanel change)
+                        @if (basketHostsPlanChange && Model.PlanChangeFor(p.Assignment.Id) != null)
+                        {
+                            <div class="p-2 border-bottom d-print-none small text-muted">
+                                @T("The template this plan is on is changed in the approval basket above.", "يُغيَّر القالب الذي تقوم عليه هذه الخطة من سلة الاعتماد أعلاه.")
+                                <a href="#feefile">@T("Go to it", "الانتقال إليها")</a>
+                            </div>
+                        }
+                        else if (Model.PlanChangeFor(p.Assignment.Id) is PlanTemplateChangePanel change)
                         {
                             <div class="p-2 border-bottom d-print-none">
                                 @if (change.IsFullyCollected)
