@@ -339,22 +339,39 @@ namespace Sms.Web.Controllers
             var years = await _db.AcademicYears.AsNoTracking().OrderByDescending(y => y.StartDate).ToListAsync();
             var year = years.FirstOrDefault(y => y.Id == (yearId ?? _workingYear.AcademicYearId)) ?? years.FirstOrDefault(y => y.Status == AcademicYearStatus.Active) ?? years.FirstOrDefault();
             var m = new CurriculumPlanViewModel { Years = years, Year = year, AvailableSlots = slots ?? 35, Subjects = await _db.Subjects.AsNoTracking().OrderBy(s => s.Code).ToListAsync() };
+
+            // An explicit ?year= that named something this school does not have has just been swapped
+            // for another year. Keep the swap — a stale bookmark should still open the screen — but
+            // record it, because the address and the plan on screen now disagree and nothing else says so.
+            // Only when a substitute was actually found: with no years at all the empty state below is
+            // the whole story, and stacking a second alert on it says nothing extra.
+            m.YearFellBack = yearId != null && year != null && year.Id != yearId.Value;
             if (year == null) return m;
 
-            // IgnoreQueryFilters on both lookups below. A grade level and a subject are soft-active
-            // master data, but a profile and an offering outlive their deactivation — so joining the
-            // filtered query with First() threw "Sequence contains no matching element" and took the
-            // whole screen down the first time anybody retired a subject. Same shape as the fee
+            // IgnoreQueryFilters on the three lookups below. A grade level, a stage and a subject are
+            // soft-active master data, but a profile and an offering outlive their deactivation — so
+            // joining the filtered query with First() threw "Sequence contains no matching element" and
+            // took the whole screen down the first time anybody retired a subject. Same shape as the fee
             // category that made a GL period unexportable (gap G-14): the filter is there to stop new
             // records being made against a retired row, not to pretend the old ones never happened.
             var grades = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking()
                 .Where(g => g.SchoolId == _db.CurrentSchoolId).ToListAsync();
+            var stages = await _db.Stages.IgnoreQueryFilters().AsNoTracking()
+                .Where(s => s.SchoolId == _db.CurrentSchoolId).ToListAsync();
             var profiles = await _db.GradeYearProfiles.AsNoTracking().Where(p => p.AcademicYearId == year.Id).ToListAsync();
             m.Profiles = profiles
                 .Where(p => grades.Any(g => g.Id == p.GradeLevelId))
-                .Select(p => new CurriculumPlanViewModel.ProfileOption(p.Id, grades.First(g => g.Id == p.GradeLevelId)))
+                .Select(p =>
+                {
+                    var grade = grades.First(g => g.Id == p.GradeLevelId);
+                    return new CurriculumPlanViewModel.ProfileOption(p.Id, grade, stages.FirstOrDefault(s => s.Id == grade.StageId));
+                })
                 .OrderBy(p => p.Grade.SequenceOrder).ToList();
             m.Profile = m.Profiles.FirstOrDefault(p => p.ProfileId == profileId) ?? m.Profiles.FirstOrDefault();
+
+            // The usual way to land here: the year and grade pickers submit as one form, so changing the
+            // year carries the previous year's profile id into a year that has no profile for that grade.
+            m.ProfileFellBack = profileId != null && m.Profile != null && m.Profile.ProfileId != profileId.Value;
             if (m.Profile == null) return m;
 
             var offerings = await _db.CurriculumOfferings.AsNoTracking().Where(o => o.GradeYearProfileId == m.Profile.ProfileId).OrderBy(o => o.EffectiveToUtc != null).ThenBy(o => o.SubjectId).ToListAsync();

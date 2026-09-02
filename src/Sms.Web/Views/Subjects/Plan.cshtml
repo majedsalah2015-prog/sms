@@ -24,17 +24,53 @@
 }
 
 <div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade-year: subject, periods/week, assessable, GPA weight, elective group; the period total must fit the timetable's available slots (BR-SUB-005). Offerings are end-dated, never removed (BR-SUB-004).", "لكل صف سنوي: المادة، الحصص أسبوعياً، قابلة للتقييم، وزن المعدل، مجموعة اختيارية؛ يجب أن يتسع مجموع الحصص في الجدول (BR-SUB-005). المواد تُنهى بتاريخ ولا تُحذف (BR-SUB-004).")</p></div>
-    <div class="d-flex gap-2 align-items-center">
-    <form method="get" class="d-flex gap-2 align-items-center">
-        <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }</select>
-        <select name="profile" class="form-select form-select-sm" onchange="this.form.submit()">@foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)</option> }</select>
-        <label class="small text-muted text-nowrap">@T("slots/wk", "حصص/أسبوع")</label><input name="slots" type="number" class="form-control form-control-sm" style="width:5rem" value="@Model.AvailableSlots" onchange="this.form.submit()" />
+    @* Each picker carries its own visible label. Two bare dropdowns side by side did not say which
+       one was the year and which the grade, and the one label on the row ("slots/wk") sat between
+       the grade dropdown and the number box, so it read as the grade's. Labels above fields is the
+       house rule anyway (docs/UI/02-Screen-Patterns.md §2). *@
+    <div class="d-flex gap-2 align-items-end flex-wrap">
+    <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+        <div>
+            <label for="plan-year" class="form-label small text-muted mb-1">@T("Academic year", "العام الدراسي")</label>
+            <select id="plan-year" name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+                @if (Model.Years.Count == 0) { <option value="">@T("— no years defined —", "— لا أعوام معرَّفة —")</option> }
+                @foreach (var y in Model.Years) { <option value="@y.Id" selected="@(y.Id == yid)">@(isRtl ? y.LabelAr : y.LabelEn)</option> }
+            </select>
+        </div>
+        <div>
+            <label for="plan-grade" class="form-label small text-muted mb-1">@T("Grade", "الصف")</label>
+            <select id="plan-grade" name="profile" class="form-select form-select-sm" onchange="this.form.submit()">
+                @if (Model.Profiles.Count == 0) { <option value="">@T("— no grades this year —", "— لا صفوف هذا العام —")</option> }
+                @foreach (var p in Model.Profiles) { <option value="@p.ProfileId" selected="@(p.ProfileId == pid)">@p.Grade.Code · @(isRtl ? p.Grade.Name.NameAr : p.Grade.Name.NameEn)@(p.Stage == null ? "" : " · " + (isRtl ? p.Stage.Name.NameAr : p.Stage.Name.NameEn))</option> }
+            </select>
+        </div>
+        <div>
+            <label for="plan-slots" class="form-label small text-muted mb-1">@T("Slots/week", "حصص الأسبوع")</label>
+            <input id="plan-slots" name="slots" type="number" min="1" class="form-control form-control-sm" style="width:6rem" value="@Model.AvailableSlots" onchange="this.form.submit()" />
+        </div>
     </form>
     <partial name="_HelpModal" model="help" />
     </div></div>
 <partial name="_SubjectsNav" />
 
-@if (Model.Profile == null)
+@if (Model.YearFellBack || Model.ProfileFellBack)
+{
+    <div class="alert alert-warning d-flex align-items-start gap-2">
+        <i class="bi bi-exclamation-triangle mt-1 flex-shrink-0" aria-hidden="true"></i>
+        <div>
+            @if (Model.YearFellBack) { <div>@T("The address named an academic year this school does not have; the plan below is for the year selected above.", "طلب العنوان عاماً دراسياً لا تملكه المدرسة؛ والخطة أدناه للعام المحدد أعلاه.")</div> }
+            @if (Model.ProfileFellBack) { <div>@T("The address named a grade with no profile in this year; the plan below is for the grade selected above.", "طلب العنوان صفاً لا ملف له في هذا العام؛ والخطة أدناه للصف المحدد أعلاه.")</div> }
+        </div>
+    </div>
+}
+
+@if (Model.Year == null)
+{
+    @* Split from the message below: with no year at all, "define a grade-year profile for this year"
+       named a year that does not exist and sent the reader to the wrong screen. *@
+    <div class="alert alert-info">@T("Define an academic year first (Academic years → Define).", "عرّف عاماً دراسياً أولاً (الأعوام الدراسية → تعريف).")</div>
+}
+else if (Model.Profile == null)
 {
     <div class="alert alert-info">@T("Define a grade-year profile for this year first (Grades → Profile).", "عرّف ملف الصف السنوي لهذا العام أولاً (الصفوف → الملف).")</div>
 }
@@ -43,8 +79,14 @@ else
     <div class="row g-3">
         <div class="col-xl-8">
             <div class="sms-card">
-                <div class="p-3 border-bottom d-flex align-items-center gap-3">
-                    <h2 class="h6 mb-0">@Model.Profile.Grade.Code @(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) · @(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)</h2>
+                <div class="p-3 border-bottom d-flex align-items-center gap-3 flex-wrap">
+                    @* Which grade, which year — said once, plainly, above the plan itself. It was an h6
+                       reading "G3 Grade 3 · 2027-2028", smaller than the table it heads and with the
+                       code welded to the name. *@
+                    <div>
+                        <h2 class="h5 mb-0">@(isRtl ? Model.Profile.Grade.Name.NameAr : Model.Profile.Grade.Name.NameEn) <span class="text-muted fw-normal">· @(isRtl ? Model.Year!.LabelAr : Model.Year!.LabelEn)</span></h2>
+                        <div class="small text-muted"><code>@Model.Profile.Grade.Code</code>@if (Model.Profile.Stage != null) { <text> · @(isRtl ? Model.Profile.Stage.Name.NameAr : Model.Profile.Stage.Name.NameEn)</text> }</div>
+                    </div>
                     <div class="ms-auto d-flex align-items-center gap-2 small"><span class="@(over ? "text-danger fw-semibold" : "")">@Model.TotalPeriods / @Model.AvailableSlots @T("periods/week", "حصة/أسبوع")</span><div class="sms-progress" role="progressbar" aria-valuenow="@pct" aria-valuemin="0" aria-valuemax="100" aria-label="@T("Capacity", "السعة")" style="width:8rem"><span style="width:@(pct)%;@(over ? "background:#dc2626" : "")"></span></div>@if (over) { <span class="badge text-bg-danger">@T("over capacity (BR-SUB-005)", "يتجاوز السعة (BR-SUB-005)")</span> }</div>
                 </div>
                 <div class="table-responsive"><table class="table sms-table mb-0">

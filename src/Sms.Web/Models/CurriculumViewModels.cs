@@ -119,7 +119,14 @@ namespace Sms.Web.Models
         /// </summary>
         public sealed record OfferingRow(CurriculumOffering Offering, Subject Subject, bool SubjectIsRetired = false);
 
-        public sealed record ProfileOption(int ProfileId, GradeLevel Grade);
+        /// <summary>
+        /// One grade-year the plan can be written for. <paramref name="Stage"/> rides along because a
+        /// grade code alone ("G3") identifies a grade only to whoever wrote the codes — the rest of the
+        /// product names the stage beside it, and on this screen the grade *is* the axis being edited.
+        /// Nullable so a stage row that has gone missing degrades to "no stage shown" rather than
+        /// taking the picker down.
+        /// </summary>
+        public sealed record ProfileOption(int ProfileId, GradeLevel Grade, Stage? Stage);
 
         public IReadOnlyList<AcademicYear> Years { get; set; } = Array.Empty<AcademicYear>();
 
@@ -128,6 +135,20 @@ namespace Sms.Web.Models
         public IReadOnlyList<ProfileOption> Profiles { get; set; } = Array.Empty<ProfileOption>();
 
         public ProfileOption? Profile { get; set; }
+
+        /// <summary>
+        /// The <c>?year=</c> in the address named a year this school does not have, so the screen fell
+        /// back to another one. Falling back is deliberate — a bookmarked id that has gone stale should
+        /// not produce an error page — but a *silent* fallback is how somebody edits the wrong plan, so
+        /// the screen says it happened (doc/Modules/07 §8.2).
+        /// </summary>
+        public bool YearFellBack { get; set; }
+
+        /// <summary>
+        /// Same for <c>?profile=</c>, and it is the common one: the two pickers submit together, so
+        /// changing the year carries the old year's grade id into a year that has no profile for it.
+        /// </summary>
+        public bool ProfileFellBack { get; set; }
 
         public IReadOnlyList<OfferingRow> Offerings { get; set; } = Array.Empty<OfferingRow>();
 
