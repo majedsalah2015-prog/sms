@@ -20,7 +20,7 @@
 
 <div class="sms-card">
     <form method="get" class="p-2 border-bottom d-flex flex-wrap gap-2 align-items-center">
-        <input name="q" class="form-control form-control-sm" style="max-width:20rem" value="@Model.Query" placeholder="@T("number, name, ID, mobile…", "الرقم، الاسم، الهوية، الجوال…")" />
+        <input name="q" class="form-control form-control-sm" style="max-width:14rem" value="@Model.Query" placeholder="@T("number, name, ID, mobile…", "الرقم، الاسم، الهوية، الجوال…")" />
         <select name="status" class="form-select form-select-sm" style="max-width:11rem" onchange="this.form.submit()"><option value="">@T("Any status", "كل الحالات")</option>@foreach (StudentStatus s in Enum.GetValues(typeof(StudentStatus))) { <option value="@s" selected="@(s == Model.Status)">@Labels.StudentStatus(s, isRtl)</option> }</select>
         <select name="grade" class="form-select form-select-sm" style="max-width:12rem" onchange="this.form.submit()" aria-label="@T("Grade", "الصف")"><option value="">@T("Any grade", "كل الصفوف")</option>@foreach (var g in Model.Grades) { <option value="@g.Id" selected="@(g.Id == Model.GradeId)">@g.Code @(isRtl ? g.Name.NameAr : g.Name.NameEn)</option> }</select>
         @* The working year's sections, grouped by their grade — "A" names nothing on its own. *@
