@@ -40,6 +40,8 @@
             new HelpPanelViewModel.Item(T("Status is a lifecycle, not a flag", "الحالة دورة حياة لا وسماً"), T("Enrolled, suspended, graduated, alumni and the rest each change what other modules will accept for this student — a suspended student is not a deleted one, and their history stays intact and readable throughout (BR-STU-002).", "«ملتحق» و«موقوف» و«متخرج» و«خريج» وغيرها، كل منها يغيّر ما تقبله الوحدات الأخرى لهذا الطالب — فالطالب الموقوف ليس محذوفاً، ويبقى سجله سليماً مقروءاً طوال الوقت (BR-STU-002).")),
             new HelpPanelViewModel.Item(T("The audit tab answers \"who changed this\"", "لسان التدقيق يجيب «من غيّر هذا»"), T("Identity edits on a student are captured field by field with the old and new value, in the same transaction as the change itself. Nothing is written there by hand and nothing can be removed from it.", "تُلتقط تعديلات هوية الطالب حقلاً حقلاً بالقيمة القديمة والجديدة، في المعاملة نفسها مع التغيير. ولا يُكتب فيه شيء يدوياً ولا يُنزع منه شيء.")),
             new HelpPanelViewModel.Item(T("Guardians are people, not fields", "أولياء الأمور أشخاص لا حقول"), T("A parent is a record in their own right and is linked to the student, which is what lets siblings share one father and one portal account. Correct a guardian's details on the parent's own file, not by re-typing them here.", "ولي الأمر سجل قائم بذاته ومرتبط بالطالب، وهذا ما يتيح للإخوة أن يشتركوا في أبٍ واحد وحساب بوابة واحد. فصحّح بيانات ولي الأمر في ملفه هو لا بإعادة كتابتها هنا.")),
+            new HelpPanelViewModel.Item(T("Correcting a grade is not moving a student", "تصحيح الصف ليس نقلاً للطالب"), T("The ✎ on an academic-history row changes the grade the record should have carried all along, within the same academic year. Moving a child to the next year is the rollover, and it is refused here (BR-GLB-023). A child sitting in a section cannot have their grade corrected underneath them, because the section belongs to that grade — take them out of the section first with the ⬆ button on the same row, correct the grade, then seat them again.", "زر ✎ في سطر السجل الأكاديمي يغيّر الصف الذي كان ينبغي أن يحمله القيد منذ البداية، ضمن العام الدراسي نفسه. أما نقل الطفل إلى العام التالي فهو الترحيل، ويُرفض من هنا (BR-GLB-023). والطالب الجالس في شعبة لا يُصحَّح صفه من تحته، لأن الشعبة تتبع ذلك الصف — أخرِجه من الشعبة أولاً بزر ⬆ في السطر نفسه، ثم صحّح الصف، ثم أعِد إسناده.")),
+            new HelpPanelViewModel.Item(T("A record is removed only while it is still only a typing mistake", "لا يُحذف السجل إلا ما دام مجرد خطأ إدخال"), T("The 🗑 on an academic-history row removes an enrollment nothing has ever been recorded against, and asks why — the reason is written to the audit trail, which is all that will be left of it. One attendance day, one mark, one charge, and the button greys out and names what is in the way: that enrollment is history now, and history is closed by withdrawal rather than removed (BR-GLB-005).", "زر 🗑 في سطر السجل الأكاديمي يحذف قيداً لم يُسجَّل عليه شيء قط، ويسأل عن السبب — ويُكتب السبب في سجل التدقيق، وهو كل ما سيبقى منه. ويكفي يوم حضور واحد أو درجة واحدة أو رسم واحد ليبهت الزر ويسمّي ما يمنعه: صار ذلك القيد سجلاً تاريخياً، والسجل التاريخي يُغلق بالانسحاب لا يُحذف (BR-GLB-005).")),
         },
     };
 }
@@ -248,10 +250,132 @@
         }
 
         <div class="tab-pane fade @Show("academic")" id="tab-academic">
-            <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Academic history", "السجل الأكاديمي")</caption><thead><tr><th scope="col">@T("Year", "العام")</th><th scope="col">@T("Grade", "الصف")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Enrolled", "القيد")</th><th scope="col">@T("Source", "المصدر")</th><th scope="col">@T("Status", "الحالة")</th></tr></thead>
-                <tbody>@foreach (var e in Model.Enrollments) { <tr><td>@(isRtl ? e.Year.LabelAr : e.Year.LabelEn)</td><td>@e.Grade.Code @(isRtl ? e.Grade.Name.NameAr : e.Grade.Name.NameEn)</td><td>@(e.Section == null ? "—" : (isRtl ? e.Section.NameAr : e.Section.NameEn))</td><td>@e.Enrollment.EnrollmentDate.ToString("yyyy-MM-dd")@(e.Enrollment.ExitDate == null ? "" : " → " + e.Enrollment.ExitDate?.ToString("yyyy-MM-dd"))</td><td>@e.Enrollment.SourceType</td><td>@e.Enrollment.Status</td></tr> }@if (Model.Enrollments.Count == 0) { <tr><td colspan="6" class="text-center text-muted py-3">@T("No enrollments.", "لا قيود.")</td></tr> }</tbody></table>
+            @*  Each row now answers three questions besides "what does the record say": may this
+                grade be corrected, may this enrollment be taken off the record, and may this child
+                leave their section. The controls are drawn from the permission flags and the usage
+                guard, so a button that could only refuse is never offered (BR-SEC-010, and the same
+                reasoning applied to the guard). The correction form opens under its own row rather
+                than on a screen of its own — the thing being corrected is the row above it, and a
+                separate page would lose it.  *@
+            @{
+                var anyRowAction = Model.CanCorrectEnrollment || Model.CanRemoveEnrollment || Model.CanSeat;
+                var actionCols = anyRowAction ? 7 : 6;
+            }
+            <div class="table-responsive">
+            <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Academic history", "السجل الأكاديمي")</caption><thead><tr><th scope="col">@T("Year", "العام")</th><th scope="col">@T("Grade", "الصف")</th><th scope="col">@T("Section", "الشعبة")</th><th scope="col">@T("Enrolled", "القيد")</th><th scope="col">@T("Source", "المصدر")</th><th scope="col">@T("Status", "الحالة")</th>@if (anyRowAction) { <th scope="col" class="text-end">@T("Actions", "إجراءات")</th> }</tr></thead>
+                <tbody>
+                @foreach (var e in Model.Enrollments)
+                {
+                    var en = e.Enrollment;
+                    Model.EnrollmentActionsById.TryGetValue(en.Id, out var act);
+                    var gradeName = $"{e.Grade.Code} {(isRtl ? e.Grade.Name.NameAr : e.Grade.Name.NameEn)}";
+                    var yearName = isRtl ? e.Year.LabelAr : e.Year.LabelEn;
+                    var identity = $"{gradeName} · {yearName}";
+                    <tr>
+                        <td>@yearName</td>
+                        <td>@gradeName</td>
+                        <td>@(e.Section == null ? "—" : (isRtl ? e.Section.NameAr : e.Section.NameEn))</td>
+                        <td dir="ltr">@en.EnrollmentDate.ToString("yyyy-MM-dd")@(en.ExitDate == null ? "" : " → " + en.ExitDate?.ToString("yyyy-MM-dd"))</td>
+                        <td>@en.SourceType</td>
+                        <td>@en.Status</td>
+                        @if (anyRowAction)
+                        {
+                            <td class="text-end text-nowrap">
+                                @if (Model.CanCorrectEnrollment)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#correct-@en.Id" aria-expanded="false" aria-controls="correct-@en.Id" title="@T("Correct the grade", "تصحيح الصف")" aria-label="@T($"Correct the enrollment {identity}", $"تصحيح القيد {identity}")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                                }
+                                @if (Model.CanSeat && act != null && act.Seated)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#leave-@en.Id" aria-expanded="false" aria-controls="leave-@en.Id" title="@T("Leave the section", "الخروج من الشعبة")" aria-label="@T($"Take the student out of their section, {identity}", $"إخراج الطالب من شعبته، {identity}")"><i class="bi bi-box-arrow-up" aria-hidden="true"></i></button>
+                                }
+                                @if (Model.CanRemoveEnrollment && act != null && act.CanRemove)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#remove-@en.Id" aria-expanded="false" aria-controls="remove-@en.Id" title="@T("Remove this enrollment", "حذف هذا القيد")" aria-label="@T($"Remove the enrollment {identity}", $"حذف القيد {identity}")"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                }
+                                else if (Model.CanRemoveEnrollment && act != null)
+                                {
+                                    @*  Disabled rather than hidden, and it says why. A missing button reads as
+                                        a missing feature; a disabled one that names the attendance and the
+                                        charges tells the registrar this record is history, not a mistake.  *@
+                                    <button class="btn btn-sm btn-outline-danger" type="button" disabled title="@T($"Cannot be removed — {act.Usage.Describe(arabic: false)} recorded against it.", $"لا يمكن حذفه — سُجِّل عليه {act.Usage.Describe(arabic: true)}.")" aria-label="@T($"The enrollment {identity} cannot be removed", $"القيد {identity} لا يمكن حذفه")"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                }
+                            </td>
+                        }
+                    </tr>
+                    @if (Model.CanCorrectEnrollment)
+                    {
+                        var options = Model.CorrectionOptionsByEnrollment.TryGetValue(en.Id, out var os) ? os : new List<GradeYearOption>();
+                        <tr class="collapse" id="correct-@en.Id"><td colspan="@actionCols" class="bg-body-tertiary">
+                            <form method="post" asp-action="CorrectEnrollment" asp-route-id="@s.Id" asp-route-enrollmentId="@en.Id" class="row g-2 align-items-end">
+                                <div class="col-12"><div class="small text-muted">@T($"Correcting the enrollment recorded as {identity}. The year cannot change here — moving a student between years is the rollover (BR-GLB-023).", $"تصحيح القيد المسجَّل بوصفه {identity}. ولا يتغيّر العام من هنا — فانتقال الطالب بين الأعوام يتم بالترحيل (BR-GLB-023).")</div></div>
+                                <div class="col-md-4">
+                                    <label class="form-label small" for="correct-grade-@en.Id">@T("Grade it should have been", "الصف الصحيح") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <select name="gradeYearProfileId" id="correct-grade-@en.Id" class="form-select form-select-sm" required aria-required="true">
+                                        @foreach (var o in options) { <option value="@o.ProfileId" selected="@(o.ProfileId == en.GradeYearProfileId)">@o.Code @(isRtl ? o.NameAr : o.NameEn)</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small" for="correct-date-@en.Id">@T("Date", "التاريخ")</label>
+                                    <input name="enrollmentDate" id="correct-date-@en.Id" type="date" class="form-control form-control-sm" value="@en.EnrollmentDate.ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small" for="correct-source-@en.Id">@T("Source", "المصدر")</label>
+                                    <select name="sourceType" id="correct-source-@en.Id" class="form-select form-select-sm">
+                                        @foreach (var st in Enum.GetValues<EnrollmentSourceType>()) { <option value="@st" selected="@(st == en.SourceType)">@st</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small" for="correct-reason-@en.Id">@T("Reason (kept in the audit trail)", "السبب (يُحفظ في سجل التدقيق)")</label>
+                                    <input name="reason" id="correct-reason-@en.Id" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit" aria-label="@T("Save the correction", "حفظ التصحيح")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></div>
+                                @if (act != null && act.Seated)
+                                {
+                                    <div class="col-12"><div class="form-text text-danger-emphasis">@T("The student is seated in a section of this grade, so the grade cannot be corrected yet — a section belongs to one grade-year. Take them out of the section first.", "الطالب مُسنَد إلى شعبة من هذا الصف، فلا يُصحَّح الصف بعد — إذ تتبع الشعبة صفاً سنوياً واحداً. أخرِجه من الشعبة أولاً.")</div></div>
+                                }
+                            </form>
+                        </td></tr>
+                    }
+                    @if (Model.CanSeat && act != null && act.Seated)
+                    {
+                        <tr class="collapse" id="leave-@en.Id"><td colspan="@actionCols" class="bg-body-tertiary">
+                            <form method="post" asp-action="LeaveSection" asp-route-id="@s.Id" asp-route-enrollmentId="@en.Id" class="row g-2 align-items-end">
+                                <div class="col-12"><div class="small text-muted">@T("The membership is closed on the effective date and kept, so the register for the days already served still reads correctly (BR-SCN-006). No new section is opened.", "تُغلق العضوية في تاريخ السريان وتُحفَظ، فيبقى كشف الأيام المنقضية صحيحاً (BR-SCN-006). ولا تُفتح شعبة جديدة.")</div></div>
+                                <div class="col-md-4">
+                                    <label class="form-label small" for="leave-reason-@en.Id">@T("Reason", "السبب") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <select name="reasonCode" id="leave-reason-@en.Id" class="form-select form-select-sm" required aria-required="true">
+                                        @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small" for="leave-date-@en.Id">@T("Effective", "تاريخ السريان")</label>
+                                    <input name="effectiveDate" id="leave-date-@en.Id" type="date" class="form-control form-control-sm" value="@today" />
+                                </div>
+                                <div class="col-md-4"><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>@T("Leave the section", "الخروج من الشعبة")</button></div>
+                            </form>
+                        </td></tr>
+                    }
+                    @if (Model.CanRemoveEnrollment && act != null && act.CanRemove)
+                    {
+                        <tr class="collapse" id="remove-@en.Id"><td colspan="@actionCols" class="bg-body-tertiary">
+                            <form method="post" asp-action="RemoveEnrollment" asp-route-id="@s.Id" asp-route-enrollmentId="@en.Id" class="row g-2 align-items-end" onsubmit="return confirm('@T($"Remove the enrollment {identity} for {s.StudentNo}? Nothing has been recorded against it, and the removal is written to the audit trail.", $"حذف القيد {identity} للطالب {s.StudentNo}؟ لم يُسجَّل عليه شيء، ويُكتب الحذف في سجل التدقيق.")');">
+                                <div class="col-12"><div class="small text-muted">@T("Only an enrollment nothing has happened against can be removed — one that has been used is history and is closed by withdrawal instead (BR-GLB-005).", "لا يُحذف إلا قيد لم يحدث عليه شيء — أما ما استُخدم فهو سجل تاريخي يُغلق بالانسحاب (BR-GLB-005).")</div></div>
+                                <div class="col-md-7">
+                                    <label class="form-label small" for="remove-reason-@en.Id">@T("Why is it being removed?", "لماذا يُحذف؟") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <input name="reason" id="remove-reason-@en.Id" class="form-control form-control-sm" required aria-required="true" placeholder="@T("e.g. keyed against the wrong student", "مثال: أُدخل على الطالب الخطأ")" />
+                                </div>
+                                <div class="col-md-4"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1" aria-hidden="true"></i>@T("Remove the enrollment", "حذف القيد")</button></div>
+                            </form>
+                        </td></tr>
+                    }
+                }
+                @if (Model.Enrollments.Count == 0) { <tr><td colspan="@actionCols" class="text-center text-muted py-3">@T("No enrollments.", "لا قيود.")</td></tr> }
+                </tbody></table>
+            </div>
             <form method="post" asp-action="Enroll" asp-route-id="@s.Id" class="row g-2 align-items-end"><div class="col-md-5"><label class="form-label small" for="enroll-gradeYearProfileId">@T("Grade-year", "الصف السنوي")</label><select name="gradeYearProfileId" id="enroll-gradeYearProfileId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Profiles) { <option value="@p.ProfileId">@(isRtl ? p.GradeAr : p.GradeEn) · @(isRtl ? p.YearAr : p.YearEn)</option> }</select></div><div class="col-md-3"><label class="form-label small" for="enroll-enrollmentDate">@T("Date", "التاريخ")</label><input name="enrollmentDate" id="enroll-enrollmentDate" type="date" class="form-control form-control-sm" value="@today" /></div><div class="col-md-2"><label class="form-label small" for="enroll-sourceType">@T("Source", "المصدر")</label><select name="sourceType" id="enroll-sourceType" class="form-select form-select-sm"><option value="Admission">Admission</option><option value="Reinstatement">Reinstatement</option></select></div><div class="col-md-2"><button class="btn btn-sm btn-primary w-100" type="submit">@T("Enroll", "قيد")</button></div></form>
-            <div class="form-text">@T("Section assignment happens on the section page; the rollover moves students between years (BR-GLB-023).", "إسناد الشعبة من صفحة الشعبة؛ والترحيل ينقل الطلاب بين الأعوام (BR-GLB-023).")</div>
+            <div class="form-text">@T("Seating a student in a section is done on their placement screen or the section's own page; leaving one can be done from the row above. The rollover — not a correction — is what moves students between years (BR-GLB-023).", "إسناد الطالب إلى شعبة يتم من شاشة إسناده أو من صفحة الشعبة؛ أما الخروج منها فمن السطر أعلاه. والترحيل — لا التصحيح — هو ما ينقل الطلاب بين الأعوام (BR-GLB-023).")</div>
+            <div class="form-text">@T("Closing an enrollment with an exit date is the withdrawal wizard's job (BR-STU-006), which arrives with its clearance board; it is not what the buttons above do.", "إغلاق القيد بتاريخ خروج من عمل معالج الانسحاب (BR-STU-006) الذي يأتي مع لوحة إخلاء الطرف؛ وليس هو ما تفعله الأزرار أعلاه.")</div>
         </div>
         <div class="tab-pane fade @Show("status")" id="tab-status">
             <div class="d-flex flex-wrap gap-2 mb-3">@foreach (var st in Model.AllowedTransitions) { <form method="post" asp-action="Status" asp-route-id="@s.Id" class="d-inline-flex gap-1"><input type="hidden" name="target" value="@st" /><input name="reason" class="form-control form-control-sm" placeholder="@T("reason", "السبب")" style="width:11rem" aria-label="@T($"Reason for changing status to {st}", $"سبب تغيير الحالة إلى {st}")" /><button class="btn btn-sm btn-outline-primary" type="submit">→ @st</button></form> }@if (Model.AllowedTransitions.Count == 0) { <span class="text-muted small">@T("Terminal status.", "حالة نهائية.")</span> }</div>

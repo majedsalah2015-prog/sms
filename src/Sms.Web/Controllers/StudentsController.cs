@@ -65,11 +65,19 @@ namespace Sms.Web.Controllers
         /// </summary>
         private readonly Sms.Application.Sections.ISectionAdmin _sections;
 
+        /// <summary>
+        /// What an enrollment would take with it, asked <em>before</em> the academic tab draws a
+        /// remove button rather than after it is pressed. The admin port asks the same question
+        /// again on the way in — this one shapes the screen, that one is the rule.
+        /// </summary>
+        private readonly Sms.Application.Students.IEnrollmentUsageInspector _enrollmentUsage;
+
         /// <summary>What an attachment calls this record. Written once so a typo cannot detach a whole file's documents.</summary>
         private const string StudentEntity = "Student";
 
-        public StudentsController(IStudentAdmin students, IParentAdmin parents, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions, Sms.Web.Services.PersonPhotoService photos, Sms.Web.Services.AttachmentIntake intake, ICurrentUser currentUser, Sms.Application.Sections.ISectionAdmin sections)
+        public StudentsController(IStudentAdmin students, IParentAdmin parents, AppDbContext db, IAuditContext audit, IClock clock, IWorkingYearContext workingYear, IPermissionService permissions, Sms.Web.Services.PersonPhotoService photos, Sms.Web.Services.AttachmentIntake intake, ICurrentUser currentUser, Sms.Application.Sections.ISectionAdmin sections, Sms.Application.Students.IEnrollmentUsageInspector enrollmentUsage)
         {
+            _enrollmentUsage = enrollmentUsage;
             _sections = sections;
             _intake = intake;
             _currentUser = currentUser;
@@ -829,6 +837,31 @@ namespace Sms.Web.Controllers
             // The residence picker's opening state and the one-line address beside it — see
             // StudentsController.Residence.cs.
             await FillResidenceAsync(model, s);
+
+            // The academic tab's row actions — see StudentsController.Enrollment.cs. The three
+            // rights are asked once here rather than per row: they do not vary by row, and BR-SEC-010
+            // wants the control absent, not refusing.
+            var ct = HttpContext.RequestAborted;
+            model.CanCorrectEnrollment = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Edit, ct);
+            model.CanRemoveEnrollment = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Deactivate, ct);
+            model.CanSeat = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Roster, ActionVerb.Edit, ct);
+
+            // Skipped entirely for a reader who can do neither — the usage query is one round trip
+            // per enrollment row, and it exists only to decide what to draw.
+            if (model.CanCorrectEnrollment || model.CanRemoveEnrollment)
+            {
+                model.EnrollmentActionsById = await EnrollmentActionsAsync(enrollments);
+                var options = new Dictionary<int, IReadOnlyList<GradeYearOption>>();
+                foreach (var e in enrollments)
+                {
+                    options[e.Id] = await CorrectionOptionsAsync(e.AcademicYearId, e.GradeYearProfileId);
+                }
+
+                model.CorrectionOptionsByEnrollment = options;
+            }
 
             return model;
         }

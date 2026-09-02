@@ -170,7 +170,7 @@ namespace Sms.Web.Models
         public IReadOnlyList<Parent> Parents { get; set; } = Array.Empty<Parent>();
     }
 
-    public sealed class StudentFileViewModel
+    public sealed partial class StudentFileViewModel
     {
         public sealed record GuardianRow(StudentGuardianLink Link, Parent Parent, string Relationship);
 
@@ -270,7 +270,7 @@ namespace Sms.Web.Models
     /// from the child's end instead, and writes through the same two services.
     /// </para>
     /// </summary>
-    public sealed class StudentPlacementViewModel
+    public sealed partial class StudentPlacementViewModel
     {
         /// <summary>A section of the student's own grade-year, with what is left of its seats.</summary>
         public sealed record SectionOption(Section Section, int Members, bool IsCurrent);

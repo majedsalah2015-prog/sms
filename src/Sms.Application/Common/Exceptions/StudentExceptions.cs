@@ -29,4 +29,49 @@ namespace Sms.Application.Common.Exceptions
         {
         }
     }
+
+    /// <summary>
+    /// BR-GLB-023: correcting an enrollment may change the grade, never the academic year.
+    /// <para>
+    /// The enrollment is the year pivot every year-scoped row hangs off, so re-pointing one at
+    /// another year would re-file this year's attendance, marks and charges under a year they did
+    /// not happen in. Moving a child between years is the rollover, which writes a new enrollment
+    /// and leaves the old one closed behind it.
+    /// </para>
+    /// </summary>
+    public class EnrollmentYearChangeException : InvalidOperationException
+    {
+        public EnrollmentYearChangeException(int enrollmentId, int fromAcademicYearId, int toAcademicYearId)
+            : base($"Enrollment {enrollmentId} is in academic year {fromAcademicYearId} and cannot be corrected into year {toAcademicYearId} — that is a rollover, not a correction (BR-GLB-023).")
+        {
+            FromAcademicYearId = fromAcademicYearId;
+            ToAcademicYearId = toAcademicYearId;
+        }
+
+        public int FromAcademicYearId { get; }
+
+        public int ToAcademicYearId { get; }
+    }
+
+    /// <summary>
+    /// The grade cannot be corrected under a child who is sitting in a section, because the section
+    /// belongs to the grade being corrected (BR-SCN-002/003 are properties of that pairing).
+    /// <para>
+    /// Carries the section's names so the refusal can say which seat to give up rather than only
+    /// that there is one.
+    /// </para>
+    /// </summary>
+    public class EnrollmentSeatedException : InvalidOperationException
+    {
+        public EnrollmentSeatedException(int enrollmentId, string sectionNameEn, string sectionNameAr)
+            : base($"Enrollment {enrollmentId} is seated in section '{sectionNameEn}'; a section belongs to one grade-year, so the seat must be given up before the grade is corrected.")
+        {
+            SectionNameEn = sectionNameEn;
+            SectionNameAr = sectionNameAr;
+        }
+
+        public string SectionNameEn { get; }
+
+        public string SectionNameAr { get; }
+    }
 }

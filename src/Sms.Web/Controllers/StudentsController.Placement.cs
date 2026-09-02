@@ -121,6 +121,10 @@ namespace Sms.Web.Controllers
                     ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Create, HttpContext.RequestAborted),
                 CanSeat = await _permissions.HasPermissionAsync(
                     ScreenCatalog.Modules.Sections, ScreenCatalog.Sections.Roster, ActionVerb.Edit, HttpContext.RequestAborted),
+                CanCorrectEnrollment = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Edit, HttpContext.RequestAborted),
+                CanRemoveEnrollment = await _permissions.HasPermissionAsync(
+                    ScreenCatalog.Modules.Students, ScreenCatalog.Students.Enrollment, ActionVerb.Deactivate, HttpContext.RequestAborted),
             };
 
             // The grade-year picker reads past the soft-active filter for the grade names it has to
@@ -144,6 +148,14 @@ namespace Sms.Web.Controllers
             var profile = profiles.First(p => p.Id == enrollment.GradeYearProfileId);
             model.Grade = grades.First(g => g.Id == profile.GradeLevelId);
             model.Year = years.First(y => y.Id == profile.AcademicYearId);
+
+            // The correction half: the same year's grades only (BR-GLB-023), and what the record
+            // would take with it if it were removed instead — see StudentsController.Enrollment.cs.
+            if (model.CanCorrectEnrollment || model.CanRemoveEnrollment)
+            {
+                model.CorrectionOptions = await CorrectionOptionsAsync(enrollment.AcademicYearId, enrollment.GradeYearProfileId);
+                model.Usage = await _enrollmentUsage.InspectAsync(enrollment.Id, HttpContext.RequestAborted);
+            }
 
             model.Membership = await _db.SectionMemberships.AsNoTracking()
                 .SingleOrDefaultAsync(m => m.EnrollmentId == enrollment.Id && m.EffectiveToUtc == null, HttpContext.RequestAborted);

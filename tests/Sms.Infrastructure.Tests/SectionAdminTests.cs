@@ -251,6 +251,44 @@ namespace Sms.Infrastructure.Tests
             Assert.Null(db.SectionMemberships.Single(m => m.Id == transferred.Id).EffectiveToUtc);
         }
 
+        [Fact]
+        [BusinessRule("BR-SCN-006")]
+        public async Task A_student_can_leave_a_section_without_being_put_in_another_one()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var section = await admin.DefineSectionAsync(_profileId, "ثالث-أ", "3-A", 3, GenderPolicy.Mixed);
+            var enrollmentId = await CreateEnrollment(db);
+            var original = await admin.AssignMembershipAsync(section.Id, enrollmentId, new DateTime(2026, 9, 1));
+
+            var closed = await admin.EndMembershipAsync(enrollmentId, "parent-request", new DateTime(2026, 10, 1));
+
+            Assert.NotNull(closed);
+            Assert.Equal(original.Id, closed!.Id);
+
+            // Closed and kept, and no second row opened — the whole difference from a transfer.
+            var rows = db.SectionMemberships.Where(m => m.EnrollmentId == enrollmentId).ToList();
+            Assert.Single(rows);
+            Assert.Equal(new DateTime(2026, 10, 1), rows[0].EffectiveToUtc);
+            Assert.Equal("parent-request", rows[0].TransferReasonCode);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-006")]
+        public async Task Leaving_a_section_the_student_is_not_in_writes_nothing()
+        {
+            using var db = CreateContext();
+            var admin = new SectionAdmin(db);
+            var enrollmentId = await CreateEnrollment(db);
+
+            // Not an error: "take him out of his section" asked of a child who has none is already
+            // true, and refusing would make the screen report a failure for a correct state.
+            var closed = await admin.EndMembershipAsync(enrollmentId, "balancing", new DateTime(2026, 10, 1));
+
+            Assert.Null(closed);
+            Assert.Empty(db.SectionMemberships.Where(m => m.EnrollmentId == enrollmentId));
+        }
+
         // --- BR-SCN-007 close-with-zero-members ---------------------------------
 
         [Fact]

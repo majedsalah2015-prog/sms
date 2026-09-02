@@ -201,6 +201,13 @@ namespace Sms.Application.Security
             /// placement form and the bulk placement screen both demand it. <c>View</c> opens the
             /// bulk screen without granting the write, so a registrar can read the year's unplaced
             /// roll before anyone hands them the right to change it (BR-SEC-010).
+            /// <para>
+            /// <c>Edit</c> and <c>Deactivate</c> are the two corrections, and they are separated
+            /// from <c>Create</c> on purpose: enrolling a child is daily registrar work, while
+            /// changing the grade already on their record, or removing an enrollment altogether,
+            /// rewrites what the register said yesterday. A school that wants its front desk to
+            /// enroll but not to re-grade grants <c>Create</c> alone.
+            /// </para>
             /// </summary>
             public const string Enrollment = "Enrollment";
 
@@ -587,7 +594,7 @@ namespace Sms.Application.Security
             S(Modules.Students, Students.File, "Student file", "ملف الطالب", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Approve),
             S(Modules.Students, Students.SocialProfile, "Social profile", "البيانات الاجتماعية", ActionVerb.View, ActionVerb.Edit),
             S(Modules.Students, Students.Guardians, "Guardians", "أولياء الأمر", ActionVerb.Edit, ActionVerb.Deactivate),
-            S(Modules.Students, Students.Enrollment, "Enrollment", "التسجيل", ActionVerb.View, ActionVerb.Create),
+            S(Modules.Students, Students.Enrollment, "Enrollment", "التسجيل", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
 
             // ---- Parents
             S(Modules.Parents, Parents.Directory, "Parent directory", "دليل أولياء الأمور", ActionVerb.View, ActionVerb.Create),

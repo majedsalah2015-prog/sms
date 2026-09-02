@@ -71,6 +71,31 @@ namespace Sms.Application.Sections
         Task<SectionMembership> TransferMembershipAsync(
             int enrollmentId, int targetSectionId, string transferReasonCode, DateTime effectiveDate, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Takes a student out of their section without putting them in another one (BR-SCN-006):
+        /// the open membership is closed on <paramref name="effectiveDate"/> and none is opened.
+        /// <para>
+        /// Every other way out of a section was a way into a different one. That left two ordinary
+        /// situations with no answer at all — a child seated in the wrong section on a day the right
+        /// one is not yet open, and a child whose grade was recorded wrongly, whose seat has to be
+        /// given up before the grade can be corrected. The workaround people reached for was a
+        /// transfer into any section that would accept them, which puts a child on a register they
+        /// were never in.
+        /// </para>
+        /// <para>
+        /// The reason code is required for the same purpose as a transfer's (BR-SCN-005): leaving a
+        /// section is the part of the history somebody later has to explain, and it does not become
+        /// self-explanatory for being a departure rather than a move. The closed row is kept, so the
+        /// register for the days the child was in that section still reads correctly.
+        /// </para>
+        /// <para>
+        /// Returns the closed membership, or <c>null</c> when the enrollment held no seat — asking a
+        /// student with no section to leave one is not an error, it is already true.
+        /// </para>
+        /// </summary>
+        Task<SectionMembership?> EndMembershipAsync(
+            int enrollmentId, string reasonCode, DateTime effectiveDate, CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.SectionCloseWithMembersException"/> unless the section has zero current members (BR-SCN-007).</summary>
         Task CloseSectionAsync(int sectionId, CancellationToken cancellationToken = default);
 

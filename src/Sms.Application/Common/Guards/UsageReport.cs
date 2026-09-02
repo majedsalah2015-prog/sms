@@ -83,4 +83,24 @@ namespace Sms.Application.Common.Guards
 
         public UsageReport Usage { get; }
     }
+
+    /// <summary>
+    /// Raised when a record is removed without saying why (BR-GLB-032: a record that goes away
+    /// carries a mandatory reason).
+    /// <para>
+    /// It is a separate refusal from the usage guard above because the two answer different
+    /// questions — "may this be removed at all" and "is it being removed accountably" — and a
+    /// screen that conflated them would tell an operator to clear a reference they do not have.
+    /// </para>
+    /// </summary>
+    public class MissingRemovalReasonException : InvalidOperationException
+    {
+        public MissingRemovalReasonException(string entityType)
+            : base($"Removing a {entityType} requires a reason (BR-GLB-032).")
+        {
+            EntityType = entityType;
+        }
+
+        public string EntityType { get; }
+    }
 }

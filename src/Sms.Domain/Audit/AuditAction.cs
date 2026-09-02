@@ -12,6 +12,19 @@ namespace Sms.Domain.Audit
         Update = 2,
         StatusChange = 3,
 
+        /// <summary>
+        /// A row that was removed rather than deactivated. Rare by design — BR-GLB-005 leaves this
+        /// to the few records nothing has ever referenced (an enrollment keyed in error, a section
+        /// that never had a member) — and recorded explicitly because <c>AuditCaptor</c> diffs
+        /// <c>Added</c> and <c>Modified</c> only: a deleted row otherwise leaves the trail with no
+        /// trace that it was ever there, which is the one case where an audit log must not be quiet.
+        /// <para>
+        /// Extends the open-ended vocabulary in docs/Database/03 §"Action" (Create/Update/
+        /// StatusChange/View/Export/Login…), keeping the data-audit block contiguous.
+        /// </para>
+        /// </summary>
+        Delete = 4,
+
         // T0 read audit (doc 07 §3, BR-SEC-021 exports)
         View = 10,
         Print = 11,

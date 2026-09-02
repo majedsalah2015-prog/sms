@@ -265,6 +265,27 @@ namespace Sms.Infrastructure.Sections
             return newMembership;
         }
 
+        public async Task<SectionMembership?> EndMembershipAsync(
+            int enrollmentId, string reasonCode, DateTime effectiveDate, CancellationToken cancellationToken = default)
+        {
+            var current = await _db.SectionMemberships.SingleOrDefaultAsync(
+                m => m.EnrollmentId == enrollmentId && m.EffectiveToUtc == null, cancellationToken);
+            if (current == null)
+            {
+                return null;
+            }
+
+            current.EffectiveToUtc = effectiveDate;
+
+            // The reason lands on the row being closed, not on a new one — there is no new one. On a
+            // transfer the code rides the membership that opens, because it answers "why is he here
+            // now"; here it answers "why did he leave", which is a property of the seat he vacated.
+            current.TransferReasonCode = reasonCode;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return current;
+        }
+
         public async Task CloseSectionAsync(int sectionId, CancellationToken cancellationToken = default)
         {
             var section = await _db.Sections.SingleAsync(s => s.Id == sectionId, cancellationToken);

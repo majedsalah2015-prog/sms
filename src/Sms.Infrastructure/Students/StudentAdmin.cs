@@ -3,9 +3,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Audit;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Numbering;
 using Sms.Application.Students;
+using Sms.Domain.Audit;
 using Sms.Domain.Common;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
@@ -23,11 +26,27 @@ namespace Sms.Infrastructure.Students
     {
         private readonly AppDbContext _db;
         private readonly INumberIssuer _numberIssuer;
+        private readonly IAuditEventWriter _auditEvents;
+        private readonly IUsageInspector<Enrollment> _enrollmentUsage;
 
-        public StudentAdmin(AppDbContext db, INumberIssuer numberIssuer)
+        /// <param name="auditEvents">
+        /// Removing an enrollment is the one write here that <c>AuditCaptor</c> cannot see:
+        /// it diffs <c>Added</c> and <c>Modified</c> entries, so a deleted row would leave no
+        /// trace at all. <see cref="RemoveEnrollmentAsync"/> logs it explicitly.
+        /// </param>
+        /// <param name="enrollmentUsage">
+        /// What would break if an enrollment went away. Optional because it is a pure query over the
+        /// same context with no state of its own; the container passes the registered one, and a
+        /// caller that does not care gets the same object built here rather than a null to guard.
+        /// </param>
+        public StudentAdmin(
+            AppDbContext db, INumberIssuer numberIssuer, IAuditEventWriter auditEvents,
+            IUsageInspector<Enrollment>? enrollmentUsage = null)
         {
             _db = db;
             _numberIssuer = numberIssuer;
+            _auditEvents = auditEvents;
+            _enrollmentUsage = enrollmentUsage ?? new EnrollmentUsageInspector(db);
         }
 
         public async Task<Student> RegisterStudentAsync(
@@ -237,6 +256,95 @@ namespace Sms.Infrastructure.Students
 
             await _db.SaveChangesAsync(cancellationToken);
             return enrollment;
+        }
+
+        public async Task<Enrollment> CorrectEnrollmentAsync(
+            int enrollmentId, int gradeYearProfileId, DateTime enrollmentDate, EnrollmentSourceType sourceType,
+            CancellationToken cancellationToken = default)
+        {
+            var enrollment = await _db.Enrollments.SingleAsync(e => e.Id == enrollmentId, cancellationToken);
+
+            // Past the soft-active filter on purpose. A grade retired since the mistake was made
+            // still has to be nameable as the thing being corrected *away from*, and the target is
+            // re-validated below rather than trusted from a picker.
+            var profile = await _db.GradeYearProfiles.IgnoreQueryFilters()
+                .SingleOrDefaultAsync(p => p.Id == gradeYearProfileId && p.SchoolId == enrollment.SchoolId, cancellationToken);
+            if (profile == null)
+            {
+                throw new InvalidOperationException($"Grade-year profile {gradeYearProfileId} does not exist in this school.");
+            }
+
+            if (profile.AcademicYearId != enrollment.AcademicYearId)
+            {
+                throw new EnrollmentYearChangeException(enrollmentId, enrollment.AcademicYearId, profile.AcademicYearId);
+            }
+
+            // The seat, not the grade, is what makes this refuse: a section belongs to one
+            // grade-year, so a corrected grade would leave the child on a register that no longer
+            // contains their grade. Checked before anything is written.
+            var seat = await _db.SectionMemberships.AsNoTracking()
+                .SingleOrDefaultAsync(m => m.EnrollmentId == enrollmentId && m.EffectiveToUtc == null, cancellationToken);
+            if (seat != null && enrollment.GradeYearProfileId != gradeYearProfileId)
+            {
+                var section = await _db.Sections.AsNoTracking().SingleAsync(s => s.Id == seat.SectionId, cancellationToken);
+                throw new EnrollmentSeatedException(enrollmentId, section.NameEn, section.NameAr);
+            }
+
+            enrollment.GradeYearProfileId = gradeYearProfileId;
+            enrollment.EnrollmentDate = enrollmentDate;
+            enrollment.SourceType = sourceType;
+
+            // No audit call of its own: Enrollment is [Audited(AuditTier.T2)], so the field-level
+            // before/after is captured inside this SaveChanges, in the same transaction as the change.
+            await _db.SaveChangesAsync(cancellationToken);
+            return enrollment;
+        }
+
+        public async Task RemoveEnrollmentAsync(int enrollmentId, string reason, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                throw new MissingRemovalReasonException(nameof(Enrollment));
+            }
+
+            var enrollment = await _db.Enrollments.SingleAsync(e => e.Id == enrollmentId, cancellationToken);
+
+            var usage = await _enrollmentUsage.InspectAsync(enrollmentId, cancellationToken);
+            if (usage.IsInUse)
+            {
+                throw new RecordInUseException(usage);
+            }
+
+            // The memberships are the placement itself, not something recorded against it, so they
+            // go with it — closed ones included. The guard above has already established that
+            // nothing was ever taken, marked or charged while the child sat in them.
+            _db.SectionMemberships.RemoveRange(
+                await _db.SectionMemberships.Where(m => m.EnrollmentId == enrollmentId).ToListAsync(cancellationToken));
+            _db.Enrollments.Remove(enrollment);
+
+            // Written before the save, so the entry and the removal are one transaction (BR-AUD-003)
+            // — and written at all because the captor never sees a delete. The business key carries
+            // what the row said, since after this commits there is nothing left to join back to.
+            _auditEvents.Log(
+                AuditAction.Delete,
+                nameof(Enrollment),
+                enrollmentId,
+                businessKey: FormattableString.Invariant(
+                    $"student {enrollment.StudentId}, grade-year profile {enrollment.GradeYearProfileId}, year {enrollment.AcademicYearId}"),
+                reason: reason.Trim());
+
+            try
+            {
+                await _db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                // The inspector names every reference this build knows about; a module added later
+                // that points at an enrollment without being listed there arrives here instead, as
+                // a foreign key. Refusing is right either way — the message is simply less useful.
+                throw new InvalidOperationException(
+                    "Enrollment cannot be removed: other records still reference it (" + (ex.InnerException?.Message ?? ex.Message) + ").");
+            }
         }
 
         public async Task DeleteStudentAsync(int studentId, CancellationToken cancellationToken = default)

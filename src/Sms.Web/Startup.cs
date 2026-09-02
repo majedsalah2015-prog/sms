@@ -580,6 +580,13 @@ namespace Sms.Web
             services.AddScoped<IStudentAdmin, StudentAdmin>();
             services.AddScoped<IParentAdmin, ParentAdmin>();
 
+            // What an enrollment would take with it. Registered separately from the admin that
+            // enforces it because the academic-history tab asks the same question before drawing
+            // the remove button — a destructive control that cannot work is never offered.
+            services.AddScoped<EnrollmentUsageInspector>();
+            services.AddScoped<Sms.Application.Students.IEnrollmentUsageInspector>(sp => sp.GetRequiredService<EnrollmentUsageInspector>());
+            services.AddScoped<IUsageInspector<Sms.Domain.Students.Enrollment>>(sp => sp.GetRequiredService<EnrollmentUsageInspector>());
+
             // E-104 (slice: Classrooms, doc/Modules/08, BR-ROM-001..008) — E-104 is
             // now fully done (Subjects + Classrooms). Section.DefaultClassroomId got
             // its real FK to core.Room in this slice.

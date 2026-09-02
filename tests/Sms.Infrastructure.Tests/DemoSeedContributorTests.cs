@@ -111,7 +111,7 @@ namespace Sms.Infrastructure.Tests
                 db, audit, _clock, new SchoolAdmin(db), new AcademicYearAdmin(db), new GradeStructureAdmin(db),
                 new SectionAdmin(db), new SubjectAdmin(db), new CalendarAdmin(db, _clock),
                 new EmployeeAdmin(db, numberIssuer), new TeacherAdmin(db, _clock),
-                new ParentAdmin(db, numberIssuer), new StudentAdmin(db, numberIssuer),
+                new ParentAdmin(db, numberIssuer), new StudentAdmin(db, numberIssuer, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, audit)),
                 new AttendanceAdmin(db), new FeeAdmin(db, numberIssuer, _clock), CreateSetupAdmin(db, audit));
         }
 

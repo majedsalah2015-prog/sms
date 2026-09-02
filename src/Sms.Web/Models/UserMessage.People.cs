@@ -57,6 +57,14 @@ namespace Sms.Web.Models
                 ? "للطالب قيد فعّال في هذا العام الدراسي بالفعل — القيد واحد لكل عام؛ أنهِ القيد القائم أو انقله بدل إنشاء ثانٍ (BR-GLB-024)."
                 : "The student already has an active enrolment for this academic year — there is one per year; end or transfer the existing one rather than creating a second (BR-GLB-024).",
 
+            EnrollmentYearChangeException => arabic
+                ? "تصحيح القيد يغيّر الصف لا العام — والعام الدراسي هو ما تتبعه درجات الطالب وحضوره ورسومه، فنقله إلى عام آخر يُعيد تصنيف ما حدث فعلاً. انتقال الطالب بين الأعوام يتم بالترحيل (BR-GLB-023)."
+                : "Correcting an enrolment changes the grade, not the year — attendance, marks and fees all hang off the academic year, so moving the enrolment into another one would re-file what already happened. Moving a student between years is the rollover's job (BR-GLB-023).",
+
+            EnrollmentSeatedException e => arabic
+                ? $"الطالب مُسنَد إلى شعبة «{e.SectionNameAr}»، والشعبة تتبع صفاً سنوياً واحداً — أخرِجه من الشعبة أولاً، ثم صحّح الصف، ثم أعِد إسناده."
+                : $"The student is seated in section \"{e.SectionNameEn}\", and a section belongs to one grade-year — take them out of the section first, then correct the grade, then seat them again.",
+
             // ---------------------------------------------------------------- M11 parents
 
             InvalidResidenceSelectionException e => arabic
@@ -134,6 +142,10 @@ namespace Sms.Web.Models
             RecordInUseException e => arabic
                 ? $"لا يمكن تنفيذ هذا الإجراء: ما زال السجل مرتبطاً بـ {e.Usage.Describe(arabic: true)} — عالِج ما سبق أولاً."
                 : $"This cannot go ahead: the record is still referenced by {e.Usage.Describe(arabic: false)} — clear those first.",
+
+            MissingRemovalReasonException => arabic
+                ? "اكتب سبب الحذف — السجل الذي يُحذف يُقيَّد سببه في سجل التدقيق، وإلا لم يبقَ منه أثر يُسأل عنه (BR-GLB-032)."
+                : "Say why it is being removed — a record that goes away is recorded in the audit trail with its reason, or nothing is left to answer for it (BR-GLB-032).",
 
             _ => null,
         };

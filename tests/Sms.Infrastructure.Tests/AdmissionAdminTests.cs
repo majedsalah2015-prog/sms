@@ -134,7 +134,7 @@ namespace Sms.Infrastructure.Tests
         private AdmissionAdmin CreateAdmin(AppDbContext db)
         {
             var numberIssuer = new NumberIssuer(db, _tenant, _tenant, _clock);
-            var studentAdmin = new StudentAdmin(db, numberIssuer);
+            var studentAdmin = new StudentAdmin(db, numberIssuer, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit));
             var sectionAdmin = new SectionAdmin(db);
             return new AdmissionAdmin(db, numberIssuer, studentAdmin, sectionAdmin);
         }

@@ -88,6 +88,32 @@
                             <button class="btn btn-primary" type="submit"><i class="bi bi-@(seated ? "arrow-left-right" : "box-arrow-in-down") me-1" aria-hidden="true"></i>@(seated ? T("Transfer", "نقل") : T("Seat in section", "إسناد إلى الشعبة"))</button>
                         </div>
                     </form>
+
+                    @*  The way out that is not a way into somewhere else. Until this existed a child
+                        could only ever be transferred, so "he should not be in a section at all" and
+                        "his grade was wrong and the seat has to go first" both had to be answered by
+                        moving him somewhere he did not belong.  *@
+                    @if (seated)
+                    {
+                        <hr class="my-3" />
+                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#place-leave" aria-expanded="false" aria-controls="place-leave"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>@T("Leave the section without a new one", "الخروج من الشعبة دون شعبة جديدة")</button>
+                        <div class="collapse mt-3" id="place-leave">
+                            <form method="post" asp-action="LeaveSection" asp-route-id="@s.Id" asp-route-enrollmentId="@Model.Enrollment!.Id" asp-route-returnTo="placement" class="row g-3 align-items-end">
+                                <div class="col-12"><div class="small text-muted">@T("The membership is closed on the effective date and kept, so the register for the days already served still reads correctly (BR-SCN-006).", "تُغلق العضوية في تاريخ السريان وتُحفَظ، فيبقى كشف الأيام المنقضية صحيحاً (BR-SCN-006).")</div></div>
+                                <div class="col-md-5">
+                                    <label class="form-label small" for="place-leave-reason">@T("Reason", "السبب") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <select name="reasonCode" id="place-leave-reason" class="form-select form-select-sm" required aria-required="true">
+                                        @foreach (var code in SectionBoardViewModel.ReasonCodes) { <option value="@code">@SectionBoardViewModel.ReasonLabel(code, isRtl)</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small" for="place-leave-date">@T("Effective", "تاريخ السريان")</label>
+                                    <input name="effectiveDate" id="place-leave-date" type="date" class="form-control form-control-sm" value="@today" />
+                                </div>
+                                <div class="col-md-4"><button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-box-arrow-up me-1" aria-hidden="true"></i>@T("Leave the section", "الخروج من الشعبة")</button></div>
+                            </form>
+                        </div>
+                    }
                 }
             </div>
         </div>
@@ -130,6 +156,80 @@
                         </div>
                     </form>
                     <div class="form-text mt-2">@T("A student holds one open enrollment per year (BR-GLB-024); the rollover is what moves a whole grade between years (BR-GLB-023).", "للطالب قيد مفتوح واحد في العام (BR-GLB-024)؛ والترحيل هو ما ينقل صفاً بأكمله بين الأعوام (BR-GLB-023).")</div>
+                }
+
+                @*  Correcting what is already on the record, as opposed to adding to it. Only ever
+                    offered for the open enrollment shown above — the file's academic tab is where
+                    the other years are corrected, because that is where they are visible.  *@
+                @if (Model.Enrollment != null && (Model.CanCorrectEnrollment || Model.CanRemoveEnrollment))
+                {
+                    var en = Model.Enrollment;
+                    <hr class="my-3" />
+                    <div class="d-flex flex-wrap gap-2">
+                        @if (Model.CanCorrectEnrollment)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#place-correct" aria-expanded="false" aria-controls="place-correct"><i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Correct the grade", "تصحيح الصف")</button>
+                        }
+                        @if (Model.CanRemoveEnrollment)
+                        {
+                            @if (Model.Usage != null && !Model.Usage.IsInUse)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="collapse" data-bs-target="#place-remove" aria-expanded="false" aria-controls="place-remove"><i class="bi bi-trash me-1" aria-hidden="true"></i>@T("Remove the enrollment", "حذف القيد")</button>
+                            }
+                            else if (Model.Usage != null)
+                            {
+                                <button class="btn btn-sm btn-outline-danger" type="button" disabled title="@T($"Cannot be removed — {Model.Usage.Describe(arabic: false)} recorded against it.", $"لا يمكن حذفه — سُجِّل عليه {Model.Usage.Describe(arabic: true)}.")"><i class="bi bi-trash me-1" aria-hidden="true"></i>@T("Remove the enrollment", "حذف القيد")</button>
+                            }
+                        }
+                    </div>
+
+                    @if (Model.CanCorrectEnrollment)
+                    {
+                        <div class="collapse mt-3" id="place-correct">
+                            <form method="post" asp-action="CorrectEnrollment" asp-route-id="@s.Id" asp-route-enrollmentId="@en.Id" asp-route-returnTo="placement" class="row g-3 align-items-end">
+                                <div class="col-12"><div class="small text-muted">@T("The grade this year's enrollment should have carried. The year itself cannot change here — moving a student between years is the rollover (BR-GLB-023).", "الصف الذي كان ينبغي أن يحمله قيد هذا العام. أما العام نفسه فلا يتغيّر من هنا — فانتقال الطالب بين الأعوام يتم بالترحيل (BR-GLB-023).")</div></div>
+                                <div class="col-md-4">
+                                    <label class="form-label small" for="place-correct-grade">@T("Grade it should have been", "الصف الصحيح") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <select name="gradeYearProfileId" id="place-correct-grade" class="form-select form-select-sm" required aria-required="true">
+                                        @foreach (var o in Model.CorrectionOptions) { <option value="@o.ProfileId" selected="@(o.ProfileId == en.GradeYearProfileId)">@o.Code @(isRtl ? o.NameAr : o.NameEn)</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small" for="place-correct-date">@T("Date", "التاريخ")</label>
+                                    <input name="enrollmentDate" id="place-correct-date" type="date" class="form-control form-control-sm" value="@en.EnrollmentDate.ToString("yyyy-MM-dd")" />
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small" for="place-correct-source">@T("Source", "المصدر")</label>
+                                    <select name="sourceType" id="place-correct-source" class="form-select form-select-sm">
+                                        @foreach (var st in Enum.GetValues<Sms.Domain.Students.EnrollmentSourceType>()) { <option value="@st" selected="@(st == en.SourceType)">@st</option> }
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small" for="place-correct-reason">@T("Reason (kept in the audit trail)", "السبب (يُحفظ في سجل التدقيق)")</label>
+                                    <input name="reason" id="place-correct-reason" class="form-control form-control-sm" />
+                                </div>
+                                <div class="col-md-1"><button class="btn btn-sm btn-primary w-100" type="submit" aria-label="@T("Save the correction", "حفظ التصحيح")"><i class="bi bi-check-lg" aria-hidden="true"></i></button></div>
+                                @if (seated)
+                                {
+                                    <div class="col-12"><div class="form-text text-danger-emphasis">@T("The student is seated in a section of this grade, so the grade cannot be corrected yet — a section belongs to one grade-year. Move them out of the section above first.", "الطالب مُسنَد إلى شعبة من هذا الصف، فلا يُصحَّح الصف بعد — إذ تتبع الشعبة صفاً سنوياً واحداً. أخرِجه من الشعبة أعلاه أولاً.")</div></div>
+                                }
+                            </form>
+                        </div>
+                    }
+
+                    @if (Model.CanRemoveEnrollment && Model.Usage != null && !Model.Usage.IsInUse)
+                    {
+                        <div class="collapse mt-3" id="place-remove">
+                            <form method="post" asp-action="RemoveEnrollment" asp-route-id="@s.Id" asp-route-enrollmentId="@en.Id" asp-route-returnTo="placement" class="row g-3 align-items-end" onsubmit="return confirm('@T($"Remove this enrollment for {s.StudentNo}? Nothing has been recorded against it, and the removal is written to the audit trail.", $"حذف هذا القيد للطالب {s.StudentNo}؟ لم يُسجَّل عليه شيء، ويُكتب الحذف في سجل التدقيق.")');">
+                                <div class="col-12"><div class="small text-muted">@T("Only an enrollment nothing has happened against can be removed — one that has been used is history and is closed by withdrawal instead (BR-GLB-005).", "لا يُحذف إلا قيد لم يحدث عليه شيء — أما ما استُخدم فهو سجل تاريخي يُغلق بالانسحاب (BR-GLB-005).")</div></div>
+                                <div class="col-md-7">
+                                    <label class="form-label small" for="place-remove-reason">@T("Why is it being removed?", "لماذا يُحذف؟") <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <input name="reason" id="place-remove-reason" class="form-control form-control-sm" required aria-required="true" placeholder="@T("e.g. keyed against the wrong student", "مثال: أُدخل على الطالب الخطأ")" />
+                                </div>
+                                <div class="col-md-4"><button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-trash me-1" aria-hidden="true"></i>@T("Remove the enrollment", "حذف القيد")</button></div>
+                            </form>
+                        </div>
+                    }
                 }
             </div>
         </div>

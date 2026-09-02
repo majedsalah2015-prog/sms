@@ -85,7 +85,7 @@ namespace Sms.Infrastructure.Tests
         private RolloverAdmin CreateAdmin(AppDbContext db)
         {
             var numbers = new NumberIssuer(db, _tenant, _tenant, _clock);
-            return new RolloverAdmin(db, _clock, _user, _audit, new GradeStructureAdmin(db), new StudentAdmin(db, numbers), new SectionAdmin(db),
+            return new RolloverAdmin(db, _clock, _user, _audit, new GradeStructureAdmin(db), new StudentAdmin(db, numbers, new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit)), new SectionAdmin(db),
                 new FeeAdmin(db, numbers, _clock), new AcademicYearAdmin(db));
         }
 

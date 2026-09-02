@@ -4,12 +4,16 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
+using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
+using Sms.Domain.Attendance;
+using Sms.Domain.Audit;
 using Sms.Domain.Common;
 using Sms.Domain.Geography;
 using Sms.Domain.Grades;
 using Sms.Domain.Numbering;
 using Sms.Domain.Schools;
+using Sms.Domain.Sections;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Audit;
 using Sms.Infrastructure.Numbering;
@@ -90,6 +94,15 @@ namespace Sms.Infrastructure.Tests
             return new AppDbContext(options, _tenant, _user, _clock, _audit);
         }
 
+        /// <summary>
+        /// The real audit writer, not a stub: <c>RemoveEnrollmentAsync</c>'s whole contract is that
+        /// the entry and the removal commit together, and a no-op double would let a regression that
+        /// loses the entry pass every test here.
+        /// </summary>
+        private StudentAdmin CreateAdmin(AppDbContext db)
+            => new(db, new NumberIssuer(db, _tenant, _tenant, _clock),
+                new AuditEventWriter(db, _tenant, _tenant, _user, _clock, _audit));
+
         private static Task<Student> Register(StudentAdmin admin, string suffix = "1")
             => admin.RegisterStudentAsync(
                 "طالب" + suffix, "أب", "جد", "عائلة", "Student" + suffix, "Father", "Grandfather", "Family",
@@ -102,7 +115,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Registering_a_student_issues_a_real_permanent_number_via_the_STU_series()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
 
             var student = await Register(admin);
 
@@ -114,7 +127,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Successive_registrations_get_distinct_sequential_numbers()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
 
             var first = await Register(admin, "1");
             var second = await Register(admin, "2");
@@ -128,7 +141,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Editing_identity_fields_without_a_reason_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
 
             _audit.Reason = null;
@@ -144,7 +157,7 @@ namespace Sms.Infrastructure.Tests
         public async Task An_illegal_status_transition_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
 
             await Assert.ThrowsAsync<InvalidStudentStatusTransitionException>(() =>
@@ -158,7 +171,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Unlinking_the_last_financially_responsible_guardian_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
             var link = await admin.LinkGuardianAsync(
                 student.Id, parentId: 1, relationshipLookupId: 1, isPrimaryContact: true, isFinanciallyResponsible: true,
@@ -173,7 +186,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Unlinking_one_of_two_financially_responsible_guardians_succeeds()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
             var first = await admin.LinkGuardianAsync(student.Id, 1, 1, true, true, true, true, new DateTime(2026, 9, 1));
             await admin.LinkGuardianAsync(student.Id, 2, 1, false, true, false, true, new DateTime(2026, 9, 1));
@@ -189,7 +202,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Enrolling_a_student_creates_an_active_enrollment_for_the_grade_year()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
 
             var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
@@ -202,7 +215,7 @@ namespace Sms.Infrastructure.Tests
         public async Task A_second_active_enrollment_for_the_same_student_and_year_is_rejected()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
             await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
 
@@ -210,12 +223,233 @@ namespace Sms.Infrastructure.Tests
                 admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 2), EnrollmentSourceType.Admission));
         }
 
+        // --- Correcting and removing an enrollment (doc/Modules/10 §8.10) -------
+        //
+        // The two halves of "the clerk put him in the wrong grade". Until these existed the record
+        // could only be added to, so a wrong grade stayed wrong: BR-GLB-024 refuses a second
+        // enrollment in the year, and nothing else in the product writes GradeYearProfileId.
+
+        /// <summary>Another grade in the same academic year — a legal correction target.</summary>
+        private int SecondProfileInSameYear(AppDbContext db)
+        {
+            var year = db.AcademicYears.Single().Id;
+            var stage = db.Stages.Single().Id;
+            var grade = new GradeLevel { StageId = stage, Code = "G4", Name = new LocalizedName("رابع", "Grade 4"), SequenceOrder = 4 };
+            db.GradeLevels.Add(grade);
+            db.SaveChanges();
+            var profile = new GradeYearProfile { GradeLevelId = grade.Id, AcademicYearId = year, GenderPolicy = GenderPolicy.Mixed, TargetSections = 2, TargetSectionSize = 25 };
+            db.GradeYearProfiles.Add(profile);
+            db.SaveChanges();
+            return profile.Id;
+        }
+
+        /// <summary>The same grade in the year after — which a correction may never reach (BR-GLB-023).</summary>
+        private int ProfileInAnotherYear(AppDbContext db)
+        {
+            var next = new AcademicYear
+            {
+                LabelAr = "٢٠٢٧-٢٠٢٨", LabelEn = "2027-2028", HijriLabel = "١٤٤٩هـ",
+                StartDate = new DateTime(2027, 9, 1), EndDate = new DateTime(2028, 6, 30), Status = AcademicYearStatus.Preparation,
+            };
+            db.AcademicYears.Add(next);
+            db.SaveChanges();
+            var profile = new GradeYearProfile
+            {
+                GradeLevelId = db.GradeLevels.First().Id, AcademicYearId = next.Id,
+                GenderPolicy = GenderPolicy.Mixed, TargetSections = 2, TargetSectionSize = 25,
+            };
+            db.GradeYearProfiles.Add(profile);
+            db.SaveChanges();
+            return profile.Id;
+        }
+
+        [Fact]
+        public async Task Correcting_an_enrollment_re_points_it_at_the_grade_it_should_have_had()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+            var right = SecondProfileInSameYear(db);
+
+            var corrected = await admin.CorrectEnrollmentAsync(
+                enrollment.Id, right, new DateTime(2026, 9, 3), EnrollmentSourceType.Reinstatement);
+
+            Assert.Equal(right, corrected.GradeYearProfileId);
+            Assert.Equal(new DateTime(2026, 9, 3), corrected.EnrollmentDate);
+            Assert.Equal(EnrollmentSourceType.Reinstatement, corrected.SourceType);
+
+            // The id is the point: everything year-scoped hangs off it, so a correction that
+            // replaced the row would have orphaned whatever already pointed at it.
+            Assert.Equal(enrollment.Id, corrected.Id);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-023")]
+        public async Task Correcting_an_enrollment_into_another_academic_year_is_rejected()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+            var nextYear = ProfileInAnotherYear(db);
+
+            await Assert.ThrowsAsync<EnrollmentYearChangeException>(() =>
+                admin.CorrectEnrollmentAsync(enrollment.Id, nextYear, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission));
+
+            Assert.Equal(_profileId, db.Enrollments.Single(e => e.Id == enrollment.Id).GradeYearProfileId);
+        }
+
+        [Fact]
+        [BusinessRule("BR-SCN-005")]
+        public async Task The_grade_cannot_be_corrected_while_the_student_is_seated_in_a_section()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+            var right = SecondProfileInSameYear(db);
+
+            var section = new Section { AcademicYearId = enrollment.AcademicYearId, GradeYearProfileId = _profileId, NameAr = "ثالث-أ", NameEn = "3-A", Capacity = 25, GenderPolicy = GenderPolicy.Mixed };
+            db.Sections.Add(section);
+            db.SaveChanges();
+            db.SectionMemberships.Add(new SectionMembership { AcademicYearId = enrollment.AcademicYearId, SectionId = section.Id, EnrollmentId = enrollment.Id, EffectiveFromUtc = new DateTime(2026, 9, 1) });
+            db.SaveChanges();
+
+            var refusal = await Assert.ThrowsAsync<EnrollmentSeatedException>(() =>
+                admin.CorrectEnrollmentAsync(enrollment.Id, right, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission));
+
+            // The refusal names the seat rather than only reporting one, so the screen can say which.
+            Assert.Equal("3-A", refusal.SectionNameEn);
+            Assert.Equal("ثالث-أ", refusal.SectionNameAr);
+        }
+
+        [Fact]
+        public async Task Fixing_the_date_of_a_seated_students_enrollment_is_still_allowed()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+
+            var section = new Section { AcademicYearId = enrollment.AcademicYearId, GradeYearProfileId = _profileId, NameAr = "ثالث-أ", NameEn = "3-A", Capacity = 25, GenderPolicy = GenderPolicy.Mixed };
+            db.Sections.Add(section);
+            db.SaveChanges();
+            db.SectionMemberships.Add(new SectionMembership { AcademicYearId = enrollment.AcademicYearId, SectionId = section.Id, EnrollmentId = enrollment.Id, EffectiveFromUtc = new DateTime(2026, 9, 1) });
+            db.SaveChanges();
+
+            // The seat blocks a *grade* change and nothing else — it is the grade the section
+            // belongs to. Refusing a mistyped date as well would leave it uncorrectable all year.
+            var corrected = await admin.CorrectEnrollmentAsync(
+                enrollment.Id, _profileId, new DateTime(2026, 9, 8), EnrollmentSourceType.Admission);
+
+            Assert.Equal(new DateTime(2026, 9, 8), corrected.EnrollmentDate);
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task An_enrollment_nothing_was_recorded_against_can_be_removed_with_its_memberships()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+
+            var section = new Section { AcademicYearId = enrollment.AcademicYearId, GradeYearProfileId = _profileId, NameAr = "ثالث-أ", NameEn = "3-A", Capacity = 25, GenderPolicy = GenderPolicy.Mixed };
+            db.Sections.Add(section);
+            db.SaveChanges();
+            db.SectionMemberships.Add(new SectionMembership { AcademicYearId = enrollment.AcademicYearId, SectionId = section.Id, EnrollmentId = enrollment.Id, EffectiveFromUtc = new DateTime(2026, 9, 1) });
+            db.SaveChanges();
+
+            await admin.RemoveEnrollmentAsync(enrollment.Id, "keyed against the wrong student");
+
+            Assert.Empty(db.Enrollments.Where(e => e.Id == enrollment.Id));
+            Assert.Empty(db.SectionMemberships.Where(m => m.EnrollmentId == enrollment.Id));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-005")]
+        public async Task An_enrollment_with_attendance_against_it_is_refused_and_says_what_is_in_the_way()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+
+            var section = new Section { AcademicYearId = enrollment.AcademicYearId, GradeYearProfileId = _profileId, NameAr = "ثالث-أ", NameEn = "3-A", Capacity = 25, GenderPolicy = GenderPolicy.Mixed };
+            db.Sections.Add(section);
+            db.SaveChanges();
+            db.AttendanceDays.Add(new AttendanceDay
+            {
+                AcademicYearId = enrollment.AcademicYearId, EnrollmentId = enrollment.Id, SectionId = section.Id,
+                Date = new DateTime(2026, 9, 2), Status = AttendanceStatus.Present,
+            });
+            db.SaveChanges();
+
+            var refusal = await Assert.ThrowsAsync<RecordInUseException>(() =>
+                admin.RemoveEnrollmentAsync(enrollment.Id, "keyed against the wrong student"));
+
+            Assert.Contains("attendance day(s)", refusal.Usage.Describe(arabic: false));
+            Assert.Single(db.Enrollments.Where(e => e.Id == enrollment.Id));
+        }
+
+        [Fact]
+        public async Task The_batch_usage_report_attributes_each_years_history_to_its_own_enrollment()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var thisYear = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+            var nextYearProfile = ProfileInAnotherYear(db);
+            var nextYear = await admin.EnrollAsync(student.Id, nextYearProfile, new DateTime(2027, 9, 1), EnrollmentSourceType.Reinstatement);
+
+            var section = new Section { AcademicYearId = thisYear.AcademicYearId, GradeYearProfileId = _profileId, NameAr = "ثالث-أ", NameEn = "3-A", Capacity = 25, GenderPolicy = GenderPolicy.Mixed };
+            db.Sections.Add(section);
+            db.SaveChanges();
+            db.AttendanceDays.Add(new AttendanceDay
+            {
+                AcademicYearId = thisYear.AcademicYearId, EnrollmentId = thisYear.Id, SectionId = section.Id,
+                Date = new DateTime(2026, 9, 2), Status = AttendanceStatus.Present,
+            });
+            db.SaveChanges();
+
+            var reports = await new EnrollmentUsageInspector(db).InspectManyAsync(new[] { thisYear.Id, nextYear.Id });
+
+            // The batch reads every table once for the whole set, so the risk it carries — and the
+            // reason this test exists — is one row's history being reported against another's row.
+            Assert.True(reports[thisYear.Id].IsInUse);
+            Assert.False(reports[nextYear.Id].IsInUse);
+            Assert.Contains("1 attendance day(s)", reports[thisYear.Id].Describe(arabic: false));
+        }
+
+        [Fact]
+        [BusinessRule("BR-GLB-032")]
+        public async Task Removing_an_enrollment_without_a_reason_is_refused_and_with_one_is_audited()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            var student = await Register(admin);
+            var enrollment = await admin.EnrollAsync(student.Id, _profileId, new DateTime(2026, 9, 1), EnrollmentSourceType.Admission);
+
+            await Assert.ThrowsAsync<MissingRemovalReasonException>(() =>
+                admin.RemoveEnrollmentAsync(enrollment.Id, "   "));
+
+            await admin.RemoveEnrollmentAsync(enrollment.Id, "duplicate of the September entry");
+
+            // AuditCaptor diffs added and modified entries only, so without this explicit entry the
+            // row would leave no trace whatever that it had ever existed.
+            var entry = db.AuditEntries.Single(a => a.EntityType == nameof(Enrollment) && a.Action == AuditAction.Delete);
+            Assert.Equal(enrollment.Id, entry.EntityId);
+            Assert.Equal("duplicate of the September entry", entry.Reason);
+            Assert.Contains($"student {student.Id}", entry.BusinessKey);
+        }
+
         [Fact]
         [BusinessRule("BR-STU-002")]
         public async Task Renaming_a_student_requires_an_audit_reason_because_identity_is_T1()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var student = await Register(admin);
 
             _audit.Reason = null;
@@ -247,7 +481,7 @@ namespace Sms.Infrastructure.Tests
         public async Task A_locality_on_its_own_is_a_complete_student_residence()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var (areaId, _, _) = SeedResidenceHierarchy(db);
             var student = await Register(admin);
 
@@ -264,7 +498,7 @@ namespace Sms.Infrastructure.Tests
         public async Task A_student_quarter_cannot_be_recorded_without_its_locality()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var (_, _, hoodId) = SeedResidenceHierarchy(db);
             var student = await Register(admin);
 
@@ -284,7 +518,7 @@ namespace Sms.Infrastructure.Tests
         public async Task A_student_quarter_from_another_locality_is_refused_rather_than_stored()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var (_, otherAreaId, hoodId) = SeedResidenceHierarchy(db);
             var student = await Register(admin);
 
@@ -306,7 +540,7 @@ namespace Sms.Infrastructure.Tests
         public async Task Clearing_a_students_locality_clears_the_quarter_under_it()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var (areaId, _, hoodId) = SeedResidenceHierarchy(db);
             var student = await Register(admin);
             await admin.SetResidenceAsync(student.Id, areaId, hoodId);
@@ -329,7 +563,7 @@ namespace Sms.Infrastructure.Tests
         public async Task A_students_residence_does_not_reach_the_guardians_file()
         {
             using var db = CreateContext();
-            var admin = new StudentAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var admin = CreateAdmin(db);
             var (areaId, otherAreaId, _) = SeedResidenceHierarchy(db);
             var student = await Register(admin);
             var parent = new Sms.Domain.Parents.Parent

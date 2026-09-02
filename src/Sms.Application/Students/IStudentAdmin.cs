@@ -103,6 +103,67 @@ namespace Sms.Application.Students
             int studentId, int gradeYearProfileId, DateTime enrollmentDate, EnrollmentSourceType sourceType, CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Corrects an enrollment that was recorded wrongly — the grade the child was put in, the
+        /// date it took effect, or where it came from (doc/Modules/10 §5).
+        /// <para>
+        /// Not a promotion and not a transfer. Until this existed the only answer to "the clerk
+        /// enrolled him in grade 3 and he is in grade 4" was a second enrollment, which BR-GLB-024
+        /// refuses outright — so the mistake stayed on the record and every register, mark sheet and
+        /// fee schedule that reads the grade from it read the wrong one.
+        /// </para>
+        /// <para>
+        /// The target profile must belong to the <b>same academic year</b>
+        /// (<see cref="Common.Exceptions.EnrollmentYearChangeException"/>). Moving a child between
+        /// years is the rollover's job (BR-GLB-023): the enrollment is what every year-scoped row
+        /// hangs off, so re-pointing it at another year would silently re-file this year's
+        /// attendance, marks and charges under a year they did not happen in.
+        /// </para>
+        /// <para>
+        /// It is also refused while the student holds a section seat
+        /// (<see cref="Common.Exceptions.EnrollmentSeatedException"/>). A section belongs to one
+        /// grade-year, so correcting the grade underneath a seated child would leave them on the
+        /// register of a section their grade no longer contains. Give up the seat, correct the
+        /// grade, seat them again — three visible steps rather than one that quietly does two of
+        /// them.
+        /// </para>
+        /// <para>
+        /// The change itself is captured by the audit tier on <c>Enrollment</c> (T2, field-level),
+        /// so what the grade was before is recoverable without this method writing anything extra.
+        /// </para>
+        /// </summary>
+        Task<Enrollment> CorrectEnrollmentAsync(
+            int enrollmentId, int gradeYearProfileId, DateTime enrollmentDate, EnrollmentSourceType sourceType,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Removes an enrollment that should never have been written, together with the section
+        /// memberships that were part of the same placement.
+        /// <para>
+        /// BR-GLB-005 forbids deleting records, and this does not contradict it: the rule protects
+        /// <i>history</i>, and an enrollment nothing has happened against is not history but a
+        /// typing mistake. The line between the two is drawn by
+        /// <see cref="Common.Guards.IUsageInspector{T}"/> rather than by judgement — one attendance
+        /// day, one mark, one charge, one issued certificate against this enrollment and it is a
+        /// record of something, at which point it is withdrawn (an exit date and a status) and
+        /// never removed. The same distinction <c>DeleteStudentAsync</c> and
+        /// <c>ISectionAdmin.DeleteSectionAsync</c> already draw.
+        /// </para>
+        /// <para>
+        /// Throws <see cref="Common.Guards.RecordInUseException"/> naming what stands in the way,
+        /// so the screen can say which module to clear first — and can hide the button before the
+        /// operator ever presses it.
+        /// </para>
+        /// <para>
+        /// <paramref name="reason"/> is mandatory (BR-GLB-032) and is written as an explicit
+        /// <c>AuditAction.Delete</c> entry in the same transaction, carrying what the row said. The
+        /// declarative captor cannot do it: it diffs added and modified entries, so a removed row
+        /// would otherwise leave the audit trail with no sign it ever existed.
+        /// Throws <see cref="Common.Guards.MissingRemovalReasonException"/> when it is blank.
+        /// </para>
+        /// </summary>
+        Task RemoveEnrollmentAsync(int enrollmentId, string reason, CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Hard-deletes a student record together with its guardian links, emergency contacts,
         /// enrollments and section memberships. Refused (InvalidOperationException) when the student
         /// already has history in other modules (attendance, charges, certificates) or other records
