@@ -18,6 +18,7 @@ using Sms.Application.Lookups;
 using Sms.Application.Dashboards;
 using Sms.Application.Numbering;
 using Sms.Application.Parents;
+using Sms.Application.Payments;
 using Sms.Application.Reports;
 using Sms.Application.Schools;
 using Sms.Application.Sections;
@@ -41,6 +42,7 @@ using Sms.Infrastructure.Lookups;
 using Sms.Infrastructure.Dashboards;
 using Sms.Infrastructure.Numbering;
 using Sms.Infrastructure.Parents;
+using Sms.Infrastructure.Payments;
 using Sms.Infrastructure.Persistence;
 using Sms.Infrastructure.Reports;
 using Sms.Infrastructure.Schools;
@@ -125,6 +127,10 @@ namespace Sms.Seeder
             services.AddScoped<IAcademicYearAdmin, AcademicYearAdmin>();
             services.AddScoped<IGradeStructureAdmin, GradeStructureAdmin>();
             services.AddScoped<ISectionAdmin, SectionAdmin>();
+            // SubjectAdmin grew a usage guard for curriculum offerings and the web host registers
+            // it; without the same registration here the seeder cannot build its own container at
+            // all, and fails before a single contributor runs.
+            services.AddScoped<Sms.Application.Common.Guards.IUsageInspector<Sms.Domain.Subjects.CurriculumOffering>, CurriculumOfferingUsageInspector>();
             services.AddScoped<ISubjectAdmin, SubjectAdmin>();
             services.AddScoped<ICalendarAdmin, CalendarAdmin>();
             services.AddScoped<IEmployeeAdmin, EmployeeAdmin>();
@@ -165,6 +171,12 @@ namespace Sms.Seeder
             services.AddScoped<ISeedContributor, StaffDemoSeedContributor>();
             services.AddScoped<ISeedContributor, PortalDemoAccountSeedContributor>();
             services.AddScoped<ISeedContributor, CafeteriaDemoSeedContributor>();
+
+            // The cashier's destination picker. Its own contributor rather than a tail of the demo
+            // tenant: that one returns early once a school exists, so these never reached a database
+            // provisioned before the catalogue was built (BR-PAY-002).
+            services.AddScoped<ICollectionAccountAdmin, CollectionAccountAdmin>();
+            services.AddScoped<ISeedContributor, CollectionAccountDemoSeedContributor>();
 
             // The embedded ERP modules' permission names, catalogued as sec.Permission rows and
             // granted to SYSADMIN, so an administrator can reach the accounting screens and hand the
