@@ -226,12 +226,20 @@ namespace Sms.Infrastructure.Discounts
             return gross <= 0m ? 0m : Math.Round(basisValue / gross * 100m, 2, MidpointRounding.AwayFromZero);
         }
 
-        private async Task EnsureStackableAsync(int studentId, int academicYearId, DiscountType type, decimal percentEquivalent, CancellationToken cancellationToken)
+        /// <summary>
+        /// BR-DIS-001 over what already stands on this student-year. <paramref name="excludeGrantId"/>
+        /// leaves one grant out of the sum: an edit re-checks its own new value against the *other*
+        /// grants, and without the exclusion a lone non-stackable proposal would refuse to be
+        /// corrected because it collided with the row being corrected.
+        /// </summary>
+        private async Task EnsureStackableAsync(
+            int studentId, int academicYearId, DiscountType type, decimal percentEquivalent, CancellationToken cancellationToken, int? excludeGrantId = null)
         {
             var existing = await (
                 from g in _db.DiscountGrants
                 join t in _db.DiscountTypes on g.DiscountTypeId equals t.Id
                 where g.StudentId == studentId && g.AcademicYearId == academicYearId
+                      && (excludeGrantId == null || g.Id != excludeGrantId)
                       && (g.Status == DiscountGrantStatus.Proposed || g.Status == DiscountGrantStatus.Approved)
                       && (t.FeeCategoryId == null || type.FeeCategoryId == null || t.FeeCategoryId == type.FeeCategoryId)
                 select new { t.IsStackable, t.Basis, g.BasisValue, t.FeeCategoryId }).ToListAsync(cancellationToken);
@@ -279,6 +287,47 @@ namespace Sms.Infrastructure.Discounts
             _db.DiscountGrants.Add(grant);
             await _db.SaveChangesAsync(cancellationToken);
             return grant;
+        }
+
+        public async Task UpdateManualGrantAsync(
+            int discountGrantId, decimal basisValue, string reason,
+            bool hasHardshipDocumentation = false, CancellationToken cancellationToken = default)
+        {
+            var grant = await _db.DiscountGrants.SingleAsync(g => g.Id == discountGrantId, cancellationToken);
+            if (grant.Status != DiscountGrantStatus.Proposed)
+            {
+                throw new InvalidDiscountGrantStateException(discountGrantId, DiscountGrantStatus.Proposed);
+            }
+
+            // IgnoreQueryFilters, as GetGrantPercentEquivalentAsync does: a grant keeps pointing at
+            // its type after the type is retired, and correcting a typo in a proposal must not become
+            // impossible the day somebody stops offering that discount to new students.
+            var type = await _db.DiscountTypes.IgnoreQueryFilters()
+                .Where(t => t.SchoolId == _db.CurrentSchoolId)
+                .SingleAsync(t => t.Id == grant.DiscountTypeId, cancellationToken);
+
+            if (type.RequiresHardshipDocumentation && !hasHardshipDocumentation)
+            {
+                throw new HardshipDocumentationRequiredException(grant.DiscountTypeId);
+            }
+
+            var charges = await LoadChargeInputsAsync(grant.StudentId, grant.AcademicYearId, type.FeeCategoryId, cancellationToken);
+            var percent = PercentEquivalent(type, basisValue, charges);
+            await EnsureStackableAsync(grant.StudentId, grant.AcademicYearId, type, percent, cancellationToken, excludeGrantId: grant.Id);
+
+            // The tier is re-derived rather than kept: BR-DIS-003 routes on the percentage, so a
+            // proposal edited from 8% to 30% has to end up in front of the approver the new figure
+            // names. Source is left alone — an automatic proposal corrected by hand is still the
+            // eligibility run's row, and re-labelling it Manual would hide it from BR-DIS-002's
+            // "already granted" check at the next run.
+            grant.BasisValue = basisValue;
+            grant.Reason = reason;
+            grant.RequiredTier = GrantApprovalRouter.Route(grant.Source, percent);
+
+            // Not required by the captor — RequiresAuditReason sits on RevokedEffectiveDate alone —
+            // but a correction whose audit entry says only "8 became 30" is half a record.
+            _audit.Reason = reason;
+            await _db.SaveChangesAsync(cancellationToken);
         }
 
         public async Task<IReadOnlyList<DiscountGrant>> ProposeAutomaticGrantsAsync(int discountTypeId, int proposedByUserId, CancellationToken cancellationToken = default)

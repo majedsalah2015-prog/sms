@@ -93,6 +93,33 @@ namespace Sms.Application.Discounts
             int studentId, int discountTypeId, decimal basisValue, string reason, int proposedByUserId,
             bool hasHardshipDocumentation = false, CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// doc/Modules/22 §8.3: corrects a grant that is still <see cref="DiscountGrantStatus.Proposed"/> —
+        /// its basis value, its reason, and the hardship attestation behind it.
+        /// <para>
+        /// The desk could only propose and decide. A clerk who typed 5 where the family was promised
+        /// 50 had to reject the proposal and enter a second one, and the register then carried a
+        /// rejected grant nobody had actually refused. This changes the proposal in place instead;
+        /// the T1 audit keeps both values, so the correction is visible without inventing a decision.
+        /// </para>
+        /// <para>
+        /// Only while Proposed. Once approved, BR-DIS-005's discount documents are issued and the
+        /// forward installments are recomputed against them — editing the basis value then would
+        /// leave <see cref="DiscountGrant.AppliedAmount"/>, the documents and the schedule disagreeing
+        /// about the same grant. The honest correction there is <see cref="RevokeGrantAsync"/>
+        /// followed by a fresh grant, and this refuses with
+        /// <see cref="Common.Exceptions.InvalidDiscountGrantStateException"/> to say so.
+        /// </para>
+        /// <para>
+        /// The new value is re-routed (BR-DIS-003) and re-stacked (BR-DIS-001) exactly as a fresh
+        /// proposal would be: raising 8% to 30% moves the approver, and the grant's own row is left
+        /// out of the stacking sum so a proposal never collides with itself.
+        /// </para>
+        /// </summary>
+        Task UpdateManualGrantAsync(
+            int discountGrantId, decimal basisValue, string reason,
+            bool hasHardshipDocumentation = false, CancellationToken cancellationToken = default);
+
         /// <summary>BR-DIS-002: evaluates the type's automatic rules over the working year (sibling ladder via StudentGuardianLink families; staff via Parent↔Employee UserAccountId bridge) and creates one Proposed grant per eligible student — batch-approved with <see cref="ApproveGrantsAsync"/>.</summary>
         Task<IReadOnlyList<DiscountGrant>> ProposeAutomaticGrantsAsync(int discountTypeId, int proposedByUserId, CancellationToken cancellationToken = default);
 

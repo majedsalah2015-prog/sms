@@ -14,6 +14,7 @@ using Sms.Domain.Workflow;
 using Sms.Domain.Fees;
 using Sms.Domain.Students;
 using Sms.Infrastructure.Persistence;
+using Sms.Web.Finance;
 using Sms.Web.Models;
 using Sms.Application.Security;
 using Sms.Domain.Security;
@@ -609,71 +610,25 @@ namespace Sms.Web.Controllers
         // ================================================================== WF-04 (doc 05 §5, BR-DIS-003)
 
         /// <summary>
-        /// What the operator is told a proposal was routed to. BR-DIS-003 sends
-        /// anything over 25% to the Owner, and the tier is recorded on the grant —
-        /// but doc 06 §4.3 seeds no Owner role, so WF-04's chain stops at the
-        /// principal. Naming an approver who will never be asked would be the worse
-        /// half of that gap: the register keeps the tier, the message says who is
-        /// actually going to sign, and says the rest is missing.
+        /// The four sentences and the two chain steps live in <see cref="GrantChain"/>, shared with
+        /// the student fee file's own grant panel — the same request must reach the same approver
+        /// whichever screen raised it (doc/Modules/22 §8.3).
         /// </summary>
-        private static string RoutedMessage(ApprovalTier tier)
-            => tier == ApprovalTier.Owner
-                ? T("Grant proposed. It exceeds the principal's threshold, so BR-DIS-003 routes it to the Owner — a role this deployment does not have, so it waits with the principal and the owner tier is recorded on the grant.",
-                    "اقتُرحت المنحة. وهي تتجاوز حدّ المدير، فتوجّهها BR-DIS-003 إلى المالك — وهو دور غير موجود في هذا التركيب، فتنتظر عند المدير ويُسجَّل مستوى المالك على المنحة.")
-                : T($"Grant proposed — routed to {DiscountLabels.Tier(tier, false)} for approval.",
-                    $"اقتُرحت المنحة — وُجّهت إلى {DiscountLabels.Tier(tier, true)} للاعتماد.");
+        private static string RoutedMessage(ApprovalTier tier) => GrantChain.Routed(tier, IsArabic);
 
-        private static string SelfApprovalMessage => T(
-            "You proposed this grant, so you cannot approve it (BR-WF-003). It waits for another holder of the approving role.",
-            "أنت من اقترح هذه المنحة، فلا يمكنك اعتمادها (BR-WF-003). تنتظر شخصاً آخر يحمل دور الاعتماد.");
+        private static string SelfApprovalMessage => GrantChain.SelfApproval(IsArabic);
 
-        private static string NotTheApproverMessage => T(
-            "This request is waiting at a level your roles do not decide.",
-            "هذا الطلب ينتظر عند مستوى لا تبتّ فيه أدوارك.");
+        private static string NotTheApproverMessage => GrantChain.NotTheApprover(IsArabic);
 
-        /// <summary>
-        /// The open WF-04 request for a grant, or null when it has none — automatic
-        /// batch proposals (BR-DIS-002 approves an enumerated batch under one
-        /// decision) and scholarship nominations (BR-DIS-004 routes them to a
-        /// committee, which the seeded chain does not model) keep the direct path.
-        /// </summary>
         private async Task<WorkflowInstance?> OpenGrantChainAsync(int grantId)
-            => await _db.WorkflowInstances.AsNoTracking()
-                .Where(i => !i.IsClosed && i.EntityTypeName == DiscountWorkflow.EntityTypeName && i.EntityId == grantId)
-                .OrderByDescending(i => i.Id)
-                .FirstOrDefaultAsync(HttpContext.RequestAborted);
+            => await GrantChain.OpenAsync(_db, grantId, HttpContext.RequestAborted);
 
-        /// <summary>
-        /// Raises the grant into WF-04 and submits it in one step. The routing value
-        /// is the grant's own percentage equivalent — the same number BR-DIS-003
-        /// routed the tier from, read back through the port so the chain and the
-        /// recorded tier cannot disagree about who signs.
-        /// <para>
-        /// A school whose catalogue has not been seeded has no WF-04 to start. The
-        /// grant is still proposed and still approvable from this screen, so a
-        /// missing definition degrades to the old behaviour instead of losing the
-        /// operator's work — but it is reported, because a chain nobody notices is
-        /// missing is how an approval requirement quietly stops being enforced.
-        /// </para>
-        /// </summary>
         private async Task StartGrantChainAsync(DiscountGrant grant, string reason)
         {
-            try
+            var missing = await GrantChain.StartAsync(_discounts, _workflow, grant, reason, IsArabic, HttpContext.RequestAborted);
+            if (missing != null)
             {
-                var percent = await _discounts.GetGrantPercentEquivalentAsync(grant.Id, HttpContext.RequestAborted);
-                var label = string.Format(
-                    CultureInfo.InvariantCulture, "{0} {1}% · student #{2}",
-                    DiscountWorkflow.Code, percent.ToString("0.##", CultureInfo.InvariantCulture), grant.StudentId);
-
-                var instance = await _workflow.StartAsync(
-                    DiscountWorkflow.Code, DiscountWorkflow.EntityTypeName, grant.Id, label, percent, HttpContext.RequestAborted);
-                await _workflow.ExecuteAsync(instance.Id, WorkflowActionType.Submit, reason, cancellationToken: HttpContext.RequestAborted);
-            }
-            catch (WorkflowDefinitionMissingException)
-            {
-                TempData["Error"] = T(
-                    "The grant was proposed, but no WF-04 workflow is defined for this school, so it is not on anyone's approvals queue — approve it from this screen.",
-                    "اقتُرحت المنحة، لكن لا يوجد مسار WF-04 معرَّف لهذه المدرسة، فهي ليست في طابور موافقات أحد — اعتمدها من هذه الشاشة.");
+                TempData["Error"] = missing;
             }
         }
     }

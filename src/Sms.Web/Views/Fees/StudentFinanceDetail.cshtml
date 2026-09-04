@@ -15,9 +15,12 @@
     // Where the "change the template" picker is drawn (owner request, 2026-09-02: in the basket's
     // own template field). It goes there whenever the basket is actually drawing its form; when the
     // basket is absent, blocked or exhausted, the same picker falls back to the schedule panel so a
-    // Finance Manager who never posts charges is not left without it. Never both â one control.
+    // Finance Manager who never posts charges is not left without it. Never both — one control.
     var basketHostsPlanChange = Model.FeeFile is { CanCommit: true, CanAssignPlan: true, HasPlan: true } b
         && b.Blocker == FeeFileBlocker.None && !b.IsExhausted && Model.PlanChanges.Count > 0;
+    // BR-DIS-008 refuses a revocation dated before today, so the picker cannot offer one. UTC, the
+    // same clock the engine compares against — a local "today" would offer a date it then refuses.
+    var revokeFrom = DateTime.UtcNow.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     var help = new HelpPanelViewModel
     {
         Id = "stufin-detail-help", Title = T("Fee breakdown — help", "تفصيل الرسوم — مساعدة"),
@@ -26,6 +29,7 @@
         {
             new HelpPanelViewModel.Item(T("Priced vs billed", "المسعَّر مقابل المفوتَر"), T("A priced category with no invoice is revenue the school has not billed; an invoice with no price line came from a service assignment or a manual charge, which the source column names.", "فئة مسعَّرة بلا فاتورة إيراد لم تُطالِب به المدرسة؛ وفاتورة بلا سطر تسعير جاءت من إسناد خدمة أو رسم يدوي، ويبيّن ذلك عمود المصدر.")),
             new HelpPanelViewModel.Item(T("Discounts", "الخصومات"), T("Only an approved grant reduces an invoice, and only through a discount document against a specific charge — the applied figure is what those documents actually took off, not what the grant promises (BR-DIS-005).", "لا يخفض الفاتورة إلا خصم معتمد، وعبر مستند خصم على فاتورة بعينها — والمبلغ المطبَّق هو ما خصمته تلك المستندات فعلاً لا ما يَعِد به المنح (BR-DIS-005).")),
+            new HelpPanelViewModel.Item(T("Adding, changing and removing a discount", "إضافة الخصم وتعديله وسحبه"), T("Granting a discount proposes it and routes it to the approver its percentage names (BR-DIS-003); it reduces nothing until approved. A proposal can still be corrected in place, which re-routes it. Nothing is deleted here (BR-GLB-005): a proposal is rejected, and a discount already applied is revoked from a date on or after today, with a reason — its past documents stand unless you ask for the claw-back charge (BR-DIS-008).", "منح الخصم يقترحه ويوجّهه إلى المعتمِد الذي تحدّده نسبته (BR-DIS-003)، ولا يخفض شيئاً قبل الاعتماد. والاقتراح ما زال قابلاً للتصحيح في مكانه، ويُعاد توجيهه بعده. ولا يُحذف شيء هنا (BR-GLB-005): الاقتراح يُرفض، والخصم المطبَّق يُسحَب بتاريخ اليوم أو بعده مع ذكر السبب — وتبقى مستنداته السابقة إلا أن تطلب فاتورة الاسترجاع (BR-DIS-008).")),
             new HelpPanelViewModel.Item(T("Covered", "المغطّى"), T("An installment is covered by the payments allocated to the charges it draws on, oldest installment first — there is no second ledger of installment payments (BR-PAY-003).", "يُغطّى القسط بالمدفوعات المخصّصة للفواتير التي يسحب منها، الأقدم أولاً — ولا يوجد سجل ثانٍ لمدفوعات الأقساط (BR-PAY-003).")),
             new HelpPanelViewModel.Item(T("Unscheduled", "غير مجدوَل"), T("Net charges of this year that no installment line claims — payable on demand rather than on a schedule.", "صافي رسوم هذا العام التي لا يطالب بها أي سطر قسط — تُدفع عند الطلب لا وفق جدول.")),
         },
@@ -519,10 +523,182 @@ else
                             {
                                 <div class="small text-warning-emphasis mt-1"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>@T("Approved but not yet applied to any invoice — it reduces nothing until a discount document is issued against a charge (BR-DIS-005).", "معتمد لكنه لم يُطبَّق على أي فاتورة — لا يخفض شيئاً حتى يصدر مستند خصم على فاتورة (BR-DIS-005).")</div>
                             }
+
+                            @* ---- act on this grant (doc/Modules/22 §8.3, BR-DIS-003/005/008) ---- *@
+                            @if (Model.DiscountDesk is StudentDiscountDesk rowDesk)
+                            {
+                                var isProposed = d.Grant.Status == DiscountGrantStatus.Proposed;
+                                var mayEdit = rowDesk.CanPropose && isProposed;
+                                var mayDecide = rowDesk.CanDecide && isProposed;
+                                var mayRevoke = rowDesk.CanRevoke && d.Grant.Status == DiscountGrantStatus.Approved;
+
+                                if (mayEdit || mayDecide || mayRevoke)
+                                {
+                                    <div class="d-flex flex-wrap gap-2 mt-2 d-print-none">
+                                        @if (mayDecide)
+                                        {
+                                            <form method="post" asp-action="ApproveStudentDiscount" asp-route-id="@s.Id" asp-route-grantId="@d.Grant.Id" asp-route-year="@yid">
+                                                <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2 me-1" aria-hidden="true"></i>@T("Approve", "اعتماد")</button>
+                                            </form>
+                                        }
+                                        @if (mayEdit)
+                                        {
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#dsc-edit-@d.Grant.Id" aria-expanded="false" aria-controls="dsc-edit-@d.Grant.Id">
+                                                <i class="bi bi-pencil me-1" aria-hidden="true"></i>@T("Edit", "تعديل")
+                                            </button>
+                                        }
+                                        @if (mayDecide)
+                                        {
+                                            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="collapse" data-bs-target="#dsc-reject-@d.Grant.Id" aria-expanded="false" aria-controls="dsc-reject-@d.Grant.Id">
+                                                <i class="bi bi-x-lg me-1" aria-hidden="true"></i>@T("Reject", "رفض")
+                                            </button>
+                                        }
+                                        @if (mayRevoke)
+                                        {
+                                            <button type="button" class="btn btn-outline-warning btn-sm" data-bs-toggle="collapse" data-bs-target="#dsc-revoke-@d.Grant.Id" aria-expanded="false" aria-controls="dsc-revoke-@d.Grant.Id">
+                                                <i class="bi bi-slash-circle me-1" aria-hidden="true"></i>@T("Revoke", "سحب الخصم")
+                                            </button>
+                                        }
+                                    </div>
+                                }
+
+                                @* Editing a proposal, not the approved thing: BR-DIS-005 has not issued a
+                                   document yet, so the value can still simply change — and the port re-routes
+                                   the approver from the new figure (BR-DIS-003). *@
+                                @if (mayEdit)
+                                {
+                                    <div class="collapse mt-2 d-print-none" id="dsc-edit-@d.Grant.Id">
+                                        <form method="post" asp-action="EditStudentDiscount" asp-route-id="@s.Id" asp-route-grantId="@d.Grant.Id" asp-route-year="@yid" class="row g-2 border rounded p-2 bg-body-tertiary">
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="dsc-val-@d.Grant.Id">@T("Value (percent, or amount by type)", "القيمة (نسبة أو مبلغ حسب النوع)")</label>
+                                                <input class="form-control form-control-sm" id="dsc-val-@d.Grant.Id" name="basisValue" type="number" step="0.01" min="0.01" dir="ltr" required aria-required="true"
+                                                       value="@d.Grant.BasisValue.ToString("0.##", CultureInfo.InvariantCulture)" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="dsc-reason-@d.Grant.Id">@T("Reason", "السبب")</label>
+                                                <input class="form-control form-control-sm" id="dsc-reason-@d.Grant.Id" name="reason" maxlength="400" required aria-required="true" value="@d.Grant.Reason" />
+                                                <div class="form-text">@T("Mandatory — the register is read for this field (BR-DIS-003/009). Changing the value may move the grant to a different approver.", "إلزامي — وهذا هو الحقل الذي يُقرأ السجل لأجله (BR-DIS-003/009). وتغيير القيمة قد ينقل المنحة إلى معتمِد آخر.")</div>
+                                            </div>
+                                            @if (d.Type is { RequiresHardshipDocumentation: true })
+                                            {
+                                                <div class="col-12 form-check ms-1">
+                                                    <input class="form-check-input" type="checkbox" id="dsc-hard-@d.Grant.Id" name="hasHardshipDocumentation" value="true" checked />
+                                                    <label class="form-check-label small" for="dsc-hard-@d.Grant.Id">@T("Hardship documentation is held on file (BR-DIS-003)", "مستندات الحالة الاجتماعية محفوظة في الملف (BR-DIS-003)")</label>
+                                                </div>
+                                            }
+                                            <div class="col-12">
+                                                <button type="submit" class="btn btn-primary btn-sm">@T("Save the change", "حفظ التعديل")</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                }
+
+                                @if (mayDecide)
+                                {
+                                    <div class="collapse mt-2 d-print-none" id="dsc-reject-@d.Grant.Id">
+                                        <form method="post" asp-action="RejectStudentDiscount" asp-route-id="@s.Id" asp-route-grantId="@d.Grant.Id" asp-route-year="@yid" class="row g-2 border rounded p-2 bg-body-tertiary">
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="dsc-rej-@d.Grant.Id">@T("Reason for refusing", "سبب الرفض")</label>
+                                                <input class="form-control form-control-sm" id="dsc-rej-@d.Grant.Id" name="reason" maxlength="400" required aria-required="true" />
+                                                <div class="form-text">@T("The proposal stays in the register as refused, with this reason — nothing is deleted here (BR-GLB-005).", "يبقى الاقتراح في السجل مرفوضاً بهذا السبب — ولا يُحذف شيء هنا (BR-GLB-005).")</div>
+                                            </div>
+                                            <div class="col-12">
+                                                <button type="submit" class="btn btn-danger btn-sm">@T("Reject the discount", "رفض الخصم")</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                }
+
+                                @if (mayRevoke)
+                                {
+                                    <div class="collapse mt-2 d-print-none" id="dsc-revoke-@d.Grant.Id">
+                                        <form method="post" asp-action="RevokeStudentDiscount" asp-route-id="@s.Id" asp-route-grantId="@d.Grant.Id" asp-route-year="@yid" class="row g-2 border rounded p-2 bg-body-tertiary">
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="dsc-eff-@d.Grant.Id">@T("Effective date (today or later)", "تاريخ السريان (اليوم أو بعده)")</label>
+                                                <input class="form-control form-control-sm" id="dsc-eff-@d.Grant.Id" name="effectiveDate" type="date" dir="ltr" min="@revokeFrom" value="@revokeFrom" required aria-required="true" />
+                                            </div>
+                                            <div class="col-12">
+                                                <label class="form-label small mb-0" for="dsc-rev-@d.Grant.Id">@T("Reason (mandatory)", "السبب (إلزامي)")</label>
+                                                <input class="form-control form-control-sm" id="dsc-rev-@d.Grant.Id" name="reason" maxlength="400" required aria-required="true" />
+                                            </div>
+                                            <div class="col-12 form-check ms-1">
+                                                <input class="form-check-input" type="checkbox" id="dsc-claw-@d.Grant.Id" name="clawBack" value="true" />
+                                                <label class="form-check-label small" for="dsc-claw-@d.Grant.Id">@T("Claw back the unconsumed part of the year as a new charge", "استرجاع الجزء غير المستهلك من العام كفاتورة جديدة")</label>
+                                            </div>
+                                            <div class="col-12">
+                                                <div class="form-text mb-1">@T("By default the past is forgiven: the discount documents already issued stand, and only the rest of the year stops being discounted (BR-DIS-008).", "الأصل هو العفو عن الماضي: تبقى مستندات الخصم الصادرة كما هي، ويتوقف الخصم عن بقية العام فقط (BR-DIS-008).")</div>
+                                                <button type="submit" class="btn btn-warning btn-sm">@T("Revoke the discount", "سحب الخصم")</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                }
+                            }
                         </li>
                     }
                     </ul>
                     <div class="p-2 border-top small d-flex justify-content-between"><span class="fw-semibold">@T("Total discount applied", "إجمالي الخصم المطبَّق")</span><bdi dir="ltr" class="fw-semibold text-success">−@Model.Discounts.Sum(d => d.Applied).ToString("N2")</bdi></div>
+                }
+
+                @* ---- grant a new one (doc/Modules/22 §8.3, BR-DIS-003) ---- *@
+                @if (Model.DiscountDesk is StudentDiscountDesk addDesk && addDesk.CanPropose)
+                {
+                    <div class="p-2 border-top d-print-none">
+                        @if (!addDesk.IsWorkingYear)
+                        {
+                            <p class="small text-muted mb-0">@T("A discount is always granted into the working year, and you are reading another one — switch year to grant one here (BR-DIS-007).", "يُمنح الخصم دائماً في عام العمل، وأنت تستعرض عاماً آخر — بدّل العام لتمنح خصماً من هنا (BR-DIS-007).")</p>
+                        }
+                        else if (Model.NotEnrolled)
+                        {
+                            <p class="small text-muted mb-0">@T("This student is not enrolled in this year, so there is nothing to discount.", "هذا الطالب غير مقيَّد في هذا العام، فلا شيء يُخصم منه.")</p>
+                        }
+                        else if (addDesk.Types.Count == 0)
+                        {
+                            <p class="small text-muted mb-0">@T("No manually-granted discount type is defined — define one in the discount catalogue first (BR-DIS-001). An automatic type is granted by its own eligibility run over the whole roll, not from one child's file (BR-DIS-002).", "لا يوجد نوع خصم يُمنح يدوياً — عرّف نوعاً في كتالوج الخصومات أولاً (BR-DIS-001). أما النوع التلقائي فيُمنح بتشغيل الاستحقاق على كامل القائمة لا من ملف طالب واحد (BR-DIS-002).")</p>
+                        }
+                        else
+                        {
+                            <details>
+                                <summary class="small fw-semibold text-primary" style="cursor:pointer"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Grant a discount to this student", "منح خصم لهذا الطالب")</summary>
+                                <form method="post" asp-action="GrantStudentDiscount" asp-route-id="@s.Id" asp-route-year="@yid" class="row g-2 mt-1">
+                                    <div class="col-12">
+                                        <label class="form-label small mb-0" for="dsc-new-type">@T("Discount type", "نوع الخصم")</label>
+                                        <select class="form-select form-select-sm" id="dsc-new-type" name="discountTypeId" required aria-required="true">
+                                            <option value="">@T("— choose a type —", "— اختر نوعاً —")</option>
+                                            @foreach (var t in addDesk.Types)
+                                            {
+                                                <option value="@t.Id">@(isRtl ? t.NameAr : t.NameEn) — @DiscountLabels.Basis(t.Basis, isRtl)</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-0" for="dsc-new-val">@T("Value (percent, or amount by type)", "القيمة (نسبة أو مبلغ حسب النوع)")</label>
+                                        <input class="form-control form-control-sm" id="dsc-new-val" name="basisValue" type="number" step="0.01" min="0.01" dir="ltr" required aria-required="true" />
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small mb-0" for="dsc-new-reason">@T("Reason", "السبب")</label>
+                                        <input class="form-control form-control-sm" id="dsc-new-reason" name="reason" maxlength="400" required aria-required="true" />
+                                    </div>
+                                    <div class="col-12 form-check ms-1">
+                                        <input class="form-check-input" type="checkbox" id="dsc-new-hardship" name="hasHardshipDocumentation" value="true" />
+                                        <label class="form-check-label small" for="dsc-new-hardship">@T("Hardship documentation is held on file (needed only by a type that requires it)", "مستندات الحالة الاجتماعية محفوظة في الملف (مطلوبة فقط للنوع الذي يشترطها)")</label>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-text mb-1">
+                                            @if (addDesk.CanDecide)
+                                            {
+                                                @T("The grant is proposed, then routed for approval by its own percentage (BR-DIS-003). It reduces nothing until it is approved — approve it from the row above once it appears.", "يُقترح الخصم ثم يُوجَّه للاعتماد بحسب نسبته (BR-DIS-003). ولا يخفض شيئاً حتى يُعتمد — اعتمده من السطر أعلاه بعد ظهوره.")
+                                            }
+                                            else
+                                            {
+                                                @T("The grant is proposed, then routed for approval by its own percentage (BR-DIS-003). It reduces nothing until whoever holds that approval decides it.", "يُقترح الخصم ثم يُوجَّه للاعتماد بحسب نسبته (BR-DIS-003). ولا يخفض شيئاً حتى يبتّ فيه صاحب صلاحية الاعتماد.")
+                                            }
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-sm">@T("Propose the discount", "اقتراح الخصم")</button>
+                                    </div>
+                                </form>
+                            </details>
+                        }
+                    </div>
                 }
             </div>
 

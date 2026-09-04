@@ -325,6 +325,10 @@ namespace Sms.Web.Controllers
             // Its own right and its own panel: a Finance Manager who never posts charges gets no
             // basket above and must still be able to move a family onto a different plan.
             m.PlanChanges = await BuildPlanChangePanelsAsync(installments, m);
+
+            // Likewise the grant desk (doc/Modules/22 §8.3): the discounts panel below was a
+            // register, and the only place to act on a grant was the school-wide roll at /discounts.
+            m.DiscountDesk = await BuildDiscountDeskAsync(m);
             return View(m);
         }
 

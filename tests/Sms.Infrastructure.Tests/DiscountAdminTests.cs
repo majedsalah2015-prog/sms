@@ -217,6 +217,121 @@ namespace Sms.Infrastructure.Tests
             await Assert.ThrowsAsync<DiscountStackingViolationException>(() => admin.ProposeManualGrantAsync(_studentId, exclusive.Id, 5m, "exclusive beside others", 1));
         }
 
+        /// <summary>
+        /// doc/Modules/22 §8.3: a proposal is correctable. The desk could only propose and decide, so
+        /// a clerk who typed 5 where the family was promised 50 had to reject their own proposal and
+        /// enter a second one — leaving a refusal in the register that nobody had actually made.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-DIS-003")]
+        public async Task A_proposal_can_be_corrected_and_is_re_routed_to_the_approver_the_new_value_names()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var type = await admin.DefineTypeAsync("Neg", "Negotiated", DiscountBasis.Percentage, DiscountEligibilityMode.Manual);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 5m, "typo", 1);
+            Assert.Equal(ApprovalTier.FinanceManager, grant.RequiredTier);
+
+            await admin.UpdateManualGrantAsync(grant.Id, 50m, "the value the family was promised");
+
+            var stored = db.DiscountGrants.Single();
+            Assert.Equal(50m, stored.BasisValue);
+            Assert.Equal("the value the family was promised", stored.Reason);
+            Assert.Equal(DiscountGrantStatus.Proposed, stored.Status);
+
+            // The point of the re-route: 5% was the finance manager's to sign and 50% is not.
+            Assert.Equal(ApprovalTier.Owner, stored.RequiredTier);
+        }
+
+        /// <summary>
+        /// The grant under edit is left out of its own stacking sum. Without the exclusion a lone
+        /// non-stackable proposal could never be corrected: BR-DIS-001 would refuse it for colliding
+        /// with the very row being corrected.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-DIS-001")]
+        public async Task Correcting_a_lone_non_stackable_proposal_does_not_collide_with_itself()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var exclusive = await admin.DefineTypeAsync("B", "B", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, isStackable: false);
+            var only = await admin.ProposeManualGrantAsync(_studentId, exclusive.Id, 20m, "the only grant", 1);
+
+            await admin.UpdateManualGrantAsync(only.Id, 25m, "still the only grant");
+
+            Assert.Equal(25m, db.DiscountGrants.Single().BasisValue);
+        }
+
+        /// <summary>
+        /// BR-DIS-001's combined cap still holds over an edit, counted against the *other* grants:
+        /// 20 + 10 is exactly the 30% cap, and would read as 35 if the edited row's own 5 were
+        /// counted alongside its replacement.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-DIS-001")]
+        public async Task Correcting_a_proposal_still_respects_the_combined_cap()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var capped = await admin.DefineTypeAsync("A", "A", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, maxCombinedPercent: 30m);
+            await admin.ProposeManualGrantAsync(_studentId, capped.Id, 20m, "first", 1);
+            var edited = await admin.ProposeManualGrantAsync(_studentId, capped.Id, 5m, "second", 1);
+
+            await Assert.ThrowsAsync<DiscountStackingViolationException>(
+                () => admin.UpdateManualGrantAsync(edited.Id, 15m, "over the combined cap"));
+            Assert.Equal(5m, db.DiscountGrants.Single(g => g.Id == edited.Id).BasisValue);
+
+            await admin.UpdateManualGrantAsync(edited.Id, 10m, "up to the cap exactly");
+            Assert.Equal(10m, db.DiscountGrants.Single(g => g.Id == edited.Id).BasisValue);
+        }
+
+        /// <summary>
+        /// BR-DIS-005/008: once approved, the discount documents are issued and the schedule is
+        /// recomputed against them. Editing the basis value then would leave the grant, its documents
+        /// and its instalments telling three different stories — the correction is revoke and re-grant.
+        /// </summary>
+        [Fact]
+        [BusinessRule("BR-DIS-005")]
+        public async Task An_approved_grant_is_not_editable()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var type = await admin.DefineTypeAsync("Neg", "Negotiated", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, feeCategoryId: _tuitionId);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, type.Id, 10m, "negotiated", 1);
+            await admin.ApproveGrantAsync(grant.Id, approvedByUserId: 2);
+
+            var refusal = await Assert.ThrowsAsync<InvalidDiscountGrantStateException>(
+                () => admin.UpdateManualGrantAsync(grant.Id, 20m, "second thoughts"));
+            Assert.Equal(DiscountGrantStatus.Proposed, refusal.Expected);
+
+            var stored = db.DiscountGrants.Single();
+            Assert.Equal(10m, stored.BasisValue);
+            Assert.Equal(115m, stored.AppliedAmount);
+        }
+
+        /// <summary>BR-DIS-003: the attestation is re-asked on an edit, not inherited from the proposal.</summary>
+        [Fact]
+        [BusinessRule("BR-DIS-003")]
+        public async Task Correcting_a_hardship_grant_still_needs_the_documentation()
+        {
+            using var db = CreateContext();
+            var admin = CreateAdmin(db);
+            await PostCharge(db, 1000m);
+            var hardship = await admin.DefineTypeAsync(
+                "Hardship", "Hardship", DiscountBasis.Percentage, DiscountEligibilityMode.Manual, requiresHardshipDocumentation: true);
+            var grant = await admin.ProposeManualGrantAsync(_studentId, hardship.Id, 20m, "hardship", 1, hasHardshipDocumentation: true);
+
+            await Assert.ThrowsAsync<HardshipDocumentationRequiredException>(
+                () => admin.UpdateManualGrantAsync(grant.Id, 30m, "worse than we thought"));
+
+            await admin.UpdateManualGrantAsync(grant.Id, 30m, "worse than we thought", hasHardshipDocumentation: true);
+            Assert.Equal(30m, db.DiscountGrants.Single().BasisValue);
+        }
+
         // --- BR-DIS-005 application ------------------------------------------------------------
 
         [Fact]

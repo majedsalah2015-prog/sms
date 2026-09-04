@@ -225,6 +225,57 @@ namespace Sms.Web.Models
         /// <summary>The change panel for one plan row, or null when that plan is not changeable here.</summary>
         public PlanTemplateChangePanel? PlanChangeFor(int planAssignmentId)
             => PlanChanges.FirstOrDefault(p => p.PlanAssignmentId == planAssignmentId);
+
+        /// <summary>
+        /// The grant desk as it appears on this child's file. Null when the reader may neither
+        /// propose, decide nor revoke a grant — the panel then stays the register it always was
+        /// rather than growing a row of disabled buttons (BR-SEC-010).
+        /// </summary>
+        public StudentDiscountDesk? DiscountDesk { get; set; }
+    }
+
+    /// <summary>
+    /// doc/Modules/22 §8.3 read student-first: "student/family position with gross/net preview per
+    /// proposed discount" is a description of this screen, and until now the only place to act on a
+    /// grant was <c>/discounts</c> — a roll of every child in the school, which a clerk sitting with
+    /// one family had to search their way back out of.
+    /// <para>
+    /// The three rights are separate because BR-DIS-003 separates them: finance staff propose,
+    /// the routed tier approves, FM+Principal revoke. A holder of one gets that one control and
+    /// nothing else.
+    /// </para>
+    /// </summary>
+    public sealed class StudentDiscountDesk
+    {
+        /// <summary>Discounts/Grants/Submit — may propose a manual grant and correct one still proposed.</summary>
+        public bool CanPropose { get; set; }
+
+        /// <summary>Discounts/Grants/Approve — may approve or reject a proposal.</summary>
+        public bool CanDecide { get; set; }
+
+        /// <summary>Discounts/Grants/Deactivate — may revoke an approved grant (BR-DIS-008).</summary>
+        public bool CanRevoke { get; set; }
+
+        /// <summary>
+        /// False when the screen is showing a year other than the working one. A grant is always
+        /// proposed into the working year (BR-DIS-007: nothing carries silently between years), so
+        /// offering the form while reading last year's file would file the grant against a year the
+        /// operator is not looking at.
+        /// </summary>
+        public bool IsWorkingYear { get; set; }
+
+        /// <summary>
+        /// The manually-grantable types. Automatic types are deliberately absent: BR-DIS-002 grants
+        /// those by an eligibility run over the whole roll, and handing one to a single child from
+        /// here would produce a grant the run does not know it made.
+        /// </summary>
+        public IReadOnlyList<DiscountType> Types { get; set; } = Array.Empty<DiscountType>();
+
+        /// <summary>True when any control at all is rendered — the panel's header shows the actions only then.</summary>
+        public bool CanAct => CanPropose || CanDecide || CanRevoke;
+
+        /// <summary>The add form is worth rendering only for someone who may propose, in the working year, with something to propose.</summary>
+        public bool CanAddNow => CanPropose && IsWorkingYear && Types.Count > 0;
     }
 
     /// <summary>
