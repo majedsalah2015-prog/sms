@@ -39,6 +39,12 @@
         <h1 class="sms-page-title">@(isRtl ? p.NameAr : p.NameEn) @if (Model.PossibleDuplicates.Count > 0) { <span class="badge fs-6 text-bg-warning">@T("possible duplicate", "تكرار محتمل")</span> }</h1></div>
     <div class="d-flex align-items-center gap-2">
         <a class="btn btn-outline-secondary" asp-action="Index"><i class="bi bi-arrow-left me-1 @(isRtl ? "sms-flip" : "")" aria-hidden="true"></i>@T("Directory", "الدليل")</a>
+        @* Print and export carry their own rights (PAR/File/Print, PAR/File/Export): the sheet
+           names every child, a mobile number and what the family owes, which is a different
+           disclosure from reading one record on screen. BR-SEC-010 — a clerk without the right
+           sees no button rather than one that answers not-found. *@
+        @if (Model.CanPrint) { <a class="btn btn-outline-secondary" asp-action="Print" asp-route-id="@p.Id"><i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")</a> }
+        @if (Model.CanExport) { <a class="btn btn-outline-secondary" asp-action="ExportCsv" asp-route-id="@p.Id"><i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>@T("Export", "تصدير")</a> }
         <partial name="_HelpModal" model="help" />
     </div>
 </div>
@@ -118,7 +124,7 @@
             <div class="form-text">@T("Consolidated read-through of Fees/Payments (posted charges − credit notes − discounts − allocations, BR-FEE-008); the pay-ready statement with installments and aging opens with the Finance screens.", "قراءة موحدة من الرسوم/المدفوعات (المرحّل − الإشعارات الدائنة − الخصومات − المخصصات، BR-FEE-008)؛ الكشف الجاهز للسداد مع الأقساط والأعمار مع شاشات المالية.")</div>
         </div>
         <div class="tab-pane fade @Show("portal")" id="tab-portal">
-            @if (Model.PortalUserName != null) { <p class="mb-1"><i class="bi bi-person-check text-success me-1" aria-hidden="true"></i>@T("Portal account:", "حساب البوابة:") <code>@Model.PortalUserName</code></p> } else { <p class="text-muted mb-1">@T("No portal account linked.", "لا حساب بوابة مرتبط.")</p> }
+            @if (Model.PortalUserName != null) { <p class="mb-1"><i class="bi bi-person-check text-success me-1" aria-hidden="true"></i>@T("Portal account:", "حساب البوابة:") <code>@Model.PortalUserName</code>@if (Model.CanOpenAccounts) { <a class="ms-2" asp-controller="Security" asp-action="Users" asp-route-q="@Model.PortalUserName">@T("Manage the account →", "إدارة الحساب ←")</a> }</p> } else { <p class="text-muted mb-1">@T("No portal account linked.", "لا حساب بوابة مرتبط.")@if (Model.CanProvisionAccount) { <a class="ms-2" asp-controller="Security" asp-action="NewUser" asp-route-accountType="Parent" asp-route-personId="@Model.Parent.Id" asp-route-personSearch="@Model.Parent.ParentFileNo">@T("Create the account →", "إنشاء الحساب ←")</a> }</p> }
             <div class="form-text">@T("Account provisioning / reset / revoke land with System Administration (Module 36). The portal shows this parent exactly the children linked here with portal visibility on (BR-SEC-011).", "إنشاء/إعادة تعيين/إلغاء الحساب مع إدارة النظام (الوحدة 36). تعرض البوابة لولي الأمر الأبناء المرتبطين هنا مع تفعيل الظهور فقط (BR-SEC-011).") <a asp-controller="Portal" asp-action="Index">@T("Open portal →", "فتح البوابة ←")</a></div>
         </div>
         <div class="tab-pane fade @Show("dups")" id="tab-dups">

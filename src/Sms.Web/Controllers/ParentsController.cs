@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sms.Application.Audit;
+using Sms.Application.Common.Interfaces;
 using Sms.Application.Parents;
 using Sms.Domain.Common;
 using Sms.Domain.Parents;
@@ -28,19 +29,21 @@ namespace Sms.Web.Controllers
     /// their module screens; custody restrictions 🔒 with Module 24/25.
     /// </summary>
     [Route("parents")]
-    public class ParentsController : Controller
+    public partial class ParentsController : Controller
     {
         private readonly IParentAdmin _parents;
         private readonly AppDbContext _db;
         private readonly IAuditContext _audit;
         private readonly IPermissionService _permissions;
+        private readonly IClock _clock;
 
-        public ParentsController(IParentAdmin parents, AppDbContext db, IAuditContext audit, IPermissionService permissions)
+        public ParentsController(IParentAdmin parents, AppDbContext db, IAuditContext audit, IPermissionService permissions, IClock clock)
         {
             _parents = parents;
             _db = db;
             _audit = audit;
             _permissions = permissions;
+            _clock = clock;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -164,6 +167,29 @@ namespace Sms.Web.Controllers
             }
 
             var portal = p.UserAccountId == null ? null : await _db.UserAccounts.AsNoTracking().Where(u => u.Id == p.UserAccountId).Select(u => u.UserName).FirstOrDefaultAsync();
+
+            // The portal tab sends the clerk on to Module 36 for the account itself, and asks here
+            // whether it may show the way (BR-SEC-010): unauthorized surface disappears rather than
+            // links to a not-found. Two different grants because they are two different screens —
+            // creating the login that a person signs in with is not the same authority as granting
+            // an existing one its role.
+            var canProvisionAccount = portal == null && await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.Users,
+                ActionVerb.Create, HttpContext.RequestAborted);
+            var canOpenAccounts = portal != null && await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.SystemAdministration, ScreenCatalog.SystemAdministration.UserRoles,
+                ActionVerb.View, HttpContext.RequestAborted);
+
+            // The page head's print and export buttons, held to the same rule as the portal tab's
+            // links (BR-SEC-010): a clerk who may read this file but not hand it out sees no button
+            // rather than a button that answers not-found.
+            var canPrint = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File,
+                ActionVerb.Print, HttpContext.RequestAborted);
+            var canExport = await _permissions.HasPermissionAsync(
+                ScreenCatalog.Modules.Parents, ScreenCatalog.Parents.File,
+                ActionVerb.Export, HttpContext.RequestAborted);
+
             var audit = await _db.AuditEntries.AsNoTracking().Where(e => e.EntityType == nameof(Parent) && e.EntityId == id).OrderByDescending(e => e.OccurredAtUtc).Take(100).ToListAsync();
             var dups = await _db.Parents.AsNoTracking().Where(x => x.Id != id && (x.PrimaryMobile == p.PrimaryMobile || x.NameEn == p.NameEn || x.NameAr == p.NameAr)).ToListAsync();
 
@@ -187,6 +213,8 @@ namespace Sms.Web.Controllers
                 Children = links.Where(l => l.EffectiveToUtc == null).Select(C).ToList(),
                 PastChildren = links.Where(l => l.EffectiveToUtc != null).Select(C).ToList(),
                 PossibleDuplicates = dups, PortalUserName = portal, IdTypes = await IdTypesAsync(),
+                CanProvisionAccount = canProvisionAccount, CanOpenAccounts = canOpenAccounts,
+                CanPrint = canPrint, CanExport = canExport,
                 EducationLevels = await LookupAsync("EducationLevel"),
                 Audit = audit.Select(a => (a.Action.ToString(), a.FieldName, a.OldValue, a.NewValue, a.OccurredAtUtc, a.ActorUserId, a.Reason)).ToList(),
             };

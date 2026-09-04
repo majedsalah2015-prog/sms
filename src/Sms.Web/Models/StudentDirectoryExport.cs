@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Text;
 
 namespace Sms.Web.Models
 {
@@ -22,33 +20,17 @@ namespace Sms.Web.Models
     public static class StudentDirectoryExport
     {
         /// <summary>
-        /// One CSV cell. Always quoted, with the quote itself doubled — a family name can carry a
-        /// comma, an address line usually does, and quoting only the cells that look dangerous
-        /// means the escaping is decided by whoever typed the name.
+        /// One CSV cell, one CSV record and the finished bytes. The rules themselves live in
+        /// <see cref="CsvFile"/>, where the parent file's export reads them too — the day the
+        /// quoting has to change, it must change for every file this product hands out.
         /// </summary>
-        public static string Cell(string? value)
-            => "\"" + (value ?? string.Empty).Replace("\"", "\"\"") + "\"";
+        public static string Cell(string? value) => CsvFile.Cell(value);
 
-        /// <summary>One CSV record, comma-separated, every cell quoted.</summary>
-        public static string Line(IEnumerable<string?> cells)
-            => string.Join(",", (cells ?? Array.Empty<string?>()).Select(Cell));
+        /// <inheritdoc cref="CsvFile.Line"/>
+        public static string Line(IEnumerable<string?> cells) => CsvFile.Line(cells);
 
-        /// <summary>
-        /// The finished file. UTF-8 with a byte-order mark, because the first thing anybody does
-        /// with this download is open it in Excel, and Excel without the mark reads every Arabic
-        /// name as mojibake — which looks like the system mangled the register rather than like a
-        /// missing three bytes.
-        /// </summary>
-        public static byte[] Bytes(IEnumerable<IEnumerable<string?>> records)
-        {
-            var text = new StringBuilder();
-            foreach (var record in records ?? Array.Empty<IEnumerable<string?>>())
-            {
-                text.Append(Line(record)).Append("\r\n");
-            }
-
-            return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(text.ToString())).ToArray();
-        }
+        /// <inheritdoc cref="CsvFile.Bytes"/>
+        public static byte[] Bytes(IEnumerable<IEnumerable<string?>> records) => CsvFile.Bytes(records);
 
         /// <summary>
         /// The column headings, in the reader's language — the file is read by the person who

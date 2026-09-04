@@ -1,0 +1,194 @@
+@using System.Globalization
+@using Sms.Domain.Parents
+@model ParentFileSheetViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var file = Model.File;
+    var p = file.Parent;
+    ViewData["Title"] = T("Parent file", "ملف ولي الأمر") + " — " + p.ParentFileNo;
+    ViewData["Breadcrumb"] = T("Parents / ", "أولياء الأمور / ") + p.ParentFileNo;
+    string SName(Sms.Domain.Students.Student s) => isRtl ? $"{s.FirstNameAr} {s.FatherNameAr} {s.FamilyNameAr}" : $"{s.FirstNameEn} {s.FatherNameEn} {s.FamilyNameEn}";
+    string Yes(bool v) => v ? T("Yes", "نعم") : "—";
+    // FirstOrDefault, not First: a lookup row retired after this parent was recorded still has to
+    // print. The soft-active filter answers the picker's question, not this one.
+    var idType = file.IdTypes.FirstOrDefault(t => t.Id == p.PrimaryIdTypeLookupId);
+    var education = file.EducationLevels.FirstOrDefault(e => e.Id == p.EducationLookupId);
+    var total = file.FamilyStatement.Sum(l => l.Position);
+    var help = new HelpPanelViewModel
+    {
+        Id = "parent-sheet-help",
+        Title = T("The parent file sheet — help", "ورقة ملف ولي الأمر — مساعدة"),
+        Intro = T("The parent file on a sheet to sign, file or hand to the family (doc/Modules/11 §8.2). It is the same record the file screen draws, read a second way — the school's name and the moment the copy was taken are printed on it, so a sheet found in a folder next year still says both.", "ملف ولي الأمر في ورقة توقَّع أو تُحفظ أو تُسلَّم للأسرة (وثيقة الوحدة 11 §8.2). وهي السجل نفسه الذي تعرضه شاشة الملف مقروءاً مرة أخرى — ويُطبع عليها اسم المدرسة ولحظة أخذ النسخة، حتى تظل ورقة تُوجد في ملف بعد عام تقول الأمرين."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Print, not PDF", "طباعة لا PDF"),
+                T("This build has no PDF engine, so the sheet is printed by the browser. Choose A4 portrait, and the application's menus are hidden from the printed page automatically.", "لا يوجد في هذه النسخة محرك PDF، فتُطبع الورقة عبر المتصفح. اختر A4 عمودياً، وتُخفى قوائم النظام من الصفحة المطبوعة تلقائياً.")),
+            new HelpPanelViewModel.Item(
+                T("The balance is the family's, not a bill", "الرصيد رصيد الأسرة لا فاتورة"),
+                T("It consolidates every current child's posted charges less credit notes, discounts and payments (BR-FEE-008). The pay-ready statement — installments, aging, due dates — is the Finance screens' document, and this sheet is not a substitute for it.", "يجمع الرسوم المرحّلة لكل ابن حالي ناقص الإشعارات الدائنة والخصومات والمدفوعات (BR-FEE-008). أما الكشف الجاهز للسداد — الأقساط والأعمار وتواريخ الاستحقاق — فهو وثيقة شاشات المالية، وهذه الورقة ليست بديلاً عنه.")),
+            new HelpPanelViewModel.Item(
+                T("Its own permission", "صلاحية مستقلة"),
+                T("Printing the file and exporting it are rights of their own, apart from reading it: the sheet names every child in the family, a mobile number and what the family owes (doc/Modules/11 §6).", "طباعة الملف وتصديره صلاحيتان مستقلتان عن قراءته، لأن الورقة تذكر كل أبناء الأسرة ورقم جوال وما على الأسرة (وثيقة الوحدة 11 §6).")),
+        },
+    };
+}
+
+<div class="sms-page-head d-print-none">
+    <div>
+        <h1 class="sms-page-title">@T("Parent file", "ملف ولي الأمر")</h1>
+        <p class="text-muted mb-0"><code>@p.ParentFileNo</code> · @(isRtl ? p.NameAr : p.NameEn)</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a class="btn btn-sm btn-outline-secondary" asp-action="File" asp-route-id="@p.Id">
+            <i class="bi bi-arrow-@(isRtl ? "right" : "left") me-1" aria-hidden="true"></i>@T("Back to the file", "عودة إلى الملف")
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print();">
+            <i class="bi bi-printer me-1" aria-hidden="true"></i>@T("Print", "طباعة")
+        </button>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<div class="sms-card">
+    <header class="text-center mb-4">
+        <h2 class="h5 mb-1">@Model.SchoolName</h2>
+        <p class="h6 mb-1">@T("Parent file", "ملف ولي الأمر")</p>
+        <p class="text-muted small mb-0">
+            <code>@p.ParentFileNo</code>
+            &middot; @T("printed", "طُبع"): <span dir="ltr">@Model.PrintedAtUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</span>
+        </p>
+    </header>
+
+    <h3 class="h6 border-bottom pb-1 mb-2">@T("Identity & contacts", "الهوية والتواصل")</h3>
+    <dl class="row mb-4 small">
+        <dt class="col-sm-3">@T("Name (Arabic)", "الاسم (عربي)")</dt><dd class="col-sm-3" dir="rtl">@p.NameAr</dd>
+        <dt class="col-sm-3">@T("Name (English)", "الاسم (إنجليزي)")</dt><dd class="col-sm-3" dir="ltr">@p.NameEn</dd>
+
+        <dt class="col-sm-3">@T("Primary mobile", "الجوال الأساسي")</dt><dd class="col-sm-3" dir="ltr">@p.PrimaryMobile</dd>
+        <dt class="col-sm-3">@T("Email", "البريد")</dt><dd class="col-sm-3" dir="ltr">@(string.IsNullOrWhiteSpace(p.Email) ? "—" : p.Email)</dd>
+
+        <dt class="col-sm-3">@T("ID type", "نوع الهوية")</dt><dd class="col-sm-3">@(idType == default ? "—" : (isRtl ? idType.Ar : idType.En))</dd>
+        <dt class="col-sm-3">@T("ID number", "رقم الهوية")</dt><dd class="col-sm-3" dir="ltr">@(string.IsNullOrWhiteSpace(p.PrimaryIdNo) ? "—" : p.PrimaryIdNo)</dd>
+
+        <dt class="col-sm-3">@T("Residence", "السكن")</dt><dd class="col-sm-3">@(file.ResidencePath ?? "—")</dd>
+        <dt class="col-sm-3">@T("Address", "العنوان")</dt><dd class="col-sm-3">@(string.IsNullOrWhiteSpace(p.Address) ? "—" : p.Address)</dd>
+
+        <dt class="col-sm-3">@T("Occupation / employer", "المهنة / جهة العمل")</dt><dd class="col-sm-3">@(string.IsNullOrWhiteSpace(p.OccupationEmployer) ? "—" : p.OccupationEmployer)</dd>
+        <dt class="col-sm-3">@T("Education", "المؤهل")</dt><dd class="col-sm-3">@(education == default ? "—" : (isRtl ? education.Ar : education.En))</dd>
+
+        <dt class="col-sm-3">@T("Status", "الحالة")</dt><dd class="col-sm-3">@SocialProfileLabels.ParentStatus(p.LifeStatus, isRtl)@(string.IsNullOrWhiteSpace(p.LifeStatusNote) ? "" : " — " + p.LifeStatusNote)</dd>
+        <dt class="col-sm-3">@T("Preferred language", "اللغة المفضلة")</dt><dd class="col-sm-3">@(p.PreferredLanguage == "ar" ? "العربية" : "English")</dd>
+
+        <dt class="col-sm-3">@T("Portal account", "حساب البوابة")</dt>
+        <dd class="col-sm-9">@(file.PortalUserName == null ? T("none", "لا يوجد") : file.PortalUserName)</dd>
+    </dl>
+
+    <h3 class="h6 border-bottom pb-1 mb-2">@T("Children", "الأبناء")</h3>
+    <table class="table table-sm sms-table mb-4">
+        <caption class="visually-hidden">@T("The children linked to this parent, with grade, relationship and link flags", "الأبناء المرتبطون بولي الأمر مع الصف والقرابة وأعلام الربط")</caption>
+        <thead>
+            <tr>
+                <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                <th scope="col">@T("Student", "الطالب")</th>
+                <th scope="col">@T("Grade", "الصف")</th>
+                <th scope="col">@T("Relationship", "القرابة")</th>
+                <th scope="col">@T("Primary", "أساسي")</th>
+                <th scope="col">@T("Financial", "مالي")</th>
+                <th scope="col">@T("Pickup", "استلام")</th>
+                <th scope="col">@T("Portal", "بوابة")</th>
+                <th scope="col">@T("Since", "منذ")</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in file.Children)
+            {
+                <tr>
+                    <td class="text-nowrap"><code>@c.Student.StudentNo</code></td>
+                    <td>@SName(c.Student)</td>
+                    <td>@(c.GradeName ?? "—")</td>
+                    <td>@c.Relationship</td>
+                    <td>@Yes(c.Link.IsPrimaryContact)</td>
+                    <td>@Yes(c.Link.IsFinanciallyResponsible)</td>
+                    <td>@Yes(c.Link.IsPickupAuthorized)</td>
+                    <td>@Yes(c.Link.IsPortalVisible)</td>
+                    <td dir="ltr" class="text-nowrap">@c.Link.EffectiveFromUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                </tr>
+            }
+            @if (file.Children.Count == 0)
+            {
+                <tr><td colspan="9" class="text-center text-muted py-3">@T("No linked children.", "لا أبناء مرتبطون.")</td></tr>
+            }
+        </tbody>
+    </table>
+
+    @if (file.PastChildren.Count > 0)
+    {
+        <h3 class="h6 border-bottom pb-1 mb-2">@T("Past links", "روابط سابقة")</h3>
+        <table class="table table-sm sms-table mb-4">
+            <caption class="visually-hidden">@T("Links that have ended, with the period they covered", "الروابط المنتهية مع الفترة التي غطّتها")</caption>
+            <thead>
+                <tr>
+                    <th scope="col">@T("Student no.", "رقم الطالب")</th>
+                    <th scope="col">@T("Student", "الطالب")</th>
+                    <th scope="col">@T("Relationship", "القرابة")</th>
+                    <th scope="col">@T("From", "من")</th>
+                    <th scope="col">@T("Until", "حتى")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var c in file.PastChildren)
+                {
+                    <tr>
+                        <td class="text-nowrap"><code>@c.Student.StudentNo</code></td>
+                        <td>@SName(c.Student)</td>
+                        <td>@c.Relationship</td>
+                        <td dir="ltr" class="text-nowrap">@c.Link.EffectiveFromUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</td>
+                        <td dir="ltr" class="text-nowrap">@(c.Link.EffectiveToUtc?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h3 class="h6 border-bottom pb-1 mb-2">@T("Family statement", "كشف الأسرة")</h3>
+    <table class="table table-sm sms-table mb-2">
+        <caption class="visually-hidden">@T("Each current child's posted charges less credit notes, discounts and payments", "الرسوم المرحّلة لكل ابن حالي ناقص الإشعارات الدائنة والخصومات والمدفوعات")</caption>
+        <thead>
+            <tr>
+                <th scope="col">@T("Student", "الطالب")</th>
+                <th scope="col" class="text-end">@T("Posted", "مرحّل")</th>
+                <th scope="col" class="text-end">@T("Credit notes", "إشعارات دائنة")</th>
+                <th scope="col" class="text-end">@T("Discounts", "خصومات")</th>
+                <th scope="col" class="text-end">@T("Paid", "مدفوع")</th>
+                <th scope="col" class="text-end">@T("Balance", "الرصيد")</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var l in file.FamilyStatement)
+            {
+                <tr>
+                    <td>@SName(l.Student) <span class="small text-muted">(@l.ChargeCount @T("invoices", "فاتورة"))</span></td>
+                    <td class="text-end" dir="ltr">@l.Gross.ToString("N2")</td>
+                    <td class="text-end" dir="ltr">@l.CreditNotes.ToString("N2")</td>
+                    <td class="text-end" dir="ltr">@l.Discounts.ToString("N2")</td>
+                    <td class="text-end" dir="ltr">@l.Paid.ToString("N2")</td>
+                    <td class="text-end fw-semibold" dir="ltr">@l.Position.ToString("N2")</td>
+                </tr>
+            }
+            @if (file.FamilyStatement.Count == 0)
+            {
+                <tr><td colspan="6" class="text-center text-muted py-3">@T("No linked children.", "لا أبناء مرتبطون.")</td></tr>
+            }
+        </tbody>
+        <tfoot>
+            <tr>
+                <th colspan="5">@T("Family balance due", "رصيد الأسرة المستحق")</th>
+                <th class="text-end" dir="ltr">@total.ToString("N2")</th>
+            </tr>
+        </tfoot>
+    </table>
+
+    <p class="text-muted small mb-0">@T("Posted charges − credit notes − discounts − allocations (BR-FEE-008). The pay-ready statement with installments and aging is a Finance document.", "الرسوم المرحّلة − الإشعارات الدائنة − الخصومات − المخصصات (BR-FEE-008). أما الكشف الجاهز للسداد مع الأقساط والأعمار فهو وثيقة مالية.")</p>
+</div>

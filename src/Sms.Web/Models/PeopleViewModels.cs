@@ -412,6 +412,34 @@ namespace Sms.Web.Models
 
         public string? PortalUserName { get; set; }
 
+        /// <summary>
+        /// BR-SEC-010 on the portal tab's way into Module 36. The tab names System Administration
+        /// as the place a parent's login is made, and the two flags decide whether it also offers
+        /// the way there: an unauthorized clerk reads the sentence and is handed no link, rather
+        /// than a link that answers not-found.
+        /// <para>True only when this parent has no account yet — the provisioning picker offers
+        /// people who have none, so for anybody else the link would lead to an empty list.</para>
+        /// </summary>
+        public bool CanProvisionAccount { get; set; }
+
+        /// <summary>
+        /// As above for the account this parent already holds: the accounts directory
+        /// (<c>SYS/UserRoles</c>), where the role is granted and the password is reset. An account
+        /// with no role reaches nothing, so this is the link that finishes the job.
+        /// </summary>
+        public bool CanOpenAccounts { get; set; }
+
+        /// <summary>
+        /// BR-SEC-010 again, on the two buttons in the page head. Printing the file and exporting
+        /// it are rights of their own rather than a consequence of reading it: the sheet names
+        /// every child in the family, a mobile number and what the family owes, which is a
+        /// different disclosure from one clerk reading one record on screen (doc/Modules/11 §6).
+        /// </summary>
+        public bool CanPrint { get; set; }
+
+        /// <inheritdoc cref="CanPrint"/>
+        public bool CanExport { get; set; }
+
         public string ActiveTab { get; set; } = "identity";
 
         public IReadOnlyList<FamilyStatementLine> FamilyStatement { get; set; } = Array.Empty<FamilyStatementLine>();
@@ -502,6 +530,33 @@ namespace Sms.Web.Models
 {
     /// <summary>doc/Modules/11 §8.2 "Family statement": consolidated finance read-through per child (posted charges only, BR-SEC-012-style scoping; discounts shown separately per BR-DIS-010).</summary>
     public sealed record FamilyStatementLine(Sms.Domain.Students.Student Student, decimal Gross, decimal CreditNotes, decimal Discounts, decimal Paid, decimal Position, int ChargeCount);
+}
+
+namespace Sms.Web.Models
+{
+    /// <summary>
+    /// The parent file as a sheet somebody signs, files or hands to a family (doc/Modules/11 §8.2).
+    /// <para>
+    /// It wraps the file's own view model rather than restating it, so the paper and the screen can
+    /// never come to disagree about what this family is: the sheet is the same query, read a second
+    /// way. What it adds is what paper needs and a screen does not — whose school this is, and when
+    /// the copy was taken, so a sheet found in a folder next year still says both.
+    /// </para>
+    /// <para>
+    /// <b>Not a PDF.</b> This build has no PDF engine (a pending owner decision, docs/Status), so
+    /// the sheet is the browser's own print of an HTML page, as every other printable document here
+    /// is.
+    /// </para>
+    /// </summary>
+    public sealed class ParentFileSheetViewModel
+    {
+        public ParentFileViewModel File { get; set; } = null!;
+
+        /// <summary>The school in the reader's language; empty when the row cannot be read.</summary>
+        public string SchoolName { get; set; } = string.Empty;
+
+        public System.DateTime PrintedAtUtc { get; set; }
+    }
 }
 
 namespace Sms.Web.Models
