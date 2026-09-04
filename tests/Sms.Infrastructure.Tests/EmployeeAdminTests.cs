@@ -382,6 +382,114 @@ namespace Sms.Infrastructure.Tests
             Assert.Null(db.EmployeeAssignments.Single(a => a.Id == second.Id).EffectiveToUtc);
         }
 
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Correcting_an_assignment_rewrites_the_row_rather_than_adding_one()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var assignment = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+
+            await admin.UpdateAssignmentAsync(assignment.Id, _orgUnitId, positionLookupId: 2, managerEmployeeId: null, new DateTime(2025, 9, 1), null);
+
+            var rows = db.EmployeeAssignments.Where(a => a.EmployeeId == employee.Id).ToList();
+            Assert.Single(rows);
+            Assert.Equal(2, rows[0].PositionLookupId);
+            Assert.Equal(new DateTime(2025, 9, 1), rows[0].EffectiveFromUtc);
+            Assert.Null(rows[0].EffectiveToUtc);
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Re_opening_a_closed_assignment_is_refused_while_another_is_current()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var first = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+            await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 2, managerEmployeeId: null, new DateTime(2026, 6, 1));
+
+            // Clearing the closed row's end date would leave two open rows, and the org chart counts
+            // heads by exactly that column — the employee would appear twice in their own tree.
+            await Assert.ThrowsAsync<DuplicateCurrentAssignmentException>(() =>
+                admin.UpdateAssignmentAsync(first.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1), null));
+
+            Assert.Single(db.EmployeeAssignments.Where(a => a.EmployeeId == employee.Id && a.EffectiveToUtc == null).ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Re_saving_the_current_assignment_open_is_not_taken_for_a_second_one()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var assignment = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+
+            // The ordinary correction: the current row, still current afterwards. A guard written
+            // against every open row rather than the other ones would refuse this.
+            await admin.UpdateAssignmentAsync(assignment.Id, _orgUnitId, positionLookupId: 3, managerEmployeeId: null, new DateTime(2026, 1, 1), null);
+
+            Assert.Equal(3, db.EmployeeAssignments.Single(a => a.Id == assignment.Id).PositionLookupId);
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task An_assignment_ending_before_it_starts_is_refused()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var assignment = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+
+            await Assert.ThrowsAsync<AssignmentPeriodReversedException>(() =>
+                admin.UpdateAssignmentAsync(assignment.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 6, 1), new DateTime(2026, 3, 1)));
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Deleting_an_assignment_takes_the_row_off_the_file()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var first = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+            var second = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 2, managerEmployeeId: null, new DateTime(2026, 6, 1));
+
+            await admin.DeleteAssignmentAsync(first.Id);
+
+            Assert.Equal(new[] { second.Id }, db.EmployeeAssignments.Where(a => a.EmployeeId == employee.Id).Select(a => a.Id).ToArray());
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Deleting_the_only_assignment_leaves_the_employee_without_a_position()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+            var employee = await Register(admin);
+            var assignment = await admin.AssignPositionAsync(employee.Id, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1));
+
+            // Allowed on purpose: a file with one row and it is wrong has no other way out, and the
+            // Position tab already says out loud that the employee has no position.
+            await admin.DeleteAssignmentAsync(assignment.Id);
+
+            Assert.Empty(db.EmployeeAssignments.Where(a => a.EmployeeId == employee.Id).ToList());
+        }
+
+        [Fact]
+        [BusinessRule("BR-EMP-002")]
+        public async Task Correcting_or_deleting_an_assignment_that_is_gone_is_refused_by_name()
+        {
+            using var db = CreateContext();
+            var admin = new EmployeeAdmin(db, new NumberIssuer(db, _tenant, _tenant, _clock));
+
+            await Assert.ThrowsAsync<EmployeeAssignmentNotFoundException>(() => admin.DeleteAssignmentAsync(4242));
+            await Assert.ThrowsAsync<EmployeeAssignmentNotFoundException>(() =>
+                admin.UpdateAssignmentAsync(4242, _orgUnitId, positionLookupId: 1, managerEmployeeId: null, new DateTime(2026, 1, 1), null));
+        }
+
         // --- BR-EMP-003 contracts ------------------------------------------------
 
         [Fact]

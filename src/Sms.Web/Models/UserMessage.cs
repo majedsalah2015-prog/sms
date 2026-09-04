@@ -337,6 +337,18 @@ namespace Sms.Web.Models
                 ? "الوحدة التنظيمية ما زالت مرتبطة بغيرها — انقل الوحدات التابعة لها وأعد إسناد من شغلوا مناصب فيها أولاً، فسجل المناصب لا يُحذف معها (BR-EMP-002)."
                 : "The org unit is still referenced — move its child units and reassign anyone who has held a position in it first; the position history is not deleted along with it (BR-EMP-002).",
 
+            EmployeeAssignmentNotFoundException => arabic
+                ? "لم يعد هذا الإسناد على الملف — يُرجَّح أنه حُذف من نافذة أخرى. أعِد تحميل الصفحة لترى ما بقي من سجل المناصب."
+                : "That assignment is no longer on the file — most likely it was removed from another window. Reload the page to see what remains of the position history.",
+
+            DuplicateCurrentAssignmentException => arabic
+                ? "للموظف منصب حالي بالفعل، ولا يشغل الموظف إلا منصباً أساسياً واحداً — اترك تاريخ الانتهاء على هذا الصف، أو أغلق الصف الحالي أولاً (BR-EMP-002)."
+                : "The employee already holds a current position, and an employee holds only one primary position — leave the end date on this row, or close the current row first (BR-EMP-002).",
+
+            AssignmentPeriodReversedException => arabic
+                ? "تاريخ انتهاء الإسناد يسبق تاريخ بدايته — صحّح أحد التاريخين (BR-EMP-002)."
+                : "The assignment ends before it starts — correct one of the two dates (BR-EMP-002).",
+
             QualificationNotFoundException => arabic
                 ? "لم يعد هذا المؤهل على الملف — يُرجَّح أنه حُذف من نافذة أخرى. أعِد تحميل الصفحة لترى ما بقي منها."
                 : "That qualification is no longer on the file — most likely it was removed from another window. Reload the page to see what remains.",

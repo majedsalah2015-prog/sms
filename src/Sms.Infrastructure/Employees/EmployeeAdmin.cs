@@ -102,6 +102,62 @@ namespace Sms.Infrastructure.Employees
             return assignment;
         }
 
+        public async Task<EmployeeAssignment> UpdateAssignmentAsync(
+            int assignmentId, int orgUnitId, int positionLookupId, int? managerEmployeeId,
+            DateTime effectiveFromUtc, DateTime? effectiveToUtc, CancellationToken cancellationToken = default)
+        {
+            // SingleOrDefault, not Single: the tenant filter is what makes another school's
+            // assignment invisible here, and it should read as "no such row" rather than throw the
+            // bare InvalidOperationException the screen would word as some other refusal.
+            var assignment = await _db.EmployeeAssignments
+                .SingleOrDefaultAsync(a => a.Id == assignmentId, cancellationToken);
+            if (assignment == null)
+            {
+                throw new EmployeeAssignmentNotFoundException(assignmentId);
+            }
+
+            if (effectiveToUtc != null && effectiveToUtc.Value < effectiveFromUtc)
+            {
+                throw new AssignmentPeriodReversedException(effectiveFromUtc, effectiveToUtc.Value);
+            }
+
+            // BR-EMP-002 — one primary position. Checked only when this correction leaves the row
+            // open, and only against the *other* rows: re-saving the current assignment with its end
+            // date still empty is the ordinary case and must not refuse itself.
+            if (effectiveToUtc == null)
+            {
+                var anotherIsOpen = await _db.EmployeeAssignments.AnyAsync(
+                    a => a.EmployeeId == assignment.EmployeeId && a.Id != assignmentId && a.EffectiveToUtc == null,
+                    cancellationToken);
+                if (anotherIsOpen)
+                {
+                    throw new DuplicateCurrentAssignmentException(assignment.EmployeeId);
+                }
+            }
+
+            assignment.OrgUnitId = orgUnitId;
+            assignment.PositionLookupId = positionLookupId;
+            assignment.ManagerEmployeeId = managerEmployeeId;
+            assignment.EffectiveFromUtc = effectiveFromUtc;
+            assignment.EffectiveToUtc = effectiveToUtc;
+
+            await _db.SaveChangesAsync(cancellationToken);
+            return assignment;
+        }
+
+        public async Task DeleteAssignmentAsync(int assignmentId, CancellationToken cancellationToken = default)
+        {
+            var assignment = await _db.EmployeeAssignments
+                .SingleOrDefaultAsync(a => a.Id == assignmentId, cancellationToken);
+            if (assignment == null)
+            {
+                throw new EmployeeAssignmentNotFoundException(assignmentId);
+            }
+
+            _db.EmployeeAssignments.Remove(assignment);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
         public async Task<Contract> DefineContractAsync(
             int employeeId, ContractType type, DateTime startDate, DateTime endDate, decimal salaryBasic,
             decimal? salaryAllowances = null, CancellationToken cancellationToken = default)

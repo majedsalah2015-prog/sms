@@ -442,6 +442,72 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(File), new { id, tab = "position" });
         }
 
+        /// <summary>
+        /// Corrects a row already in the position history. <see cref="AssignPosition"/> is the
+        /// promotion — it closes one row and opens another, keeping both. This is the mis-entry: a
+        /// unit picked one line off, a start date typed a year out, a reporting line that was never
+        /// that person. Reassigning to fix one of those writes a second false row instead of
+        /// removing the first, which is why the history needed an edit of its own.
+        /// </summary>
+        [HttpPost("{id:int}/position/{assignmentId:int}/edit")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Edit)]
+        public async Task<IActionResult> EditAssignment(int id, int assignmentId, int? orgUnitId, int? positionLookupId, int? managerEmployeeId, DateTime? effectiveFrom, DateTime? effectiveTo)
+        {
+            // The route's employee owns the row, or there is no row — as in EditQualification:
+            // without the check, one file's edit permission would rewrite any assignment in the
+            // school by guessing an id.
+            if (!await _db.EmployeeAssignments.AnyAsync(a => a.Id == assignmentId && a.EmployeeId == id, HttpContext.RequestAborted)) { return NotFound(); }
+
+            try
+            {
+                if (orgUnitId == null || positionLookupId == null) throw new InvalidOperationException(T("Org unit and position are required (BR-EMP-002).", "الوحدة التنظيمية والمسمى الوظيفي مطلوبان (BR-EMP-002)."));
+                if (effectiveFrom == null) throw new InvalidOperationException(T("The effective-from date is required (BR-EMP-002).", "تاريخ بداية السريان مطلوب (BR-EMP-002)."));
+                if (managerEmployeeId == id) throw new InvalidOperationException(T("An employee cannot report to themselves.", "لا يمكن أن يكون الموظف مديراً لنفسه."));
+                await _employees.UpdateAssignmentAsync(
+                    assignmentId, orgUnitId.Value, positionLookupId.Value, managerEmployeeId,
+                    DateTime.SpecifyKind(effectiveFrom.Value, DateTimeKind.Utc),
+                    effectiveTo == null ? null : DateTime.SpecifyKind(effectiveTo.Value, DateTimeKind.Utc),
+                    HttpContext.RequestAborted);
+                TempData["Flash"] = T("Position history corrected.", "صُحّح سجل المناصب.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(File), new { id, tab = "position" });
+        }
+
+        /// <summary>
+        /// Takes a row off the position history — entered against the wrong person, or a duplicate
+        /// of the one beside it. Same ground BR-GLB-005 leaves open as
+        /// <see cref="DeleteQualification"/>: nothing in the model holds an assignment id.
+        /// <para>
+        /// <see cref="ActionVerb.Deactivate"/> rather than <c>Edit</c> — ScreenCatalog's header has
+        /// Deactivate covering delete/void/cancel, and it is already catalogued on this screen, so
+        /// no new permission and no seeder re-run. A role that may correct a file still does not
+        /// automatically get to empty its history.
+        /// </para>
+        /// </summary>
+        [HttpPost("{id:int}/position/{assignmentId:int}/delete")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.File, ActionVerb.Deactivate)]
+        public async Task<IActionResult> DeleteAssignment(int id, int assignmentId)
+        {
+            // The two ways of failing are split, as in DeleteQualification: a row belonging to
+            // someone else is a guessed id and gets NotFound, while a row that is simply gone is a
+            // stale page or a second click, and its reader deserves the sentence telling them to
+            // reload rather than an error page.
+            var owner = await _db.EmployeeAssignments.Where(a => a.Id == assignmentId)
+                .Select(a => (int?)a.EmployeeId).SingleOrDefaultAsync(HttpContext.RequestAborted);
+            if (owner != null && owner != id) { return NotFound(); }
+
+            try
+            {
+                await _employees.DeleteAssignmentAsync(assignmentId, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Position history row deleted.", "حُذف صف من سجل المناصب.");
+            }
+            catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic); }
+            return RedirectToAction(nameof(File), new { id, tab = "position" });
+        }
+
         [HttpPost("{id:int}/contracts")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Employees, ScreenCatalog.Employees.Contracts, ActionVerb.Create)]

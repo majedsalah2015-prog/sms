@@ -220,6 +220,25 @@ namespace Sms.Web.Api
                           "الوحدة ما زال عليها موظفون أو وحدات فرعية."));
                     return true;
 
+                case EmployeeAssignmentNotFoundException:
+                    status = StatusCodes.Status404NotFound;
+                    error = new ApiError("employee_assignment_not_found",
+                        T("That assignment is not on this file.", "هذا الإسناد ليس على هذا الملف."));
+                    return true;
+
+                case DuplicateCurrentAssignmentException:
+                    status = StatusCodes.Status409Conflict;
+                    error = new ApiError("duplicate_current_assignment",
+                        T("The employee already holds a current position.",
+                          "للموظف منصب حالي بالفعل."));
+                    return true;
+
+                case AssignmentPeriodReversedException:
+                    status = StatusCodes.Status400BadRequest;
+                    error = new ApiError("assignment_period_reversed",
+                        T("The assignment ends before it starts.", "الإسناد ينتهي قبل أن يبدأ."));
+                    return true;
+
                 case QualificationNotFoundException:
                     status = StatusCodes.Status404NotFound;
                     error = new ApiError("qualification_not_found",

@@ -24,6 +24,50 @@ namespace Sms.Application.Employees
             int employeeId, int orgUnitId, int positionLookupId, int? managerEmployeeId, DateTime effectiveFromUtc,
             CancellationToken cancellationToken = default);
 
+        /// <summary>
+        /// Corrects an assignment already on the file, in place (T2 — field-level audit, no reason
+        /// required). <see cref="AssignPositionAsync"/> is the promotion: it closes one row and opens
+        /// another, because a position held is a fact about a period and history is kept. This is the
+        /// other case — the row was entered wrong. A unit picked one line off in the dropdown, a
+        /// start date typed 2026 for 2025, a reporting line that was never that person: none of those
+        /// are a period the employee lived through, and reassigning to fix one writes a second false
+        /// row rather than removing the first.
+        /// <para>
+        /// Refuses with <see cref="Common.Exceptions.DuplicateCurrentAssignmentException"/> when
+        /// clearing the end date would leave the employee two open rows (BR-EMP-002: one primary
+        /// position), and <see cref="Common.Exceptions.AssignmentPeriodReversedException"/> when the
+        /// period ends before it starts.
+        /// </para>
+        /// </summary>
+        Task<EmployeeAssignment> UpdateAssignmentAsync(
+            int assignmentId, int orgUnitId, int positionLookupId, int? managerEmployeeId,
+            DateTime effectiveFromUtc, DateTime? effectiveToUtc, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Takes an assignment off the file entirely — the row that should never have been there:
+        /// entered against the wrong person, or a duplicate of the one beside it.
+        /// <see cref="UpdateAssignmentAsync"/> rewrites every field except the employee, so without
+        /// this the only way off a file was a row edited into something it never was.
+        /// <para>
+        /// A real delete, and BR-GLB-005 permits it on the same ground as
+        /// <see cref="DeleteQualificationAsync"/>: that rule protects master data <em>a transaction
+        /// references</em>, and no entity in this model holds an assignment id. The row is not
+        /// <c>IActivatable</c>, so the hard-delete guard in <c>SmsDbContext</c> allows it.
+        /// </para>
+        /// <para>
+        /// Deleting the open row leaves the employee with no current position, which the file already
+        /// says out loud (BR-EMP-002) rather than hides — that is a state a register can be in
+        /// mid-correction, and refusing it would trap whoever is fixing a file that has one row and
+        /// it is wrong.
+        /// </para>
+        /// <para>
+        /// Known gap, shared with every delete path here: <c>AuditCaptor</c> collects <c>Added</c> and
+        /// <c>Modified</c> only, so the removal leaves no audit entry. Closing it is an audit-wide
+        /// change and not this one's to make.
+        /// </para>
+        /// </summary>
+        Task DeleteAssignmentAsync(int assignmentId, CancellationToken cancellationToken = default);
+
         /// <summary>Throws <see cref="Common.Exceptions.OverlappingContractException"/> (BR-EMP-003).</summary>
         Task<Contract> DefineContractAsync(
             int employeeId, ContractType type, DateTime startDate, DateTime endDate, decimal salaryBasic,

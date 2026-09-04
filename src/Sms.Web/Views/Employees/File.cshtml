@@ -27,6 +27,7 @@
         Items = new[]
         {
             new HelpPanelViewModel.Item(T("Positions are dated, not replaced", "المناصب مؤرَّخة لا مستبدَلة"), T("A promotion adds an assignment and closes the previous one; it does not overwrite it (BR-EMP-002). The row with no end date is the current one. That is what lets a certificate reissued for last year name the position that was actually held then.", "الترقية تضيف إسناداً وتغلق السابق؛ ولا تكتب فوقه (BR-EMP-002). والصف بلا تاريخ انتهاء هو الحالي. وهذا ما يتيح لشهادة يُعاد إصدارها عن العام الماضي أن تسمّي المنصب الذي كان مشغولاً فعلاً حينها.")),
+            new HelpPanelViewModel.Item(T("Correcting ✎ is not reassigning", "التصحيح ✎ ليس إعادة إسناد"), T("Assign records a real move and keeps both rows. ✎ rewrites a row that was entered wrong — a unit picked one line off, a year typed 2026 for 2025 — and 🗑 takes off a row that should never have been there at all. Only one row may be left with an empty end date, because an employee holds one current position (BR-EMP-002).", "الإسناد يسجّل نقلاً فعلياً ويحفظ الصفين. أما ✎ فيعيد كتابة صف أُدخل خطأً — وحدة اختيرت في السطر التالي، أو سنة كُتبت 2026 بدل 2025 — و🗑 يرفع صفاً ما كان ينبغي أن يوجد أصلاً. ولا يبقى إلا صف واحد بتاريخ انتهاء فارغ، لأن الموظف يشغل منصباً حالياً واحداً (BR-EMP-002).")),
             new HelpPanelViewModel.Item(T("The contracts tab is restricted", "لسان العقود مقيَّد"), T("Salary and contract terms are a restricted category with their own permission (BR-GLB-072). The padlock is not decoration — without the grant the tab's contents are not sent to the browser at all.", "الراتب وشروط العقد فئة مقيَّدة لها صلاحيتها (BR-GLB-072). والقفل ليس زينة — فبدون المنح لا تُرسل محتويات اللسان إلى المتصفح أصلاً.")),
             new HelpPanelViewModel.Item(T("Teaching is a profile on top of the employee", "التدريس ملف فوق الموظف"), T("The teaching tab appears once the person has a teacher profile. Subject qualifications there are what the timetable checks before it will let someone be assigned a class (BR-TCH-001, BR-SUB-006) — an unqualified assignment is refused there, not here.", "يظهر لسان التدريس متى صار للشخص ملف معلم. ومؤهلات المواد فيه هي ما يفحصه الجدول قبل أن يسمح بإسناد حصة لأحد (BR-TCH-001، BR-SUB-006) — فالإسناد غير المؤهَّل يُرفض هناك لا هنا.")),
             new HelpPanelViewModel.Item(T("Ending service does not remove the person", "إنهاء الخدمة لا يزيل الشخص"), T("Status moves them out of the active directory and leaves everything they did in place — a rehire picks their old record back up intact. Ending service is never a delete; the delete on the qualifications tab is a correction to that one row, not to the person.", "الحالة تُخرجه من الدليل النشط وتترك كل ما فعله في مكانه — فالعائد يستأنف سجله القديم سليماً. وإنهاء الخدمة ليس حذفاً أبداً؛ أما الحذف في لسان المؤهلات فتصحيح لذلك السطر وحده لا للشخص.")),
@@ -155,9 +156,48 @@
         </div>
 
         <div class="tab-pane fade @Show("position")" id="tab-position">
-            <table class="table table-sm sms-table mb-3"><caption class="visually-hidden">@T("Position history", "سجل المناصب")</caption><thead><tr><th scope="col">@T("Org unit", "الوحدة")</th><th scope="col">@T("Position", "المسمى")</th><th scope="col">@T("Reports to", "يرفع إلى")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th></tr></thead>
-                <tbody>@foreach (var a in Model.Assignments) { <tr class="@(a.Assignment.EffectiveToUtc == null ? "fw-semibold" : "text-muted")"><td>@(a.OrgUnit == null ? "?" : (isRtl ? a.OrgUnit.NameAr : a.OrgUnit.NameEn))</td><td>@(a.Position ?? "?")</td><td>@(a.Manager == null ? "—" : $"{a.Manager.EmployeeNo} · {(isRtl ? $"{a.Manager.FirstNameAr} {a.Manager.FamilyNameAr}" : $"{a.Manager.FirstNameEn} {a.Manager.FamilyNameEn}")}")</td><td>@a.Assignment.EffectiveFromUtc.ToString("yyyy-MM-dd")</td><td>@(a.Assignment.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? T("current", "حالي"))</td></tr> }
-                @if (Model.Assignments.Count == 0) { <tr><td colspan="5" class="text-center text-warning-emphasis py-3">@T("No position yet — every employee needs a position + org unit (BR-EMP-002).", "لا منصب بعد — كل موظف يحتاج منصباً ووحدة (BR-EMP-002).")</td></tr> }</tbody></table>
+            <table class="table table-sm sms-table mb-3 align-middle"><caption class="visually-hidden">@T("Position history", "سجل المناصب")</caption><thead><tr><th scope="col">@T("Org unit", "الوحدة")</th><th scope="col">@T("Position", "المسمى")</th><th scope="col">@T("Reports to", "يرفع إلى")</th><th scope="col">@T("From", "من")</th><th scope="col">@T("To", "إلى")</th><th scope="col"></th></tr></thead>
+                <tbody>
+                @foreach (var a in Model.Assignments)
+                {
+                    var asg = a.Assignment;
+                    <tr class="@(asg.EffectiveToUtc == null ? "fw-semibold" : "text-muted")">
+                        <td>@(a.OrgUnit == null ? "?" : (isRtl ? a.OrgUnit.NameAr : a.OrgUnit.NameEn))</td>
+                        <td>@(a.Position ?? "?")</td>
+                        <td>@(a.Manager == null ? "—" : $"{a.Manager.EmployeeNo} · {(isRtl ? $"{a.Manager.FirstNameAr} {a.Manager.FamilyNameAr}" : $"{a.Manager.FirstNameEn} {a.Manager.FamilyNameEn}")}")</td>
+                        <td>@asg.EffectiveFromUtc.ToString("yyyy-MM-dd")</td>
+                        <td>@(asg.EffectiveToUtc?.ToString("yyyy-MM-dd") ?? T("current", "حالي"))</td>
+                        @*
+                            The start date names the row in the confirmation, not the unit: this file's
+                            confirm() dialogs interpolate digits only, because a unit name reaching the
+                            JS string literal through an HTML attribute brings its apostrophes with it
+                            and would end the string early. A date is digits, and it is also what tells
+                            two spells in the same unit apart.
+                        *@
+                        <td class="text-end text-nowrap"><div class="d-inline-flex gap-1">
+                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#pedit@(asg.Id)" aria-expanded="false" aria-controls="pedit@(asg.Id)" title="@T("Edit", "تعديل")" aria-label="@T($"Edit the assignment starting {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}", $"تعديل الإسناد الذي يبدأ في {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}")"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                            <form method="post" asp-action="DeleteAssignment" asp-route-id="@e.Id" asp-route-assignmentId="@asg.Id" class="d-inline" onsubmit="return confirm('@T($"Delete the assignment starting {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}? This cannot be undone.", $"حذف الإسناد الذي يبدأ في {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}؟ لا يمكن التراجع عن هذا الإجراء.")');">
+                                <button class="btn btn-sm btn-outline-danger" type="submit" title="@T("Delete", "حذف")" aria-label="@T($"Delete the assignment starting {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}", $"حذف الإسناد الذي يبدأ في {asg.EffectiveFromUtc.ToString("yyyy-MM-dd")}")"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                            </form>
+                        </div></td>
+                    </tr>
+                    @* The edit sits in its own full-width row: Bootstrap's collapse animates a block, and a table row is not one. *@
+                    <tr><td colspan="6" class="p-0 border-0">
+                        <div class="collapse" id="pedit@(asg.Id)"><div class="border rounded p-3 mb-2 bg-body-tertiary">
+                            <form method="post" asp-action="EditAssignment" asp-route-id="@e.Id" asp-route-assignmentId="@asg.Id" class="row g-2 align-items-end">
+                                <div class="col-md-3"><label class="form-label small mb-0" for="pe-org-@asg.Id">@T("Org unit", "الوحدة")</label><select name="orgUnitId" id="pe-org-@asg.Id" class="form-select form-select-sm"><option value="">—</option>@foreach (var u in Model.OrgUnits) { <option value="@u.Id" selected="@(u.Id == asg.OrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
+                                <div class="col-md-3"><label class="form-label small mb-0" for="pe-title-@asg.Id">@T("Job title", "المسمى")</label><select name="positionLookupId" id="pe-title-@asg.Id" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Positions) { <option value="@p.Id" selected="@(p.Id == asg.PositionLookupId)">@(isRtl ? p.Ar : p.En)</option> }</select></div>
+                                <div class="col-md-3"><label class="form-label small mb-0" for="pe-mgr-@asg.Id">@T("Reports to", "يرفع إلى")</label><select name="managerEmployeeId" id="pe-mgr-@asg.Id" class="form-select form-select-sm"><option value="">—</option>@foreach (var m in Model.Managers) { <option value="@m.Id" selected="@(m.Id == asg.ManagerEmployeeId)">@m.EmployeeNo · @(isRtl ? $"{m.FirstNameAr} {m.FamilyNameAr}" : $"{m.FirstNameEn} {m.FamilyNameEn}")</option> }</select></div>
+                                <div class="col-md-3"></div>
+                                <div class="col-md-3"><label class="form-label small mb-0" for="pe-from-@asg.Id">@T("Effective from", "سريان من")</label><input name="effectiveFrom" id="pe-from-@asg.Id" type="date" class="form-control form-control-sm" value="@asg.EffectiveFromUtc.ToString("yyyy-MM-dd")" /></div>
+                                <div class="col-md-3"><label class="form-label small mb-0" for="pe-to-@asg.Id">@T("Effective to", "سريان إلى")</label><input name="effectiveTo" id="pe-to-@asg.Id" type="date" class="form-control form-control-sm" value="@(asg.EffectiveToUtc?.ToString("yyyy-MM-dd"))" /></div>
+                                <div class="col-md-6"><button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-save me-1" aria-hidden="true"></i>@T("Save", "حفظ")</button></div>
+                                <div class="col-12"><div class="form-text mt-0">@T("Leave the end date empty for the current position — only one row may be left open (BR-EMP-002). Correcting a row rewrites it; it does not add to the history. Use Assign above for a real move.", "اترك تاريخ الانتهاء فارغاً للمنصب الحالي — ولا يبقى إلا صف واحد مفتوح (BR-EMP-002). وتصحيح الصف يعيد كتابته ولا يضيف إلى السجل؛ استخدم الإسناد أعلاه لنقل فعلي.")</div></div>
+                            </form>
+                        </div></div>
+                    </td></tr>
+                }
+                @if (Model.Assignments.Count == 0) { <tr><td colspan="6" class="text-center text-warning-emphasis py-3">@T("No position yet — every employee needs a position + org unit (BR-EMP-002).", "لا منصب بعد — كل موظف يحتاج منصباً ووحدة (BR-EMP-002).")</td></tr> }</tbody></table>
             <form method="post" asp-action="AssignPosition" asp-route-id="@e.Id" class="row g-2 align-items-end">
                 <div class="col-md-3"><label class="form-label small" for="pos-orgUnitId">@T("Org unit", "الوحدة")</label><select name="orgUnitId" id="pos-orgUnitId" class="form-select form-select-sm"><option value="">—</option>@foreach (var u in Model.OrgUnits) { <option value="@u.Id" selected="@(u.Id == current?.Assignment.OrgUnitId)">@(isRtl ? u.NameAr : u.NameEn)</option> }</select></div>
                 <div class="col-md-3"><label class="form-label small" for="pos-positionLookupId">@T("Job title", "المسمى")</label><select name="positionLookupId" id="pos-positionLookupId" class="form-select form-select-sm"><option value="">—</option>@foreach (var p in Model.Positions) { <option value="@p.Id" selected="@(p.Id == current?.Assignment.PositionLookupId)">@(isRtl ? p.Ar : p.En)</option> }</select></div>

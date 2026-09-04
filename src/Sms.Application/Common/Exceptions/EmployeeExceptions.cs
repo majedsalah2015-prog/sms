@@ -49,6 +49,44 @@ namespace Sms.Application.Common.Exceptions
     }
 
     /// <summary>
+    /// BR-EMP-002: the assignment being corrected or removed is not on the file — already deleted,
+    /// or in another school and therefore invisible behind the tenant filter. Its own type rather
+    /// than a bare <see cref="InvalidOperationException"/> so the Web boundary can word it
+    /// (UserMessage), the same reason <see cref="QualificationNotFoundException"/> has one.
+    /// </summary>
+    public class EmployeeAssignmentNotFoundException : InvalidOperationException
+    {
+        public EmployeeAssignmentNotFoundException(int assignmentId)
+            : base($"Employee assignment {assignmentId} is not on this school's records (BR-EMP-002).")
+        {
+        }
+    }
+
+    /// <summary>
+    /// BR-EMP-002: "each employee holds one primary position". The open row — the one with no end
+    /// date — is what every reader of this model calls current: the org chart counts heads by it,
+    /// the file header names the position by it, and <c>AssignPositionAsync</c> closes exactly one
+    /// of them on reassignment. Correcting a historical row back to open would leave two, and the
+    /// employee would be counted twice in their own org chart.
+    /// </summary>
+    public class DuplicateCurrentAssignmentException : InvalidOperationException
+    {
+        public DuplicateCurrentAssignmentException(int employeeId)
+            : base($"Employee {employeeId} already holds a current position; only one assignment may be left open (BR-EMP-002).")
+        {
+        }
+    }
+
+    /// <summary>BR-EMP-002: an assignment that ends before it starts is a period nobody can read.</summary>
+    public class AssignmentPeriodReversedException : InvalidOperationException
+    {
+        public AssignmentPeriodReversedException(DateTime effectiveFromUtc, DateTime effectiveToUtc)
+            : base($"Assignment period ends {effectiveToUtc:yyyy-MM-dd}, before it starts {effectiveFromUtc:yyyy-MM-dd} (BR-EMP-002).")
+        {
+        }
+    }
+
+    /// <summary>
     /// BR-EMP-004: the qualification being removed is not on the file — already deleted, or in
     /// another school and therefore invisible behind the tenant filter. Its own type rather than a
     /// bare <see cref="InvalidOperationException"/> so the Web boundary can word it (UserMessage):
