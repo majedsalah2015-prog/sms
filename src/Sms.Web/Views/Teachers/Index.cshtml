@@ -12,7 +12,7 @@
         Intro = T("A teacher is an employee with a teacher profile (BR-TCH-001) — designation needs an active contract. The academic view shows subjects taught, load vs max (BR-TCH-004) and homeroom for the selected year.", "المعلم موظف له ملف تدريسي (BR-TCH-001) — التعيين يحتاج عقداً سارياً. العرض الأكاديمي يُظهر المواد والنصاب مقابل الحد (BR-TCH-004) ومربي الصف للعام المختار."),
         Items = new[]
         {
-            new HelpPanelViewModel.Item(T("Designate", "تعيين"), T("Pick an active employee and a weekly maximum. Adjust the maximum later from the Employee file → Teaching.", "اختر موظفاً نشطاً وحداً أسبوعياً. عدّل الحد لاحقاً من ملف الموظف → التدريس.")),
+            new HelpPanelViewModel.Item(T("Designate", "تعيين"), T("Filter the employee list by number or name — either language — then pick a weekly maximum. A single match is chosen for you. Adjust the maximum later from the Employee file → Teaching.", "صفِّ قائمة الموظفين بالرقم أو الاسم — بأي من اللغتين — ثم اختر الحد الأسبوعي. إن بقيت نتيجة واحدة اختيرت تلقائياً. عدّل الحد لاحقاً من ملف الموظف → التدريس.")),
             new HelpPanelViewModel.Item(T("Assign", "إسناد"), T("Offerings × sections are assigned on the Assignment matrix; the Load board compares all teachers.", "تُسند المواد × الشعب من مصفوفة الإسناد؛ لوحة النصاب تقارن كل المعلمين.")),
             new HelpPanelViewModel.Item(T("Homeroom", "مربي الصف"), T("Read through Sections' homeroom assignment, which is keyed by user account — shows only when the employee's user account id is set (identity bridge, see notes).", "يُقرأ من إسناد مربي الصف في الشعب، المرتبط بحساب المستخدم — يظهر فقط إذا حُدد معرّف حساب الموظف (جسر الهوية).")),
         },
@@ -52,7 +52,18 @@
         <div class="sms-card p-3">
             <h2 class="h6 mb-3"><i class="bi bi-person-workspace me-1" aria-hidden="true"></i>@T("Designate a teacher", "تعيين معلم")</h2>
             <form method="post" asp-action="Designate" asp-route-year="@yid" asp-route-q="@Model.Query" asp-route-subject="@Model.SubjectId" class="d-grid gap-2">
-                <select name="employeeId" class="form-select form-select-sm" required aria-required="true" aria-label="@T("Employee to designate", "الموظف المراد تعيينه")"><option value="">@T("Employee…", "الموظف…")</option>@foreach (var e in Model.Designatable) { <option value="@e.Id">@e.EmployeeNo · @(isRtl ? $"{e.FirstNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FamilyNameEn}")</option> }</select>
+                <div>
+                    @* Three hundred names is a scroll, not a choice. The box narrows the list as it is
+                       typed into — employee number or either language's name — and each option carries
+                       the whole of both names in data-s so an Arabic reader can still type "Khalid". *@
+                    <input id="designate-filter" type="search" class="form-control form-control-sm" autocomplete="off" placeholder="@T("filter: number or name…", "تصفية: الرقم أو الاسم…")" aria-label="@T("Filter the employee list", "تصفية قائمة الموظفين")" aria-controls="designate-employee" />
+                    <select id="designate-employee" name="employeeId" class="form-select form-select-sm mt-2" required aria-required="true" aria-label="@T("Employee to designate", "الموظف المراد تعيينه")"><option value="">@T("Employee…", "الموظف…")</option>@foreach (var e in Model.Designatable) { <option value="@e.Id" data-s="@($"{e.EmployeeNo} {e.FirstNameAr} {e.FatherNameAr} {e.FamilyNameAr} {e.FirstNameEn} {e.FatherNameEn} {e.FamilyNameEn}")">@e.EmployeeNo · @(isRtl ? $"{e.FirstNameAr} {e.FamilyNameAr}" : $"{e.FirstNameEn} {e.FamilyNameEn}")</option> }</select>
+                    <div class="form-text" id="designate-count" aria-live="polite"></div>
+                    @if (Model.DesignatableTruncated)
+                    {
+                        <div class="form-text text-warning">@T($"The first {Model.Designatable.Count} of {Model.DesignatableTotal} employees are listed — the filter searches these only.", $"المعروض أول {Model.Designatable.Count} من {Model.DesignatableTotal} موظفاً — التصفية تبحث في هذه فقط.")</div>
+                    }
+                </div>
                 <div class="d-flex gap-2 align-items-center"><label class="small text-nowrap" for="designate-maxWeeklyPeriods">@T("Max periods/week", "الحد/أسبوع")</label><input name="maxWeeklyPeriods" id="designate-maxWeeklyPeriods" type="number" min="1" class="form-control form-control-sm" value="24" /></div>
                 <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>@T("Designate", "تعيين")</button>
                 <div class="form-text">@T("Requires an active contract (BR-TCH-001).", "يتطلب عقداً سارياً (BR-TCH-001).")</div>
@@ -60,3 +71,72 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        // Narrowing the designation picker as the box is typed into.
+        (function () {
+            var box = document.getElementById('designate-filter');
+            var picker = document.getElementById('designate-employee');
+            if (!box || !picker) { return; }
+            var readout = document.getElementById('designate-count');
+            var rtl = document.documentElement.dir === 'rtl';
+
+            // One name is written several ways and still means one person — أحمد/احمد,
+            // فاطمة/فاطمه, ليلى/ليلي — and an employee number gets typed in Arabic-Indic
+            // digits as readily as in Latin ones. Fold both sides before comparing, or the
+            // filter answers "nobody" about a name sitting in the list it is looking at.
+            function fold(s) {
+                return (s || '').toLowerCase()
+                    .replace(/[٠-٩]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x0630); })  // ٠-٩ → 0-9
+                    .replace(/[۰-۹]/g, function (d) { return String.fromCharCode(d.charCodeAt(0) - 0x06C0); })  // ۰-۹ → 0-9
+                    .replace(/[ً-ْـ]/g, '')  // U+064B..U+0652 tashkeel, U+0640 tatweel — invisible in this line, and meaningless in a name search
+                    .replace(/[آأإٱ]/g, 'ا')   // آ أ إ ٱ → ا
+                    .replace(/ة/g, 'ه')                        // ة → ه
+                    .replace(/[ىئ]/g, 'ي')                // ى ئ → ي
+                    .replace(/ؤ/g, 'و')                        // ؤ → و
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            var items = [];
+            for (var i = 0; i < picker.options.length; i++) {
+                var o = picker.options[i];
+                if (!o.value) { continue; }   // the "Employee…" placeholder is never filtered away
+                items.push({ el: o, s: fold(o.getAttribute('data-s') || o.textContent) });
+            }
+
+            function apply() {
+                var q = fold(box.value);
+                var hits = [];
+                for (var i = 0; i < items.length; i++) {
+                    var hit = q === '' || items[i].s.indexOf(q) >= 0;
+                    // Hiding alone is not enough in every browser, and a disabled option can never
+                    // be submitted — which is the point: what the filter has ruled out must not be
+                    // left sitting selected when the form posts.
+                    items[i].el.hidden = !hit;
+                    items[i].el.disabled = !hit;
+                    if (hit) { hits.push(items[i].el); }
+                }
+                var current = picker.options[picker.selectedIndex];
+                if (!current || current.disabled) { picker.selectedIndex = 0; }
+                // One survivor of something actually typed is an answer, not a shortlist: opening a
+                // list of one to click the only thing in it is the work this box exists to remove.
+                // Only when typed — a page that arrives with a name already chosen was not asked.
+                if (q !== '' && hits.length === 1) { picker.value = hits[0].value; }
+                if (!readout) { return; }
+                if (q === '') { readout.textContent = ''; }
+                else if (hits.length === 0) { readout.textContent = rtl ? 'لا موظف مطابق لهذه التصفية.' : 'No employee matches this filter.'; }
+                else { readout.textContent = rtl ? (hits.length + ' من ' + items.length + ' موظفاً') : (hits.length + ' of ' + items.length + ' employees'); }
+            }
+
+            box.addEventListener('input', apply);
+            box.addEventListener('keydown', function (e) {
+                // Enter in a filter box is "show me", not "designate" — the form has its own button.
+                if (e.key === 'Enter') { e.preventDefault(); }
+                if (e.key === 'Escape' && box.value !== '') { e.preventDefault(); box.value = ''; apply(); }
+            });
+            apply();
+        })();
+    </script>
+}

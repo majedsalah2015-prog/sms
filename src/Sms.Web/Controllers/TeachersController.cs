@@ -53,6 +53,9 @@ namespace Sms.Web.Controllers
 
         private static string T(string en, string ar) => IsArabic ? ar : en;
 
+        /// <summary>How many employees the designation picker will carry into the page at once.</summary>
+        private const int DesignatablePickerLimit = 300;
+
         // ================================================================== 8.1 Directory
 
         [HttpGet("")]
@@ -102,8 +105,14 @@ namespace Sms.Web.Controllers
                 return new TeacherDirectoryViewModel.Row(p, e, TeacherLoadCalculator.CurrentLoad(myOffs.Select(o => o.WeeklyPeriods).ToArray()), subjects, mine.Select(a => a.SectionId).Distinct().Count(), hrSec == null ? null : (IsArabic ? hrSec.NameAr : hrSec.NameEn), activeContractEmp.Contains(e.Id));
             }).Where(r => r != null).Select(r => r!).OrderBy(r => r.Employee.EmployeeNo).ToList();
 
-            var designatable = await _db.Employees.AsNoTracking().Where(e => !empIds.Contains(e.Id) && e.Status == EmployeeStatus.Active).OrderBy(e => e.EmployeeNo).Take(300).ToListAsync();
-            return View(new TeacherDirectoryViewModel { Rows = rows, Designatable = designatable, Year = yr, Years = years, Query = q, SubjectId = subject, Subjects = subjectOptions, Total = total });
+            // The designation picker is filtered in the browser, over the options it was handed — so
+            // the count of what it was *not* handed travels with them. A school with more active
+            // non-teaching employees than the cap gets told, rather than left to conclude from an
+            // empty filter that the person it cannot see does not exist.
+            var designatableQuery = _db.Employees.AsNoTracking().Where(e => !empIds.Contains(e.Id) && e.Status == EmployeeStatus.Active);
+            var designatableTotal = await designatableQuery.CountAsync();
+            var designatable = await designatableQuery.OrderBy(e => e.EmployeeNo).Take(DesignatablePickerLimit).ToListAsync();
+            return View(new TeacherDirectoryViewModel { Rows = rows, Designatable = designatable, DesignatableTotal = designatableTotal, Year = yr, Years = years, Query = q, SubjectId = subject, Subjects = subjectOptions, Total = total });
         }
 
         [HttpPost("designate")]

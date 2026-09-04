@@ -185,7 +185,17 @@ namespace Sms.Web.Models
 
         public IReadOnlyList<Row> Rows { get; set; } = Array.Empty<Row>();
 
+        /// <summary>The designation picker's options: active employees who are not teachers yet, capped.</summary>
         public IReadOnlyList<Employee> Designatable { get; set; } = Array.Empty<Employee>();
+
+        /// <summary>
+        /// How many there are in all. The picker's filter searches the options it was given, so a
+        /// list cut short by the cap has to say so — otherwise a filter that finds nobody reads as
+        /// "no such employee" when it means "not in the first few hundred".
+        /// </summary>
+        public int DesignatableTotal { get; set; }
+
+        public bool DesignatableTruncated => DesignatableTotal > Designatable.Count;
 
         public AcademicYear? Year { get; set; }
 
