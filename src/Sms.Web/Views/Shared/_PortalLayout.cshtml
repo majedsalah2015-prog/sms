@@ -38,6 +38,12 @@
         }
     }
 
+    // The app download, always shown. Outside the loop on purpose: it carries no POR permission
+    // (see PortalController.MobileApp for why), and the staff accounts that may also open /portal
+    // hold none of the grants above — a teacher gating on POR/Home would never see the tab at all.
+    // Nothing is disclosed by it: the page serves the school's own installer, not a record.
+    visibleTabs.Add(("App", string.Empty, "Mobile app", "تطبيق الجوال", "bi-phone"));
+
     // BR-SCH-006: a parent signs in to their child's school, not to a product. The same mark the
     // staff shell wears, with the same generic fallback when nothing is uploaded.
     var logoVersion = await BrandMark.VersionAsync();

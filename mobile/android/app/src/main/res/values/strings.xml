@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The launcher label. Android picks values-ar/ on an Arabic phone, so the name
+  under the icon follows the device the way every other string in this product
+  follows the culture. Leaving the generated "sms_portal" here would have put a
+  package name on a parent's home screen.
+-->
+<resources>
+    <string name="app_name">School Portal</string>
+</resources>

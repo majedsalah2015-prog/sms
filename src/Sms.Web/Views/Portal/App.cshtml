@@ -1,0 +1,78 @@
+@using System.Globalization
+@model PortalMobileAppViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Mobile app", "تطبيق الجوال");
+    var help = new HelpPanelViewModel
+    {
+        Id = "portal-app-help",
+        Title = T("Mobile app — help", "تطبيق الجوال — مساعدة"),
+        Intro = T("The school's own Android app. It shows the same attendance, results, fees, homework, lessons and announcements this portal does — the portal is the whole rulebook, and the app is a second window onto it.", "تطبيق المدرسة لنظام أندرويد. يعرض الحضور والنتائج والرسوم والواجبات والدروس والإعلانات نفسها التي تعرضها هذه البوابة — فالبوابة هي المرجع، والتطبيق نافذة ثانية عليها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("Your phone will ask before installing", "سيسألك هاتفك قبل التثبيت"), T("The file comes from your school rather than from Google Play, so Android asks you to allow installing from this browser once. That prompt is expected. Nothing else about the phone changes.", "يأتي الملف من مدرستك لا من متجر Google Play، لذا يطلب أندرويد السماح بالتثبيت من هذا المتصفح مرة واحدة. هذا الطلب متوقّع، ولا يتغيّر في الهاتف شيء آخر.")),
+            new HelpPanelViewModel.Item(T("Sign in with the same username", "الدخول بنفس اسم المستخدم"), T("The app uses the account you are signed in with now. There is nothing separate to register for, and changing your password here changes it there.", "يستخدم التطبيق الحساب الذي دخلت به الآن. فلا تسجيل منفصل، وتغيير كلمة مرورك هنا يغيّرها هناك.")),
+            new HelpPanelViewModel.Item(T("What the app does not do yet", "ما لا يفعله التطبيق بعد"), T("Homework is shown but cannot be submitted, fees are shown but cannot be paid, and there are no push notifications yet. Each of those is a school-side feature that does not exist on the portal either.", "تُعرض الواجبات ولا يمكن تسليمها، وتُعرض الرسوم ولا يمكن دفعها، ولا توجد إشعارات فورية بعد. وكلٌّ من ذلك ميزة غير موجودة في البوابة نفسها أصلاً.")),
+            new HelpPanelViewModel.Item(T("iPhone is not offered here", "الآيفون غير متاح هنا"), T("Apple does not allow an app to be installed from a web page. An iPhone version has to come through the App Store, which the school has not published to.", "لا تسمح Apple بتثبيت تطبيق من صفحة ويب. فنسخة الآيفون يجب أن تأتي عبر App Store، ولم تنشر المدرسة عليه بعد.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Install the school's app on an Android phone.", "ثبّت تطبيق المدرسة على هاتف أندرويد.")</p>
+    </div>
+    <partial name="_HelpModal" model="help" />
+</div>
+
+@if (Model.IsPublished)
+{
+    <div class="sms-card p-4">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="fs-1 text-success" aria-hidden="true"><i class="bi bi-android2"></i></span>
+            <div class="flex-grow-1">
+                <h2 class="h5 fw-semibold mb-1">@T("School Portal for Android", "بوابة المدرسة لنظام أندرويد")</h2>
+                <p class="text-muted small mb-0">
+                    @* Version, size and date stay LTR-digit in both directions, like every
+                       other figure in this product. *@
+                    @if (Model.Version != null)
+                    {
+                        <span class="me-2" dir="ltr">@T("Version", "الإصدار") @Model.Version</span>
+                    }
+                    <span class="me-2" dir="ltr">@Model.SizeText</span>
+                    <span dir="ltr">@Model.PublishedAtUtc?.ToString("yyyy-MM-dd")</span>
+                </p>
+            </div>
+            <a class="btn btn-primary btn-lg" asp-controller="Portal" asp-action="AppDownload" download>
+                <i class="bi bi-download me-1" aria-hidden="true"></i>@T("Download the app", "تنزيل التطبيق")
+            </a>
+        </div>
+    </div>
+
+    <div class="sms-card p-4 mt-3">
+        <h2 class="h6 fw-semibold">@T("How to install", "طريقة التثبيت")</h2>
+        <ol class="mb-0 ps-3">
+            <li class="mb-2">@T("Open this page on the phone itself, then tap Download.", "افتح هذه الصفحة على الهاتف نفسه ثم اضغط تنزيل.")</li>
+            <li class="mb-2">@T("When the phone asks whether to allow installing apps from this browser, allow it. It asks once.", "حين يسألك الهاتف عن السماح بتثبيت التطبيقات من هذا المتصفح، اسمح له. يسأل مرة واحدة.")</li>
+            <li class="mb-2">@T("Open the downloaded file and tap Install.", "افتح الملف بعد تنزيله واضغط تثبيت.")</li>
+            <li>@T("Sign in with the username and password you use here.", "سجّل الدخول باسم المستخدم وكلمة المرور اللذين تستعملهما هنا.")</li>
+        </ol>
+    </div>
+}
+else
+{
+    @* Nothing published. Said plainly rather than shown as a button that would
+       refuse — a family that taps and gets an error learns less than a family
+       that is told. *@
+    <div class="sms-card p-4">
+        <div class="d-flex align-items-start gap-3">
+            <span class="fs-3 text-muted" aria-hidden="true"><i class="bi bi-hourglass-split"></i></span>
+            <div>
+                <h2 class="h6 fw-semibold mb-1">@T("Not published yet", "لم يُنشر بعد")</h2>
+                <p class="text-muted mb-0">@T("Your school has not published the app yet. Everything it shows is on this portal in the meantime.", "لم تنشر مدرستك التطبيق بعد. وكل ما يعرضه متاح في هذه البوابة حتى ذلك الحين.")</p>
+            </div>
+        </div>
+    </div>
+}

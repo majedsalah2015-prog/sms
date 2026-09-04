@@ -493,6 +493,17 @@ namespace Sms.Web
                 : Path.Combine(this.Environment.ContentRootPath, configuredAttachmentsRoot);
             services.AddSingleton<IFileStore>(new LocalDiskFileStore(attachmentsRoot));
             services.AddSingleton<IVirusScanner, NullVirusScanner>();
+
+            // The Android package the school hands its families (/portal/app). Same treatment as
+            // the attachments root above and for the same reason: a relative setting is resolved
+            // against the content root, not against whichever directory the host was started from.
+            // Nothing is created here — an absent folder simply means nothing has been published,
+            // which the screen says outright.
+            var configuredMobileAppRoot = Configuration.GetValue("MobileApp:PackagePath", "App_Data/MobileApp");
+            services.AddSingleton(new Sms.Web.Services.MobileAppPackage(
+                Path.IsPathRooted(configuredMobileAppRoot)
+                    ? configuredMobileAppRoot
+                    : Path.Combine(this.Environment.ContentRootPath, configuredMobileAppRoot)));
             services.AddScoped<IAttachmentService, AttachmentService>();
             services.AddScoped<IAttachmentTypeAdmin, AttachmentTypeAdmin>();
 
@@ -571,6 +582,7 @@ namespace Sms.Web
             services.AddScoped<ISectionAdmin, SectionAdmin>();
 
             // E-104 (slice: Subjects, doc/Modules/07, BR-SUB-001..008).
+            services.AddScoped<IUsageInspector<Sms.Domain.Subjects.CurriculumOffering>, CurriculumOfferingUsageInspector>();
             services.AddScoped<ISubjectAdmin, SubjectAdmin>();
 
             // S2/E-202 (slice: Students + Parents, doc/Modules/10-11). Both admin

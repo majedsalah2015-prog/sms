@@ -1,0 +1,43 @@
+name: sms_portal
+description: >-
+  The school's portal on a phone — a Flutter client for the parent and student
+  half of the SMS mobile API (docs/Integration/03-Mobile-API.md). It is a second
+  view over screens the product already has, never a second product: every rule,
+  permission and refusal belongs to the server.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  # Built against Flutter 3.47.2 / Dart 3.13.2 (stable, 2026-08-27). The Flutter
+  # floor is 3.27 rather than something older because `ThemeData.cardTheme`
+  # takes `CardThemeData` from that release on, and the app names the type.
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Kept deliberately small. Every package here is one more thing that has to
+  # keep resolving on Dart 3.0 the next time somebody opens this project.
+  http: ^1.2.0                    # no interceptor framework needed; one client, one place
+  provider: ^6.1.2                # one controller is all the app-wide state there is
+  flutter_secure_storage: ^9.2.2  # the session token is a credential, not a preference
+  intl: ^0.20.2                   # must match what flutter_localizations pins
+
+  # A lesson resource is fetched with the bearer token and handed to the phone
+  # to open. It cannot simply be a link: the download endpoint is [Authorize]d,
+  # a browser sends no Authorization header, and a token in the URL would leak a
+  # live credential into history.
+  path_provider: ^2.1.4
+  open_filex: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
