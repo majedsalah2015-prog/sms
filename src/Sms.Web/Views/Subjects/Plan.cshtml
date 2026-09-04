@@ -15,7 +15,7 @@
         Items = new[]
         {
             new HelpPanelViewModel.Item(T("The period total is a real limit", "مجموع الحصص حدّ حقيقي"), T("The bar compares what the plan asks for against the slots a week holds. Going over is refused, not warned about (BR-SUB-005) — a plan that does not fit is a timetable that cannot be built, and it is cheaper to discover here.", "يقارن الشريط ما تطلبه الخطة بالحصص التي يتّسع لها الأسبوع. والتجاوز يُرفَض ولا يُحذَّر منه فقط (BR-SUB-005) — فالخطة التي لا تتّسع جدولٌ لا يمكن بناؤه، واكتشاف ذلك هنا أرخص.")),
-            new HelpPanelViewModel.Item(T("Offerings are end-dated, never removed", "المواد تُنهى بتاريخ ولا تُحذف"), T("Dropping a subject mid-year means giving it an end date (BR-SUB-004). Marks, timetables and reports already point at that offering, and deleting it would take last term's records with it.", "إسقاط مادة أثناء العام يعني إعطاءها تاريخ انتهاء (BR-SUB-004). فالعلامات والجداول والتقارير تشير إلى تلك الحصة، وحذفها يأخذ سجلات الفصل الماضي معه.")),
+            new HelpPanelViewModel.Item(T("Removing is for mistakes; ending is for changes", "الحذف للأخطاء والإنهاء للتغييرات"), T("The moment a mark, a timetable session, an assignment, an exam or a lesson points at a line, removing it is refused and end-dating is what applies (BR-SUB-004) — those records have to keep pointing somewhere. A line nothing has touched yet can be taken off outright, and the trash button appears only on those.", "ما إن تشير درجة أو حصة جدول أو إسناد أو اختبار أو درس إلى سطر، حتى يُرفض حذفه ويكون الإنهاء بتاريخ هو ما ينطبق (BR-SUB-004) — فتلك السجلات لا بد أن تظل تشير إلى شيء. أما السطر الذي لم يمسّه شيء بعد فيمكن رفعه تماماً، وزر السلة لا يظهر إلا عليه.")),
             new HelpPanelViewModel.Item(T("Assessable and GPA weight", "قابلة للتقييم ووزن المعدل"), T("An assessable subject appears in the gradebook and on the report card; the weight is what it counts for in the average. An activity subject is usually carried at weight zero rather than left out, so it still shows on the card.", "المادة القابلة للتقييم تظهر في سجل العلامات وكشف الدرجات؛ والوزن هو ما تُحسب به في المعدل. ومادة النشاط تُحمَل عادة بوزن صفر بدل استبعادها، فتظل ظاهرة في الكشف.")),
             new HelpPanelViewModel.Item(T("Elective groups", "المجموعات الاختيارية"), T("Subjects sharing an elective group tag are the alternatives a student picks one of. Tag them identically or the group is not a group — the tag is the only thing that ties them together.", "المواد التي تشترك في وسم مجموعة اختيارية هي البدائل التي يختار الطالب واحدة منها. فوسِمها بالنص ذاته وإلا لم تكن المجموعة مجموعة — فالوسم هو ما يربطها وحده.")),
             new HelpPanelViewModel.Item(T("Copying last year's plan", "نسخ خطة العام الماضي"), T("Copying brings the offerings of another grade-year across as new ones effective from today; it never touches what is already here. Start from the closest plan you have and edit the differences.", "النسخ يجلب مواد صف سنوي آخر كمواد جديدة تسري من اليوم؛ ولا يمسّ ما هو قائم هنا. ابدأ من أقرب خطة لديك ثم عدّل الفروق.")),
@@ -23,7 +23,7 @@
     };
 }
 
-<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade-year: subject, periods/week, assessable, GPA weight, elective group; the period total must fit the timetable's available slots (BR-SUB-005). Offerings are end-dated, never removed (BR-SUB-004).", "لكل صف سنوي: المادة، الحصص أسبوعياً، قابلة للتقييم، وزن المعدل، مجموعة اختيارية؛ يجب أن يتسع مجموع الحصص في الجدول (BR-SUB-005). المواد تُنهى بتاريخ ولا تُحذف (BR-SUB-004).")</p></div>
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Per grade-year: subject, periods/week, assessable, GPA weight, elective group; the period total must fit the timetable's available slots (BR-SUB-005). A line anything already points at is end-dated, never removed (BR-SUB-004).", "لكل صف سنوي: المادة، الحصص أسبوعياً، قابلة للتقييم، وزن المعدل، مجموعة اختيارية؛ يجب أن يتسع مجموع الحصص في الجدول (BR-SUB-005). والسطر الذي يشير إليه شيء بالفعل يُنهى بتاريخ ولا يُحذف (BR-SUB-004).")</p></div>
     @* Each picker carries its own visible label. Two bare dropdowns side by side did not say which
        one was the year and which the grade, and the one label on the row ("slots/wk") sat between
        the grade dropdown and the number box, so it read as the grade's. Labels above fields is the
@@ -96,7 +96,27 @@ else
                     {
                         var ended = r.Offering.EffectiveToUtc != null;
                         <tr class="@(ended ? "text-muted" : "")"><td><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)@if (r.SubjectIsRetired) { <span class="badge text-bg-secondary ms-1" title="@T("The subject was deactivated; this offering still stands.", "أُلغيت المادة، وهذه الحصص قائمة.")">@T("retired subject", "مادة ملغاة")</span> }</td><td>@r.Offering.WeeklyPeriods</td><td>@(r.Offering.IsAssessable ? "✓" : "—")</td><td>@r.Offering.GpaWeight</td><td>@(r.Offering.IsElective ? (r.Offering.ElectiveGroupTag ?? "✓") : "—")</td><td class="small">@r.Offering.EffectiveFromUtc.ToString("yyyy-MM-dd")@(ended ? " → " + r.Offering.EffectiveToUtc!.Value.ToString("yyyy-MM-dd") : "")</td>
-                            <td class="text-end">@if (!ended) { <form method="post" asp-action="EndOffering" asp-route-id="@r.Offering.Id" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots" class="d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" style="width:9.5rem" /><button class="btn btn-sm btn-outline-secondary" type="submit" title="@T("End-date", "إنهاء بتاريخ")" aria-label="@T("End-date", "إنهاء بتاريخ")"><i class="bi bi-calendar-x" aria-hidden="true"></i></button></form> }</td></tr>
+                            @* Three answers to "this line is wrong", in the order they cost. Edit
+                               corrects it. End-dating closes it and keeps every mark ever recorded
+                               against it (BR-SUB-004). Removing is only offered when the inspector
+                               finds nothing pointing at the line at all — a mistake caught before it
+                               was used — and is absent rather than disabled otherwise, with the
+                               reason on the lock. *@
+                            <td class="text-end"><div class="d-inline-flex gap-1 align-items-center justify-content-end flex-wrap">
+                                @if (!ended)
+                                {
+                                    <form method="post" asp-action="EndOffering" asp-route-id="@r.Offering.Id" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots" class="d-inline-flex gap-1"><input name="effectiveTo" type="date" class="form-control form-control-sm" style="width:9.5rem" aria-label="@T("End date", "تاريخ الإنهاء")" /><button class="btn btn-sm btn-outline-secondary" type="submit" title="@T("End-date", "إنهاء بتاريخ")" aria-label="@T("End-date", "إنهاء بتاريخ")"><i class="bi bi-calendar-x" aria-hidden="true"></i></button></form>
+                                    <a class="btn btn-sm btn-outline-secondary" asp-action="EditOffering" asp-route-id="@r.Offering.Id" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots" title="@T("Edit", "تعديل")" aria-label="@T("Edit", "تعديل")"><i class="bi bi-pencil" aria-hidden="true"></i></a>
+                                }
+                                @if (r.CanRemove)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger" type="button" data-bs-toggle="modal" data-bs-target="#rm-@(r.Offering.Id)" title="@T("Remove", "حذف")" aria-label="@T("Remove", "حذف")"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                                }
+                                else if (r.Usage != null)
+                                {
+                                    <span class="text-muted small" title="@T($"Cannot be removed — {r.Usage.Describe(false)} reference it. End-date it instead.", $"لا يمكن حذفه — يشير إليه {r.Usage.Describe(true)}. أنهِه بتاريخ بدلاً من ذلك.")"><i class="bi bi-lock" aria-hidden="true"></i><span class="visually-hidden">@T("Cannot be removed", "لا يمكن حذفه")</span></span>
+                                }
+                            </div></td></tr>
                     }
                     @if (Model.Offerings.Count == 0) { <tr><td colspan="7" class="text-center text-muted py-4">@T("No offerings yet.", "لا مواد في الخطة بعد.")</td></tr> }</tbody>
                 </table></div>
@@ -121,4 +141,25 @@ else
             }
         </div>
     </div>
+
+    @* Confirmations sit outside the table on purpose: a modal inside <tbody> is invalid markup and
+       Bootstrap reparents it to the body anyway, which detaches it from the antiforgery form it was
+       meant to carry. Only drawn for rows the inspector cleared, so a dialog that could only ever
+       refuse is never opened. *@
+    @foreach (var r in Model.Offerings)
+    {
+        if (!r.CanRemove) { continue; }
+        <div class="modal fade" id="rm-@(r.Offering.Id)" tabindex="-1" aria-labelledby="rml-@(r.Offering.Id)" aria-hidden="true">
+            <div class="modal-dialog"><div class="modal-content">
+                <form method="post" asp-action="RemoveOffering" asp-route-id="@r.Offering.Id" asp-route-year="@yid" asp-route-profile="@pid" asp-route-slots="@Model.AvailableSlots">
+                    <div class="modal-header"><h3 class="modal-title h6" id="rml-@(r.Offering.Id)">@T("Remove from the plan", "حذف من الخطة")</h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="@T("Close", "إغلاق")"></button></div>
+                    <div class="modal-body">
+                        <p class="mb-1"><code>@r.Subject.Code</code> @(isRtl ? r.Subject.Name.NameAr : r.Subject.Name.NameEn)</p>
+                        <p class="small text-muted mb-0">@T("Nothing has been recorded against this line — no marks, timetable sessions, teacher assignments, exams or lessons — so removing it takes nothing else with it. It cannot be undone. To close a subject that has actually been taught, end-date it instead (BR-SUB-004).", "لم يُسجَّل شيء على هذا السطر — لا درجات ولا حصص جدول ولا إسنادات معلمين ولا اختبارات ولا دروس — فحذفه لا يأخذ معه شيئاً. ولا يمكن التراجع عنه. أما إغلاق مادة دُرِّست فعلاً فيكون بإنهائها بتاريخ (BR-SUB-004).")</p>
+                    </div>
+                    <div class="modal-footer"><button class="btn btn-sm btn-danger" type="submit"><i class="bi bi-trash me-1" aria-hidden="true"></i>@T("Remove", "حذف")</button></div>
+                </form>
+            </div></div>
+        </div>
+    }
 }

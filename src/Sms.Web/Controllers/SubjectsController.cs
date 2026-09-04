@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Sms.Application.Common.Guards;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Subjects;
 using Sms.Domain.Schools;
@@ -33,12 +34,14 @@ namespace Sms.Web.Controllers
         private readonly ISubjectAdmin _subjects;
         private readonly AppDbContext _db;
         private readonly IWorkingYearContext _workingYear;
+        private readonly IUsageInspector<CurriculumOffering> _offeringUsage;
 
-        public SubjectsController(ISubjectAdmin subjects, AppDbContext db, IWorkingYearContext workingYear)
+        public SubjectsController(ISubjectAdmin subjects, AppDbContext db, IWorkingYearContext workingYear, IUsageInspector<CurriculumOffering> offeringUsage)
         {
             _subjects = subjects;
             _db = db;
             _workingYear = workingYear;
+            _offeringUsage = offeringUsage;
         }
 
         private static bool IsArabic => CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
@@ -311,6 +314,79 @@ namespace Sms.Web.Controllers
             return RedirectToAction(nameof(Plan), new { year, profile, slots });
         }
 
+        [HttpGet("plan/offering/{id:int}/edit")]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Edit)]
+        public async Task<IActionResult> EditOffering(int id, int? year = null, int? profile = null, int? slots = null)
+        {
+            var o = await _db.CurriculumOfferings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+            if (o == null) return NotFound();
+
+            var m = new OfferingEditViewModel
+            {
+                Id = id,
+                WeeklyPeriods = o.WeeklyPeriods,
+                IsAssessable = o.IsAssessable,
+                GpaWeight = o.GpaWeight,
+                IsElective = o.IsElective,
+                ElectiveGroupTag = o.ElectiveGroupTag,
+                Year = year,
+                Profile = profile,
+                Slots = slots,
+            };
+
+            await FillOfferingEditAsync(m, o);
+            return View(m);
+        }
+
+        [HttpPost("plan/offering/{id:int}/edit")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Edit)]
+        public async Task<IActionResult> EditOffering(int id, OfferingEditViewModel form)
+        {
+            form.Id = id;
+            try
+            {
+                await _subjects.UpdateOfferingAsync(
+                    id, form.WeeklyPeriods, form.IsAssessable, form.GpaWeight, form.IsElective,
+                    string.IsNullOrWhiteSpace(form.ElectiveGroupTag) ? null : form.ElectiveGroupTag.Trim(),
+                    HttpContext.RequestAborted);
+                TempData["Flash"] = T("Offering updated.", "تم تحديث المادة في الخطة.");
+                return RedirectToAction(nameof(Plan), new { year = form.Year, profile = form.Profile, slots = form.Slots });
+            }
+            catch (InvalidOperationException ex)
+            {
+                ModelState.AddModelError(string.Empty, UserMessage.For(ex, IsArabic));
+                var o = await _db.CurriculumOfferings.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id);
+                if (o == null) return NotFound();
+                await FillOfferingEditAsync(form, o);
+                return View(form);
+            }
+        }
+
+        [HttpPost("plan/offering/{id:int}/remove")]
+        [ValidateAntiForgeryToken]
+        [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Deactivate)]
+        public async Task<IActionResult> RemoveOffering(int id, int? year, int? profile, int? slots)
+        {
+            try
+            {
+                await _subjects.RemoveOfferingAsync(id, HttpContext.RequestAborted);
+                TempData["Flash"] = T("Offering removed from the plan.", "تم حذف المادة من الخطة.");
+            }
+            catch (RecordInUseException ex)
+            {
+                // The plan hides this button whenever the inspector says no, so arriving here means a
+                // stale page or a hand-made request. The answer names what is in the way *and* the
+                // operation that does apply — BR-SUB-004's whole point is that there is one, and a
+                // refusal that does not say so reads as "this screen is broken".
+                TempData["Error"] = T(
+                    $"This offering cannot be removed: {ex.Usage.Describe(arabic: false)} still reference it. End-date it instead, which keeps those records readable (BR-SUB-004).",
+                    $"لا يمكن حذف هذه المادة من الخطة: ما زال يشير إليها {ex.Usage.Describe(arabic: true)}. أنهِها بتاريخ بدلاً من ذلك، فيبقى ما سبق مقروءاً (BR-SUB-004).");
+            }
+
+            return RedirectToAction(nameof(Plan), new { year, profile, slots });
+        }
+
         [HttpPost("plan/copy")]
         [ValidateAntiForgeryToken]
         [RequirePermission(ScreenCatalog.Modules.Subjects, ScreenCatalog.Subjects.CurriculumPlan, ActionVerb.Create)]
@@ -332,6 +408,35 @@ namespace Sms.Web.Controllers
             }
             catch (InvalidOperationException ex) { TempData["Error"] = UserMessage.For(ex, IsArabic) + (copied > 0 ? T($" ({copied} copied before the error.)", $" (نُسخت {copied} قبل الخطأ.)") : ""); }
             return RedirectToAction(nameof(Plan), new { year, profile, slots });
+        }
+
+        /// <summary>
+        /// The display context around the editable fields, plus what already points at the line.
+        /// <para>
+        /// <c>IgnoreQueryFilters</c> on the subject and the grade is not defensive habit: the plan
+        /// line most likely to be edited is one whose subject has since been retired, and reading it
+        /// back through the soft-active filter is precisely the "sequence contains no matching
+        /// element" that took this screen down once already.
+        /// </para>
+        /// </summary>
+        private async Task FillOfferingEditAsync(OfferingEditViewModel m, CurriculumOffering offering)
+        {
+            m.Subject = await _db.Subjects.IgnoreQueryFilters().AsNoTracking()
+                .SingleOrDefaultAsync(s => s.Id == offering.SubjectId && s.SchoolId == _db.CurrentSchoolId);
+
+            var profile = await _db.GradeYearProfiles.AsNoTracking()
+                .SingleOrDefaultAsync(p => p.Id == offering.GradeYearProfileId);
+            if (profile != null)
+            {
+                var grade = await _db.GradeLevels.IgnoreQueryFilters().AsNoTracking()
+                    .SingleOrDefaultAsync(g => g.Id == profile.GradeLevelId && g.SchoolId == _db.CurrentSchoolId);
+                m.GradeLabel = grade == null ? null : (IsArabic ? grade.Name.NameAr : grade.Name.NameEn);
+            }
+
+            var year = await _db.AcademicYears.AsNoTracking().SingleOrDefaultAsync(y => y.Id == offering.AcademicYearId);
+            m.YearLabel = year == null ? null : (IsArabic ? year.LabelAr : year.LabelEn);
+
+            m.Usage = await _offeringUsage.InspectAsync(offering.Id, HttpContext.RequestAborted);
         }
 
         private async Task<CurriculumPlanViewModel> BuildPlanAsync(int? yearId, int? profileId, int? slots)
@@ -379,10 +484,21 @@ namespace Sms.Web.Controllers
             var allSubjects = await _db.Subjects.IgnoreQueryFilters().AsNoTracking()
                 .Where(s => s.SchoolId == _db.CurrentSchoolId && offeredSubjectIds.Contains(s.Id))
                 .ToDictionaryAsync(s => s.Id);
-            m.Offerings = offerings
-                .Where(o => allSubjects.ContainsKey(o.SubjectId))
-                .Select(o => new CurriculumPlanViewModel.OfferingRow(o, allSubjects[o.SubjectId], !allSubjects[o.SubjectId].IsActive))
-                .ToList();
+
+            // One inspector call per row, because the row's own remove button is drawn from the
+            // answer. The same inspector backs the remove action itself, so what the screen offers
+            // and what the guard allows cannot drift into disagreeing — the failure mode where a
+            // button is drawn that always fails, or withheld where it would have worked.
+            var rows = new List<CurriculumPlanViewModel.OfferingRow>();
+            foreach (var o in offerings.Where(o => allSubjects.ContainsKey(o.SubjectId)))
+            {
+                rows.Add(new CurriculumPlanViewModel.OfferingRow(
+                    o, allSubjects[o.SubjectId], !allSubjects[o.SubjectId].IsActive,
+                    await _offeringUsage.InspectAsync(o.Id, HttpContext.RequestAborted)));
+            }
+
+            m.Offerings = rows;
+
             m.TotalPeriods = CurriculumPlanValidator.TotalWeeklyPeriods(offerings.Where(o => o.EffectiveToUtc == null).Select(o => o.WeeklyPeriods));
 
             // Copy-from-previous-year: the same grade's profile in the year that ends right before this one.

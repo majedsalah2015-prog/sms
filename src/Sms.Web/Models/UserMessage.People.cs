@@ -119,6 +119,14 @@ namespace Sms.Web.Models
                 ? "المادة المحتسَبة في المعدل تحتاج وزناً أكبر من صفر — إمّا أن تُعطى وزناً، وإمّا أن تُعلَّم غير محتسَبة في المعدل."
                 : "A subject that counts towards the GPA needs a weight greater than zero — either give it one, or mark it as not assessed.",
 
+            EndedOfferingNotEditableException => arabic
+                ? "هذه المادة أُنهيت بتاريخ، وما انتهى لا يُعدَّل — فدرجات الفصل الماضي وجداوله تشير إليها كما كانت. أضِف مادة جديدة إلى الخطة لتقول شيئاً مختلفاً من الآن فصاعداً (BR-SUB-004)."
+                : "This offering has been end-dated, and what has ended is not rewritten — last term's marks and timetables point at it as it was. Add a new offering to say something different from now on (BR-SUB-004).",
+
+            InvalidOfferingPeriodsException => arabic
+                ? "المادة في الخطة تحتاج حصة واحدة على الأقل في الأسبوع — فمادة بصفر حصص لا يستطيع الجدول وضعها أبداً."
+                : "An offering needs at least one period a week — a subject with zero periods is one the timetable can never place.",
+
             // ---------------------------------------------------------------- M09 buildings, floors and rooms
 
             DuplicateRoomCodeException => arabic

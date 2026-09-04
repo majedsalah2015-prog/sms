@@ -572,7 +572,7 @@ namespace Sms.Application.Security
             // ---- Subjects
             S(Modules.Subjects, Subjects.Subjects_, "Subjects", "المواد الدراسية", Crud),
             S(Modules.Subjects, Subjects.Departments, "Departments", "الأقسام", ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
-            S(Modules.Subjects, Subjects.CurriculumPlan, "Curriculum plan", "الخطة الدراسية", ActionVerb.View, ActionVerb.Create, ActionVerb.Deactivate),
+            S(Modules.Subjects, Subjects.CurriculumPlan, "Curriculum plan", "الخطة الدراسية", ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate),
 
             // ---- Classrooms
             S(Modules.Classrooms, Classrooms.Rooms, "Classrooms", "القاعات", Crud),
@@ -598,7 +598,7 @@ namespace Sms.Application.Security
 
             // ---- Parents
             S(Modules.Parents, Parents.Directory, "Parent directory", "دليل أولياء الأمور", ActionVerb.View, ActionVerb.Create),
-            S(Modules.Parents, Parents.File, "Parent file", "ملف ولي الأمر", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate),
+            S(Modules.Parents, Parents.File, "Parent file", "ملف ولي الأمر", ActionVerb.View, ActionVerb.Edit, ActionVerb.Deactivate, ActionVerb.Print, ActionVerb.Export),
             S(Modules.Parents, Parents.Dedup, "Duplicate workbench", "معالجة التكرار", ReadOnly),
 
             // ---- Employees

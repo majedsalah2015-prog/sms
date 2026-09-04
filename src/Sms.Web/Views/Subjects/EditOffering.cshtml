@@ -1,0 +1,99 @@
+@using System.Globalization
+@model OfferingEditViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    var subjectName = Model.Subject == null ? "—" : (isRtl ? Model.Subject.Name.NameAr : Model.Subject.Name.NameEn);
+    ViewData["Title"] = T("Edit offering", "تعديل مادة الخطة") + " — " + subjectName;
+    ViewData["Breadcrumb"] = T("Subjects / Curriculum plan / Edit", "المواد الدراسية / الخطة الدراسية / تعديل");
+    var help = new HelpPanelViewModel
+    {
+        Id = "offering-edit-help",
+        Title = T("Edit offering — help", "تعديل مادة الخطة — مساعدة"),
+        Intro = T("One line of one grade's plan: how much of the week this subject takes, and what it counts for. Everything here can be changed for as long as the line is current; ending it is what closes it.", "سطر واحد من خطة صف واحد: كم يأخذ من الأسبوع، وبم يُحتسب. وكل ما هنا قابل للتغيير ما دام السطر سارياً؛ وإنهاؤه هو ما يغلقه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(T("The subject itself is not a field here", "المادة نفسها ليست حقلاً هنا"), T("A plan line is identified by its grade-year and its subject together, so the subject is not something the line has — it is what makes it this line. Teaching a different subject means ending this one and adding that one, which is also what keeps last term's marks pointing where they did.", "يُعرَّف سطر الخطة بصفه السنوي ومادته معاً، فالمادة ليست شيئاً يملكه السطر — بل هي ما يجعله هذا السطر. وتدريس مادة أخرى يعني إنهاء هذا السطر وإضافة ذاك، وهو أيضاً ما يُبقي درجات الفصل الماضي تشير إلى حيث كانت.")),
+            new HelpPanelViewModel.Item(T("Periods come out of one week", "الحصص تُقتطع من أسبوع واحد"), T("Raising the periods here raises the grade's weekly total on the plan screen, against the slots the timetable actually has (BR-SUB-005). The plan editor shows the overrun rather than refusing it — activating the year is what refuses it — so a plan left over capacity is a timetable that cannot be built later.", "رفع الحصص هنا يرفع مجموع الصف الأسبوعي في شاشة الخطة، مقابل ما يملكه الجدول فعلاً (BR-SUB-005). ومحرر الخطة يُظهر التجاوز ولا يرفضه — وتفعيل العام هو ما يرفضه — فالخطة المتجاوِزة جدولٌ لا يمكن بناؤه لاحقاً.")),
+            new HelpPanelViewModel.Item(T("Assessable and GPA weight travel together", "قابلة للتقييم والوزن يسيران معاً"), T("An assessable line must carry a weight above zero (BR-SUB §9): it appears in the gradebook and on the report card, and the weight is what it counts for in the average. An activity is usually carried as not assessable rather than left out, so it still shows on the card.", "السطر القابل للتقييم يجب أن يحمل وزناً أكبر من صفر (BR-SUB §9): فهو يظهر في سجل العلامات وكشف الدرجات، والوزن هو ما يُحتسب به في المعدل. والنشاط يُحمَل عادة كغير قابل للتقييم بدل استبعاده، فيظل ظاهراً في الكشف.")),
+            new HelpPanelViewModel.Item(T("An elective group is only its tag", "المجموعة الاختيارية وسمها وحده"), T("Lines sharing an elective group tag are the alternatives a student picks one of. The tag is the only thing tying them together, so changing it here takes this subject out of that group — and a tag that matches nothing else is a group of one.", "الأسطر التي تشترك في وسم مجموعة اختيارية هي البدائل التي يختار الطالب واحدة منها. والوسم وحده هو ما يربطها، فتغييره هنا يُخرج هذه المادة من تلك المجموعة — والوسم الذي لا يطابق شيئاً آخر مجموعةٌ من واحد.")),
+            new HelpPanelViewModel.Item(T("Editing stays open where removing closes", "التعديل يبقى مفتوحاً حيث يُغلق الحذف"), T("Marks, timetable sessions and assignments pointing at this line stop it being removed (BR-SUB-004) — they do not stop it being corrected. A wrong period count is worth fixing whether or not the subject has been taught yet.", "الدرجات وحصص الجدول والإسنادات التي تشير إلى هذا السطر تمنع حذفه (BR-SUB-004) — ولا تمنع تصحيحه. فعدد حصص خاطئ يستحق الإصلاح سواء دُرِّست المادة أم لا.")),
+        },
+    };
+}
+
+<div class="sms-page-head"><div><h1 class="sms-page-title">@ViewData["Title"]</h1><p class="text-muted mb-0">@T("Periods a week, whether it is assessed and for how much, and its elective group. The subject and the grade-year identify the line and are not edited here (BR-SUB-004).", "الحصص أسبوعياً، وهل تُقيَّم وبكم، ومجموعتها الاختيارية. أما المادة والصف السنوي فيعرِّفان السطر ولا يُعدَّلان هنا (BR-SUB-004).")</p></div>
+    <partial name="_HelpModal" model="help" /></div>
+<partial name="_SubjectsNav" />
+
+<div class="sms-card p-4" style="max-width:680px">
+    @* Which line is being edited, said before the fields that change it. The subject and grade are
+       the line's identity, so they read as a heading rather than as disabled inputs — a greyed-out
+       box invites a click that will never do anything. *@
+    <div class="border-bottom pb-3 mb-3">
+        <h2 class="h6 mb-1">@if (Model.Subject != null) { <code>@Model.Subject.Code</code> } @subjectName</h2>
+        <div class="small text-muted">
+            @(Model.GradeLabel ?? T("(grade unknown)", "(الصف غير معروف)"))<text> · </text>@(Model.YearLabel ?? T("(year unknown)", "(العام غير معروف)"))
+            @if (Model.Subject != null && !Model.Subject.IsActive)
+            {
+                <span class="badge text-bg-secondary ms-1">@T("retired subject", "مادة ملغاة")</span>
+            }
+        </div>
+    </div>
+
+    <form method="post" asp-action="EditOffering" asp-route-id="@Model.Id" novalidate>
+        <div asp-validation-summary="All" class="alert alert-danger py-2 small" role="alert"></div>
+
+        @* The plan the edit came from, carried through so Save and Cancel both land back on it —
+           slots included, which is a screen setting rather than stored data and would otherwise
+           reset to the default on the way back. *@
+        <input type="hidden" asp-for="Year" />
+        <input type="hidden" asp-for="Profile" />
+        <input type="hidden" asp-for="Slots" />
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <label asp-for="WeeklyPeriods" class="form-label">@T("Periods per week", "الحصص أسبوعياً")</label>
+                <input asp-for="WeeklyPeriods" class="form-control" type="number" min="1" dir="ltr" />
+                <div class="form-text">@T("At least one — a line with none is one the timetable can never place.", "واحدة على الأقل — فسطر بلا حصص لا يستطيع الجدول وضعه أبداً.")</div>
+            </div>
+            <div class="col-md-6">
+                @* Rendered invariant on purpose: a decimal written with the Arabic culture's separator
+                   comes back to a number input as an empty box. *@
+                <label for="GpaWeight" class="form-label">@T("GPA weight", "وزن المعدل")</label>
+                <input id="GpaWeight" name="GpaWeight" class="form-control" type="number" step="0.5" min="0" dir="ltr" value="@Model.GpaWeight.ToString(CultureInfo.InvariantCulture)" />
+                <div class="form-text">@T("Must be above zero when the subject is assessed.", "يجب أن يكون أكبر من صفر عندما تكون المادة مقيَّمة.")</div>
+            </div>
+        </div>
+
+        <div class="form-check mb-2">
+            <input asp-for="IsAssessable" class="form-check-input" />
+            <label asp-for="IsAssessable" class="form-check-label">@T("Assessable — appears in the gradebook and counts towards the average", "قابلة للتقييم — تظهر في سجل العلامات وتُحتسب في المعدل")</label>
+        </div>
+        <div class="form-check mb-3">
+            <input asp-for="IsElective" class="form-check-input" />
+            <label asp-for="IsElective" class="form-check-label">@T("Elective — one of a set the student chooses from", "اختيارية — واحدة من مجموعة يختار منها الطالب")</label>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="ElectiveGroupTag" class="form-label">@T("Elective group tag", "وسم المجموعة الاختيارية")</label>
+            <input asp-for="ElectiveGroupTag" class="form-control" placeholder="@T("optional", "اختياري")" />
+            <div class="form-text">@T("Lines sharing this tag are the alternatives a student picks one of. Spell it identically or the group is not a group.", "الأسطر التي تشترك في هذا الوسم هي البدائل التي يختار الطالب واحدة منها. اكتبه بالنص ذاته وإلا لم تكن المجموعة مجموعة.")</div>
+        </div>
+
+        @if (Model.Usage != null && Model.Usage.IsInUse)
+        {
+            @* Context, not a refusal: none of this stops the edit. It is here because changing what a
+               line is worth is a different act when a term has already been taught against it. *@
+            <div class="alert alert-info d-flex align-items-start gap-2 py-2 small">
+                <i class="bi bi-info-circle mt-1 flex-shrink-0" aria-hidden="true"></i>
+                <div>
+                    @T($"Already referenced by {Model.Usage.Describe(arabic: false)}. Editing stays open; removing the line does not (BR-SUB-004).", $"يشير إليها بالفعل {Model.Usage.Describe(arabic: true)}. والتعديل يبقى متاحاً، أما حذف السطر فلا (BR-SUB-004).")
+                </div>
+            </div>
+        }
+
+        <button class="btn btn-primary" type="submit"><i class="bi bi-check-lg me-1" aria-hidden="true"></i>@T("Save changes", "حفظ التعديلات")</button>
+        <a class="btn btn-outline-secondary" asp-action="Plan" asp-route-year="@Model.Year" asp-route-profile="@Model.Profile" asp-route-slots="@Model.Slots">@T("Cancel", "إلغاء")</a>
+    </form>
+</div>

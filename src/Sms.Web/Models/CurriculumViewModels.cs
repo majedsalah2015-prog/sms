@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Sms.Application.Common.Guards;
 using Sms.Domain.Classrooms;
 using Sms.Domain.Grades;
 using Sms.Domain.Schools;
@@ -116,8 +117,21 @@ namespace Sms.Web.Models
         /// deactivated. The offering is still real and still counts toward the week — deactivating a
         /// subject stops new offerings, it does not erase the ones already made — so the row is shown
         /// and labelled rather than hidden or, as it was, thrown over.
+        /// <para>
+        /// <paramref name="Usage"/> is what the row is allowed to offer. Null means nobody asked, and
+        /// the row then offers nothing destructive — the safe reading, since "not inspected" and
+        /// "free" are the same shape and only one of them is safe to act on.
+        /// </para>
         /// </summary>
-        public sealed record OfferingRow(CurriculumOffering Offering, Subject Subject, bool SubjectIsRetired = false);
+        public sealed record OfferingRow(CurriculumOffering Offering, Subject Subject, bool SubjectIsRetired = false, UsageReport? Usage = null)
+        {
+            /// <summary>
+            /// Whether the remove button is drawn at all — absent rather than disabled, matching the
+            /// template list. A control that cannot work is noise; what stands in the way is named on
+            /// the row instead, where it can be acted on (BR-SUB-004).
+            /// </summary>
+            public bool CanRemove => Usage is { IsInUse: false };
+        }
 
         /// <summary>
         /// One grade-year the plan can be written for. <paramref name="Stage"/> rides along because a
@@ -311,5 +325,55 @@ namespace Sms.Web.Models
         public IReadOnlyList<AcademicYear> Years { get; set; } = Array.Empty<AcademicYear>();
 
         public int? WorkingYearId { get; set; }
+    }
+
+    /// <summary>
+    /// One plan line being corrected in place (doc/Modules/07 §8.2).
+    /// <para>
+    /// The subject is display-only, and deliberately so: an offering is identified by (grade-year,
+    /// subject), so the subject is not a field of the line — it is what makes it <i>this</i> line.
+    /// Teaching a different subject is a different offering, made by ending this one and defining
+    /// that one, which is also the only shape that keeps last term's marks pointing where they did.
+    /// </para>
+    /// <para>
+    /// <see cref="Year"/>, <see cref="Profile"/> and <see cref="Slots"/> ride along untouched so
+    /// both Save and Cancel land back on the plan the edit was started from — including the
+    /// slots-per-week the reader had typed, which is a screen setting rather than stored data and
+    /// would otherwise reset to the default on every return trip.
+    /// </para>
+    /// </summary>
+    public sealed class OfferingEditViewModel
+    {
+        public int Id { get; set; }
+
+        public int WeeklyPeriods { get; set; } = 1;
+
+        public bool IsAssessable { get; set; }
+
+        public decimal GpaWeight { get; set; }
+
+        public bool IsElective { get; set; }
+
+        public string? ElectiveGroupTag { get; set; }
+
+        public int? Year { get; set; }
+
+        public int? Profile { get; set; }
+
+        public int? Slots { get; set; }
+
+        /// <summary>Display only — see the note on the class.</summary>
+        public Subject? Subject { get; set; }
+
+        public string? GradeLabel { get; set; }
+
+        public string? YearLabel { get; set; }
+
+        /// <summary>
+        /// What already points at this line. Shown as context rather than as a refusal: everything
+        /// listed here is a reason the line cannot be <i>removed</i>, while editing its periods and
+        /// weight stays open for as long as the line itself is current (BR-SUB-004).
+        /// </summary>
+        public UsageReport? Usage { get; set; }
     }
 }

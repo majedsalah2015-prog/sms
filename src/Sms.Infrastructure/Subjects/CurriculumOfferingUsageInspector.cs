@@ -28,6 +28,15 @@ namespace Sms.Infrastructure.Subjects
     /// for future terms and leaves every mark ever recorded against it standing —
     /// which is the whole reason ending exists as an alternative to removing.
     /// </para>
+    /// <para>
+    /// Lessons and homework are counted for the same reason, though BR-SUB-004
+    /// does not name them: BR-LRN-001 anchors every piece of e-learning content
+    /// on the offering rather than the subject, and promises that ending one
+    /// leaves its content readable. Removing an offering out from under a term's
+    /// lessons would break that promise — and, because every non-ownership
+    /// cascade in this model is downgraded to Restrict, would surface as a
+    /// foreign-key violation rather than as an answer.
+    /// </para>
     /// </summary>
     public class CurriculumOfferingUsageInspector : IUsageInspector<CurriculumOffering>
     {
@@ -53,6 +62,8 @@ namespace Sms.Infrastructure.Subjects
             var assignments = await _db.TeacherAssignments.CountAsync(a => a.CurriculumOfferingId == id, cancellationToken);
             var exams = await _db.Exams.CountAsync(e => e.CurriculumOfferingId == id, cancellationToken);
             var results = await _db.TermResults.CountAsync(r => r.CurriculumOfferingId == id, cancellationToken);
+            var lessons = await _db.Lessons.CountAsync(l => l.CurriculumOfferingId == id, cancellationToken);
+            var homework = await _db.Homeworks.CountAsync(h => h.CurriculumOfferingId == id, cancellationToken);
 
             return UsageReport.From(
                 new UsageReference("marksheet(s)", "كشف درجات", marksheets),
@@ -60,7 +71,9 @@ namespace Sms.Infrastructure.Subjects
                 new UsageReference("timetable session(s)", "حصة في الجدول", placements),
                 new UsageReference("teacher assignment(s)", "إسناد معلم", assignments),
                 new UsageReference("exam(s)", "اختبار", exams),
-                new UsageReference("term result(s)", "نتيجة فصل", results));
+                new UsageReference("term result(s)", "نتيجة فصل", results),
+                new UsageReference("lesson(s)", "درس", lessons),
+                new UsageReference("homework item(s)", "واجب", homework));
         }
     }
 }
