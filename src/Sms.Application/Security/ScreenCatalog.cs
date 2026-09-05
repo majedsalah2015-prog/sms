@@ -522,6 +522,14 @@ namespace Sms.Application.Security
             /// </para>
             /// </summary>
             public const string QuestionBank = "QuestionBank";
+
+            /// <summary>
+            /// §8.7 — the paper builder. §6: "View, Create, Edit, <b>Approve</b> |
+            /// Teacher (build), HoD (approve)", and that split is the whole point
+            /// of the Approve verb here: the same screen serves both, and the
+            /// permission decides which of them may sign it. §4 calls it P2.
+            /// </summary>
+            public const string Papers = "Papers";
         }
 
         public static class Portal
@@ -866,6 +874,13 @@ namespace Sms.Application.Security
             S(Modules.Learning, Learning.Marking, "Marking queue", "طابور التصحيح",
                 ActionVerb.View, ActionVerb.Edit),
             S(Modules.Learning, Learning.QuestionBank, "Question bank", "بنك الأسئلة", Crud),
+            // DEVIATION from §6, which lists View/Create/Edit/Approve and no more.
+            // BR-LRN-016 requires a paper to be withdrawable with a stated reason,
+            // and this module already spells withdrawal as Deactivate on the
+            // homework desk and the resource library. Following the module's own
+            // precedent beats inventing a fifth verb or leaving the rule with no
+            // action behind it.
+            S(Modules.Learning, Learning.Papers, "Paper builder", "بنّاء الأوراق", CrudApprove),
 
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),

@@ -1,0 +1,325 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model PaperViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = Model.Title;
+    ViewData["Breadcrumb"] = T("E-learning / Question banks / Papers", "التعليم الإلكتروني / بنوك الأسئلة / الأوراق");
+
+    var r = Model.Reconciliation;
+    var total = r.TotalMarks.ToString("0.##", CultureInfo.InvariantCulture);
+    var target = r.ComponentMaxScore.ToString("0.##", CultureInfo.InvariantCulture);
+    var gap = Math.Abs(r.Variance).ToString("0.##", CultureInfo.InvariantCulture);
+    var percent = r.ComponentMaxScore <= 0m ? 0 : (int)Math.Min(100m, Math.Round(100m * r.TotalMarks / r.ComponentMaxScore));
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "paper-help",
+        Title = T("Building a paper — help", "بناء ورقة — مساعدة"),
+        Intro = T("Add questions until the paper's marks match the component exactly.",
+            "أضف الأسئلة حتى تُطابق درجات الورقة المكوّنَ تماماً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Exactly, not approximately", "تماماً لا تقريباً"),
+                T("The paper is approved only when its marks equal what the component expects — not close to it. Module 17 owns that number and this module matches it or refuses (BR-LRN-008).",
+                  "لا تُعتمد الورقة إلا حين تساوي درجاتُها ما ينتظره المكوّن — لا أن تقاربه. فالوحدة 17 تملك ذلك الرقم، وهذه الوحدة تُطابقه أو ترفض (BR-LRN-008).")),
+            new HelpPanelViewModel.Item(
+                T("A question's marks on this paper are its own", "درجة السؤال على هذه الورقة له وحدها"),
+                T("They are copied from the bank when you add the question and can be changed here. Later edits in the bank do not move what this paper is worth — a class must not find the paper reweighted after they sat it.",
+                  "تُنسخ من البنك عند إضافة السؤال ويمكن تغييرها هنا. ولا تُحرّك تعديلاتُ البنك لاحقاً ما تساويه هذه الورقة — فلا يجد صفٌّ ورقتَه أُعيد وزنها بعد أن أدّاها.")),
+            new HelpPanelViewModel.Item(
+                T("Generation is a shortcut, not a decision", "التوليد اختصار لا قرار"),
+                T("Ask for five easy questions from one lesson and the bank supplies what it has. If it has three, you are told — a paper you believed was built is worse than one you know is unfinished.",
+                  "اطلب خمسة أسئلة سهلة من درس فيُعطيك البنك ما عنده. فإن كان عنده ثلاثة أُخبِرت — فورقةٌ تظنّها اكتملت أسوأ من ورقة تعرف أنها ناقصة.")),
+            new HelpPanelViewModel.Item(
+                T("Approval freezes the question list", "الاعتماد يُجمّد قائمة الأسئلة"),
+                T("What the head of department signed is what the class sits. A paper that must change after approval is withdrawn and rebuilt, which is visible to everyone (doc/Modules/37 §4).",
+                  "ما وقّعه رئيس القسم هو ما يؤدّيه الصف. والورقة التي يجب أن تتغيّر بعد الاعتماد تُسحب وتُبنى غيرها، وهذا ظاهر للجميع (الوثيقة 37 §4).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@Model.Title</h1>
+        <p class="text-muted mb-0">
+            @Model.BankName
+            <span class="mx-1">·</span>@r.ComponentName
+            <span class="mx-1">·</span>
+            <span class="badge bg-secondary">@LearningLabels.PaperStatusName(Model.Paper.Status, isRtl)</span>
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Papers" asp-route-id="@Model.Paper.QuestionBankId">@T("All papers", "كل الأوراق")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@* BR-LRN-008's meter. The two numbers are the screen: an author who can see them
+   the whole time never meets the refusal. *@
+<div class="sms-card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <span dir="ltr" class="h5 mb-0 @(r.Reconciles ? "text-success" : "text-danger")">@total</span>
+            <span class="text-muted">/ @target</span>
+            <span class="mx-2">·</span>
+            @if (r.Reconciles)
+            {
+                <span class="text-success">@T("matches the component", "تطابق المكوّن")</span>
+            }
+            else if (r.Variance > 0)
+            {
+                <span class="text-danger">@T($"{gap} over", $"زيادة {gap}")</span>
+            }
+            else
+            {
+                <span class="text-danger">@T($"{gap} short", $"نقص {gap}")</span>
+            }
+            <span class="text-muted">
+                <span class="mx-1">·</span>@T($"{r.ItemCount} questions", $"{r.ItemCount} سؤالاً")
+            </span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            @if (Model.CanSubmit)
+            {
+                <form method="post" asp-action="SubmitPaper" asp-route-id="@Model.Paper.Id" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary btn-sm">@T("Send for approval", "أرسل للاعتماد")</button>
+                </form>
+            }
+            else if (Model.IsEditable)
+            {
+                <button type="button" class="btn btn-primary btn-sm" disabled
+                        title="@(r.ItemCount == 0
+                                  ? T("The paper is empty", "الورقة فارغة")
+                                  : r.WithdrawnQuestionCount > 0
+                                      ? T("A question on it was withdrawn from the bank", "أحد أسئلتها سُحب من البنك")
+                                      : T("The marks do not match the component yet", "الدرجات لا تطابق المكوّن بعد"))">
+                    @T("Send for approval", "أرسل للاعتماد")
+                </button>
+            }
+
+            @if (Model.IsAwaitingApproval)
+            {
+                <form method="post" asp-action="ApprovePaper" asp-route-id="@Model.Paper.Id" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-success btn-sm">@T("Approve", "اعتمد")</button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <div class="progress" role="progressbar" aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100"
+         aria-label="@T("Marks against the component", "الدرجات مقابل المكوّن")" style="height:.5rem">
+        <div class="progress-bar @(r.Reconciles ? "bg-success" : "bg-danger")" style="width:@percent.ToString(CultureInfo.InvariantCulture)%"></div>
+    </div>
+
+    @if (r.WithdrawnQuestionCount > 0)
+    {
+        <p class="text-danger small mb-0 mt-2">
+            @T($"{r.WithdrawnQuestionCount} question(s) on this paper were withdrawn from the bank after they were added. Remove or replace them before approval (BR-LRN-007).",
+               $"{r.WithdrawnQuestionCount} من أسئلة هذه الورقة سُحبت من البنك بعد إضافتها. احذفها أو استبدلها قبل الاعتماد (BR-LRN-007).")
+        </p>
+    }
+
+    @if (Model.IsApproved && Model.Paper.ApprovedAtUtc is DateTime approvedAt)
+    {
+        <p class="text-muted small mb-0 mt-2">
+            @T("Approved on", "اعتُمدت في") @approvedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+            <span class="mx-1">·</span>@T("the question list is frozen", "قائمة الأسئلة مُجمّدة")
+        </p>
+    }
+
+    @if (Model.IsWithdrawn && !string.IsNullOrWhiteSpace(Model.Paper.WithdrawnReason))
+    {
+        <p class="text-muted small mb-0 mt-2">@T("Withdrawn:", "سُحبت:") @Model.Paper.WithdrawnReason</p>
+    }
+</div>
+
+<div class="sms-card mb-3">
+    <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("On the paper", "على الورقة")</h2></div>
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("The questions on this paper", "أسئلة هذه الورقة")</caption>
+        <thead><tr>
+            <th scope="col" style="width:3rem">#</th>
+            <th scope="col">@T("Question", "السؤال")</th>
+            <th scope="col">@T("Type", "النوع")</th>
+            <th scope="col">@T("Marks", "الدرجة")</th>
+            @if (Model.IsEditable)
+            {
+                <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+            }
+        </tr></thead>
+        <tbody>
+        @if (Model.Items.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted p-3">
+                @T("Nothing on the paper yet. Pick questions below, or generate a set.",
+                   "لا شيء على الورقة بعد. اختر أسئلة أدناه أو ولِّد مجموعة.")
+            </td></tr>
+        }
+        @{ var n = 1; }
+        @foreach (var (item, question) in Model.Items)
+        {
+            <tr class="@(question.IsDeprecated ? "table-danger" : null)">
+                <td class="text-muted">@n</td>
+                <td>
+                    <div>@(isRtl ? question.StemAr : question.StemEn)</div>
+                    @if (question.IsDeprecated)
+                    {
+                        <div class="small text-danger">@T("withdrawn from the bank", "مسحوب من البنك")</div>
+                    }
+                    else if (question.Version > 1)
+                    {
+                        <div class="small text-muted">@T($"version {question.Version}", $"النسخة {question.Version}")</div>
+                    }
+                </td>
+                <td>@LearningLabels.QuestionTypeName(question.Type, isRtl)</td>
+                <td dir="ltr">@item.Marks.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                @if (Model.IsEditable)
+                {
+                    <td class="text-end">
+                        <form method="post" asp-action="RemovePaperItem" asp-route-id="@Model.Paper.Id" asp-route-itemId="@item.Id" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger">@T("Remove", "احذف")</button>
+                        </form>
+                    </td>
+                }
+            </tr>
+            n++;
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@if (Model.IsAwaitingApproval)
+{
+    <div class="sms-card p-3 mb-3">
+        <h2 class="h6">@T("Hand it back", "أعِدها")</h2>
+        <form method="post" asp-action="RejectPaper" asp-route-id="@Model.Paper.Id" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-9">
+                <label class="form-label" for="rejectReason">@T("What needs changing", "ما ينبغي تغييره")</label>
+                <input class="form-control" id="rejectReason" name="reason" required />
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-secondary w-100">@T("Return to the author", "أعِدها إلى كاتبها")</button>
+            </div>
+        </form>
+    </div>
+}
+
+@if (Model.IsEditable)
+{
+    <div class="sms-card p-3 mb-3">
+        <h2 class="h6">@T("Generate a set", "ولِّد مجموعة")</h2>
+        <form method="post" asp-action="GeneratePaper" asp-route-id="@Model.Paper.Id" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-2">
+                <label class="form-label" for="count">@T("How many", "كم سؤالاً")</label>
+                <input type="number" min="1" max="50" class="form-control" id="count" name="count" value="5" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="genLesson">@T("Lesson", "الدرس")</label>
+                <select class="form-select" id="genLesson" name="lessonId">
+                    <option value="">@T("Any", "أيّ")</option>
+                    @foreach (var lesson in Model.Lessons)
+                    {
+                        <option value="@lesson.Id">@lesson.Title</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="genDifficulty">@T("Difficulty", "الصعوبة")</label>
+                <select class="form-select" id="genDifficulty" name="difficulty">
+                    <option value="">@T("Any", "أيّ")</option>
+                    @foreach (var d in new[] { QuestionDifficulty.Easy, QuestionDifficulty.Medium, QuestionDifficulty.Hard })
+                    {
+                        <option value="@((int)d)">@LearningLabels.QuestionDifficultyName(d, isRtl)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="genType">@T("Type", "النوع")</label>
+                <select class="form-select" id="genType" name="type">
+                    <option value="">@T("Any", "أيّ")</option>
+                    @foreach (var t in new[] { QuestionType.SingleChoice, QuestionType.MultipleChoice, QuestionType.TrueFalse, QuestionType.Numeric, QuestionType.ShortText, QuestionType.Essay })
+                    {
+                        <option value="@((int)t)">@LearningLabels.QuestionTypeName(t, isRtl)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-outline-primary w-100">@T("Add", "أضف")</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="sms-card">
+        <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("Pick from the bank", "اختر من البنك")</h2></div>
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@T("The bank's live questions", "أسئلة البنك الحيّة")</caption>
+            <thead><tr>
+                <th scope="col">@T("Question", "السؤال")</th>
+                <th scope="col">@T("Type", "النوع")</th>
+                <th scope="col">@T("Difficulty", "الصعوبة")</th>
+                <th scope="col" class="text-end">@T("Marks", "الدرجة")</th>
+            </tr></thead>
+            <tbody>
+            @if (Model.Candidates.Count == 0)
+            {
+                <tr><td colspan="4" class="text-muted p-3">
+                    @T("The bank has no live questions. Write some first.", "لا أسئلة حيّة في البنك. اكتب بعضها أولاً.")
+                </td></tr>
+            }
+            @foreach (var c in Model.Candidates)
+            {
+                <tr class="@(c.AlreadyOn ? "text-muted" : null)">
+                    <td>@c.Stem</td>
+                    <td>@LearningLabels.QuestionTypeName(c.Question.Type, isRtl)</td>
+                    <td>@LearningLabels.QuestionDifficultyName(c.Question.Difficulty, isRtl)</td>
+                    <td class="text-end">
+                        @if (c.AlreadyOn)
+                        {
+                            <span class="badge bg-secondary">@T("on the paper", "على الورقة")</span>
+                        }
+                        else
+                        {
+                            <form method="post" asp-action="AddPaperItem" asp-route-id="@Model.Paper.Id" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="questionId" value="@c.Question.Id" />
+                                <input type="number" step="0.25" min="0" name="marks" class="form-control form-control-sm d-inline-block" style="width:6rem"
+                                       value="@c.Question.Marks.ToString("0.##", CultureInfo.InvariantCulture)"
+                                       aria-label="@T("Marks on this paper", "الدرجة على هذه الورقة")" />
+                                <button type="submit" class="btn btn-sm btn-outline-primary">@T("Add", "أضف")</button>
+                            </form>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+}
+
+@if (!Model.IsWithdrawn)
+{
+    <div class="sms-card p-3 mt-3">
+        <h2 class="h6">@T("Withdraw this paper", "اسحب هذه الورقة")</h2>
+        <form method="post" asp-action="WithdrawPaper" asp-route-id="@Model.Paper.Id" class="row g-2 align-items-end">
+            @Html.AntiForgeryToken()
+            <div class="col-md-9">
+                <label class="form-label" for="withdrawReason">@T("Why", "لماذا")</label>
+                <input class="form-control" id="withdrawReason" name="reason" required />
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-outline-danger w-100">@T("Withdraw", "اسحب")</button>
+            </div>
+        </form>
+    </div>
+}

@@ -215,6 +215,58 @@ namespace Sms.Web.Models
                 ? "هذا البنك متقاعد فلا يقبل أسئلة جديدة، ويحتفظ بكلّ ما فيه لأنّ أسئلته قد تكون على ورقة أُجيبت فعلاً (BR-GLB-006)."
                 : "This bank is retired and takes no new questions, and it keeps every one it holds because they may sit on a paper already answered (BR-GLB-006).",
 
+            // ---- M37 the paper builder (§8.7)
+
+            PaperRefusedException pr => pr.Refusal switch
+            {
+                // BR-LRN-008 requires the refusal to NAME BOTH TOTALS. "Does not
+                // reconcile" is not a sentence an author can act on; "you are
+                // three marks over twenty" is.
+                PaperRefusal.MarksDoNotReconcile => arabic
+                    ? $"مجموع درجات الورقة {Amount(pr.PaperTotalMarks)} ومكوّن الدرجات ينتظر {Amount(pr.ComponentMaxScore)} — {(pr.PaperTotalMarks > pr.ComponentMaxScore ? $"زيادة {Amount(pr.PaperTotalMarks - pr.ComponentMaxScore)}" : $"نقص {Amount(pr.ComponentMaxScore - pr.PaperTotalMarks)}")}. عدّل درجات الأسئلة أو أضف سؤالاً أو احذف واحداً حتى يتطابق الرقمان (BR-LRN-008)."
+                    : $"The paper adds up to {Amount(pr.PaperTotalMarks)} and the grading component expects {Amount(pr.ComponentMaxScore)} — {(pr.PaperTotalMarks > pr.ComponentMaxScore ? $"{Amount(pr.PaperTotalMarks - pr.ComponentMaxScore)} over" : $"{Amount(pr.ComponentMaxScore - pr.PaperTotalMarks)} short")}. Adjust a question's marks, or add or remove one, until the two numbers meet (BR-LRN-008).",
+
+                PaperRefusal.NoItems => arabic
+                    ? "الورقة فارغة — أضف أسئلة إليها قبل إرسالها للاعتماد (BR-LRN-008)."
+                    : "The paper is empty — put questions on it before sending it for approval (BR-LRN-008).",
+
+                PaperRefusal.ContainsWithdrawnQuestion => arabic
+                    ? $"على الورقة {pr.WithdrawnQuestionCount} من الأسئلة سُحبت من البنك بعد إضافتها — احذفها أو استبدلها. فالسحب يمنع السؤال من أوراق قادمة، وهذه الورقة منها ما دامت لم تُعتمد (BR-LRN-007)."
+                    : $"{pr.WithdrawnQuestionCount} question(s) on this paper were withdrawn from the bank after they were added — remove or replace them. Withdrawal keeps a question out of future papers, and an unapproved paper is one of them (BR-LRN-007).",
+
+                PaperRefusal.WrongStatus => arabic
+                    ? "لا تُتاح هذه الحركة من حالة الورقة الحالية (الوثيقة 37 §4)."
+                    : "That move is not available from the paper's current state (doc/Modules/37 §4).",
+
+                _ => arabic
+                    ? "لا يمكن نقل هذه الورقة في وضعها الحالي (BR-LRN-008)."
+                    : "This paper cannot be moved as it stands (BR-LRN-008).",
+            },
+
+            OnlinePaperTransitionException opt => arabic
+                ? (opt.From == OnlinePaperStatus.Approved
+                    ? "هذه الورقة معتمدة، وقائمة أسئلتها هي ما وقّع عليه رئيس القسم — تعديلها بعد الاعتماد يجعل التوقيع على مستند آخر. اسحبها وابنِ غيرها إن لزم (الوثيقة 37 §4)."
+                    : opt.From == OnlinePaperStatus.Withdrawn
+                        ? "هذه الورقة مسحوبة، والمسحوب سجلّ يُقرأ لا مسوّدة تُحرَّر — أنشئ ورقة جديدة بدلاً من إحيائها (BR-LRN-016)."
+                        : "لا تُتاح هذه الحركة من حالة الورقة الحالية (الوثيقة 37 §4).")
+                : (opt.From == OnlinePaperStatus.Approved
+                    ? "This paper is approved, and its question list is what the head of department signed — editing it afterwards would leave that signature on a different document. Withdraw it and build another if it must change (doc/Modules/37 §4)."
+                    : opt.From == OnlinePaperStatus.Withdrawn
+                        ? "This paper is withdrawn, and withdrawn work is readable history rather than an editable draft — create a new paper instead of reviving it (BR-LRN-016)."
+                        : "That move is not available from the paper's current state (doc/Modules/37 §4)."),
+
+            PaperNotEditableException pne => arabic
+                ? (pne.Status == OnlinePaperStatus.PendingApproval
+                    ? "الورقة عند رئيس القسم للاعتماد، فهي مستند قيد المراجعة لا مسوّدة — استردّها إن أردت تعديلها (الوثيقة 37 §4)."
+                    : "لم تعد أسئلة هذه الورقة قابلة للتغيير في حالتها الحالية (الوثيقة 37 §4).")
+                : (pne.Status == OnlinePaperStatus.PendingApproval
+                    ? "The paper is with the head of department, so it is a document under review rather than a draft — take it back if you need to edit it (doc/Modules/37 §4)."
+                    : "This paper's questions can no longer be changed in its current state (doc/Modules/37 §4)."),
+
+            QuestionNotInBankException => arabic
+                ? "هذا السؤال من بنك آخر — والورقة تسحب من بنك واحد، وهو ما يُبقي كلّ أسئلتها داخل مقرر واحد (BR-LRN-001)."
+                : "That question belongs to another bank — a paper draws on one bank, which is what keeps every question on it inside one subject (BR-LRN-001).",
+
             // ---------------------------------------------------------------- M16 grading
 
             GradingScaleLockedException => arabic

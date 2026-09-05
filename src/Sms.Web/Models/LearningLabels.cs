@@ -94,5 +94,15 @@ namespace Sms.Web.Models
             Domain.Learning.QuestionShareScope.Department => arabic ? "القسم كلّه" : "The whole department",
             _ => arabic ? "غير معروف" : "Unknown",
         };
+
+        /// <summary>doc/Modules/37 §4 paper lifecycle, named as a teacher and a head of department would each read it.</summary>
+        public static string PaperStatusName(Domain.Learning.OnlinePaperStatus status, bool arabic) => status switch
+        {
+            Domain.Learning.OnlinePaperStatus.Draft => arabic ? "مسوّدة" : "Draft",
+            Domain.Learning.OnlinePaperStatus.PendingApproval => arabic ? "بانتظار الاعتماد" : "Awaiting approval",
+            Domain.Learning.OnlinePaperStatus.Approved => arabic ? "معتمدة" : "Approved",
+            Domain.Learning.OnlinePaperStatus.Withdrawn => arabic ? "مسحوبة" : "Withdrawn",
+            _ => arabic ? "غير معروف" : "Unknown",
+        };
     }
 }

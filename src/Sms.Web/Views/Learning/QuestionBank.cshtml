@@ -45,6 +45,7 @@
     </div>
     <div class="d-flex align-items-center gap-2">
         <a class="btn btn-outline-secondary" asp-action="QuestionBanks" asp-route-offeringId="@Model.Bank.CurriculumOfferingId">@T("All banks", "كل البنوك")</a>
+        <a class="btn btn-outline-secondary" asp-action="Papers" asp-route-id="@Model.Bank.Id">@T("Papers", "الأوراق")</a>
         @if (!Model.IsRetired)
         {
             <a class="btn btn-primary" asp-action="NewQuestion" asp-route-id="@Model.Bank.Id">@T("New question", "سؤال جديد")</a>

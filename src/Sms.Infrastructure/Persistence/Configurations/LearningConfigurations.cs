@@ -260,4 +260,54 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasIndex(x => x.QuestionId, "IX_QuestionAcceptedAnswer_Question");
         }
     }
+
+    /// <summary>
+    /// doc/Modules/37 §7 lrn.OnlinePaper, BR-LRN-008. Outside the soft-active
+    /// filter with the rest of the versioned catalogs: a paper a class has
+    /// answered must stay loadable forever.
+    /// </summary>
+    public class OnlinePaperConfiguration : IEntityTypeConfiguration<OnlinePaper>
+    {
+        public void Configure(EntityTypeBuilder<OnlinePaper> builder)
+        {
+            builder.ToTable("OnlinePaper", "lrn");
+
+            builder.Property(x => x.TitleAr).IsRequired().HasMaxLength(200);
+            builder.Property(x => x.TitleEn).IsRequired().HasMaxLength(200);
+            builder.Property(x => x.WithdrawnReason).HasMaxLength(500);
+
+            builder.HasOne<QuestionBank>().WithMany().HasForeignKey(x => x.QuestionBankId);
+
+            // BR-LRN-008: the number this paper is measured against. Module 17
+            // owns it; this is the reference, never a copy of the figure.
+            builder.HasOne<BlueprintComponent>().WithMany().HasForeignKey(x => x.BlueprintComponentId);
+
+            builder.HasIndex(x => new { x.QuestionBankId, x.Status }, "IX_OnlinePaper_Bank_Status");
+            builder.HasIndex(x => x.BlueprintComponentId, "IX_OnlinePaper_Component");
+        }
+    }
+
+    /// <summary>
+    /// doc/Modules/37 §7 lrn.PaperItem, BR-LRN-007. The foreign key to a question
+    /// <em>version</em> is the freeze: a later revision of that question changes
+    /// nothing here, which is what makes a past paper render as it was answered.
+    /// </summary>
+    public class PaperItemConfiguration : IEntityTypeConfiguration<PaperItem>
+    {
+        public void Configure(EntityTypeBuilder<PaperItem> builder)
+        {
+            builder.ToTable("PaperItem", "lrn");
+
+            builder.Property(x => x.Marks).HasColumnType("decimal(6,2)");
+
+            builder.HasOne<OnlinePaper>().WithMany().HasForeignKey(x => x.OnlinePaperId);
+            builder.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId);
+
+            // The same question twice on one paper is a slip, not an intention:
+            // a student would be asked it twice and marked for it twice.
+            builder.HasIndex(x => new { x.OnlinePaperId, x.QuestionId }, "UQ_PaperItem_Paper_Question").IsUnique();
+
+            builder.HasIndex(x => new { x.OnlinePaperId, x.DisplayOrder }, "IX_PaperItem_Paper_Order");
+        }
+    }
 }

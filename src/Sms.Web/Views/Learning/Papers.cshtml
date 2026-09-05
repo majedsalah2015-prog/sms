@@ -1,0 +1,133 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model PapersViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Papers", "الأوراق");
+    ViewData["Breadcrumb"] = T("E-learning / Question banks / Papers", "التعليم الإلكتروني / بنوك الأسئلة / الأوراق");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "papers-help",
+        Title = T("Papers — help", "الأوراق — مساعدة"),
+        Intro = T("A paper is a set of questions built to fill exactly one grading component.",
+            "الورقة مجموعة أسئلة تُبنى لتملأ مكوّن درجات واحداً بعينه."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("The component decides what the paper must be worth", "المكوّن يقرّر كم تساوي الورقة"),
+                T("You name it when you create the paper, so the meter is live while you build instead of a surprise at the end. The paper's marks must add up to exactly what the component expects, or it cannot be approved (BR-LRN-008).",
+                  "تُحدّده عند إنشاء الورقة، فيعمل المقياس وأنت تبني بدل أن يفاجئك في النهاية. ويجب أن يُساوي مجموع درجات الورقة ما ينتظره المكوّن تماماً، وإلا لم تُعتمد (BR-LRN-008).")),
+            new HelpPanelViewModel.Item(
+                T("You build it; the head of department signs it", "أنت تبنيها ورئيس القسم يوقّعها"),
+                T("Send a finished paper for approval and it goes to the head of department. They approve it or hand it back with what needs changing (doc/Modules/37 §4).",
+                  "أرسل الورقة المكتملة للاعتماد فتذهب إلى رئيس القسم، فيعتمدها أو يُعيدها مع ما ينبغي تغييره (الوثيقة 37 §4).")),
+            new HelpPanelViewModel.Item(
+                T("A paper draws on one bank", "الورقة تسحب من بنك واحد"),
+                T("That is what keeps every question on it inside one subject and one year (BR-LRN-001).",
+                  "وهذا ما يُبقي كل أسئلتها داخل مادة واحدة وعام واحد (BR-LRN-001).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@Model.BankName</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="QuestionBankDetail" asp-route-id="@Model.Bank.Id">@T("Back to the bank", "عودة إلى البنك")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+<div class="sms-card mb-3">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("The papers built on this bank", "الأوراق المبنيّة على هذا البنك")</caption>
+        <thead><tr>
+            <th scope="col">@T("Paper", "الورقة")</th>
+            <th scope="col">@T("Questions", "الأسئلة")</th>
+            <th scope="col">@T("Marks", "الدرجات")</th>
+            <th scope="col">@T("Status", "الحالة")</th>
+            <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Papers.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted p-3">
+                @T("No papers built on this bank yet.", "لا أوراق مبنيّة على هذا البنك بعد.")
+            </td></tr>
+        }
+        @foreach (var row in Model.Papers)
+        {
+            var r = row.Reconciliation;
+            <tr>
+                <td class="fw-semibold">@row.Title</td>
+                <td>@r.ItemCount</td>
+                <td dir="ltr">
+                    <span class="@(r.Reconciles ? "text-success" : "text-danger")">
+                        @r.TotalMarks.ToString("0.##", CultureInfo.InvariantCulture)
+                    </span>
+                    <span class="text-muted">/ @r.ComponentMaxScore.ToString("0.##", CultureInfo.InvariantCulture)</span>
+                </td>
+                <td><span class="badge bg-secondary">@LearningLabels.PaperStatusName(row.Paper.Status, isRtl)</span></td>
+                <td class="text-end">
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="Paper" asp-route-id="@row.Paper.Id">@T("Open", "افتح")</a>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@if (!Model.Bank.IsActive)
+{
+    <div class="sms-card p-4">
+        <p class="text-muted mb-0">
+            @T("This bank is retired, so no new paper can be built on it. Its existing papers stay readable (BR-GLB-006).",
+               "هذا البنك متقاعد فلا تُبنى عليه ورقة جديدة. وتبقى أوراقه القائمة مقروءة (BR-GLB-006).")
+        </p>
+    </div>
+}
+else if (Model.Components.Count == 0)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("This subject has no grading components yet", "لا مكوّنات درجات لهذه المادة بعد")</h2>
+        <p class="text-muted mb-0">
+            @T("A paper must fill a component of the subject's grading blueprint, and this subject has none. Define the blueprint in the grading module first (BR-LRN-008).",
+               "الورقة تملأ مكوّناً من نموذج درجات المادة، ولا مكوّنات لهذه المادة. عرِّف النموذج في وحدة الدرجات أولاً (BR-LRN-008).")
+        </p>
+    </div>
+}
+else
+{
+    <div class="sms-card p-3">
+        <h2 class="h6">@T("New paper", "ورقة جديدة")</h2>
+        <form method="post" asp-action="CreatePaper" asp-route-id="@Model.Bank.Id" class="row g-3">
+            @Html.AntiForgeryToken()
+            <div class="col-md-4">
+                <label class="form-label" for="titleAr">@T("Title (Arabic)", "العنوان بالعربية")</label>
+                <input class="form-control" id="titleAr" name="titleAr" dir="rtl" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="titleEn">@T("Title (English)", "العنوان بالإنجليزية")</label>
+                <input class="form-control" id="titleEn" name="titleEn" dir="ltr" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="blueprintComponentId">@T("Grading component", "مكوّن الدرجات")</label>
+                <select class="form-select" id="blueprintComponentId" name="blueprintComponentId" required>
+                    @foreach (var c in Model.Components)
+                    {
+                        <option value="@c.Id">@c.Label — @c.MaxScore.ToString("0.##", CultureInfo.InvariantCulture)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">@T("Add", "أضف")</button>
+            </div>
+        </form>
+    </div>
+}

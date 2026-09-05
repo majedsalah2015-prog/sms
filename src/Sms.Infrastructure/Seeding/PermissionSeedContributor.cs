@@ -254,11 +254,18 @@ namespace Sms.Infrastructure.Seeding
             // own offerings)" — the same verbs for both, with BR-LRN-002's
             // offering reach deciding whose bank each of them can touch.
             new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.QuestionBank, null),
+            // §6: "Teacher (build), HoD (approve)". The teacher gets every verb
+            // except Approve — the split is the point of the screen, and giving
+            // both to one role would make P2 a formality the author performs on
+            // their own paper.
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Papers,
+                new[] { ActionVerb.View, ActionVerb.Create, ActionVerb.Edit, ActionVerb.Deactivate }),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Marking, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.QuestionBank, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Papers, null),
 
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),

@@ -293,6 +293,10 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<QuestionAcceptedAnswer> QuestionAcceptedAnswers => Set<QuestionAcceptedAnswer>();
 
+        public DbSet<OnlinePaper> OnlinePapers => Set<OnlinePaper>();
+
+        public DbSet<PaperItem> PaperItems => Set<PaperItem>();
+
         public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
 
         public DbSet<FeeStructureLine> FeeStructureLines => Set<FeeStructureLine>();

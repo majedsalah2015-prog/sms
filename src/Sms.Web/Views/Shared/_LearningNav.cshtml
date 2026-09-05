@@ -23,7 +23,10 @@
         // it and returning to it.
         || (a == "QuestionBanks" && (string.Equals(action, "QuestionBankDetail", StringComparison.OrdinalIgnoreCase)
             || string.Equals(action, "NewQuestion", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(action, "ReviseQuestion", StringComparison.OrdinalIgnoreCase)));
+            || string.Equals(action, "ReviseQuestion", StringComparison.OrdinalIgnoreCase)
+            // A paper is reached from its bank and belongs to it (BR-LRN-001).
+            || string.Equals(action, "Papers", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "Paper", StringComparison.OrdinalIgnoreCase)));
 }
 <nav aria-label="@(isRtl ? "التعليم الإلكتروني" : "E-learning")">
 <ul class="nav nav-pills sms-subnav mb-4">

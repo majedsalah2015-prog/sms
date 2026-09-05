@@ -377,4 +377,94 @@ namespace Sms.Application.Common.Exceptions
 
         public int QuestionBankId { get; }
     }
+
+    /// <summary>
+    /// BR-LRN-008 (doc/Modules/37 §8.7): the paper does not match the Module 17
+    /// component it fills. Carries both totals because the rule requires the
+    /// refusal to name them — "does not reconcile" is not a sentence an author can
+    /// act on, and "you are three marks over twenty" is.
+    /// </summary>
+    public class PaperRefusedException : InvalidOperationException
+    {
+        public PaperRefusedException(
+            int onlinePaperId,
+            PaperRefusal refusal,
+            decimal paperTotalMarks = 0m,
+            decimal componentMaxScore = 0m,
+            int withdrawnQuestionCount = 0)
+            : base($"Paper {onlinePaperId} is refused: {refusal} ({paperTotalMarks} vs {componentMaxScore}) (BR-LRN-008).")
+        {
+            OnlinePaperId = onlinePaperId;
+            Refusal = refusal;
+            PaperTotalMarks = paperTotalMarks;
+            ComponentMaxScore = componentMaxScore;
+            WithdrawnQuestionCount = withdrawnQuestionCount;
+        }
+
+        public int OnlinePaperId { get; }
+
+        public PaperRefusal Refusal { get; }
+
+        public decimal PaperTotalMarks { get; }
+
+        public decimal ComponentMaxScore { get; }
+
+        /// <summary>Meaningful only for <see cref="PaperRefusal.ContainsWithdrawnQuestion"/>.</summary>
+        public int WithdrawnQuestionCount { get; }
+    }
+
+    /// <summary>doc/Modules/37 §4: the paper's lifecycle does not offer this move.</summary>
+    public class OnlinePaperTransitionException : InvalidOperationException
+    {
+        public OnlinePaperTransitionException(int onlinePaperId, OnlinePaperStatus from, OnlinePaperStatus to)
+            : base($"Paper {onlinePaperId} cannot move from {from} to {to} (doc/Modules/37 §4).")
+        {
+            OnlinePaperId = onlinePaperId;
+            From = from;
+            To = to;
+        }
+
+        public int OnlinePaperId { get; }
+
+        public OnlinePaperStatus From { get; }
+
+        public OnlinePaperStatus To { get; }
+    }
+
+    /// <summary>
+    /// BR-LRN-008: items move only while the paper is a draft. Once it is with the
+    /// head of department it is a document under review, and once approved it is
+    /// the one they approved.
+    /// </summary>
+    public class PaperNotEditableException : InvalidOperationException
+    {
+        public PaperNotEditableException(int onlinePaperId, OnlinePaperStatus status)
+            : base($"Paper {onlinePaperId} is {status} and its items are frozen (doc/Modules/37 §4).")
+        {
+            OnlinePaperId = onlinePaperId;
+            Status = status;
+        }
+
+        public int OnlinePaperId { get; }
+
+        public OnlinePaperStatus Status { get; }
+    }
+
+    /// <summary>
+    /// BR-LRN-001: a paper draws on one bank, which is what keeps every question
+    /// on it inside one curriculum offering.
+    /// </summary>
+    public class QuestionNotInBankException : InvalidOperationException
+    {
+        public QuestionNotInBankException(int questionId, int questionBankId)
+            : base($"Question {questionId} does not belong to bank {questionBankId} (BR-LRN-001).")
+        {
+            QuestionId = questionId;
+            QuestionBankId = questionBankId;
+        }
+
+        public int QuestionId { get; }
+
+        public int QuestionBankId { get; }
+    }
 }

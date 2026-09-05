@@ -672,6 +672,10 @@ namespace Sms.Web
             // timed paper (§8.11) are later slices and draw on this one.
             services.AddScoped<IQuestionBankAdmin, QuestionBankAdmin>();
 
+            // §8.7 — the paper builder, blueprint-reconciled against Module 17
+            // (BR-LRN-008). The sitting console (§8.8) schedules what it approves.
+            services.AddScoped<IOnlinePaperAdmin, OnlinePaperAdmin>();
+
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
             // (doc's "single marks store") - this service owns scheduling,
