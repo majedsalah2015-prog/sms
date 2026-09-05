@@ -38,7 +38,8 @@ tab is therefore not the security decision; the endpoint answering **404** is
 |---|---|
 | **The teacher role** | The API has no attendance capture, no mark entry and no teacher timetable. A teacher app that only listed lesson plans would be a demo. Building it means a backend slice first — its own task. |
 | **Homework submission** | There is no submission entity in the domain (`docs/Integration/03-Mobile-API.md` §6). An upload button would promise a family something the school could never receive. |
-| **Push notifications** | Needs a device registry and a provider decision, both pending in `docs/Status/`. Roadmap R2. |
+| **Push notifications** | Needs a device registry and a provider decision, both pending in `docs/Status/`. Roadmap R2. The update notice below is **not** an exception: the phone asks when it starts, so a family who never opens the app is never told. |
+| **Installing the update itself** | "Update now" opens the portal's app page in a browser. Fetching and installing the package from inside the app needs `REQUEST_INSTALL_PACKAGES` — the permission to install software — so this app could do what one browser tab already does, and that page is also the only place the phone's "allow installs from this browser" prompt is explained. |
 | **Paying online** | The payment gateway is roadmap R1 and dormant in `BR-PAY-007`. |
 | **Its own arithmetic** | `IStatementService` and `IFeeAdmin.ComputeStudentPositionAsync` are the single central computation BR-FEE-008 requires. A phone that added the children up itself is how a family and the accounts office begin disagreeing. |
 | **A copy of the password policy** | The school owns it and the server answers `422 password_policy` with a sentence per broken rule. A client-side copy goes stale the day a school tightens it. |
@@ -147,6 +148,33 @@ The version shown comes from the file name (`sms-portal-<version>.apk`); a file
 named otherwise still downloads and simply shows no version. Until a build is
 dropped there the page says so outright rather than offering a button that would
 refuse.
+
+### Telling the phones already installed
+
+The same file name is what `GET /api/v1/app/version` answers with, so publishing
+a build is all it takes to have the app say so. Every phone asks on launch and,
+when it is behind, shows a banner above the family screen with what is installed,
+what is waiting, and a button to the page above. The banner is dismissible — for
+that version, for that run.
+
+To stop accepting an old build altogether, set the floor and restart:
+
+```json
+"MobileApp": { "MinimumSupportedVersion": "1.2.0+3" }
+```
+
+Anything older then meets a screen it cannot get past, in front of sign-in,
+because the case this exists for at its sharpest is a build too old to sign in.
+Two guards sit on it: **the requirement is withheld unless a published build
+actually satisfies it** — raising the setting before uploading the APK would
+otherwise empty the app of every family at once — and a value that cannot be
+read is treated as no floor. Both log a warning naming the setting. A phone that
+cannot reach the school is silent, never blocked: an update check that treated a
+timeout as a verdict would lock a family out of their child's marks over a
+request that never arrived.
+
+The setting is per deployment and needs no migration, no seeder run and no new
+permission — the endpoint is anonymous, deliberately, and carries no record.
 
 The screen carries `[NoPermissionRequired]` rather than a `POR/*` gate, and that
 is deliberate: the three audiences who need it — student, guardian, **teacher** —

@@ -13,6 +13,7 @@ import 'format.dart';
 import 'statement_page.dart';
 import 'theme.dart';
 import 'widgets/async_view.dart';
+import 'widgets/update_banner.dart';
 
 /// The family, as `GET /portal/children` reports it.
 ///
@@ -120,41 +121,53 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: me != null && !me.can(PortalPermissions.home)
-          // The account signed in but holds no portal home. A staff account
-          // reaching this app is the usual cause, and saying so beats an empty
-          // list that looks like a school with no students in it.
-          ? Padding(
-              padding: const EdgeInsets.all(24),
-              child: EmptyView(message: s.noChildren, section: Section.family),
-            )
-          : AsyncView<List<PortalChild>>(
-              load: () => auth.api.children(),
-              empty: s.noChildren,
-              emptySection: Section.family,
-              builder: (BuildContext context, List<PortalChild> children) {
-                final bool self =
-                    children.isNotEmpty && children.every((PortalChild c) => c.isSelf);
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: children.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (BuildContext context, int index) {
-                    if (index == 0) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: SectionHeader(
-                          section: Section.family,
-                          title: self ? s.myFile : s.myChildren,
-                          subtitle: me?.workingAcademicYearName,
-                        ),
+      body: Column(
+        children: <Widget>[
+          // Draws nothing at all when the school has nothing to say, so it sits
+          // here unconditionally rather than behind a second condition that
+          // would have to be kept in step with the controller's own.
+          const UpdateBanner(),
+          Expanded(
+            child: me != null && !me.can(PortalPermissions.home)
+                // The account signed in but holds no portal home. A staff account
+                // reaching this app is the usual cause, and saying so beats an
+                // empty list that looks like a school with no students in it.
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: EmptyView(
+                        message: s.noChildren, section: Section.family),
+                  )
+                : AsyncView<List<PortalChild>>(
+                    load: () => auth.api.children(),
+                    empty: s.noChildren,
+                    emptySection: Section.family,
+                    builder:
+                        (BuildContext context, List<PortalChild> children) {
+                      final bool self = children.isNotEmpty &&
+                          children.every((PortalChild c) => c.isSelf);
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        itemCount: children.length + 1,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (BuildContext context, int index) {
+                          if (index == 0) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: SectionHeader(
+                                section: Section.family,
+                                title: self ? s.myFile : s.myChildren,
+                                subtitle: me?.workingAcademicYearName,
+                              ),
+                            );
+                          }
+                          return _ChildCard(child: children[index - 1]);
+                        },
                       );
-                    }
-                    return _ChildCard(child: children[index - 1]);
-                  },
-                );
-              },
-            ),
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

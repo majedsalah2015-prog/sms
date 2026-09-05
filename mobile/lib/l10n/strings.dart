@@ -63,6 +63,39 @@ class Strings {
         'حدث خطأ غير متوقع. أعد المحاولة بعد قليل.',
       );
 
+  // ---------------------------------------------------------------- update
+
+  /// The version numbers are deliberately kept out of these sentences and shown
+  /// beside them instead. A build reads `1.1.0 (2)` left to right in both
+  /// languages — like every other figure in this product — and dropping one into
+  /// the middle of an Arabic sentence is how the arrow between two of them ends
+  /// up pointing at the wrong one.
+
+  String get updateAvailableTitle =>
+      _t('A new version is available', 'يتوفر إصدار جديد من التطبيق');
+  String get updateAvailableBody => _t(
+        'Update to get the newest screens and fixes from your school.',
+        'حدّث التطبيق للحصول على أحدث الشاشات والإصلاحات من مدرستك.',
+      );
+  String get updateRequiredTitle =>
+      _t('This version is no longer supported', 'لم يعد هذا الإصدار مدعوماً');
+  String get updateRequiredBody => _t(
+        'Your school requires a newer version of the app before you can carry on. '
+            'Everything the app shows is on the school portal in the meantime.',
+        'تطلب مدرستك إصداراً أحدث من التطبيق قبل المتابعة. وكل ما يعرضه التطبيق '
+            'متاح في بوابة المدرسة حتى ذلك الحين.',
+      );
+  String get updateNow => _t('Update now', 'حدّث الآن');
+  String get updateLater => _t('Later', 'لاحقاً');
+  String get updateInstalled => _t('Installed', 'المثبَّت');
+  String get updateNewest => _t('Newest', 'الأحدث');
+  String get updateOpenFailed => _t(
+        'This device could not open the school\'s page. Open the school address '
+            'in a browser and choose the app page.',
+        'تعذّر على الجهاز فتح صفحة المدرسة. افتح عنوان المدرسة في المتصفّح ثم '
+            'اختر صفحة التطبيق.',
+      );
+
   // --------------------------------------------------------------- sign-in
 
   String get signIn => _t('Sign in', 'تسجيل الدخول');

@@ -42,5 +42,20 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+
+        <!-- "Update now" opens the school's app page in a browser. From Android 11
+             on, an app cannot see which activities handle a URL unless it declares
+             the intent here, and url_launcher answers "nothing can open this"
+             rather than failing loudly — so without these two the button would do
+             nothing at all, on new phones only. Both schemes: a school on a LAN is
+             reached over http, which is why network_security_config exists. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
     </queries>
 </manifest>

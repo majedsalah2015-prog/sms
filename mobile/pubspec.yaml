@@ -42,6 +42,16 @@ dependencies:
   path_provider: ^2.1.4
   open_filex: ^4.6.0
 
+  # "Update now" hands the family to the portal's own app page, which already
+  # carries the file, its size, its date and the four install steps in both
+  # languages. The app deliberately does not fetch and install the package
+  # itself: that needs REQUEST_INSTALL_PACKAGES in the manifest — the permission
+  # to install software — for a job one browser tab already does, and the page
+  # is also the only place the "allow installs from this browser" prompt is
+  # explained. Flutter has no way to open a URL without a plugin; this is the
+  # Flutter team's own.
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

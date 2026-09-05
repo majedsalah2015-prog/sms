@@ -1,4 +1,6 @@
+import '../app_version.dart';
 import '../core/api_client.dart';
+import '../models/app_update.dart';
 import '../models/json.dart';
 import '../models/me.dart';
 import '../models/portal.dart';
@@ -14,6 +16,31 @@ class PortalApi {
   const PortalApi(this._client);
 
   final ApiClient _client;
+
+  // ----------------------------------------------------------------- app
+
+  /// What build the school is publishing, and whether this one is behind it.
+  ///
+  /// Anonymous on the server, deliberately: the case this exists for at its
+  /// sharpest is a build too old to sign in, and a check that needed a token
+  /// would answer that phone with a sign-in failure instead of the one message
+  /// that would help it. So it is also the only call this app makes before the
+  /// keystore has been read.
+  ///
+  /// The running build goes out as two parameters rather than one `1.1.0+2`
+  /// string because `+` in a query string decodes to a space — the one-parameter
+  /// form would need percent-encoding forever, and forgetting it once would look
+  /// like a build with no versionCode rather than like a mistake.
+  Future<AppUpdate> appVersion() async {
+    final dynamic json = await _client.get(
+      '/api/v1/app/version',
+      query: <String, dynamic>{
+        'version': kAppVersion,
+        'build': kAppBuild,
+      },
+    );
+    return AppUpdate.fromJson(json as Map<String, dynamic>);
+  }
 
   // ---------------------------------------------------------------- auth
 
