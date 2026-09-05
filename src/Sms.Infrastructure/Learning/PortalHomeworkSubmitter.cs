@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Learning;
+using Sms.Application.Notifications;
 using Sms.Domain.Learning;
 using Sms.Infrastructure.Persistence;
 
@@ -35,12 +37,17 @@ namespace Sms.Infrastructure.Learning
     {
         private readonly AppDbContext _db;
         private readonly IClock _clock;
+        private readonly INotificationPublisher _notifications;
 
-        public PortalHomeworkSubmitter(AppDbContext db, IClock clock)
+        public PortalHomeworkSubmitter(AppDbContext db, IClock clock, INotificationPublisher notifications)
         {
             _db = db;
             _clock = clock;
+            _notifications = notifications;
         }
+
+        /// <summary>doc/Modules/37 §12 — the student's own receipt, catalogued under module LRN.</summary>
+        private const string ReceivedEventCode = "SubmissionReceived";
 
         public async Task<HomeworkSubmission> SubmitAsync(
             int requestingUserAccountId,
@@ -192,6 +199,26 @@ namespace Sms.Infrastructure.Learning
                 homework.Status = HomeworkStatus.Collecting;
                 await _db.SaveChangesAsync(cancellationToken);
             }
+
+            // §12 SubmissionReceived — the receipt, and only to the student who
+            // handed in. BR-LRN-013 already guarantees that account is their own,
+            // so no further resolution is needed or wanted: a parent is told when
+            // work is missing or marked, not every time their child saves a draft
+            // answer.
+            //
+            // Inside the transaction, so a receipt cannot outlive the hand-in it
+            // acknowledges.
+            await _notifications.PublishAsync(
+                ReceivedEventCode,
+                new[] { new NotificationRecipient(requestingUserAccountId, "ar") },
+                new Dictionary<string, string>
+                {
+                    ["Homework"] = homework.TitleAr,
+                    ["HomeworkEn"] = homework.TitleEn,
+                    ["SubmittedAt"] = now.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+                },
+                cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
             return submission;

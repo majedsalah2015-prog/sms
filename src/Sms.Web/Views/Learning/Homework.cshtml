@@ -120,6 +120,14 @@ else
                         <td>@(h.MaxMarks.HasValue ? h.MaxMarks.Value.ToString("0.##") : T("Practice", "تدريب"))</td>
                         <td><span class="badge bg-secondary">@LearningLabels.HomeworkStatus(h.Status, isRtl)</span></td>
                         <td class="text-end">
+                            @* §8.4/§8.5 open only once the class has been told about
+                               the work: a draft has no roster to chase and nothing to
+                               mark, and a withdrawn one is history (BR-LRN-003/016). *@
+                            @if (h.Status != HomeworkStatus.Draft && h.Status != HomeworkStatus.Withdrawn)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Submissions" asp-route-id="@h.Id">@T("Submissions", "التسليمات")</a>
+                                <a class="btn btn-sm btn-outline-secondary" asp-action="Marking" asp-route-id="@h.Id">@T("Marking", "التصحيح")</a>
+                            }
                             @if (h.Status == HomeworkStatus.Draft)
                             {
                                 <form method="post" asp-action="IssueHomework" asp-route-id="@h.Id" class="d-inline">

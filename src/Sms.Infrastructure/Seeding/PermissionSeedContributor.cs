@@ -246,9 +246,14 @@ namespace Sms.Infrastructure.Seeding
             new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
             new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
             new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+            // doc/Modules/37 §6: "Marking queue | View, Edit | Teacher, HoD".
+            // BR-LRN-002 still decides WHICH class a holder sees — the grant opens
+            // the screen, the placement decides its contents.
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Marking, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Marking, null),
 
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),

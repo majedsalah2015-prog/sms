@@ -112,6 +112,7 @@ namespace Sms.Application.Notifications
             public const string Employees = "EMP";
             public const string Workflow = "WFL";
             public const string System = "SYS";
+            public const string Learning = "LRN";
         }
 
         private static readonly EventGroup[] GroupList =
@@ -130,6 +131,7 @@ namespace Sms.Application.Notifications
             new(M.Library, "Library", "المكتبة"),
             new(M.Cafeteria, "Cafeteria", "المقصف"),
             new(M.Employees, "Employees", "الموظفون"),
+            new(M.Learning, "E-learning", "التعليم الإلكتروني"),
             new(M.Workflow, "Workflow and approvals", "سير العمل والاعتمادات"),
             new(M.System, "System and security", "النظام والأمان"),
         };
@@ -183,6 +185,30 @@ namespace Sms.Application.Notifications
                 "Parents", "أولياء الأمور", InAppEmail,
                 floorEn: "doc 09 §3 marks this one mandatory and routes it through WF-08: a mark that moves after it was published is corrected in the open, or the published result meant nothing.",
                 floorAr: "يجعله دليل الإشعارات §3 إلزامياً ويمرّره عبر WF-08: الدرجة التي تتغير بعد نشرها تُصحَّح في العلن، وإلا فلا معنى للنتيجة المنشورة."),
+
+            // ---- E-learning (doc/Modules/37 §12)
+            //
+            // Three of §12's ten, and only three, because these are the three the
+            // product actually raises today: the chase button on §8.4's tracker,
+            // the portal's hand-in receipt, and release into Module 17. The other
+            // seven (HomeworkPublished, HomeworkDueSoon, HomeworkWithdrawn, the
+            // sitting trio and IntegrityFlagRaised) have no publisher in this
+            // repository, and a catalogued event nothing raises is a subscription
+            // rule that can never match — a school would configure it, believe it
+            // was on, and never be told. They arrive with the code that raises
+            // them.
+            E("HomeworkOverdue", M.Learning, "Homework overdue", "تأخر تسليم واجب",
+                "Student and parents", "الطالب وأولياء الأمور", InAppEmail, hasPublisher: true),
+
+            E("SubmissionReceived", M.Learning, "Homework received (receipt)", "استلام تسليم واجب (إشعار استلام)",
+                "Student", "الطالب", InAppEmail, hasPublisher: true),
+
+            // Timing follows BR-LRN-012's boundary, not this module's convenience:
+            // the mark a family is told about here is the RAW mark handed to
+            // Module 17, which still owns publication. The message therefore says
+            // the work was marked, never what the grade is.
+            E("MarkReleased", M.Learning, "Homework marks released", "رصد درجات واجب",
+                "Student and parents", "الطالب وأولياء الأمور", InAppEmail, hasPublisher: true),
 
             // ---- Certificates (doc 09 §3)
             E("CertificateIssued", M.Certificates, "Certificate issued", "إصدار شهادة",

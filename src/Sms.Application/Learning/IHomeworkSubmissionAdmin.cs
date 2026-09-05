@@ -124,5 +124,40 @@ namespace Sms.Application.Learning
             int homeworkId,
             bool hasSchoolWideReach = false,
             CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// doc/Modules/37 §8.4's "one-click chase": tell the named students, and
+        /// their families, that this homework has not reached us (§12
+        /// <c>HomeworkOverdue</c>).
+        ///
+        /// <para>
+        /// It lives here rather than on the screen because the enrolment ids
+        /// arrive from a form and a chase names a child. Reach (BR-LRN-002) is
+        /// re-checked, and the ids are intersected with the homework's own roster
+        /// before anything is sent — a hand-edited request cannot make this
+        /// product message a family whose class the sender does not teach.
+        /// </para>
+        ///
+        /// <para>
+        /// Only students who have actually submitted nothing are chased. Passing
+        /// one who has handed in is silently skipped rather than refused: the
+        /// roster is a live screen, and a hand-in that lands between rendering it
+        /// and pressing the button is exactly the case where telling a family
+        /// their child did not submit would be both wrong and unkind.
+        /// </para>
+        ///
+        /// <para>
+        /// BR-LRN-005 governs the wording downstream: late work stays acceptable,
+        /// so this is a reminder and never a refusal. Returns how many students
+        /// were chased, so the screen can say so.
+        /// </para>
+        /// Throws <see cref="Common.Exceptions.TeachingReachException"/> without
+        /// reach.
+        /// </summary>
+        Task<int> ChaseAsync(
+            int homeworkId,
+            IReadOnlyCollection<int> enrollmentIds,
+            bool hasSchoolWideReach = false,
+            CancellationToken cancellationToken = default);
     }
 }

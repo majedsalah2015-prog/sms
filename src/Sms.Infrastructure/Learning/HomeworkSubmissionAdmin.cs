@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,6 +8,7 @@ using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Grading;
 using Sms.Application.Learning;
+using Sms.Application.Notifications;
 using Sms.Domain.Grading;
 using Sms.Domain.Learning;
 using Sms.Infrastructure.Persistence;
@@ -39,20 +41,28 @@ namespace Sms.Infrastructure.Learning
         private readonly ICurrentUser _user;
         private readonly IHomeworkAdmin _homeworkAdmin;
         private readonly IGradingAdmin _grading;
+        private readonly INotificationPublisher _notifications;
 
         public HomeworkSubmissionAdmin(
             AppDbContext db,
             IClock clock,
             ICurrentUser user,
             IHomeworkAdmin homeworkAdmin,
-            IGradingAdmin grading)
+            IGradingAdmin grading,
+            INotificationPublisher notifications)
         {
             _db = db;
             _clock = clock;
             _user = user;
             _homeworkAdmin = homeworkAdmin;
             _grading = grading;
+            _notifications = notifications;
         }
+
+        /// <summary>doc/Modules/37 §12, catalogued in <c>NotificationEventCatalog</c> under module LRN.</summary>
+        private const string OverdueEventCode = "HomeworkOverdue";
+
+        private const string MarkReleasedEventCode = "MarkReleased";
 
         public async Task<IReadOnlyList<HomeworkRosterRow>> RosterAsync(
             int homeworkId,
@@ -298,7 +308,155 @@ namespace Sms.Infrastructure.Learning
             }
 
             homework.Status = HomeworkStatus.Released;
+
+            // §12 MarkReleased. Ambient publish, so the message and the status
+            // move commit together: a family told the work was marked, on a
+            // transaction that then rolled back, would be told about a mark that
+            // does not exist.
+            //
+            // Only the students whose work was actually marked. Someone who
+            // handed nothing in has had no mark released, and BR-LRN-012 left
+            // their row to Module 17's judgement rather than posting a zero — so
+            // there is nothing here to tell their family either.
+            await _notifications.PublishAsync(
+                MarkReleasedEventCode,
+                await StudentAndFamilyRecipientsAsync(
+                    scored.Select(s => s.EnrollmentId).ToList(), cancellationToken),
+                await HomeworkPayloadAsync(homework, cancellationToken),
+                cancellationToken);
+
             await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        public async Task<int> ChaseAsync(
+            int homeworkId,
+            IReadOnlyCollection<int> enrollmentIds,
+            bool hasSchoolWideReach = false,
+            CancellationToken cancellationToken = default)
+        {
+            if (enrollmentIds is null || enrollmentIds.Count == 0)
+            {
+                return 0;
+            }
+
+            var homework = await _db.Homeworks.SingleAsync(h => h.Id == homeworkId, cancellationToken);
+            await GuardReachAsync(homework, hasSchoolWideReach, cancellationToken);
+
+            // The roster is the authority on who may be chased, and it is already
+            // reach-checked and restricted to the section's current membership.
+            // Intersecting against it is what stops a hand-edited form from
+            // messaging a family in a class this user does not teach.
+            var roster = await RosterAsync(homeworkId, hasSchoolWideReach, cancellationToken);
+
+            var chase = roster
+                .Where(r => !r.HasSubmitted && enrollmentIds.Contains(r.EnrollmentId))
+                .Select(r => r.EnrollmentId)
+                .ToList();
+
+            if (chase.Count == 0)
+            {
+                return 0;
+            }
+
+            await _notifications.PublishAsync(
+                OverdueEventCode,
+                await StudentAndFamilyRecipientsAsync(chase, cancellationToken),
+                await HomeworkPayloadAsync(homework, cancellationToken),
+                cancellationToken);
+
+            // Nothing of this module's own is written — a chase is a message, not
+            // a state change, and recording "chased" on the submission row would
+            // be inventing a status BR-LRN-005 does not have. The delivery rows
+            // the publisher writes are the record that it happened, and they are
+            // Module 33's to keep.
+            await _db.SaveChangesAsync(cancellationToken);
+
+            return chase.Count;
+        }
+
+        /// <summary>
+        /// §12 routes these to "student and parents". The student's own portal
+        /// account is included when they have one — older grades do, younger ones
+        /// do not (<c>Student.UserAccountId</c> is nullable by design) — and the
+        /// family's guardians always are, which is why a child with no account of
+        /// their own is still reachable.
+        /// </summary>
+        private async Task<IReadOnlyCollection<NotificationRecipient>> StudentAndFamilyRecipientsAsync(
+            IReadOnlyCollection<int> enrollmentIds, CancellationToken cancellationToken)
+        {
+            var studentIds = await _db.Enrollments
+                .Where(e => enrollmentIds.Contains(e.Id))
+                .Select(e => e.StudentId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            if (studentIds.Count == 0)
+            {
+                return new List<NotificationRecipient>();
+            }
+
+            var recipients = new Dictionary<int, NotificationRecipient>();
+
+            var studentAccounts = await _db.Students
+                .Where(s => studentIds.Contains(s.Id) && s.UserAccountId != null)
+                .Select(s => s.UserAccountId!.Value)
+                .ToListAsync(cancellationToken);
+
+            foreach (var accountId in studentAccounts)
+            {
+                // A student row carries no language preference of its own — only
+                // Parent does — so the product default stands, exactly as it does
+                // on Parent itself.
+                recipients[accountId] = new NotificationRecipient(accountId, "ar");
+            }
+
+            var parentIds = await _db.StudentGuardianLinks
+                .Where(l => studentIds.Contains(l.StudentId) && l.EffectiveToUtc == null)
+                .Select(l => l.ParentId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+
+            var parents = await _db.Parents
+                .Where(p => parentIds.Contains(p.Id) && p.UserAccountId != null)
+                .Select(p => new { p.UserAccountId, p.PreferredLanguage })
+                .ToListAsync(cancellationToken);
+
+            foreach (var parent in parents)
+            {
+                // A guardian of two children in the same class is one person and
+                // gets one message, in their own language.
+                recipients[parent.UserAccountId!.Value] =
+                    new NotificationRecipient(parent.UserAccountId!.Value, parent.PreferredLanguage);
+            }
+
+            return recipients.Values.ToList();
+        }
+
+        /// <summary>
+        /// The placeholders both module 37 templates name. The subject comes from
+        /// the offering rather than the homework, because BR-LRN-001 anchors work
+        /// on the offering precisely so the subject is year-correct.
+        /// </summary>
+        private async Task<IReadOnlyDictionary<string, string>> HomeworkPayloadAsync(
+            Domain.Learning.Homework homework, CancellationToken cancellationToken)
+        {
+            // Looked up, not picked: a retired subject must still name itself on a
+            // message about work already set for it (SoftActiveLookupTests).
+            var subject = await (
+                from o in _db.CurriculumOfferings.IgnoreQueryFilters()
+                join s in _db.Subjects.IgnoreQueryFilters() on o.SubjectId equals s.Id
+                where o.Id == homework.CurriculumOfferingId && s.SchoolId == _db.CurrentSchoolId
+                select new { s.Name.NameAr, s.Name.NameEn })
+                .SingleOrDefaultAsync(cancellationToken);
+
+            return new Dictionary<string, string>
+            {
+                ["Homework"] = homework.TitleAr,
+                ["HomeworkEn"] = homework.TitleEn,
+                ["Subject"] = subject?.NameAr ?? string.Empty,
+                ["SubjectEn"] = subject?.NameEn ?? string.Empty,
+                ["DueDate"] = homework.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            };
         }
 
         /// <summary>

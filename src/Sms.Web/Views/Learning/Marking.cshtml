@@ -1,0 +1,229 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model HomeworkMarkingViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Marking queue", "طابور التصحيح");
+    ViewData["Breadcrumb"] = T("E-learning / Homework / Marking", "التعليم الإلكتروني / الواجبات / التصحيح");
+
+    var handedIn = Model.Roster.Where(r => r.HasSubmitted).ToList();
+    var percent = Model.Submitted == 0 ? 0 : (int)Math.Round(100m * Model.Scored / Model.Submitted);
+    var maxText = Model.MaxMarks?.ToString("0.##", CultureInfo.InvariantCulture);
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "marking-help",
+        Title = T("Marking queue — help", "طابور التصحيح — مساعدة"),
+        Intro = T("Mark what was handed in, then release the marks to the gradebook in one step.",
+            "صحّح ما سُلّم، ثم ارصد الدرجات في سجل الدرجات دفعةً واحدة."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("An empty box means not marked, never zero", "الخانة الفارغة تعني «لم تُرصد» لا صفراً"),
+                T("Leave a mark empty and the work stays unmarked. That is what the meter counts, and what stops the release — a zero typed by accident would satisfy the check and reach the gradebook as a real mark.",
+                  "اترك الدرجة فارغة يبقَ العمل بلا رصد. وهذا ما يعدّه المقياس وما يمنع الرصد — أمّا صفر يُكتب سهواً فيجتاز الفحص ويصل سجل الدرجات درجةً حقيقية.")),
+            new HelpPanelViewModel.Item(
+                T("Release is all of it or none of it", "الرصد كلّه أو لا شيء"),
+                T("The whole class's marks go to the gradebook together, and release is refused while any hand-in is unmarked (BR-LRN-011). Half a released class is worse than a late one.",
+                  "تذهب درجات الصف كلّها معاً، ويُرفض الرصد ما دام تسليم واحد بلا درجة (BR-LRN-011). فنصف صفّ مرصود أسوأ من صفّ متأخر.")),
+            new HelpPanelViewModel.Item(
+                T("Releasing is not publishing", "الرصد ليس نشراً"),
+                T("Release writes a raw mark into the subject's marksheet and stops there. When a family sees a grade is the marksheet's own approval step in the grading module, not this screen's (BR-LRN-012).",
+                  "الرصد يكتب درجة خاماً في كشف درجات المادة ويقف. ومتى ترى الأسرة تقديراً فذلك اعتماد الكشف في وحدة الدرجات لا هذه الشاشة (BR-LRN-012).")),
+            new HelpPanelViewModel.Item(
+                T("After release, corrections happen in the gradebook", "بعد الرصد يكون التصحيح في سجل الدرجات"),
+                T("Once released, the mark belongs to the grading module and a correction there is a recorded mark change. This screen does not take it back.",
+                  "بعد الرصد تصير الدرجة ملك وحدة الدرجات، وتصحيحها هناك تغييرُ درجة مسجَّل. وهذه الشاشة لا تستردّها.")),
+            new HelpPanelViewModel.Item(
+                T("Ungraded practice is marked with words", "التدريب بلا درجة يُصحَّح بالكلمات"),
+                T("Homework set with no maximum mark takes feedback and never reaches the gradebook — that is what it was set as, and there is nothing to release.",
+                  "الواجب المكلَّف بلا درجة عظمى يقبل الملاحظات ولا يصل سجل الدرجات — هكذا كُلِّف، ولا شيء فيه يُرصد.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            <span class="fw-semibold">@Model.Title</span>
+            <span class="mx-1">·</span>@Model.ClassLabel
+            <span class="mx-1">·</span>@T("due", "موعد التسليم") @Model.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            @if (Model.IsGraded)
+            {
+                <span class="mx-1">·</span>
+                <span>@T("out of", "من") @maxText</span>
+                @if (!string.IsNullOrWhiteSpace(Model.ComponentLabel))
+                {
+                    <span class="mx-1">·</span><span>@Model.ComponentLabel</span>
+                }
+            }
+            else
+            {
+                <span class="mx-1">·</span><span>@T("ungraded practice", "تدريب بلا درجة")</span>
+            }
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Submissions" asp-route-id="@Model.HomeworkId">@T("Submission tracker", "متتبّع التسليم")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@* The completeness meter is BR-LRN-011's gate made visible before the button is pressed. *@
+<div class="sms-card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+        <div>
+            <span class="fw-semibold">@Model.Scored</span>
+            <span class="text-muted">/ @Model.Submitted @T("marked", "مُصحَّح")</span>
+            @if (Model.Missing > 0)
+            {
+                <span class="text-muted">
+                    <span class="mx-1">·</span>@T($"{Model.Missing} did not hand in", $"{Model.Missing} لم يسلّموا")
+                </span>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            @if (Model.CanBeginMarking)
+            {
+                <form method="post" asp-action="BeginMarking" asp-route-id="@Model.HomeworkId" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">@T("Start marking", "ابدأ التصحيح")</button>
+                </form>
+            }
+
+            @if (Model.IsReleased)
+            {
+                <span class="badge bg-success-subtle text-success-emphasis">@T("Marks released", "رُصدت الدرجات")</span>
+            }
+            else if (Model.CanRelease)
+            {
+                <form method="post" asp-action="Release" asp-route-id="@Model.HomeworkId" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-primary btn-sm">@T("Release marks to the gradebook", "ارصد الدرجات في سجل الدرجات")</button>
+                </form>
+            }
+            else if (Model.IsGraded)
+            {
+                @* Says why rather than hiding the button: a disabled control with
+                   no reason is the most common way a screen gets reported broken. *@
+                <button type="button" class="btn btn-primary btn-sm" disabled
+                        title="@(Model.Unscored > 0
+                                  ? T($"{Model.Unscored} hand-in(s) still unmarked", $"ما زال {Model.Unscored} تسليماً بلا درجة")
+                                  : Model.Status != HomeworkStatus.Marking
+                                      ? T("Start marking first", "ابدأ التصحيح أولاً")
+                                      : T("This homework names no grading component", "هذا الواجب لا يشير إلى مكوّن في نموذج الدرجات"))">
+                    @T("Release marks to the gradebook", "ارصد الدرجات في سجل الدرجات")
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="progress" role="progressbar" aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100"
+         aria-label="@T("Marking progress", "تقدّم التصحيح")" style="height:.5rem">
+        <div class="progress-bar @(Model.IsComplete ? "bg-success" : null)" style="width:@percent.ToString(CultureInfo.InvariantCulture)%"></div>
+    </div>
+
+    @if (!Model.IsGraded)
+    {
+        <p class="text-muted small mb-0 mt-2">
+            @T("This work was set without a maximum mark, so it takes feedback only and never reaches the gradebook (BR-LRN-004).",
+               "كُلِّف هذا العمل بلا درجة عظمى، فيقبل الملاحظات وحدها ولا يصل سجل الدرجات (BR-LRN-004).")
+        </p>
+    }
+</div>
+
+@if (handedIn.Count == 0)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("Nothing to mark yet", "لا شيء للتصحيح بعد")</h2>
+        <p class="text-muted mb-0">
+            @(Model.Total == 0
+                ? T("This section has nobody enrolled for the working year.", "لا أحد مسجَّل في هذه الشعبة للعام العامل.")
+                : T("Nobody in this class has handed in yet. The submission tracker is where you remind them.",
+                    "لم يسلّم أحد من هذا الصف بعد. ومن متتبّع التسليم تذكّرهم."))
+        </p>
+    </div>
+}
+else
+{
+    @* P-SHEET: roster rows x input columns, one submit for the whole sheet. *@
+    <form method="post" asp-action="SaveMarks" asp-route-id="@Model.HomeworkId">
+        @Html.AntiForgeryToken()
+        <div class="sms-card">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Marks and feedback for what was handed in", "درجات وملاحظات على ما سُلّم")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Student", "الطالب")</th>
+                    <th scope="col">@T("Handed in", "التسليم")</th>
+                    <th scope="col" style="width:9rem">@T("Mark", "الدرجة")</th>
+                    <th scope="col">@T("Feedback", "ملاحظات")</th>
+                </tr></thead>
+                <tbody>
+                @foreach (var row in handedIn)
+                {
+                    <tr>
+                        <td>
+                            <div>@(isRtl ? row.StudentNameAr : row.StudentNameEn)</div>
+                            <div class="text-muted small">@row.StudentNo</div>
+                        </td>
+                        <td>
+                            <span class="badge @(row.IsLate ? "bg-warning-subtle text-warning-emphasis" : "bg-success-subtle text-success-emphasis")">
+                                @(row.IsLate ? T("Late", "متأخر") : T("On time", "في الموعد"))
+                            </span>
+                            <div class="text-muted small">
+                                @row.SubmittedAtUtc!.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+                                @if (row.VersionCount > 1)
+                                {
+                                    <span>· @T($"{row.VersionCount} versions", $"{row.VersionCount} نسخ")</span>
+                                }
+                            </div>
+                        </td>
+                        <td>
+                            @if (!Model.IsGraded)
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                            else
+                            {
+                                @* Invariant: an Arabic culture renders a decimal
+                                   the number box will not accept back. *@
+                                <input type="number" step="0.01" min="0" max="@maxText"
+                                       class="form-control form-control-sm"
+                                       name="score_@row.SubmissionId"
+                                       value="@(row.Score?.ToString("0.##", CultureInfo.InvariantCulture))"
+                                       disabled="@(!Model.CanScore)"
+                                       aria-label="@T("Mark", "الدرجة") @(isRtl ? row.StudentNameAr : row.StudentNameEn)" />
+                            }
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm"
+                                   name="feedback_@row.SubmissionId"
+                                   value="@row.Feedback"
+                                   disabled="@(!Model.CanScore)"
+                                   aria-label="@T("Feedback", "ملاحظات") @(isRtl ? row.StudentNameAr : row.StudentNameEn)" />
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+
+            @if (Model.CanScore)
+            {
+                <div class="p-3 border-top d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">@T("Save marks", "احفظ الدرجات")</button>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 border-top text-muted small">
+                    @T("These marks are in the gradebook and are corrected there, under mark-change control (BR-LRN-012).",
+                       "هذه الدرجات في سجل الدرجات وتُصحَّح هناك بضوابط تغيير الدرجات (BR-LRN-012).")
+                </div>
+            }
+        </div>
+    </form>
+}

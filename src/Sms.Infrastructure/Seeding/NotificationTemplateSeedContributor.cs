@@ -161,6 +161,29 @@ namespace Sms.Infrastructure.Seeding
                 "الطالب لم يصعد الحافلة", "Child did not board",
                 "لم يصعد ابنكم حافلة المدرسة اليوم {Date}. نرجو التواصل مع المدرسة فوراً.",
                 "Your child did not board the school bus on {Date}. Please contact the school immediately."),
+
+            // Module 37 §12. The overdue notice names the work and the date and
+            // asks for it — BR-LRN-005 keeps late work acceptable, so a message
+            // that read like a refusal would contradict the rule the product
+            // enforces one layer down.
+            ("HomeworkOverdue",
+                "واجب لم يُسلَّم", "Homework not handed in",
+                "لم يصلنا تسليم الواجب «{Homework}» في مادة {Subject}، وكان موعده {DueDate}. التسليم المتأخر ما زال مقبولاً — نرجو رفعه عبر البوابة.",
+                "We have not received \"{Homework}\" for {Subject}, which was due on {DueDate}. Late work is still accepted — please hand it in through the portal."),
+
+            ("SubmissionReceived",
+                "تم استلام تسليمك", "Your work was received",
+                "استُلم تسليمك للواجب «{Homework}» بتاريخ {SubmittedAt}. يمكنك تحديثه ما دام الواجب مفتوحاً.",
+                "Your submission for \"{Homework}\" was received on {SubmittedAt}. You can update it for as long as the homework is open."),
+
+            // Says the work was marked, never what the grade is: BR-LRN-012 hands
+            // a raw mark to Module 17, and Module 17's publication rules decide
+            // when a family may see a grade. Putting the number in this message
+            // would publish a result this module has no right to publish.
+            ("MarkReleased",
+                "رُصدت درجة واجب", "Homework marked",
+                "صُحِّح الواجب «{Homework}» في مادة {Subject} ورُصدت درجته في سجل الدرجات. تظهر الدرجة عند اعتماد كشف درجات المادة.",
+                "\"{Homework}\" in {Subject} has been marked and its mark recorded in the gradebook. The grade appears once the subject's marksheet is approved."),
         };
 
         public async Task SeedAsync(CancellationToken cancellationToken = default)

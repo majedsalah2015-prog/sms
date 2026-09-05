@@ -1,0 +1,220 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model HomeworkMarkingViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Submission tracker", "متتبّع التسليم");
+    ViewData["Breadcrumb"] = T("E-learning / Homework / Submissions", "التعليم الإلكتروني / الواجبات / التسليمات");
+
+    var missing = Model.Roster.Where(r => !r.HasSubmitted).ToList();
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "submissions-help",
+        Title = T("Submission tracker — help", "متتبّع التسليم — مساعدة"),
+        Intro = T("Who handed this work in, who was late, and who has not handed it in at all.",
+            "من سلّم هذا العمل، ومن تأخّر، ومن لم يسلّم إطلاقاً."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("The list is the class, not the hand-ins", "القائمة هي الصف لا التسليمات"),
+                T("Every student currently in this section has a row, including the ones who submitted nothing — they are the reason this screen exists. A student who transferred out is not listed and is not chased.",
+                  "لكل طالب في هذه الشعبة اليوم صفّ، بمن فيهم من لم يسلّم شيئاً — وهم سبب وجود هذه الشاشة. ومن انتقل من الشعبة لا يُدرَج ولا يُذكَّر.")),
+            new HelpPanelViewModel.Item(
+                T("Late is a flag, never a refusal", "التأخير علامة لا رفض"),
+                T("Late work is accepted and marked; the lateness policy decides the penalty, not whether the work is taken (BR-LRN-005). There is deliberately no way to close a homework to late hand-ins.",
+                  "العمل المتأخر يُقبل ويُصحَّح، وسياسة التأخير تحدّد الخصم لا قبول العمل (BR-LRN-005). ولا توجد قصداً طريقة لإغلاق واجب أمام التسليم المتأخر.")),
+            new HelpPanelViewModel.Item(
+                T("The reminder goes to the student and the family", "التذكير يصل الطالب والأسرة"),
+                T("Choose who to remind — a teacher who has already spoken to two of them should not have to message them again. Students who have since handed in are skipped, even if you tick them.",
+                  "اختر من تُذكّره — فمن تحدّث إلى اثنين منهم لا ينبغي أن يُرسل إليهما ثانيةً. ومن سلّم بعد فتح الصفحة يُتجاوَز ولو أشّرت عليه.")),
+            new HelpPanelViewModel.Item(
+                T("Marking is the next screen", "التصحيح في الشاشة التالية"),
+                T("This screen answers who; the marking queue answers what it is worth, and is where marks reach the gradebook.",
+                  "هذه الشاشة تجيب «من»، وطابور التصحيح يجيب «بكم»، وفيه تصل الدرجات إلى سجل الدرجات.")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            <span class="fw-semibold">@Model.Title</span>
+            <span class="mx-1">·</span>@Model.ClassLabel
+            <span class="mx-1">·</span>@T("due", "موعد التسليم") @Model.DueDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="Marking" asp-route-id="@Model.HomeworkId">@T("Marking queue", "طابور التصحيح")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@* P-CONSOLE: the tiles first, because the number a teacher wants is "how many are missing". *@
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="sms-card p-3">
+            <div class="text-muted small">@T("Handed in", "سلّموا")</div>
+            <div class="h4 mb-0">@Model.Submitted <span class="text-muted fs-6">/ @Model.Total</span></div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="sms-card p-3">
+            <div class="text-muted small">@T("Late", "متأخر")</div>
+            <div class="h4 mb-0">@Model.Late</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="sms-card p-3">
+            <div class="text-muted small">@T("Not handed in", "لم يسلّموا")</div>
+            <div class="h4 mb-0 @(Model.Missing > 0 ? "text-danger" : null)">@Model.Missing</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="sms-card p-3">
+            <div class="text-muted small">@T("Unmarked", "بلا درجة")</div>
+            <div class="h4 mb-0">@Model.Unscored</div>
+        </div>
+    </div>
+</div>
+
+@if (Model.Total == 0)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("This class has no students", "لا طلاب في هذه الشعبة")</h2>
+        <p class="text-muted mb-0">
+            @T("Nobody is enrolled in this section for the working year, so there is nobody to hand work in. Check the section's membership.",
+               "لا أحد مسجَّل في هذه الشعبة للعام العامل، فليس هناك من يسلّم. راجع عضوية الشعبة.")
+        </p>
+    </div>
+}
+else
+{
+    @* The exception queue: every row carries its own one-click action. *@
+    <form method="post" asp-action="Chase" asp-route-id="@Model.HomeworkId">
+        @Html.AntiForgeryToken()
+        <div class="sms-card mb-3">
+            <div class="p-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h6 mb-0">@T("Not handed in", "لم يسلّموا") <span class="badge bg-secondary">@missing.Count</span></h2>
+                @if (missing.Count > 0)
+                {
+                    <button type="submit" class="btn btn-primary btn-sm">@T("Remind the selected", "ذكّر المحدَّدين")</button>
+                }
+            </div>
+
+            @if (missing.Count == 0)
+            {
+                <div class="p-3 text-muted">
+                    @(Model.Submitted == 0
+                        ? T("Nobody has handed in yet.", "لم يسلّم أحد بعد.")
+                        : T("Everyone has handed in.", "سلّم الجميع."))
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive"><table class="table sms-table mb-0">
+                    <caption class="visually-hidden">@T("Students who have not handed in", "الطلاب الذين لم يسلّموا")</caption>
+                    <thead><tr>
+                        <th scope="col" style="width:2.5rem">
+                            <input type="checkbox" class="form-check-input" id="chase-all" checked
+                                   aria-label="@T("Select everyone", "تحديد الجميع")" />
+                        </th>
+                        <th scope="col">@T("Student", "الطالب")</th>
+                        <th scope="col">@T("Number", "الرقم")</th>
+                    </tr></thead>
+                    <tbody>
+                    @foreach (var row in missing)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input chase-one" name="enrollmentIds"
+                                       value="@row.EnrollmentId" checked
+                                       aria-label="@(isRtl ? row.StudentNameAr : row.StudentNameEn)" />
+                            </td>
+                            <td>@(isRtl ? row.StudentNameAr : row.StudentNameEn)</td>
+                            <td class="text-muted">@row.StudentNo</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table></div>
+            }
+        </div>
+    </form>
+
+    <div class="sms-card">
+        <div class="p-3 border-bottom"><h2 class="h6 mb-0">@T("The whole class", "الصف كاملاً")</h2></div>
+        <div class="table-responsive"><table class="table sms-table mb-0">
+            <caption class="visually-hidden">@T("Every student and what they handed in", "كل طالب وما سلّمه")</caption>
+            <thead><tr>
+                <th scope="col">@T("Student", "الطالب")</th>
+                <th scope="col">@T("Handed in", "التسليم")</th>
+                <th scope="col">@T("Mark", "الدرجة")</th>
+            </tr></thead>
+            <tbody>
+            @foreach (var row in Model.Roster)
+            {
+                <tr>
+                    <td>
+                        <div>@(isRtl ? row.StudentNameAr : row.StudentNameEn)</div>
+                        <div class="text-muted small">@row.StudentNo</div>
+                    </td>
+                    <td>
+                        @if (!row.HasSubmitted)
+                        {
+                            <span class="badge bg-danger-subtle text-danger-emphasis">@T("Not handed in", "لم يسلّم")</span>
+                        }
+                        else
+                        {
+                            <span class="badge @(row.IsLate ? "bg-warning-subtle text-warning-emphasis" : "bg-success-subtle text-success-emphasis")">
+                                @(row.IsLate ? T("Late", "متأخر") : T("On time", "في الموعد"))
+                            </span>
+                            <div class="text-muted small">
+                                @row.SubmittedAtUtc!.Value.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)
+                                @if (row.VersionCount > 1)
+                                {
+                                    <span>· @T($"{row.VersionCount} versions", $"{row.VersionCount} نسخ")</span>
+                                }
+                            </div>
+                        }
+                    </td>
+                    <td>
+                        @if (row.Score is decimal score)
+                        {
+                            <span class="fw-semibold">@score.ToString("0.##", CultureInfo.InvariantCulture)</span>
+                            @if (Model.MaxMarks is decimal max)
+                            {
+                                <span class="text-muted"> / @max.ToString("0.##", CultureInfo.InvariantCulture)</span>
+                            }
+                            @if (row.IsLate && row.LatePenaltyPercent is decimal penalty && penalty > 0m)
+                            {
+                                <div class="text-muted small">
+                                    @T($"{penalty.ToString("0.##", CultureInfo.InvariantCulture)}% late penalty applied",
+                                       $"طُبِّق خصم تأخير {penalty.ToString("0.##", CultureInfo.InvariantCulture)}%")
+                                </div>
+                            }
+                        }
+                        else if (row.HasSubmitted)
+                        {
+                            <span class="text-muted">@T("Not marked yet", "لم تُرصد بعد")</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table></div>
+    </div>
+
+    <script>
+        document.getElementById('chase-all')?.addEventListener('change', function () {
+            document.querySelectorAll('.chase-one').forEach(function (b) { b.checked = document.getElementById('chase-all').checked; });
+        });
+    </script>
+}

@@ -478,12 +478,11 @@ namespace Sms.Application.Security
         }
 
         /// <summary>
-        /// Module 37 §8. Slice 1 builds screens 1 and 2 only; homework (3-5),
-        /// the question bank and paper builder (6-7), the sitting and integrity
-        /// consoles (8-9), the portal surfaces (10-11) and analytics (12) are
-        /// later slices and are deliberately absent rather than declared and
-        /// unbuilt — a catalogued screen no action answers is a grant that
-        /// opens nothing.
+        /// Module 37 §8, screens 1-5. The question bank and paper builder (6-7),
+        /// the sitting and integrity consoles (8-9), the portal's write half
+        /// (10-11) and analytics (12) are later slices and are deliberately
+        /// absent rather than declared and unbuilt — a catalogued screen no
+        /// action answers is a grant that opens nothing.
         /// </summary>
         public static class Learning
         {
@@ -495,6 +494,21 @@ namespace Sms.Application.Security
 
             /// <summary>§8.3 — the homework desk.</summary>
             public const string Homework = "Homework";
+
+            /// <summary>
+            /// §8.4 <em>and</em> §8.5 — the submission tracker and the marking
+            /// queue behind one permission, because §6's table gives "Marking
+            /// queue | View, Edit" one row and gives the tracker none of its own.
+            /// The two are one screen's two faces: View is the roster of who
+            /// handed in, Edit is scoring it and releasing the marks.
+            /// <para>
+            /// Release takes <c>Edit</c> rather than <c>Approve</c> deliberately.
+            /// BR-LRN-012 writes a <em>raw</em> mark into a <em>draft</em>
+            /// marksheet and leaves Module 17's WF-07 owning publication, so the
+            /// approval this module would be claiming is one it does not perform.
+            /// </para>
+            /// </summary>
+            public const string Marking = "Marking";
         }
 
         public static class Portal
@@ -830,6 +844,14 @@ namespace Sms.Application.Security
             // and BR-LRN-004's gate runs on it. Deactivate is withdrawal
             // (BR-LRN-016) — there is no delete here either.
             S(Modules.Learning, Learning.Homework, "Homework desk", "مكتب الواجبات", CrudApprove),
+            // §6 gives the marking queue View and Edit, and nothing else. No
+            // Create: the roster is the section's own membership, so a row here
+            // is a student the school already enrolled, never one this screen
+            // makes. No Deactivate: a hand-in is superseded by the next one
+            // (BR-LRN-005) and a homework is withdrawn from the desk, so there is
+            // nothing on this screen for it to end.
+            S(Modules.Learning, Learning.Marking, "Marking queue", "طابور التصحيح",
+                ActionVerb.View, ActionVerb.Edit),
 
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),

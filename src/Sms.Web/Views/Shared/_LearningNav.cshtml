@@ -11,8 +11,13 @@
     // The per-lesson library reached from the planner keeps the planner tab lit:
     // it is the same §8.2 data read from inside one lesson, and lighting the
     // Materials tab from there would say the teacher had left the planner.
+    // The tracker and the marking queue are opened from a homework row and are
+    // about that homework, so they keep the desk tab lit: a teacher who followed
+    // a link out of the desk has not left it.
     bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
-        || (a == "Index" && string.Equals(action, "Resources", StringComparison.OrdinalIgnoreCase));
+        || (a == "Index" && string.Equals(action, "Resources", StringComparison.OrdinalIgnoreCase))
+        || (a == "Homework" && (string.Equals(action, "Submissions", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "Marking", StringComparison.OrdinalIgnoreCase)));
 }
 <nav aria-label="@(isRtl ? "التعليم الإلكتروني" : "E-learning")">
 <ul class="nav nav-pills sms-subnav mb-4">

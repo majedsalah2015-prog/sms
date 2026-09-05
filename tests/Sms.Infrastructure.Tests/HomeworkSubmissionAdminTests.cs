@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Sms.Application.Common.Exceptions;
 using Sms.Application.Common.Interfaces;
 using Sms.Application.Learning;
+using Sms.Application.Notifications;
 using Sms.Application.Setup;
 using Sms.Domain.Attachments;
 using Sms.Domain.Common;
@@ -359,6 +360,102 @@ namespace Sms.Infrastructure.Tests
             Status = AttachmentStatus.PendingScan, CurrentVersionNumber = 1,
         };
 
+        // ---------------------------------------------------------------- §8.4 the chase
+
+        [Fact]
+        [BusinessRule("BR-LRN-005")]
+        public async Task Chasing_reaches_the_student_and_their_family()
+        {
+            using var db = CreateContext();
+            var homework = await IssueMathHomeworkAsync(db);
+
+            var chased = await CreateAdmin(db).ChaseAsync(homework.Id, new[] { _enrollmentOneId });
+
+            Assert.Equal(1, chased);
+
+            var (code, recipients, payload) = Assert.Single(_published.Published);
+            Assert.Equal("HomeworkOverdue", code);
+
+            // The student's own portal account AND the guardian's: a family is
+            // told the work is missing, and the student is told directly when
+            // they are old enough to hold an account.
+            Assert.Contains(recipients, r => r.UserId == _studentOneAccountId);
+            Assert.Contains(recipients, r => r.UserId == _parentAccountId);
+            Assert.Equal(homework.TitleAr, payload["Homework"]);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-005")]
+        public async Task A_student_who_has_since_handed_in_is_not_chased()
+        {
+            using var db = CreateContext();
+            var homework = await IssueMathHomeworkAsync(db);
+
+            // The roster on the teacher's screen said "missing"; the work landed
+            // between rendering it and pressing the button.
+            await CreateSubmitter(db).SubmitAsync(_studentOneAccountId, homework.Id, "وصلت متأخراً");
+            _published.Published.Clear();
+
+            var chased = await CreateAdmin(db).ChaseAsync(homework.Id, new[] { _enrollmentOneId });
+
+            Assert.Equal(0, chased);
+            Assert.Empty(_published.Published);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-002")]
+        public async Task A_teacher_without_reach_cannot_chase_another_classs_students()
+        {
+            using var db = CreateContext();
+            var homework = await IssueMathHomeworkAsync(db);
+
+            _user.UserId = StrangerUserId;
+
+            await Assert.ThrowsAsync<TeachingReachException>(
+                () => CreateAdmin(db).ChaseAsync(homework.Id, new[] { _enrollmentOneId }));
+            Assert.Empty(_published.Published);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-002")]
+        public async Task An_enrolment_from_outside_the_homeworks_own_class_is_ignored()
+        {
+            using var db = CreateContext();
+            var homework = await IssueMathHomeworkAsync(db);
+
+            // A hand-edited form naming somebody who is not on this roster. The
+            // request is not refused — it simply reaches nobody, because the
+            // roster, not the form, decides who exists here.
+            var chased = await CreateAdmin(db).ChaseAsync(homework.Id, new[] { _enrollmentOneId + 9999 });
+
+            Assert.Equal(0, chased);
+            Assert.Empty(_published.Published);
+        }
+
+        [Fact]
+        [BusinessRule("BR-LRN-012")]
+        public async Task Releasing_tells_the_families_whose_work_was_marked_and_nobody_else()
+        {
+            using var db = CreateContext();
+            var homework = await IssueMathHomeworkAsync(db);
+
+            var submission = await CreateSubmitter(db).SubmitAsync(_studentOneAccountId, homework.Id, "إجابتي");
+            var admin = CreateAdmin(db);
+            await admin.ScoreAsync(submission.Id, 18m, "أحسنت");
+            await admin.BeginMarkingAsync(homework.Id);
+            _published.Published.Clear();
+
+            await admin.ReleaseAsync(homework.Id);
+
+            var released = Assert.Single(_published.Published, p => p.EventCode == "MarkReleased");
+
+            // Student two handed nothing in, so no mark of theirs was released and
+            // their family is told nothing — BR-LRN-012 left that row to Module 17
+            // rather than posting a zero from here.
+            Assert.Contains(released.Recipients, r => r.UserId == _studentOneAccountId);
+            Assert.DoesNotContain(released.Recipients, r => r.UserId == _studentTwoAccountId);
+        }
+
         private AppDbContext CreateContext()
         {
             var options = new DbContextOptionsBuilder<AppDbContext>().UseSqlite(_connection).Options;
@@ -368,9 +465,34 @@ namespace Sms.Infrastructure.Tests
         private HomeworkAdmin CreateDesk(AppDbContext db) => new(db, _clock, _user, _setup);
 
         private HomeworkSubmissionAdmin CreateAdmin(AppDbContext db)
-            => new(db, _clock, _user, CreateDesk(db), new GradingAdmin(db, _clock, _audit));
+            => new(db, _clock, _user, CreateDesk(db), new GradingAdmin(db, _clock, _audit), _published);
 
-        private PortalHomeworkSubmitter CreateSubmitter(AppDbContext db) => new(db, _clock);
+        private PortalHomeworkSubmitter CreateSubmitter(AppDbContext db) => new(db, _clock, _published);
+
+        private readonly RecordingPublisher _published = new();
+
+        /// <summary>
+        /// Module 33's publisher, recorded rather than run. What matters to module
+        /// 37 is which event was raised and to whom — the delivery machinery is
+        /// Module 33's own concern and has its own tests. Recording it here is
+        /// what lets a test assert that a chase reached a family, and that a
+        /// student who had already handed in was not among them.
+        /// </summary>
+        private sealed class RecordingPublisher : INotificationPublisher
+        {
+            public List<(string EventCode, IReadOnlyCollection<NotificationRecipient> Recipients, IReadOnlyDictionary<string, string> Payload)> Published { get; }
+                = new();
+
+            public Task PublishAsync(
+                string eventCode,
+                IReadOnlyCollection<NotificationRecipient> recipients,
+                IReadOnlyDictionary<string, string> payload,
+                CancellationToken cancellationToken = default)
+            {
+                Published.Add((eventCode, recipients, payload));
+                return Task.CompletedTask;
+            }
+        }
 
         /// <summary>An issued Math homework for 3-A, graded out of 20 against the Module 17 component unless told otherwise.</summary>
         private async Task<Homework> IssueMathHomeworkAsync(
