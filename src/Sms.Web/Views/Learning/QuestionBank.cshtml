@@ -1,0 +1,207 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model QuestionBankViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = Model.BankName;
+    ViewData["Breadcrumb"] = T("E-learning / Question banks", "التعليم الإلكتروني / بنوك الأسئلة");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "bank-help",
+        Title = T("This bank — help", "هذا البنك — مساعدة"),
+        Intro = T("The questions in this bank, and what happens when you change one.",
+            "أسئلة هذا البنك، وما يحدث حين تُعدّل واحداً منها."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Editing a question makes a new version", "تعديل السؤال يُنشئ نسخة جديدة"),
+                T("The old wording, its options and its accepted answers are left exactly as they were, so a paper somebody already answered still renders the question they actually saw (BR-LRN-007). New papers pick up the new version.",
+                  "تبقى الصياغة القديمة وخياراتها وإجاباتها المقبولة كما هي تماماً، فالورقة التي أجاب عنها أحدهم تعرض السؤال الذي رآه فعلاً (BR-LRN-007). والأوراق الجديدة تأخذ النسخة الجديدة.")),
+            new HelpPanelViewModel.Item(
+                T("Withdrawing takes it out of future papers only", "السحب يُخرجه من الأوراق القادمة وحدها"),
+                T("A withdrawn question stops appearing when you build a paper and keeps rendering on every paper that already used it. State why — the next author to wonder deserves the answer (BR-LRN-007, BR-GLB-006).",
+                  "السؤال المسحوب يتوقّف عن الظهور عند بناء ورقة، ويبقى ظاهراً على كلّ ورقة استُعملت فيها. واذكر السبب — فمن يتساءل بعدك يستحقّ الجواب (BR-LRN-007, BR-GLB-006).")),
+            new HelpPanelViewModel.Item(
+                T("What marks itself and what does not", "ما يُصحَّح آلياً وما لا يُصحَّح"),
+                T("Choice, true/false, numeric and short-answer questions are marked by the system. Essays go to a person — a paper full of them is a paper somebody has to sit down with (BR-LRN-011).",
+                  "أسئلة الاختيار والصواب والخطأ والعددية والإجابة القصيرة يُصحّحها النظام. أمّا المقالية فتذهب إلى إنسان — وورقة مليئة بها ورقةٌ يجلس لها أحد (BR-LRN-011).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@Model.BankName</h1>
+        <p class="text-muted mb-0">
+            @Model.OfferingLabel
+            <span class="mx-1">·</span>@LearningLabels.QuestionShareScopeName(Model.Bank.ShareScope, isRtl)
+            @if (Model.IsRetired)
+            {
+                <span class="mx-1">·</span><span class="badge bg-secondary">@T("Retired", "متقاعد")</span>
+            }
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="QuestionBanks" asp-route-offeringId="@Model.Bank.CurriculumOfferingId">@T("All banks", "كل البنوك")</a>
+        @if (!Model.IsRetired)
+        {
+            <a class="btn btn-primary" asp-action="NewQuestion" asp-route-id="@Model.Bank.Id">@T("New question", "سؤال جديد")</a>
+        }
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (Model.IsRetired)
+{
+    <div class="sms-card p-3 mb-3">
+        <p class="text-muted mb-0">
+            @T("This bank is retired: it takes no new questions, and it keeps every one it holds because they may sit on a paper already answered (BR-GLB-006).",
+               "هذا البنك متقاعد: لا يقبل أسئلة جديدة، ويحتفظ بكلّ ما فيه لأنّ أسئلته قد تكون على ورقة أُجيبت فعلاً (BR-GLB-006).")
+        </p>
+    </div>
+}
+
+<div class="sms-card p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="id" value="@Model.Bank.Id" />
+        <div class="col-md-3">
+            <label class="form-label" for="type">@T("Type", "النوع")</label>
+            <select class="form-select" id="type" name="type" onchange="this.form.submit()">
+                <option value="">@T("Every type", "كل الأنواع")</option>
+                @foreach (var t in new[] { QuestionType.SingleChoice, QuestionType.MultipleChoice, QuestionType.TrueFalse, QuestionType.Numeric, QuestionType.ShortText, QuestionType.Essay })
+                {
+                    <option value="@((int)t)" selected="@(Model.FilterType == t)">@LearningLabels.QuestionTypeName(t, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="difficulty">@T("Difficulty", "الصعوبة")</label>
+            <select class="form-select" id="difficulty" name="difficulty" onchange="this.form.submit()">
+                <option value="">@T("Every level", "كل المستويات")</option>
+                @foreach (var d in new[] { QuestionDifficulty.Easy, QuestionDifficulty.Medium, QuestionDifficulty.Hard })
+                {
+                    <option value="@((int)d)" selected="@(Model.FilterDifficulty == d)">@LearningLabels.QuestionDifficultyName(d, isRtl)</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="includeDeprecated" name="includeDeprecated" value="true"
+                       checked="@Model.IncludeDeprecated" onchange="this.form.submit()" />
+                <label class="form-check-label" for="includeDeprecated">@T("Show withdrawn questions", "أظهر الأسئلة المسحوبة")</label>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="sms-card mb-3">
+    <div class="table-responsive"><table class="table sms-table mb-0">
+        <caption class="visually-hidden">@T("The questions in this bank", "أسئلة هذا البنك")</caption>
+        <thead><tr>
+            <th scope="col">@T("Question", "السؤال")</th>
+            <th scope="col">@T("Type", "النوع")</th>
+            <th scope="col">@T("Difficulty", "الصعوبة")</th>
+            <th scope="col">@T("Marks", "الدرجة")</th>
+            <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+        </tr></thead>
+        <tbody>
+        @if (Model.Questions.Count == 0)
+        {
+            <tr><td colspan="5" class="text-muted p-3">
+                @(Model.FilterType != null || Model.FilterDifficulty != null
+                    ? T("No question in this bank matches those filters.", "لا سؤال في هذا البنك يطابق هذه التصفية.")
+                    : T("This bank has no questions yet.", "لا أسئلة في هذا البنك بعد."))
+            </td></tr>
+        }
+        @foreach (var row in Model.Questions)
+        {
+            var q = row.Question;
+            <tr class="@(q.IsDeprecated ? "text-muted" : null)">
+                <td>
+                    <div>@row.Stem</div>
+                    <div class="small text-muted">
+                        @if (q.Version > 1)
+                        {
+                            <span>@T($"version {q.Version} of {row.VersionCount}", $"النسخة {q.Version} من {row.VersionCount}")</span>
+                            <span class="mx-1">·</span>
+                        }
+                        @if (row.OptionCount > 0)
+                        {
+                            <span>@T($"{row.OptionCount} options", $"{row.OptionCount} خيارات")</span>
+                            <span class="mx-1">·</span>
+                        }
+                        <span>@LearningLabels.QuestionMarkingName(q.Type, isRtl)</span>
+                        @if (q.IsDeprecated)
+                        {
+                            <span class="mx-1">·</span>
+                            <span class="badge bg-secondary">@T("Withdrawn", "مسحوب")</span>
+                            @if (!string.IsNullOrWhiteSpace(q.DeprecatedReason))
+                            {
+                                <span> — @q.DeprecatedReason</span>
+                            }
+                        }
+                    </div>
+                </td>
+                <td>@LearningLabels.QuestionTypeName(q.Type, isRtl)</td>
+                <td>@LearningLabels.QuestionDifficultyName(q.Difficulty, isRtl)</td>
+                <td dir="ltr">@q.Marks.ToString("0.##", CultureInfo.InvariantCulture)</td>
+                <td class="text-end">
+                    @if (!q.IsDeprecated && !Model.IsRetired)
+                    {
+                        <a class="btn btn-sm btn-outline-secondary" asp-action="ReviseQuestion" asp-route-id="@q.Id">@T("Revise", "عدّل")</a>
+                        <form method="post" asp-action="DeprecateQuestion" asp-route-id="@q.Id" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="bankId" value="@Model.Bank.Id" />
+                            <input type="text" name="reason" class="form-control form-control-sm d-inline-block" style="width:12rem"
+                                   placeholder="@T("Why withdraw it?", "لماذا يُسحب؟")" aria-label="@T("Reason for withdrawing", "سبب السحب")" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">@T("Withdraw", "اسحب")</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table></div>
+</div>
+
+@if (!Model.IsRetired)
+{
+    <div class="sms-card p-3">
+        <h2 class="h6">@T("Bank settings", "إعدادات البنك")</h2>
+        <form method="post" asp-action="EditQuestionBank" asp-route-id="@Model.Bank.Id" class="row g-3">
+            @Html.AntiForgeryToken()
+            <div class="col-md-4">
+                <label class="form-label" for="nameAr">@T("Name (Arabic)", "الاسم بالعربية")</label>
+                <input class="form-control" id="nameAr" name="nameAr" dir="rtl" value="@Model.Bank.NameAr" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="nameEn">@T("Name (English)", "الاسم بالإنجليزية")</label>
+                <input class="form-control" id="nameEn" name="nameEn" dir="ltr" value="@Model.Bank.NameEn" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="shareScope">@T("Shared with", "مشارَك مع")</label>
+                <select class="form-select" id="shareScope" name="shareScope">
+                    @foreach (var scope in new[] { QuestionShareScope.AuthorOnly, QuestionShareScope.Offering, QuestionShareScope.Department })
+                    {
+                        <option value="@((int)scope)" selected="@(Model.Bank.ShareScope == scope)">@LearningLabels.QuestionShareScopeName(scope, isRtl)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">@T("Save", "احفظ")</button>
+            </div>
+        </form>
+
+        <hr />
+
+        <form method="post" asp-action="RetireQuestionBank" asp-route-id="@Model.Bank.Id"
+              onsubmit="return confirm('@T("Retire this bank? Its questions stay on every paper that used them.", "تقاعد هذا البنك؟ تبقى أسئلته على كل ورقة استُعملت فيها.")');">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-outline-danger btn-sm">@T("Retire this bank", "تقاعد هذا البنك")</button>
+        </form>
+    </div>
+}

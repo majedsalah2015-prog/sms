@@ -285,6 +285,14 @@ namespace Sms.Infrastructure.Persistence
 
         public DbSet<SubmissionAttachment> SubmissionAttachments => Set<SubmissionAttachment>();
 
+        public DbSet<QuestionBank> QuestionBanks => Set<QuestionBank>();
+
+        public DbSet<Question> Questions => Set<Question>();
+
+        public DbSet<QuestionOption> QuestionOptions => Set<QuestionOption>();
+
+        public DbSet<QuestionAcceptedAnswer> QuestionAcceptedAnswers => Set<QuestionAcceptedAnswer>();
+
         public DbSet<FeeCategory> FeeCategories => Set<FeeCategory>();
 
         public DbSet<FeeStructureLine> FeeStructureLines => Set<FeeStructureLine>();

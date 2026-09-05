@@ -250,10 +250,15 @@ namespace Sms.Infrastructure.Seeding
             // BR-LRN-002 still decides WHICH class a holder sees — the grant opens
             // the screen, the placement decides its contents.
             new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Marking, null),
+            // §6 puts the bank under the head of department "(Teacher: Create/Edit
+            // own offerings)" — the same verbs for both, with BR-LRN-002's
+            // offering reach deciding whose bank each of them can touch.
+            new("TEACHER", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.QuestionBank, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Planner, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Resources, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Homework, null),
             new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.Marking, null),
+            new("HEAD_OF_DEPARTMENT", ScreenCatalog.Modules.Learning, ScreenCatalog.Learning.QuestionBank, null),
 
             // The portal. A student is not shown the family's money — that is the parent's screen.
             new("PARENT", ScreenCatalog.Modules.Portal, AnyScreen, null),

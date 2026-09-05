@@ -1,0 +1,231 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model QuestionEditViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = Model.IsRevision ? T("Revise question", "تعديل سؤال") : T("New question", "سؤال جديد");
+    ViewData["Breadcrumb"] = T("E-learning / Question banks", "التعليم الإلكتروني / بنوك الأسئلة");
+
+    var q = Model.Revising;
+    var acceptedText = string.Join("\n", Model.AcceptedAnswers.Select(a => a.Text));
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "question-edit-help",
+        Title = T("Writing a question — help", "كتابة سؤال — مساعدة"),
+        Intro = T("What each type needs before it can be asked, and how the answers are judged.",
+            "ما يحتاجه كل نوع قبل أن يُطرح، وكيف تُحكَم الإجابات."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("Choice questions need at least two options", "أسئلة الاختيار تحتاج خيارين على الأقل"),
+                T("One option is an instruction, not a question. Single choice and true/false take exactly one correct answer; multiple choice takes more than one but not all of them — a question where everything is right marks the whole class right whatever they pick.",
+                  "الخيار الواحد تعليمات لا سؤال. والاختيار من متعدّد وصواب/خطأ يقبلان إجابة صحيحة واحدة، والاختيار متعدّد الإجابات يقبل أكثر من واحدة لا كلّها — فالسؤال الذي كلّ شيء فيه صحيح يُصحَّح للصف كلّه مهما اختار.")),
+            new HelpPanelViewModel.Item(
+                T("Short answers are matched forgivingly", "الإجابة القصيرة تُطابَق بتسامح"),
+                T("Case, extra spaces, Arabic diacritics, the alef and yaa forms a keyboard makes interchangeable, and tatweel are all ignored when matching. List every spelling you would accept — one per line.",
+                  "تُتجاهَل عند المطابقة حالةُ الأحرف والمسافات الزائدة والتشكيل وصور الألف والياء التي تجعلها لوحة المفاتيح متبادلة والتطويل. اذكر كل صيغة تقبلها — واحدة في كل سطر.")),
+            new HelpPanelViewModel.Item(
+                T("A numeric answer needs a tolerance you choose", "الإجابة العددية تحتاج هامشاً تختاره أنت"),
+                T("Leave it empty or zero for an exact match. 3.14 and 3.14159 are the same answer to one question and different answers to another, so the tolerance is yours to state.",
+                  "اتركه فارغاً أو صفراً للمطابقة التامّة. فـ3.14 و3.14159 إجابةٌ واحدة لسؤال وإجابتان مختلفتان لآخر، والهامش قرارك أنت.")),
+            new HelpPanelViewModel.Item(
+                T("An essay is never marked by the system", "السؤال المقالي لا يُصحّحه النظام أبداً"),
+                T("It goes to a person. That is not a limitation to work around — it is what the type means (BR-LRN-011).",
+                  "يذهب إلى إنسان. وليس هذا قيداً يُلتفّ عليه، بل هو معنى النوع نفسه (BR-LRN-011).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">
+            @Model.BankName
+            @if (Model.IsRevision && q != null)
+            {
+                <span class="mx-1">·</span>
+                <span>@T($"revising version {q.Version}", $"تعديل النسخة {q.Version}")</span>
+            }
+        </p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a class="btn btn-outline-secondary" asp-action="QuestionBankDetail" asp-route-id="@Model.QuestionBankId">@T("Back to the bank", "عودة إلى البنك")</a>
+        <partial name="_HelpModal" model="help" />
+    </div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (Model.IsRevision)
+{
+    <div class="sms-card p-3 mb-3">
+        <p class="mb-0 text-muted">
+            @T("Saving creates a new version. This one stays exactly as it is, with its own options and accepted answers, on every paper that already used it (BR-LRN-007).",
+               "الحفظ يُنشئ نسخة جديدة. وتبقى هذه كما هي تماماً، بخياراتها وإجاباتها المقبولة، على كلّ ورقة استُعملت فيها (BR-LRN-007).")
+        </p>
+        @if (Model.Versions.Count > 1)
+        {
+            <div class="small text-muted mt-2">
+                @T("Versions:", "النسخ:")
+                @foreach (var v in Model.Versions)
+                {
+                    <span class="badge @(v.IsCurrentVersion ? "bg-primary" : "bg-secondary") me-1">@v.Version</span>
+                }
+            </div>
+        }
+    </div>
+}
+
+<form method="post" asp-action="SaveQuestion" asp-route-id="@Model.QuestionBankId">
+    @Html.AntiForgeryToken()
+    @if (Model.IsRevision && q != null)
+    {
+        <input type="hidden" name="reviseQuestionId" value="@q.Id" />
+    }
+
+    <div class="sms-card p-3 mb-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label" for="type">@T("Type", "النوع")</label>
+                <select class="form-select" id="type" name="type">
+                    @foreach (var t in new[] { QuestionType.SingleChoice, QuestionType.MultipleChoice, QuestionType.TrueFalse, QuestionType.Numeric, QuestionType.ShortText, QuestionType.Essay })
+                    {
+                        <option value="@((int)t)" selected="@(Model.Type == t)">@LearningLabels.QuestionTypeName(t, isRtl)</option>
+                    }
+                </select>
+                <div class="form-text" id="marking-note"></div>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="difficulty">@T("Difficulty", "الصعوبة")</label>
+                <select class="form-select" id="difficulty" name="difficulty">
+                    @foreach (var d in new[] { QuestionDifficulty.Easy, QuestionDifficulty.Medium, QuestionDifficulty.Hard })
+                    {
+                        <option value="@((int)d)" selected="@((q?.Difficulty ?? QuestionDifficulty.Medium) == d)">@LearningLabels.QuestionDifficultyName(d, isRtl)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="marks">@T("Marks", "الدرجة")</label>
+                @* Invariant: an Arabic culture renders a decimal the number box will not take back. *@
+                <input type="number" step="0.25" min="0" class="form-control" id="marks" name="marks"
+                       value="@(q?.Marks.ToString("0.##", CultureInfo.InvariantCulture) ?? "1")" required />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="lessonId">@T("Lesson", "الدرس")</label>
+                <select class="form-select" id="lessonId" name="lessonId">
+                    <option value="">@T("The whole course", "المقرر كلّه")</option>
+                    @foreach (var lesson in Model.Lessons)
+                    {
+                        <option value="@lesson.Id" selected="@(q?.LessonId == lesson.Id)">@lesson.Title</option>
+                    }
+                </select>
+            </div>
+
+            <div class="col-md-6">
+                <label class="form-label" for="stemAr">@T("Question (Arabic)", "نصّ السؤال بالعربية")</label>
+                <textarea class="form-control" id="stemAr" name="stemAr" dir="rtl" rows="3" required>@q?.StemAr</textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="stemEn">@T("Question (English)", "نصّ السؤال بالإنجليزية")</label>
+                <textarea class="form-control" id="stemEn" name="stemEn" dir="ltr" rows="3" required>@q?.StemEn</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="sms-card p-3 mb-3" id="options-card">
+        <h2 class="h6">@T("Options", "الخيارات")</h2>
+        <p class="text-muted small">
+            @T("Leave a row empty to skip it. Tick every option that is correct.",
+               "اترك الصفّ فارغاً لتجاوزه. وأشِّر على كلّ خيار صحيح.")
+        </p>
+        @for (var i = 0; i < 6; i++)
+        {
+            var existing = i < Model.Options.Count ? Model.Options[i] : null;
+            <div class="row g-2 align-items-center mb-2">
+                <div class="col-md-5">
+                    <input class="form-control" name="optionAr_@i" dir="rtl" value="@existing?.TextAr"
+                           placeholder="@T("Option (Arabic)", "الخيار بالعربية")"
+                           aria-label="@T($"Option {i + 1} in Arabic", $"الخيار {i + 1} بالعربية")" />
+                </div>
+                <div class="col-md-5">
+                    <input class="form-control" name="optionEn_@i" dir="ltr" value="@existing?.TextEn"
+                           placeholder="@T("Option (English)", "الخيار بالإنجليزية")"
+                           aria-label="@T($"Option {i + 1} in English", $"الخيار {i + 1} بالإنجليزية")" />
+                </div>
+                <div class="col-md-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="optionCorrect_@i" name="optionCorrect_@i" value="true"
+                               checked="@(existing?.IsCorrect ?? false)" />
+                        <label class="form-check-label" for="optionCorrect_@i">@T("Correct", "صحيح")</label>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="sms-card p-3 mb-3" id="answers-card">
+        <h2 class="h6">@T("Accepted answers", "الإجابات المقبولة")</h2>
+        <div class="row g-3">
+            <div class="col-md-8">
+                <label class="form-label" for="acceptedAnswers">@T("One per line", "واحدة في كل سطر")</label>
+                <textarea class="form-control" id="acceptedAnswers" name="acceptedAnswers" rows="4">@acceptedText</textarea>
+            </div>
+            <div class="col-md-4" id="tolerance-field">
+                <label class="form-label" for="tolerance">@T("Tolerance (±)", "هامش الخطأ (±)")</label>
+                <input type="number" step="0.0001" min="0" class="form-control" id="tolerance" name="tolerance"
+                       value="@(q?.NumericTolerance?.ToString("0.####", CultureInfo.InvariantCulture))" />
+                <div class="form-text">@T("Empty or zero means exact.", "الفراغ أو الصفر يعني المطابقة التامّة.")</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="sms-card p-3 mb-3">
+        <h2 class="h6">@T("Explanation", "شرح الإجابة")</h2>
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label" for="explanationAr">@T("Explanation (Arabic)", "الشرح بالعربية")</label>
+                <textarea class="form-control" id="explanationAr" name="explanationAr" dir="rtl" rows="2">@q?.ExplanationAr</textarea>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label" for="explanationEn">@T("Explanation (English)", "الشرح بالإنجليزية")</label>
+                <textarea class="form-control" id="explanationEn" name="explanationEn" dir="ltr" rows="2">@q?.ExplanationEn</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <a class="btn btn-outline-secondary" asp-action="QuestionBankDetail" asp-route-id="@Model.QuestionBankId">@T("Cancel", "إلغاء")</a>
+        <button type="submit" class="btn btn-primary">
+            @(Model.IsRevision ? T("Save as a new version", "احفظ نسخة جديدة") : T("Add the question", "أضف السؤال"))
+        </button>
+    </div>
+</form>
+
+@* The server checks every one of these (BR-LRN-011). Hiding the fields a type
+   does not use is courtesy, so an author is not asked for a tolerance on an
+   essay — it is never the enforcement. *@
+<script>
+    (function () {
+        var CHOICE = [1, 2, 3], ANSWERS = [4, 5], NUMERIC = 4;
+        var type = document.getElementById('type');
+        var options = document.getElementById('options-card');
+        var answers = document.getElementById('answers-card');
+        var tolerance = document.getElementById('tolerance-field');
+        var note = document.getElementById('marking-note');
+        var autoText = '@T("Marked automatically.", "يُصحَّح آلياً.")';
+        var handText = '@T("Marked by a person.", "يُصحّحه إنسان.")';
+
+        function sync() {
+            var v = parseInt(type.value, 10);
+            options.hidden = CHOICE.indexOf(v) === -1;
+            answers.hidden = ANSWERS.indexOf(v) === -1;
+            tolerance.hidden = v !== NUMERIC;
+            note.textContent = v === 6 ? handText : autoText;
+        }
+
+        type.addEventListener('change', sync);
+        sync();
+    })();
+</script>

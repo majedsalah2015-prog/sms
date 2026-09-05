@@ -59,5 +59,40 @@ namespace Sms.Web.Models
             ScanStatus.Infected => arabic ? "مرفوض — مصاب" : "Rejected — infected",
             _ => arabic ? "لا ملف" : "No file",
         };
+
+        /// <summary>doc/Modules/37 §7 question types, named as a teacher would name them rather than as the enum spells them.</summary>
+        public static string QuestionTypeName(Domain.Learning.QuestionType type, bool arabic) => type switch
+        {
+            Domain.Learning.QuestionType.SingleChoice => arabic ? "اختيار من متعدّد" : "Single choice",
+            Domain.Learning.QuestionType.MultipleChoice => arabic ? "اختيار متعدّد الإجابات" : "Multiple choice",
+            Domain.Learning.QuestionType.TrueFalse => arabic ? "صواب أو خطأ" : "True or false",
+            Domain.Learning.QuestionType.Numeric => arabic ? "إجابة عددية" : "Numeric",
+            Domain.Learning.QuestionType.ShortText => arabic ? "إجابة قصيرة" : "Short answer",
+            Domain.Learning.QuestionType.Essay => arabic ? "سؤال مقالي" : "Essay",
+            _ => arabic ? "غير معروف" : "Unknown",
+        };
+
+        /// <summary>BR-LRN-011: whether this type marks itself, said in words, because it decides how much work a paper of them will be.</summary>
+        public static string QuestionMarkingName(Domain.Learning.QuestionType type, bool arabic)
+            => Application.Learning.QuestionTypeRules.IsAutoMarkable(type)
+                ? (arabic ? "تصحيح آلي" : "Auto-marked")
+                : (arabic ? "تصحيح يدوي" : "Marked by hand");
+
+        public static string QuestionDifficultyName(Domain.Learning.QuestionDifficulty difficulty, bool arabic) => difficulty switch
+        {
+            Domain.Learning.QuestionDifficulty.Easy => arabic ? "سهل" : "Easy",
+            Domain.Learning.QuestionDifficulty.Medium => arabic ? "متوسط" : "Medium",
+            Domain.Learning.QuestionDifficulty.Hard => arabic ? "صعب" : "Hard",
+            _ => arabic ? "غير معروف" : "Unknown",
+        };
+
+        /// <summary>BR-LRN-007's sharing, in the words that say who actually gets to see it.</summary>
+        public static string QuestionShareScopeName(Domain.Learning.QuestionShareScope scope, bool arabic) => scope switch
+        {
+            Domain.Learning.QuestionShareScope.AuthorOnly => arabic ? "لي وحدي" : "Only me",
+            Domain.Learning.QuestionShareScope.Offering => arabic ? "معلّمو المقرر" : "Teachers of this subject",
+            Domain.Learning.QuestionShareScope.Department => arabic ? "القسم كلّه" : "The whole department",
+            _ => arabic ? "غير معروف" : "Unknown",
+        };
     }
 }

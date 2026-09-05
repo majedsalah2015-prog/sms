@@ -150,6 +150,71 @@ namespace Sms.Web.Models
                 ? "كشف درجات هذه الشعبة منشور بالفعل، والكتابة فيه من هنا تلتفّ على ضبط تغيير الدرجات — أعِد الكشف إلى التحرير في الوحدة 17 بسبب مسجَّل، ثمّ ارصد (BR-LRN-012, BR-GRA-005)."
                 : "This section's marksheet is already published, and writing into it from here would slip past mark-change control — return the sheet to draft in Module 17 with a recorded reason, then release (BR-LRN-012, BR-GRA-005).",
 
+            // ---- M37 the question bank (§8.6)
+
+            QuestionShapeException qs => qs.Refusal switch
+            {
+                QuestionShapeRefusal.TooFewOptions => arabic
+                    ? "سؤال الاختيار يحتاج خيارين على الأقل — الخيار الواحد تعليمات لا سؤال (BR-LRN-011)."
+                    : "A choice question needs at least two options — one option is an instruction, not a question (BR-LRN-011).",
+
+                QuestionShapeRefusal.NoCorrectOption => arabic
+                    ? "لم تُحدَّد إجابة صحيحة، ولا يمكن تصحيح سؤال آلياً بلا إجابة يُقاس عليها (BR-LRN-011)."
+                    : "No option is marked correct, and a question with nothing to measure against cannot be marked automatically (BR-LRN-011).",
+
+                QuestionShapeRefusal.TooManyCorrectOptions => arabic
+                    ? "هذا النوع يقبل إجابة صحيحة واحدة — إمّا أن تُبقي واحدة، أو تحوّله إلى «اختيار متعدّد» (BR-LRN-011)."
+                    : "This type takes exactly one correct answer — leave one correct, or change the type to multiple choice (BR-LRN-011).",
+
+                QuestionShapeRefusal.EveryOptionCorrect => arabic
+                    ? "كلّ الخيارات صحيحة، وهذا ليس سؤالاً — يُصحَّح للصف كلّه مهما اختار، ويظهر في التحليلات سؤالاً سليماً وهو ليس كذلك (BR-LRN-011)."
+                    : "Every option is correct, which is not a question — it marks the whole class right whatever they pick, and hides in the analytics as a sound item (BR-LRN-011).",
+
+                QuestionShapeRefusal.OptionsOnANonChoiceType => arabic
+                    ? "هذا النوع لا يحمل خيارات — يبدو أنّ النوع اختير خطأً (BR-LRN-011)."
+                    : "This type carries no options — the type looks like it was chosen by mistake (BR-LRN-011).",
+
+                QuestionShapeRefusal.NoAcceptedAnswer => arabic
+                    ? "اذكر إجابةً مقبولة واحدة على الأقل، فبها يُصحَّح هذا السؤال آلياً (BR-LRN-011)."
+                    : "List at least one accepted answer — it is what marks this question automatically (BR-LRN-011).",
+
+                QuestionShapeRefusal.NonNumericAcceptedAnswer => arabic
+                    ? "السؤال العددي يقبل أرقاماً فقط في إجاباته المقبولة — اكتب الرقم، أو حوّل السؤال إلى إجابة نصية قصيرة (BR-LRN-011)."
+                    : "A numeric question accepts only numbers as accepted answers — enter the number, or change the question to short text (BR-LRN-011).",
+
+                QuestionShapeRefusal.AcceptedAnswersOnAChoiceType => arabic
+                    ? "سؤال الاختيار يُصحَّح بخياراته لا بإجابات مكتوبة — احذف الإجابات المقبولة (BR-LRN-011)."
+                    : "A choice question is marked by its options, not by typed answers — clear the accepted answers (BR-LRN-011).",
+
+                QuestionShapeRefusal.ToleranceOnANonNumericType => arabic
+                    ? "هامش الخطأ للأسئلة العددية وحدها — فلا معنى لـ«±٠٫٥» في إجابة نصية (BR-LRN-011)."
+                    : "A tolerance belongs to numeric questions only — \"±0.5\" means nothing on a text answer (BR-LRN-011).",
+
+                QuestionShapeRefusal.NegativeTolerance => arabic
+                    ? "هامش الخطأ لا يكون سالباً — فهامش سالب لا يقبل أيّ إجابة إطلاقاً. اجعله صفراً للمطابقة التامّة (BR-LRN-011)."
+                    : "A tolerance cannot be negative — a negative one accepts no answer at all. Use zero for an exact match (BR-LRN-011).",
+
+                QuestionShapeRefusal.MarksNotPositive => arabic
+                    ? "درجة السؤال يجب أن تكون أكبر من صفر (BR-LRN-011)."
+                    : "A question's marks must be greater than zero (BR-LRN-011).",
+
+                _ => arabic
+                    ? "لا يمكن طرح هذا السؤال بشكله الحالي (BR-LRN-011)."
+                    : "This question cannot be asked as it stands (BR-LRN-011).",
+            },
+
+            QuestionDeprecatedException => arabic
+                ? "هذا السؤال مسحوب من البنك، والمسحوب سجلّ يبقى على كلّ ورقة استُعمل فيها ولا يُحرَّر — أضف سؤالاً جديداً بدلاً من إحيائه (BR-LRN-007)."
+                : "This question is withdrawn from the bank, and a withdrawn question stays on every paper that used it rather than being edited — add a new question instead of reviving it (BR-LRN-007).",
+
+            QuestionNotCurrentVersionException => arabic
+                ? "هذه نسخة سابقة من السؤال، وهي سجلّ ما أجاب عنه الطلاب فعلاً — التعديل يبدأ من النسخة الحالية (BR-LRN-007)."
+                : "This is an earlier version of the question and is the record of what students actually answered — edits start from the current version (BR-LRN-007).",
+
+            QuestionBankRetiredException => arabic
+                ? "هذا البنك متقاعد فلا يقبل أسئلة جديدة، ويحتفظ بكلّ ما فيه لأنّ أسئلته قد تكون على ورقة أُجيبت فعلاً (BR-GLB-006)."
+                : "This bank is retired and takes no new questions, and it keeps every one it holds because they may sit on a paper already answered (BR-GLB-006).",
+
             // ---------------------------------------------------------------- M16 grading
 
             GradingScaleLockedException => arabic

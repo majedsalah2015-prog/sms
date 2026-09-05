@@ -317,4 +317,64 @@ namespace Sms.Application.Common.Exceptions
 
         public int MarksheetId { get; }
     }
+
+    /// <summary>
+    /// BR-LRN-011 (doc/Modules/37 §8.6): a question that cannot be marked as it
+    /// stands. Carries the specific refusal rather than a sentence, so the Web
+    /// boundary translates it and the engine stays language-free.
+    /// </summary>
+    public class QuestionShapeException : InvalidOperationException
+    {
+        public QuestionShapeException(QuestionShapeRefusal refusal, QuestionType type)
+            : base($"A {type} question is not answerable as it stands: {refusal} (BR-LRN-011).")
+        {
+            Refusal = refusal;
+            Type = type;
+        }
+
+        public QuestionShapeRefusal Refusal { get; }
+
+        public QuestionType Type { get; }
+    }
+
+    /// <summary>
+    /// BR-LRN-007: a deprecated question is history. Reviving it under a new
+    /// wording is creating a question, not editing one.
+    /// </summary>
+    public class QuestionDeprecatedException : InvalidOperationException
+    {
+        public QuestionDeprecatedException(int questionId)
+            : base($"Question {questionId} is deprecated and cannot be revised (BR-LRN-007).")
+            => QuestionId = questionId;
+
+        public int QuestionId { get; }
+    }
+
+    /// <summary>
+    /// BR-LRN-007: a question is revised from its current version. An older one is
+    /// the record of what a student answered and is never the base of an edit.
+    /// </summary>
+    public class QuestionNotCurrentVersionException : InvalidOperationException
+    {
+        public QuestionNotCurrentVersionException(int questionId, int version)
+            : base($"Question {questionId} is version {version} and is not the current one (BR-LRN-007).")
+        {
+            QuestionId = questionId;
+            Version = version;
+        }
+
+        public int QuestionId { get; }
+
+        public int Version { get; }
+    }
+
+    /// <summary>BR-GLB-006: a retired bank takes no new questions, and keeps every one it has.</summary>
+    public class QuestionBankRetiredException : InvalidOperationException
+    {
+        public QuestionBankRetiredException(int questionBankId)
+            : base($"Question bank {questionBankId} is retired (BR-GLB-006).")
+            => QuestionBankId = questionBankId;
+
+        public int QuestionBankId { get; }
+    }
 }

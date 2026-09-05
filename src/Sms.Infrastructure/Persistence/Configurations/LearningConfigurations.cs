@@ -167,4 +167,97 @@ namespace Sms.Infrastructure.Persistence.Configurations
             builder.HasIndex(x => new { x.SubmissionVersionId, x.AttachmentId }, "UQ_SubmissionAttachment_Version_Attachment").IsUnique();
         }
     }
+
+    /// <summary>
+    /// doc/Modules/37 §7 lrn.QuestionBank. Outside the soft-active filter on
+    /// purpose: §7 keeps versioned catalogs loadable, because a bank retired this
+    /// term still owns the questions on last term's paper.
+    /// </summary>
+    public class QuestionBankConfiguration : IEntityTypeConfiguration<QuestionBank>
+    {
+        public void Configure(EntityTypeBuilder<QuestionBank> builder)
+        {
+            builder.ToTable("QuestionBank", "lrn");
+
+            builder.Property(x => x.NameAr).IsRequired().HasMaxLength(200);
+            builder.Property(x => x.NameEn).IsRequired().HasMaxLength(200);
+
+            // BR-LRN-001: banks hang off the offering, never off a raw subject.
+            builder.HasOne<CurriculumOffering>().WithMany().HasForeignKey(x => x.CurriculumOfferingId);
+
+            builder.HasIndex(x => x.CurriculumOfferingId, "IX_QuestionBank_Offering");
+        }
+    }
+
+    /// <summary>
+    /// doc/Modules/37 §7 lrn.Question, BR-LRN-007. Every version is a row; the
+    /// unique index over (root, version) is what makes "version 2 of this
+    /// question" a thing the database guarantees rather than a convention the
+    /// service hopes it kept.
+    /// </summary>
+    public class QuestionConfiguration : IEntityTypeConfiguration<Question>
+    {
+        public void Configure(EntityTypeBuilder<Question> builder)
+        {
+            builder.ToTable("Question", "lrn");
+
+            builder.Property(x => x.StemAr).IsRequired();
+            builder.Property(x => x.StemEn).IsRequired();
+            builder.Property(x => x.Marks).HasColumnType("decimal(6,2)");
+            builder.Property(x => x.NumericTolerance).HasColumnType("decimal(12,4)");
+            builder.Property(x => x.DeprecatedReason).HasMaxLength(500);
+
+            builder.HasOne<QuestionBank>().WithMany().HasForeignKey(x => x.QuestionBankId);
+
+            // §8.7 generates by topic, and the topic is the lesson. Optional: a
+            // question may span the course.
+            builder.HasOne<Lesson>().WithMany().HasForeignKey(x => x.LessonId);
+
+            builder.HasIndex(x => new { x.RootQuestionId, x.Version }, "UQ_Question_Root_Version").IsUnique();
+
+            // The pick query: current, undeprecated, filtered by type and
+            // difficulty. Indexed on what it filters, per docs/Database/01.
+            builder.HasIndex(x => new { x.QuestionBankId, x.IsCurrentVersion, x.IsDeprecated }, "IX_Question_Bank_Live");
+        }
+    }
+
+    /// <summary>
+    /// doc/Modules/37 §7 lrn.QuestionOption. Bound to the question <em>version</em>
+    /// rather than to its root: a revision brings its own options, so the choices
+    /// a student was shown last term cannot be rewritten by this term's edit
+    /// (BR-LRN-007).
+    /// </summary>
+    public class QuestionOptionConfiguration : IEntityTypeConfiguration<QuestionOption>
+    {
+        public void Configure(EntityTypeBuilder<QuestionOption> builder)
+        {
+            builder.ToTable("QuestionOption", "lrn");
+
+            builder.Property(x => x.TextAr).IsRequired();
+            builder.Property(x => x.TextEn).IsRequired();
+
+            builder.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId);
+
+            builder.HasIndex(x => new { x.QuestionId, x.DisplayOrder }, "IX_QuestionOption_Question_Order");
+        }
+    }
+
+    /// <summary>
+    /// doc/Modules/37 §7, BR-LRN-011 lrn.QuestionAcceptedAnswer: the spellings a
+    /// short-text or numeric question accepts, per question version for the same
+    /// reason options are.
+    /// </summary>
+    public class QuestionAcceptedAnswerConfiguration : IEntityTypeConfiguration<QuestionAcceptedAnswer>
+    {
+        public void Configure(EntityTypeBuilder<QuestionAcceptedAnswer> builder)
+        {
+            builder.ToTable("QuestionAcceptedAnswer", "lrn");
+
+            builder.Property(x => x.Text).IsRequired().HasMaxLength(400);
+
+            builder.HasOne<Question>().WithMany().HasForeignKey(x => x.QuestionId);
+
+            builder.HasIndex(x => x.QuestionId, "IX_QuestionAcceptedAnswer_Question");
+        }
+    }
 }

@@ -1,0 +1,158 @@
+@using System.Globalization
+@using Sms.Domain.Learning
+@model QuestionBanksViewModel
+@{
+    var isRtl = CultureInfo.CurrentUICulture.TextInfo.IsRightToLeft;
+    string T(string en, string ar) => isRtl ? ar : en;
+    ViewData["Title"] = T("Question banks", "بنوك الأسئلة");
+    ViewData["Breadcrumb"] = T("E-learning / Question banks", "التعليم الإلكتروني / بنوك الأسئلة");
+
+    var help = new HelpPanelViewModel
+    {
+        Id = "banks-help",
+        Title = T("Question banks — help", "بنوك الأسئلة — مساعدة"),
+        Intro = T("The questions you write for a subject, kept and reused rather than retyped each term.",
+            "الأسئلة التي تكتبها لمقرر، تُحفظ وتُعاد فلا تُكتب من جديد كل فصل."),
+        Items = new[]
+        {
+            new HelpPanelViewModel.Item(
+                T("A bank belongs to a subject-year", "البنك يخصّ مقرراً في عامه"),
+                T("Banks hang off the curriculum offering, never a bare subject, so what you wrote for this year's syllabus stays attached to it (BR-LRN-001). You see the subjects you teach, and your department's if you head one (BR-LRN-002).",
+                  "تتبع البنوك المقرر الدراسي لا المادة المجرّدة، فيبقى ما كتبته لمنهج هذا العام مرتبطاً به (BR-LRN-001). وترى المواد التي تُدرّسها، ومواد قسمك إن كنت رئيسه (BR-LRN-002).")),
+            new HelpPanelViewModel.Item(
+                T("Sharing is per bank, not per question", "المشاركة للبنك لا للسؤال"),
+                T("Keep a bank to yourself while you draft it, then open it to the subject's other teachers or to the whole department. Nobody outside sees it either way (BR-LRN-007).",
+                  "أبقِ البنك لك وأنت تُعِدّه، ثم افتحه لمعلّمي المادة أو للقسم كلّه. ولا يراه من هم خارج ذلك في الحالين (BR-LRN-007).")),
+            new HelpPanelViewModel.Item(
+                T("A retired bank is not a deleted one", "البنك المتقاعد ليس محذوفاً"),
+                T("Retiring stops new questions and hides it from the list. Every question it holds keeps rendering on the papers that used them — there is no delete here (BR-GLB-006).",
+                  "التقاعد يوقف الأسئلة الجديدة ويُخفيه من القائمة. وتبقى كل أسئلته ظاهرة على الأوراق التي استُعملت فيها — ولا حذف هنا (BR-GLB-006).")),
+        },
+    };
+}
+
+<div class="sms-page-head">
+    <div>
+        <h1 class="sms-page-title">@ViewData["Title"]</h1>
+        <p class="text-muted mb-0">@T("Write once, ask many times.", "اكتب مرّة، واسأل مرّات.")</p>
+    </div>
+    <div class="d-flex align-items-center gap-2"><partial name="_HelpModal" model="help" /></div>
+</div>
+
+<partial name="_LearningNav" />
+
+@if (Model.HasNoReach)
+{
+    <div class="sms-card p-4">
+        <h2 class="h6">@T("No subjects to write questions for", "لا مواد لكتابة أسئلة لها")</h2>
+        <p class="text-muted mb-0">
+            @T("You write questions for the subjects you hold in the published timetable, or for your department's if you head one (BR-LRN-002). If a subject should be here, your allocation in the published timetable is where it comes from.",
+               "تكتب أسئلة للمواد التي تحملها في الجدول المنشور، أو لمواد قسمك إن كنت رئيسه (BR-LRN-002). فإن كان ينبغي أن تكون مادة هنا فمصدرها إسنادك في الجدول المنشور.")
+        </p>
+    </div>
+}
+else
+{
+    <div class="sms-card p-3 mb-3">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label" for="offeringId">@T("Subject", "المادة")</label>
+                <select class="form-select" id="offeringId" name="offeringId" onchange="this.form.submit()">
+                    <option value="">@T("Choose a subject…", "اختر مادة…")</option>
+                    @foreach (var o in Model.Offerings)
+                    {
+                        <option value="@o.Id" selected="@(Model.SelectedOfferingId == o.Id)">@o.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-4">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="includeRetired" name="includeRetired" value="true"
+                           checked="@Model.IncludeRetired" onchange="this.form.submit()" />
+                    <label class="form-check-label" for="includeRetired">@T("Show retired banks", "أظهر البنوك المتقاعدة")</label>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    @if (Model.SelectedOfferingId is int offeringId)
+    {
+        <div class="sms-card mb-3">
+            <div class="table-responsive"><table class="table sms-table mb-0">
+                <caption class="visually-hidden">@T("Question banks for this subject", "بنوك الأسئلة لهذه المادة")</caption>
+                <thead><tr>
+                    <th scope="col">@T("Bank", "البنك")</th>
+                    <th scope="col">@T("Questions", "الأسئلة")</th>
+                    <th scope="col">@T("Shared with", "مشارَك مع")</th>
+                    <th scope="col" class="text-end">@T("Actions", "إجراءات")</th>
+                </tr></thead>
+                <tbody>
+                @if (Model.Banks.Count == 0)
+                {
+                    <tr><td colspan="4" class="text-muted p-3">
+                        @T("No banks for this subject yet. The form below makes the first one.",
+                           "لا بنوك لهذه المادة بعد. والنموذج أدناه يُنشئ أوّلها.")
+                    </td></tr>
+                }
+                @foreach (var row in Model.Banks)
+                {
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">@row.Name</div>
+                            @if (!row.Bank.IsActive)
+                            {
+                                <span class="badge bg-secondary">@T("Retired", "متقاعد")</span>
+                            }
+                            @if (row.IsMine)
+                            {
+                                <span class="badge bg-info-subtle text-info-emphasis">@T("Yours", "لك")</span>
+                            }
+                        </td>
+                        <td>
+                            @row.LiveQuestionCount
+                            @if (row.DeprecatedQuestionCount > 0)
+                            {
+                                <span class="text-muted small">
+                                    · @T($"{row.DeprecatedQuestionCount} withdrawn", $"{row.DeprecatedQuestionCount} مسحوب")
+                                </span>
+                            }
+                        </td>
+                        <td class="text-muted">@LearningLabels.QuestionShareScopeName(row.Bank.ShareScope, isRtl)</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-secondary" asp-action="QuestionBankDetail" asp-route-id="@row.Bank.Id">@T("Open", "افتح")</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table></div>
+        </div>
+
+        <div class="sms-card p-3">
+            <h2 class="h6">@T("New bank", "بنك جديد")</h2>
+            <form method="post" asp-action="CreateQuestionBank" class="row g-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="offeringId" value="@offeringId" />
+                <div class="col-md-4">
+                    <label class="form-label" for="nameAr">@T("Name (Arabic)", "الاسم بالعربية")</label>
+                    <input class="form-control" id="nameAr" name="nameAr" dir="rtl" required />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="nameEn">@T("Name (English)", "الاسم بالإنجليزية")</label>
+                    <input class="form-control" id="nameEn" name="nameEn" dir="ltr" required />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="shareScope">@T("Shared with", "مشارَك مع")</label>
+                    <select class="form-select" id="shareScope" name="shareScope">
+                        @foreach (var scope in new[] { QuestionShareScope.AuthorOnly, QuestionShareScope.Offering, QuestionShareScope.Department })
+                        {
+                            <option value="@((int)scope)">@LearningLabels.QuestionShareScopeName(scope, isRtl)</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">@T("Add", "أضف")</button>
+                </div>
+            </form>
+        </div>
+    }
+}

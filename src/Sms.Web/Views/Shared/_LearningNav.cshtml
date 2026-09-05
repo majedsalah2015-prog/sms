@@ -7,6 +7,7 @@
         ("Index", "Lesson planner", "مخطط الدروس", "bi-calendar3-week"),
         ("Materials", "Materials", "مكتبة المواد", "bi-folder2-open"),
         ("Homework", "Homework desk", "مكتب الواجبات", "bi-journal-check"),
+        ("QuestionBanks", "Question banks", "بنوك الأسئلة", "bi-patch-question"),
     };
     // The per-lesson library reached from the planner keeps the planner tab lit:
     // it is the same §8.2 data read from inside one lesson, and lighting the
@@ -17,7 +18,12 @@
     bool Active(string a) => string.Equals(a, action, StringComparison.OrdinalIgnoreCase)
         || (a == "Index" && string.Equals(action, "Resources", StringComparison.OrdinalIgnoreCase))
         || (a == "Homework" && (string.Equals(action, "Submissions", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(action, "Marking", StringComparison.OrdinalIgnoreCase)));
+            || string.Equals(action, "Marking", StringComparison.OrdinalIgnoreCase)))
+        // One bank and one question are both inside the bank list, reached from
+        // it and returning to it.
+        || (a == "QuestionBanks" && (string.Equals(action, "QuestionBankDetail", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "NewQuestion", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(action, "ReviseQuestion", StringComparison.OrdinalIgnoreCase)));
 }
 <nav aria-label="@(isRtl ? "التعليم الإلكتروني" : "E-learning")">
 <ul class="nav nav-pills sms-subnav mb-4">

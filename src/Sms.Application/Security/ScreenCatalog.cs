@@ -509,6 +509,19 @@ namespace Sms.Application.Security
             /// </para>
             /// </summary>
             public const string Marking = "Marking";
+
+            /// <summary>
+            /// §8.6 — the question bank. §6: "View, Create, Edit, Deactivate |
+            /// HoD (Teacher: Create/Edit own offerings)", and the offering-level
+            /// reach of BR-LRN-002 is what draws that line — the verbs are the
+            /// same for both, the reach is not.
+            /// <para>
+            /// Deactivate is retiring a bank and deprecating a question
+            /// (BR-LRN-007/BR-GLB-006), never a delete: a question on a paper
+            /// somebody has answered must stay loadable.
+            /// </para>
+            /// </summary>
+            public const string QuestionBank = "QuestionBank";
         }
 
         public static class Portal
@@ -852,6 +865,7 @@ namespace Sms.Application.Security
             // nothing on this screen for it to end.
             S(Modules.Learning, Learning.Marking, "Marking queue", "طابور التصحيح",
                 ActionVerb.View, ActionVerb.Edit),
+            S(Modules.Learning, Learning.QuestionBank, "Question bank", "بنك الأسئلة", Crud),
 
             // ---- Portal
             S(Modules.Portal, Portal.Home, "Portal home", "الصفحة الرئيسية للبوابة", ReadOnly),

@@ -666,6 +666,12 @@ namespace Sms.Web
             services.AddScoped<IHomeworkSubmissionAdmin, HomeworkSubmissionAdmin>();
             services.AddScoped<IPortalHomeworkSubmitter, PortalHomeworkSubmitter>();
 
+            // Module 37 §8.6 — the question bank, and the first half of the
+            // online-exam side of the module. The paper builder (§8.7), the
+            // sitting console (§8.8), integrity review (§8.9) and the portal's
+            // timed paper (§8.11) are later slices and draw on this one.
+            services.AddScoped<IQuestionBankAdmin, QuestionBankAdmin>();
+
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
             // (doc's "single marks store") - this service owns scheduling,
