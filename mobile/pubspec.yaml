@@ -5,7 +5,15 @@ description: >-
   view over screens the product already has, never a second product: every rule,
   permission and refusal belongs to the server.
 publish_to: none
-version: 1.0.0+1
+
+# The `+N` half is Android's versionCode. Bump it on every build a family is
+# asked to install: a phone offered an APK whose versionCode it already has
+# treats the install as a no-op, and the family concludes the app did not
+# change. It is also what names the published file, so the browser cannot hand
+# back a cached download of the previous build under the same name.
+#
+# 1.1.0 — the section palette, the icons, and money formatted as the web does.
+version: 1.1.0+2
 
 environment:
   # Built against Flutter 3.47.2 / Dart 3.13.2 (stable, 2026-08-27). The Flutter

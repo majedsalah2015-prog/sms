@@ -5,6 +5,7 @@ import '../../l10n/strings.dart';
 import '../../models/portal.dart';
 import '../../state/auth_controller.dart';
 import '../format.dart';
+import '../theme.dart';
 import '../widgets/async_view.dart';
 import '../widgets/panels.dart';
 
@@ -28,54 +29,123 @@ class FeesTab extends StatelessWidget {
     return AsyncView<PortalFees>(
       load: () => auth.api.fees(studentId),
       builder: (BuildContext context, PortalFees fees) {
+        final bool owing = fees.position > 0;
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: <Widget>[
             Panel(
               children: <Widget>[
+                BigStat(
+                  section: Section.fees,
+                  label: owing ? s.outstanding : s.balance,
+                  value: owing
+                      ? Fmt.money(fees.position, fees.currency, s.lang)
+                      : s.settled,
+                ),
+                const Divider(height: 24),
                 Fact(
                   label: s.grossCharges,
-                  value: Fmt.money(fees.grossCharges, fees.currency),
+                  value: Fmt.money(fees.grossCharges, fees.currency, s.lang),
+                  icon: Icons.request_quote_rounded,
+                  iconColor: AppColors.muted,
                   numeric: true,
                 ),
                 Fact(
                   label: s.discounts,
-                  value: Fmt.money(fees.discounts, fees.currency),
+                  value: Fmt.money(fees.discounts, fees.currency, s.lang),
+                  icon: Icons.local_offer_rounded,
+                  // Reported apart and never netted invisibly (BR-DIS-010).
+                  iconColor: AppColors.success,
                   numeric: true,
-                ),
-                const Divider(height: 20),
-                Fact(
-                  label: s.balance,
-                  value: Fmt.money(fees.position, fees.currency),
-                  numeric: true,
-                  emphasis: true,
                 ),
               ],
             ),
             const SizedBox(height: 12),
             Panel(
+              section: Section.fees,
               title: s.postedCharges,
+              subtitle: fees.charges.isEmpty
+                  ? null
+                  : '${fees.charges.length} · ${fees.currency}',
               children: <Widget>[
                 if (fees.charges.isEmpty)
                   Text(
                     s.noCharges,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: AppColors.muted),
                   )
                 else
-                  for (final PortalChargeLine line in fees.charges)
-                    Fact(
-                      label: '${s.chargeNo} ${line.chargeNo}\n'
-                          '${Fmt.date(line.postedAtUtc, s.isArabic ? 'ar' : 'en')}',
-                      value: Fmt.money(line.grossAmount, fees.currency),
-                      numeric: true,
-                    ),
+                  for (int i = 0; i < fees.charges.length; i++) ...<Widget>[
+                    if (i > 0) const Divider(height: 18),
+                    _ChargeRow(line: fees.charges[i], currency: fees.currency),
+                  ],
               ],
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _ChargeRow extends StatelessWidget {
+  const _ChargeRow({required this.line, required this.currency});
+
+  final PortalChargeLine line;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final Strings s = Strings.of(context);
+    final ThemeData theme = Theme.of(context);
+
+    return Row(
+      children: <Widget>[
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: Section.fees.wash,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(Icons.receipt_rounded,
+              size: 17, color: Section.fees.color),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    line.chargeNo,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ),
+              Text(
+                Fmt.date(line.postedAtUtc, s.lang),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Text(
+            Fmt.money(line.grossAmount, currency, s.lang),
+            style: theme.textTheme.bodyLarge
+                ?.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }

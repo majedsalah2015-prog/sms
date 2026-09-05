@@ -10,6 +10,7 @@ import 'child/homework_tab.dart';
 import 'child/lessons_tab.dart';
 import 'child/results_tab.dart';
 import 'child/timetable_tab.dart';
+import 'theme.dart';
 import 'widgets/async_view.dart';
 
 /// One student, in as many tabs as this caller is allowed.
@@ -32,16 +33,18 @@ class ChildPage extends StatelessWidget {
 
     final List<_Tab> tabs = <_Tab>[
       if (me == null || me.can(PortalPermissions.child)) ...<_Tab>[
-        _Tab(s.overview, AttendanceTab(studentId: studentId)),
-        _Tab(s.results, ResultsTab(studentId: studentId)),
-        _Tab(s.timetable, TimetableTab(studentId: studentId)),
+        _Tab(Section.attendance, s.overview,
+            AttendanceTab(studentId: studentId)),
+        _Tab(Section.results, s.results, ResultsTab(studentId: studentId)),
+        _Tab(Section.timetable, s.timetable,
+            TimetableTab(studentId: studentId)),
       ],
       if (me == null || me.can(PortalPermissions.statement))
-        _Tab(s.fees, FeesTab(studentId: studentId)),
+        _Tab(Section.fees, s.fees, FeesTab(studentId: studentId)),
       if (me == null || me.can(PortalPermissions.work))
-        _Tab(s.homework, HomeworkTab(studentId: studentId)),
+        _Tab(Section.homework, s.homework, HomeworkTab(studentId: studentId)),
       if (me == null || me.can(PortalPermissions.lessons))
-        _Tab(s.lessons, LessonsTab(studentId: studentId)),
+        _Tab(Section.lessons, s.lessons, LessonsTab(studentId: studentId)),
     ];
 
     if (tabs.isEmpty) {
@@ -49,7 +52,7 @@ class ChildPage extends StatelessWidget {
         appBar: AppBar(title: Text(name)),
         body: Padding(
           padding: const EdgeInsets.all(24),
-          child: EmptyView(message: s.nothingHere),
+          child: EmptyView(message: s.nothingHere, section: Section.family),
         ),
       );
     }
@@ -61,8 +64,18 @@ class ChildPage extends StatelessWidget {
           title: Text(name),
           bottom: TabBar(
             isScrollable: true,
+            tabAlignment: TabAlignment.start,
             tabs: <Widget>[
-              for (final _Tab tab in tabs) Tab(text: tab.label),
+              for (final _Tab tab in tabs)
+                Tab(
+                  height: 46,
+                  // The icon carries the section's colour even when the tab is
+                  // unselected, so the row reads as six places rather than as
+                  // six words.
+                  icon: Icon(tab.section.icon, size: 18, color: tab.section.color),
+                  iconMargin: const EdgeInsets.only(bottom: 2),
+                  child: Text(tab.label),
+                ),
             ],
           ),
         ),
@@ -77,8 +90,9 @@ class ChildPage extends StatelessWidget {
 }
 
 class _Tab {
-  const _Tab(this.label, this.body);
+  const _Tab(this.section, this.label, this.body);
 
+  final Section section;
   final String label;
   final Widget body;
 }

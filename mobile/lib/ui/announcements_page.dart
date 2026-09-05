@@ -8,6 +8,7 @@ import '../models/json.dart';
 import '../models/portal.dart';
 import '../state/auth_controller.dart';
 import 'format.dart';
+import 'theme.dart';
 import 'widgets/async_view.dart';
 import 'widgets/panels.dart';
 
@@ -75,10 +76,18 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
   @override
   Widget build(BuildContext context) {
     final Strings s = Strings.of(context);
-    final String language = s.isArabic ? 'ar' : 'en';
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.announcements)),
+      appBar: AppBar(
+        title: Row(
+          children: <Widget>[
+            Icon(Section.announcements.icon,
+                size: 20, color: Section.announcements.color),
+            const SizedBox(width: 8),
+            Text(s.announcements),
+          ],
+        ),
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: Builder(
@@ -97,12 +106,17 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
             if (_items.isEmpty) {
               return ListView(
                 padding: const EdgeInsets.all(24),
-                children: <Widget>[EmptyView(message: s.noAnnouncements)],
+                children: <Widget>[
+                  EmptyView(
+                    message: s.noAnnouncements,
+                    section: Section.announcements,
+                  ),
+                ],
               );
             }
 
             return ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               itemCount: _items.length + (_hasMore || _error != null ? 1 : 0),
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (BuildContext context, int index) {
@@ -118,36 +132,70 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                             padding: EdgeInsets.all(16),
                             child: CircularProgressIndicator(),
                           )
-                        : OutlinedButton(
+                        : OutlinedButton.icon(
                             onPressed: _loadNext,
-                            child: Text(s.loadMore),
+                            icon: const Icon(Icons.expand_more_rounded,
+                                size: 18),
+                            label: Text(s.loadMore),
                           ),
                   );
                 }
-
-                final PortalAnnouncement a = _items[index];
-                return Panel(
-                  children: <Widget>[
-                    Text(
-                      s.pair(a.titleEn, a.titleAr),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      Fmt.date(a.sentAtUtc, language),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                    Prose(title: '', body: s.pair(a.bodyEn, a.bodyAr)),
-                  ],
-                );
+                return _AnnouncementCard(item: _items[index]);
               },
             );
           },
         ),
       ),
+    );
+  }
+}
+
+class _AnnouncementCard extends StatelessWidget {
+  const _AnnouncementCard({required this.item});
+
+  final PortalAnnouncement item;
+
+  @override
+  Widget build(BuildContext context) {
+    final Strings s = Strings.of(context);
+    final ThemeData theme = Theme.of(context);
+
+    return Panel(
+      children: <Widget>[
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SectionIcon(Section.announcements),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    s.pair(item.titleEn, item.titleAr),
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.schedule_rounded,
+                          size: 13, color: AppColors.muted),
+                      const SizedBox(width: 4),
+                      Text(
+                        Fmt.date(item.sentAtUtc, s.lang),
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        Prose(title: '', body: s.pair(item.bodyEn, item.bodyAr)),
+      ],
     );
   }
 }

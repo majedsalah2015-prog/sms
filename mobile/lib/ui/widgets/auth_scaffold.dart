@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../app_version.dart';
 import '../../core/api_exception.dart';
 import '../../l10n/strings.dart';
 import '../../state/auth_controller.dart';
+import '../theme.dart';
 import 'async_view.dart';
 
-/// The frame the three sign-in screens share: the school's name, the language
+/// The frame the three sign-in screens share: the school's mark, the language
 /// switch, a centred card, and one place for the server's refusal to appear.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({
     required this.title,
     required this.children,
+    this.icon = Icons.school_rounded,
     this.subtitle,
     this.error,
     super.key,
@@ -19,6 +22,10 @@ class AuthScaffold extends StatelessWidget {
 
   final String title;
   final String? subtitle;
+
+  /// The glyph above the card — what this particular step is about.
+  final IconData icon;
+
   final List<Widget> children;
 
   /// The last failure, if any. Its message is the server's own and is shown
@@ -35,9 +42,10 @@ class AuthScaffold extends StatelessWidget {
       appBar: AppBar(
         title: Text(s.appTitle),
         actions: <Widget>[
-          TextButton(
+          TextButton.icon(
             onPressed: () => auth.setLanguage(auth.isArabic ? 'en' : 'ar'),
-            child: Text(s.languageToggle),
+            icon: const Icon(Icons.language_rounded, size: 18),
+            label: Text(s.languageToggle),
           ),
         ],
       ),
@@ -50,14 +58,38 @@ class AuthScaffold extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Text(title, style: theme.textTheme.headlineSmall),
+                  Center(
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: <Color>[
+                            AppColors.primary,
+                            AppColors.primaryHover,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(icon, size: 32, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                   if (subtitle != null) ...<Widget>[
                     const SizedBox(height: 8),
                     Text(
                       subtitle!,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: AppColors.muted, height: 1.5),
                     ),
                   ],
                   const SizedBox(height: 24),
@@ -65,7 +97,26 @@ class AuthScaffold extends StatelessWidget {
                     _ErrorBanner(error: error!),
                     const SizedBox(height: 16),
                   ],
-                  ...children,
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: children,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // So a family asked to install an update can answer "did it
+                  // install?" from the first screen, without help from the school.
+                  Center(
+                    child: Text(
+                      appVersionLabel,
+                      textDirection: TextDirection.ltr,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: AppColors.muted),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -86,6 +137,8 @@ class _ErrorBanner extends StatelessWidget {
     final Strings s = Strings.of(context);
     final ThemeData theme = Theme.of(context);
     final Object e = error;
+    final bool offline = e is ApiUnreachableException;
+    final Color tone = offline ? AppColors.warning : AppColors.danger;
 
     // `validation_failed` carries a sentence per field. The server wrote all of
     // them in the caller's language, so they are listed rather than collapsed
@@ -99,23 +152,38 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: Color.alphaBlend(tone.withValues(alpha: 0.08), Colors.white),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Color.alphaBlend(tone.withValues(alpha: 0.25), Colors.white),
+        ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          for (final String line in lines)
-            if (line.trim().isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Text(
-                  line,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ),
+          Icon(
+            offline ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+            size: 20,
+            color: tone,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                for (final String line in lines)
+                  if (line.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        line,
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: tone, height: 1.4),
+                      ),
+                    ),
+              ],
+            ),
+          ),
         ],
       ),
     );

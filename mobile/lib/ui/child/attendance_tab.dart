@@ -5,6 +5,7 @@ import '../../l10n/strings.dart';
 import '../../models/portal.dart';
 import '../../state/auth_controller.dart';
 import '../format.dart';
+import '../theme.dart';
 import '../widgets/async_view.dart';
 import '../widgets/panels.dart';
 
@@ -27,30 +28,52 @@ class AttendanceTab extends StatelessWidget {
           // confident 0% would read as a child who never attended.
           return ListView(
             padding: const EdgeInsets.all(24),
-            children: <Widget>[EmptyView(message: s.noAttendance)],
+            children: <Widget>[
+              EmptyView(message: s.noAttendance, section: Section.attendance),
+            ],
           );
         }
 
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: <Widget>[
             Panel(
               children: <Widget>[
-                _Rate(percent: a.attendancePercent),
-                const SizedBox(height: 8),
+                BigStat(
+                  section: Section.attendance,
+                  label: s.attendanceRate,
+                  value: Fmt.percent(a.attendancePercent, s.lang),
+                  progress: a.attendancePercent / 100,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Panel(
+              children: <Widget>[
                 Fact(
                   label: s.scheduledDays,
-                  value: Fmt.marks(a.scheduledDays.toDouble()),
+                  value: Fmt.marks(a.scheduledDays.toDouble(), s.lang),
+                  icon: Icons.calendar_month_rounded,
+                  iconColor: Section.timetable.color,
                   numeric: true,
                 ),
+                const Divider(height: 18),
                 Fact(
                   label: s.absentDays,
-                  value: Fmt.marks(a.absentDays.toDouble()),
+                  value: Fmt.marks(a.absentDays.toDouble(), s.lang),
+                  icon: Icons.event_busy_rounded,
+                  // Absences are the figure a parent came to check; red when
+                  // there are any, muted when the answer is none.
+                  iconColor:
+                      a.absentDays > 0 ? AppColors.danger : AppColors.muted,
                   numeric: true,
                 ),
+                const Divider(height: 18),
                 Fact(
                   label: s.exemptedDays,
-                  value: Fmt.marks(a.exemptedDays.toDouble()),
+                  value: Fmt.marks(a.exemptedDays.toDouble(), s.lang),
+                  icon: Icons.verified_user_rounded,
+                  iconColor: AppColors.success,
                   numeric: true,
                 ),
               ],
@@ -58,49 +81,6 @@ class AttendanceTab extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-class _Rate extends StatelessWidget {
-  const _Rate({required this.percent});
-
-  final double percent;
-
-  @override
-  Widget build(BuildContext context) {
-    final Strings s = Strings.of(context);
-    final ThemeData theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          s.attendanceRate,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Directionality(
-          textDirection: TextDirection.ltr,
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Text(
-              Fmt.percent(percent),
-              style: theme.textTheme.displaySmall,
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            value: (percent / 100).clamp(0, 1).toDouble(),
-            minHeight: 8,
-          ),
-        ),
-      ],
     );
   }
 }

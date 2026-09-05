@@ -6,6 +6,7 @@ import '../models/me.dart';
 import '../models/portal.dart';
 import '../state/auth_controller.dart';
 import 'format.dart';
+import 'theme.dart';
 import 'widgets/async_view.dart';
 import 'widgets/panels.dart';
 
@@ -31,43 +32,60 @@ class StatementPage extends StatelessWidget {
     };
 
     return Scaffold(
-      appBar: AppBar(title: Text(s.statement)),
+      appBar: AppBar(
+        title: Row(
+          children: <Widget>[
+            Icon(Section.fees.icon, size: 20, color: Section.fees.color),
+            const SizedBox(width: 8),
+            Text(s.statement),
+          ],
+        ),
+      ),
       body: AsyncView<PortalStatement>(
         load: () => auth.api.statement(),
         builder: (BuildContext context, PortalStatement statement) {
+          final bool owing = statement.total > 0;
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: <Widget>[
               Panel(
                 children: <Widget>[
-                  Fact(
+                  BigStat(
+                    section: Section.fees,
                     label: s.familyTotal,
-                    value: statement.total == 0
-                        ? s.settled
-                        : Fmt.money(statement.total, statement.currency),
-                    numeric: statement.total != 0,
-                    emphasis: true,
+                    value: owing
+                        ? Fmt.money(statement.total, statement.currency, s.lang)
+                        : s.settled,
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               for (final PortalFees fees in statement.students) ...<Widget>[
                 Panel(
+                  section: Section.family,
                   title: names[fees.studentId] ?? '#${fees.studentId}',
                   children: <Widget>[
                     Fact(
                       label: s.grossCharges,
-                      value: Fmt.money(fees.grossCharges, fees.currency),
+                      value: Fmt.money(fees.grossCharges, fees.currency, s.lang),
+                      icon: Icons.request_quote_rounded,
                       numeric: true,
                     ),
                     Fact(
                       label: s.discounts,
-                      value: Fmt.money(fees.discounts, fees.currency),
+                      value: Fmt.money(fees.discounts, fees.currency, s.lang),
+                      icon: Icons.local_offer_rounded,
+                      iconColor: AppColors.success,
                       numeric: true,
                     ),
+                    const Divider(height: 18),
                     Fact(
                       label: s.balance,
-                      value: Fmt.money(fees.position, fees.currency),
+                      value: Fmt.money(fees.position, fees.currency, s.lang),
+                      icon: Icons.account_balance_wallet_rounded,
+                      iconColor: fees.position > 0
+                          ? AppColors.danger
+                          : AppColors.success,
                       numeric: true,
                       emphasis: true,
                     ),

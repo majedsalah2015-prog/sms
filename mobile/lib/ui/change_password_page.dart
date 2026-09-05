@@ -74,6 +74,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     final Strings s = Strings.of(context);
 
     return AuthScaffold(
+      icon: Icons.lock_reset_rounded,
       title: s.changePasswordTitle,
       subtitle: widget.forced ? s.changePasswordPrompt : null,
       error: _error,
@@ -87,7 +88,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 controller: _current,
                 obscureText: true,
                 textInputAction: TextInputAction.next,
-                decoration: InputDecoration(labelText: s.currentPassword),
+                decoration: InputDecoration(
+                  labelText: s.currentPassword,
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                ),
                 validator: (String? v) =>
                     (v ?? '').isEmpty ? s.passwordRequired : null,
               ),
@@ -96,7 +100,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 controller: _next,
                 obscureText: true,
                 textInputAction: TextInputAction.next,
-                decoration: InputDecoration(labelText: s.newPassword),
+                decoration: InputDecoration(
+                  labelText: s.newPassword,
+                  prefixIcon: const Icon(Icons.lock_reset_rounded),
+                ),
                 validator: (String? v) =>
                     (v ?? '').isEmpty ? s.passwordRequired : null,
               ),
@@ -106,7 +113,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                 obscureText: true,
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _busy ? null : _submit(),
-                decoration: InputDecoration(labelText: s.confirmPassword),
+                decoration: InputDecoration(
+                  labelText: s.confirmPassword,
+                  prefixIcon: const Icon(Icons.check_circle_outline_rounded),
+                ),
                 validator: (String? v) =>
                     v == _next.text ? null : s.passwordsDoNotMatch,
               ),

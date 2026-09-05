@@ -97,7 +97,10 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _userName,
                 autofillHints: const <String>[AutofillHints.username],
                 textInputAction: TextInputAction.next,
-                decoration: InputDecoration(labelText: s.userName),
+                decoration: InputDecoration(
+                  labelText: s.userName,
+                  prefixIcon: const Icon(Icons.person_outline_rounded),
+                ),
                 validator: (String? v) =>
                     (v ?? '').trim().isEmpty ? s.userNameRequired : null,
               ),
@@ -110,6 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                 onFieldSubmitted: (_) => _busy ? null : _submit(),
                 decoration: InputDecoration(
                   labelText: s.password,
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: IconButton(
                     icon: Icon(
                       _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
@@ -140,6 +144,7 @@ class _LoginPageState extends State<LoginPage> {
                   textDirection: TextDirection.ltr,
                   decoration: InputDecoration(
                     labelText: s.serverAddress,
+                    prefixIcon: const Icon(Icons.dns_outlined),
                     helperText: s.serverAddressHint,
                     helperMaxLines: 2,
                   ),
@@ -159,9 +164,19 @@ class _LoginPageState extends State<LoginPage> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : Text(s.signIn),
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text(s.signIn),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.login_rounded, size: 18),
+                        ],
+                      ),
               ),
             ],
           ),

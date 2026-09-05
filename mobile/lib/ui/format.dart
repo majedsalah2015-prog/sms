@@ -5,31 +5,66 @@ import 'package:intl/intl.dart';
 /// The server sends money as a JSON number in invariant form and never
 /// pre-formats it (docs/Integration/03-Mobile-API.md §2), because only the
 /// client knows what locale it is displaying in. This is that decision, in one
-/// place.
+/// place — and it is deliberately the *same* decision the web portal already
+/// made, so a figure reads identically on a laptop and on a phone.
 abstract final class Fmt {
+  /// What `decimal.ToString("N2")` produces under `ar-SA`, verified against the
+  /// running portal rather than assumed: **Western digits** with the Arabic
+  /// thousands separator U+066C and decimal separator U+066B.
+  ///
+  /// Neither of these is what CLDR's `ar` locale would give — its default
+  /// numbering system is `arab`, which would print ١٢٬٠٠٠٫٠٠ in Arabic-Indic
+  /// digits and break this product's standing rule that money keeps Western
+  /// digits in both directions. So the number is formatted in `en` and only its
+  /// two separators are swapped.
+  static const String _arabicGroup = '٬';
+  static const String _arabicDecimal = '٫';
+
+  static String _separators(String western, String languageCode) {
+    if (languageCode != 'ar') return western;
+    final StringBuffer out = StringBuffer();
+    for (int i = 0; i < western.length; i++) {
+      final String ch = western[i];
+      if (ch == ',') {
+        out.write(_arabicGroup);
+      } else if (ch == '.') {
+        out.write(_arabicDecimal);
+      } else {
+        out.write(ch);
+      }
+    }
+    return out.toString();
+  }
+
   /// Money keeps Western digits in both languages and is laid out
   /// left-to-right, which is this product's standing rule — an amount is the
   /// one thing on an Arabic screen that must not switch numeral systems, and a
   /// figure a parent reads out to the accounts office has to match the receipt.
-  static String money(double? amount, String currency) {
+  static String money(double? amount, String currency, String languageCode) {
     if (amount == null) return '—';
-    final String text = NumberFormat('#,##0.00', 'en').format(amount);
+    final String text = _separators(
+      NumberFormat('#,##0.00', 'en').format(amount),
+      languageCode,
+    );
     return currency.isEmpty ? text : '$text $currency';
   }
 
   /// Attendance and late-penalty rates. One decimal, dropped when whole:
-  /// "97.5%" and "100%", never "100.0%".
-  static String percent(double? value) {
+  /// "97.5%" and "100%", never "100.0%" — the same `0.#` the portal uses.
+  static String percent(double? value, String languageCode) {
     if (value == null) return '—';
     final bool whole = value == value.roundToDouble();
-    return '${NumberFormat(whole ? '#,##0' : '#,##0.#', 'en').format(value)}%';
+    return '${_separators(NumberFormat(whole ? '#,##0' : '#,##0.#', 'en').format(value), languageCode)}%';
   }
 
-  /// A mark out of a maximum. Trailing zeros are noise on a phone.
-  static String marks(double? value) {
+  /// A mark, or a count of days. Trailing zeros are noise on a phone.
+  static String marks(double? value, String languageCode) {
     if (value == null) return '—';
     final bool whole = value == value.roundToDouble();
-    return NumberFormat(whole ? '#,##0' : '#,##0.##', 'en').format(value);
+    return _separators(
+      NumberFormat(whole ? '#,##0' : '#,##0.##', 'en').format(value),
+      languageCode,
+    );
   }
 
   /// Gregorian, always — the calendar never follows the language (ADR-4). The

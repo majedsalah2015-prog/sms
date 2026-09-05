@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'l10n/strings.dart';
 import 'state/auth_controller.dart';
+import 'ui/theme.dart';
 import 'ui/change_password_page.dart';
 import 'ui/home_page.dart';
 import 'ui/login_page.dart';
@@ -33,8 +34,8 @@ class SmsPortalApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: _theme(Brightness.light),
-      darkTheme: _theme(Brightness.dark),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: switch (auth.stage) {
         AuthStage.restoring => const _Splash(),
         AuthStage.signedOut => const LoginPage(),
@@ -46,38 +47,51 @@ class SmsPortalApp extends StatelessWidget {
     );
   }
 
-  static ThemeData _theme(Brightness brightness) {
-    final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF0F5C4A),
-      brightness: brightness,
-    );
-    return ThemeData(
-      colorScheme: scheme,
-      // Cairo and Tajawal are not bundled: shipping a font is a licence
-      // decision the school makes, and Android's own Arabic face renders the
-      // product's text correctly without one.
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: scheme.outlineVariant),
-        ),
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-    );
-  }
 }
 
+/// Shown while the keystore is read. It carries the school's mark rather than a
+/// bare spinner, because on a cold start this is the first thing a parent sees
+/// and a blank screen with a wheel on it belongs to no product in particular.
 class _Splash extends StatelessWidget {
   const _Splash();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+    final Strings s = Strings.of(context);
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: const Icon(
+                Icons.school_rounded,
+                size: 38,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              s.appTitle,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

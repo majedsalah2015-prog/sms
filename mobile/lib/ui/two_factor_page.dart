@@ -52,6 +52,7 @@ class _TwoFactorPageState extends State<TwoFactorPage> {
     final Strings s = Strings.of(context);
 
     return AuthScaffold(
+      icon: Icons.shield_rounded,
       title: s.twoFactorTitle,
       subtitle: s.twoFactorPrompt,
       error: _error,
@@ -75,7 +76,10 @@ class _TwoFactorPageState extends State<TwoFactorPage> {
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 24, letterSpacing: 6),
                 onFieldSubmitted: (_) => _busy ? null : _submit(),
-                decoration: InputDecoration(labelText: s.twoFactorCode),
+                decoration: InputDecoration(
+                  labelText: s.twoFactorCode,
+                  prefixIcon: const Icon(Icons.pin_rounded),
+                ),
                 validator: (String? v) =>
                     (v ?? '').trim().isEmpty ? s.twoFactorRequired : null,
               ),

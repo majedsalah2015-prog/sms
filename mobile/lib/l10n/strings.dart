@@ -28,6 +28,10 @@ class Strings {
     Locale('en'),
   ];
 
+  /// The tag `intl` and [Fmt] take. One accessor so no screen has to spell out
+  /// `isArabic ? 'ar' : 'en'` for the twelfth time.
+  String get lang => isArabic ? 'ar' : 'en';
+
   String _t(String en, String ar) => isArabic ? ar : en;
 
   /// Picks the half of a server-supplied bilingual pair this locale wants,
@@ -160,6 +164,7 @@ class Strings {
         'لم يُنشر جدول لهذا الفصل.',
       );
   String get weekOf => _t('Week of', 'أسبوع');
+  String get today => _t('Today', 'اليوم');
   String get period => _t('Period', 'الحصة');
   String get room => _t('Room', 'القاعة');
   String get teacher => _t('Teacher', 'المعلم');

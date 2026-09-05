@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
 import '../../l10n/strings.dart';
+import '../theme.dart';
 
 /// One place that turns "loading / failed / empty / here it is" into a screen.
 ///
@@ -15,6 +16,7 @@ class AsyncView<T> extends StatefulWidget {
     required this.load,
     required this.builder,
     this.empty,
+    this.emptySection,
     super.key,
   });
 
@@ -23,6 +25,10 @@ class AsyncView<T> extends StatefulWidget {
 
   /// Shown instead of [builder] when the loaded value is an empty collection.
   final String? empty;
+
+  /// Colours the empty state's icon, so a blank screen still says which part of
+  /// the portal it belongs to.
+  final Section? emptySection;
 
   @override
   State<AsyncView<T>> createState() => AsyncViewState<T>();
@@ -79,7 +85,9 @@ class AsyncViewState<T> extends State<AsyncView<T>> {
             onRefresh: reload,
             child: ListView(
               padding: const EdgeInsets.all(24),
-              children: <Widget>[EmptyView(message: emptyMessage)],
+              children: <Widget>[
+                EmptyView(message: emptyMessage, section: widget.emptySection),
+              ],
             ),
           );
         }
@@ -113,29 +121,39 @@ class FailureView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Strings s = Strings.of(context);
+    final bool offline = error is ApiUnreachableException;
+    // Offline is amber: it is a condition that passes. A refusal is red.
+    final Color tone = offline ? AppColors.warning : AppColors.danger;
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        const SizedBox(height: 48),
-        Icon(
-          error is ApiUnreachableException
-              ? Icons.cloud_off_outlined
-              : Icons.error_outline,
-          size: 40,
-          color: Theme.of(context).colorScheme.outline,
+        const SizedBox(height: 40),
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(tone.withValues(alpha: 0.10), Colors.white),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            offline ? Icons.wifi_off_rounded : Icons.error_outline_rounded,
+            size: 34,
+            color: tone,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           messageFor(error, s),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge,
         ),
         if (onRetry != null) ...<Widget>[
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Center(
             child: OutlinedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
               label: Text(s.retry),
             ),
           ),
@@ -145,27 +163,35 @@ class FailureView extends StatelessWidget {
   }
 }
 
+/// Nothing to show — which is an answer, not a failure, and is coloured like
+/// one.
 class EmptyView extends StatelessWidget {
-  const EmptyView({required this.message, super.key});
+  const EmptyView({required this.message, this.section, super.key});
 
   final String message;
+  final Section? section;
 
   @override
   Widget build(BuildContext context) {
+    final Section s = section ?? Section.family;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        const SizedBox(height: 64),
-        Icon(
-          Icons.inbox_outlined,
-          size: 40,
-          color: Theme.of(context).colorScheme.outline,
+        const SizedBox(height: 56),
+        Container(
+          width: 76,
+          height: 76,
+          decoration: BoxDecoration(color: s.wash, shape: BoxShape.circle),
+          child: Icon(s.icon, size: 34, color: s.color),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: AppColors.muted),
         ),
       ],
     );

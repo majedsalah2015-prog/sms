@@ -5,6 +5,7 @@ import '../../l10n/strings.dart';
 import '../../models/portal.dart';
 import '../../state/auth_controller.dart';
 import '../format.dart';
+import '../theme.dart';
 import '../widgets/async_view.dart';
 import '../widgets/panels.dart';
 
@@ -27,9 +28,10 @@ class HomeworkTab extends StatelessWidget {
     return AsyncView<List<PortalHomework>>(
       load: () => auth.api.homework(studentId),
       empty: s.noHomework,
+      emptySection: Section.homework,
       builder: (BuildContext context, List<PortalHomework> items) {
         return ListView.separated(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           itemCount: items.length,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (BuildContext context, int index) =>
@@ -45,48 +47,85 @@ class _HomeworkCard extends StatelessWidget {
 
   final PortalHomework item;
 
+  /// Due today or already past is the thing a parent is scanning for, so it is
+  /// the one state that gets a colour of its own.
+  bool get _urgent {
+    final DateTime? due = item.dueDate;
+    if (due == null) return false;
+    final DateTime today = DateTime.now().toUtc();
+    return !due.isAfter(DateTime.utc(today.year, today.month, today.day));
+  }
+
   @override
   Widget build(BuildContext context) {
     final Strings s = Strings.of(context);
     final ThemeData theme = Theme.of(context);
-    final String language = s.isArabic ? 'ar' : 'en';
+    final String language = s.lang;
 
     return Panel(
       children: <Widget>[
-        Text(
-          s.pair(item.titleEn, item.titleAr),
-          style: theme.textTheme.titleMedium,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            SectionIcon(Section.homework),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    s.pair(item.titleEn, item.titleAr),
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    s.pair(item.subjectNameEn, item.subjectNameAr),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: AppColors.muted),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          s.pair(item.subjectNameEn, item.subjectNameAr),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: <Widget>[
-            Pill(text: '${s.dueOn} ${Fmt.date(item.dueDate, language)}'),
+            Pill(
+              text: '${s.dueOn} ${Fmt.date(item.dueDate, language)}',
+              icon: Icons.event_rounded,
+              tone: _urgent ? AppColors.danger : Section.homework.color,
+            ),
             // BR-LRN-004: no maximum means ungraded practice. Saying that is
             // the point — a blank mark reads as a mark nobody has entered yet.
             if (item.maxMarks == null)
-              Pill(text: s.ungraded)
+              Pill(
+                text: s.ungraded,
+                icon: Icons.edit_note_rounded,
+                tone: AppColors.muted,
+              )
             else
-              Pill(text: '${s.outOf} ${Fmt.marks(item.maxMarks)}'),
+              Pill(
+                text: '${s.outOf} ${Fmt.marks(item.maxMarks, s.lang)}',
+                icon: Icons.grade_rounded,
+                tone: Section.results.color,
+              ),
             if (item.latePenaltyApplies)
               Pill(
                 text: item.latePenaltyPercent == null
                     ? s.latePenalty
-                    : '${s.latePenalty} ${Fmt.percent(item.latePenaltyPercent)}',
-                tone: theme.colorScheme.errorContainer,
+                    : '${s.latePenalty} ${Fmt.percent(item.latePenaltyPercent, s.lang)}',
+                icon: Icons.timer_off_rounded,
+                tone: AppColors.warning,
               ),
           ],
         ),
         Prose(
           title: s.instructions,
+          icon: Icons.notes_rounded,
           body: s.pair(item.instructionsEn, item.instructionsAr),
         ),
       ],
