@@ -657,6 +657,15 @@ namespace Sms.Web
             services.AddScoped<ILessonAdmin, LessonAdmin>();
             services.AddScoped<IHomeworkAdmin, HomeworkAdmin>();
 
+            // Module 37 (doc/Modules/37 §8.4/§8.5/§8.10, BR-LRN-005/011/012/013)
+            // — e-learning slice 2: the homework loop closes. The tracker and the
+            // marking queue, release of a raw mark into Module 17's marksheet
+            // through IGradingAdmin, and the portal's first write surface. Screens
+            // are the next slice; nothing here is reachable from a URL yet.
+            // Question banks, papers and online sittings remain later slices.
+            services.AddScoped<IHomeworkSubmissionAdmin, HomeworkSubmissionAdmin>();
+            services.AddScoped<IPortalHomeworkSubmitter, PortalHomeworkSubmitter>();
+
             // S4/E-402 (Examinations, doc/Modules/16, BR-EXM-002..004/006/008).
             // Marks capture reuses IGradingAdmin's Marksheet/MarkEntry directly
             // (doc's "single marks store") - this service owns scheduling,

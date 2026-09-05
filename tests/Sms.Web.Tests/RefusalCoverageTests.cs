@@ -195,6 +195,18 @@ namespace Sms.Web.Tests
                 return list;
             }
 
+            // A nullable value type is that value type as far as a sample goes.
+            // Convert.ChangeType cannot target Nullable<T> and throws an
+            // InvalidCastException rather than returning null, so unwrap it and
+            // build the underlying one. Handing back null instead would leave the
+            // half of the refusal that actually names a number — "the mark 12.00
+            // is outside 0 to 10" — never once built by this test.
+            var underlying = Nullable.GetUnderlyingType(type);
+            if (underlying != null)
+            {
+                return Sample(underlying);
+            }
+
             if (type == typeof(DateTime))
             {
                 return new DateTime(2026, 3, 15);

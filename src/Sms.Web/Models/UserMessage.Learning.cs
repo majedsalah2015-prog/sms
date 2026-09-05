@@ -85,6 +85,71 @@ namespace Sms.Web.Models
                 ? "لم يكتمل فحص هذا الملف أو تبيّن أنه مصاب، ولا يُعرض ملف غير مفحوص على طالب ولا على معلّم — انتظر انتهاء الفحص أو ارفع نسخة سليمة (BR-LRN-006)."
                 : "This file is not virus-scan clean, and an unscanned file is shown to no one, staff or student — wait for the scan to finish or upload a clean copy (BR-LRN-006).",
 
+            // ---- M37 the homework loop: hand-in, marking, release (§8.4/§8.5/§8.10)
+
+            PortalSubmissionIdentityException => arabic
+                ? "التسليم يكون من حساب الطالب نفسه — حساب وليّ الأمر يرى ما كُلِّف به ابنه ودرجته، ولا يسلّم نيابةً عنه، لأنّ العمل المُسلَّم لا بدّ أن يكون عمل من تُنسب إليه الدرجة (BR-LRN-013)."
+                : "Work is handed in from the student's own account — a parent's account sees what was set and what it scored, but never submits on the student's behalf: submitted work has to be the work of whoever the mark is credited to (BR-LRN-013).",
+
+            HomeworkNotOfferedToStudentException => arabic
+                ? "هذا الواجب ليس من واجباتك — إمّا أنّه مُكلَّف لشعبة أخرى أو أنّه لم يُنشر بعد. صفحة «أعمالي» تحمل ما كُلِّفت به أنت وحدك (BR-LRN-003/013)."
+                : "This homework is not yours — it is either set to another section or not yet issued. The \"my work\" page holds what was set to you and nothing else (BR-LRN-003/013).",
+
+            HomeworkClosedToSubmissionsException hc => arabic
+                ? (hc.Status == HomeworkStatus.Withdrawn
+                    ? "سُحب هذا الواجب وأُبلغ بسبب سحبه كلّ من كان قد سلّم — ولا تسليم على عمل مسحوب (BR-LRN-016)."
+                    : "أُغلق هذا الواجب ودخل التصحيح، فلم يعد يقبل تسليماً. والتأخير وحده لا يُغلق واجباً أبداً — العمل المتأخر مقبول ما دام الواجب مفتوحاً؛ راجع معلّم المادة (BR-LRN-005).")
+                : (hc.Status == HomeworkStatus.Withdrawn
+                    ? "This homework was withdrawn and everyone who had submitted was told why — withdrawn work takes no further hand-ins (BR-LRN-016)."
+                    : "This homework has closed and moved into marking, so it no longer takes hand-ins. Lateness alone never closes a homework — late work is accepted for as long as the homework is open; speak to your subject teacher (BR-LRN-005)."),
+
+            SubmissionMarkingClosedException => arabic
+                ? "رُصدت درجات هذا الواجب في الوحدة 17، ومن تلك اللحظة صارت الدرجة ملكها — أيّ تصحيح يجري هناك بضوابط تغيير الدرجات، لا بإعادة التصحيح هنا (BR-LRN-012)."
+                : "This homework's marks are in Module 17, and from that moment the mark is theirs — a correction happens there under mark-change control, not by re-marking here (BR-LRN-012).",
+
+            SubmissionScoreOutOfRangeException sr => arabic
+                ? (sr.MaxMarks is null
+                    ? "هذا الواجب تدريب بلا درجة، فهو لا يصل إلى سجل الدرجات أصلاً — اكتب ملاحظتك للطالب دون درجة (BR-LRN-004)."
+                    : $"الدرجة {Amount(sr.Score)} خارج مدى هذا الواجب — المدى من صفر إلى {Amount(sr.MaxMarks.Value)} (BR-LRN-004).")
+                : (sr.MaxMarks is null
+                    ? "This homework is ungraded practice and never reaches the gradebook — leave feedback for the student without a mark (BR-LRN-004)."
+                    : $"The mark {Amount(sr.Score)} is outside this homework's range — it runs from 0 to {Amount(sr.MaxMarks.Value)} (BR-LRN-004)."),
+
+            HomeworkReleaseRefusedException hr => hr.Reason switch
+            {
+                HomeworkReleaseRefusal.NotBeingMarked => arabic
+                    ? "الرصد يكون من حالة «قيد التصحيح» وحدها — أغلق الواجب وابدأ تصحيحه أولاً (الوثيقة 37 §4)."
+                    : "Release is the step out of marking and only out of marking — close the homework and start marking it first (doc/Modules/37 §4).",
+
+                HomeworkReleaseRefusal.UngradedPractice => arabic
+                    ? "هذا الواجب تدريب بلا درجة عظمى، فليس فيه ما يُرصد — التدريب لا يصل إلى الوحدة 17 بالتصميم (BR-LRN-004)."
+                    : "This homework is ungraded practice with no maximum mark, so there is nothing to release — practice never reaches Module 17, by design (BR-LRN-004).",
+
+                HomeworkReleaseRefusal.NoBlueprintComponent => arabic
+                    ? "هذا الواجب عليه درجة ولا يشير إلى مكوّن في نموذج الدرجات، فلا مكان تهبط فيه درجاته — حدِّد المكوّن ثم ارصد (BR-LRN-004/012)."
+                    : "This homework carries marks but names no grading component, so its marks have nowhere to land — name the component, then release (BR-LRN-004/012).",
+
+                HomeworkReleaseRefusal.SubmissionsUnscored => arabic
+                    ? $"ما زال {hr.UnscoredSubmissionCount} من التسليمات بلا درجة — الرصد يسلّم درجات الصفّ كلّه دفعةً واحدة، ولا يُرصد نصف صفّ (BR-LRN-011)."
+                    : $"{hr.UnscoredSubmissionCount} hand-in(s) still carry no score — release hands the whole class's marks over at once, and half a class is never released (BR-LRN-011).",
+
+                _ => arabic
+                    ? "لا يمكن رصد درجات هذا الواجب في وضعه الحالي (BR-LRN-011/012)."
+                    : "This homework's marks cannot be released as it stands (BR-LRN-011/012).",
+            },
+
+            HomeworkMarksheetUnresolvedException hm => arabic
+                ? (hm.EnrollmentId is null
+                    ? "لا يوجد في الوحدة 17 كشف درجات لهذه الشعبة يحمل المكوّن الذي يُغذّيه هذا الواجب — أنشئ الكشف هناك أوّلاً. هذه الوحدة تسلّم درجة خاماً إلى مخزن الدرجات الوحيد ولا تنشئ لنفسها مخزناً ثانياً (BR-LRN-012)."
+                    : "كشف درجات الوحدة 17 لا يشمل أحد الطلاب الذين سلّموا — حدِّث تسجيل الشعبة في الكشف هناك ثمّ أعد الرصد. ورصد نصف صفّ أسوأ من تأجيل الرصد (BR-LRN-012).")
+                : (hm.EnrollmentId is null
+                    ? "Module 17 holds no marksheet for this section carrying the component this homework feeds — create it there first. This module hands a raw mark to the one marks store and never builds itself a second one (BR-LRN-012)."
+                    : "Module 17's marksheet does not cover one of the students who submitted — refresh the section's enrolment on that sheet, then release again. Releasing half a class is worse than releasing late (BR-LRN-012)."),
+
+            HomeworkReleaseMarksheetPublishedException => arabic
+                ? "كشف درجات هذه الشعبة منشور بالفعل، والكتابة فيه من هنا تلتفّ على ضبط تغيير الدرجات — أعِد الكشف إلى التحرير في الوحدة 17 بسبب مسجَّل، ثمّ ارصد (BR-LRN-012, BR-GRA-005)."
+                : "This section's marksheet is already published, and writing into it from here would slip past mark-change control — return the sheet to draft in Module 17 with a recorded reason, then release (BR-LRN-012, BR-GRA-005).",
+
             // ---------------------------------------------------------------- M16 grading
 
             GradingScaleLockedException => arabic

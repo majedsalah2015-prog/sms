@@ -220,16 +220,21 @@ namespace Sms.Infrastructure.Learning
         /// doc/Modules/37 §9's submission count.
         ///
         /// <para>
-        /// <b>Deliberately zero in this slice.</b> <c>HomeworkSubmission</c> is
-        /// §8.4's entity and does not exist yet, so no submission can exist to
-        /// block a withdrawal. The guard above is written and its exception is
-        /// tested, so the slice that adds submissions changes this one method and
-        /// the rule starts holding — rather than having to notice, months later,
-        /// that a withdrawal path was never guarded at all.
+        /// Real as of the §8.4/§8.5 slice, which added <c>HomeworkSubmission</c>.
+        /// This method was written as a stub returning zero when the desk was
+        /// built, precisely so the withdrawal guard above already existed and
+        /// started holding the day submissions did — rather than the rule being
+        /// discovered months later to have never been wired at all.
+        /// </para>
+        ///
+        /// <para>
+        /// Counts live submissions (BR-LRN-005: one per student), not versions. A
+        /// student who handed in three times is one person whose work would be
+        /// taken back, and §9's question is how many people that is.
         /// </para>
         /// </summary>
         private Task<int> CountSubmissionsAsync(int homeworkId, CancellationToken cancellationToken)
-            => Task.FromResult(0);
+            => _db.HomeworkSubmissions.CountAsync(s => s.HomeworkId == homeworkId, cancellationToken);
 
         /// <summary>BR-GLB-052: the school calendar decides which days are working days, not the day of the week alone.</summary>
         private async Task<Func<DateTime, bool>> BuildWorkingDayPredicateAsync(int academicYearId, CancellationToken cancellationToken)
