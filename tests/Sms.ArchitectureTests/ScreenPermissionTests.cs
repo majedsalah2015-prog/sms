@@ -182,12 +182,23 @@ namespace Sms.ArchitectureTests
                 "AccountController.Login",
                 "AccountController.TwoFactor",
 
+                // Which build of the school's own app to be running. Anonymous because the
+                // screen it feeds stands *in front of* sign-in: a build the school has
+                // stopped supporting is stopped before it signs in, and the case that
+                // matters most is one too old to sign in at all — which a check needing a
+                // token would answer with a sign-in failure instead of the one message that
+                // would help it. It is also the first call of a cold start, before the
+                // keystore has been read. What it discloses is a version string and a path
+                // the school hands to every family anyway: no school name, no person, no
+                // record. The package itself stays behind sign-in.
+                "AppApiController.Version",
+
                 // The mobile API's half of the same sign-in, and the same two steps: a
                 // password, then the second factor. Anonymous for the identical reason —
                 // this is what happens before there is anyone to check permissions for.
-                // Nothing else on the API is anonymous, and pinning them here is what keeps
-                // that true: a third entry appearing in this list is a second transport
-                // quietly opening a door the browser keeps shut.
+                // Pinning them here is what keeps the list honest: an entry appearing in it
+                // without a paragraph like these is a second transport quietly opening a
+                // door the browser keeps shut.
                 "AuthApiController.Login",
                 "AuthApiController.TwoFactor",
                 // The school's logo, which the sign-in screen wears (BR-SCH-006). Anonymous because

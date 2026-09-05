@@ -61,7 +61,12 @@ namespace Sms.Web.Tests
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
 
-            Assert.Equal(new[] { "AuthApiController", "PortalApiController" }, reachable);
+            // AppApiController is here on purpose and carries no record at all: it
+            // answers what build the school publishes, which is the one thing a
+            // family's phone has to be able to ask before it can sign in.
+            Assert.Equal(
+                new[] { "AppApiController", "AuthApiController", "PortalApiController" },
+                reachable);
         }
 
         [Fact]

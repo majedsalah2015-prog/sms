@@ -147,9 +147,52 @@ Every collection endpoint pages. `?page=1&pageSize=25`, `pageSize` capped at 200
 
 ## 5. The endpoints
 
-74 endpoints across seven controllers. Permissions are named as `MODULE/Screen/Verb`; all of them
+75 endpoints across eight controllers. Permissions are named as `MODULE/Screen/Verb`; all of them
 already existed in `ScreenCatalog`, so **no re-run of `tools/Sms.Seeder` is required** before the
 API works.
+
+### `/api/v1/app` — which build to be running *(anonymous)*
+
+```
+GET /api/v1/app/version?version=1.1.0&build=2
+  → { published, latestVersion, latestBuild, publishedAtUtc,
+      minimumVersion, minimumBuild, updateAvailable, updateRequired, installUrl }
+```
+
+The school already publishes its Android package by dropping a file into
+`MobileApp:PackagePath`, and `/portal/app` already serves it with its install instructions. What
+was missing was anyone telling the phone: a family that installed once had no way to learn a newer
+build existed. This is the other half of that arrangement — it publishes nothing, decides nothing
+about the family, and reads no record.
+
+`latestVersion` comes from the published file's own name (`sms-portal-1.4.0+12.apk`), so a school
+that publishes a build has already said what it is. `minimumVersion` is the operator's setting,
+`MobileApp:MinimumSupportedVersion`, **unset by default** — until a school sets one, nothing is
+ever forced.
+
+**The verdicts are the server's**, not the app's. A client deciding for itself would decide with
+whatever comparison the *old* build shipped, and the old build is precisely the one being asked
+about; sending `updateAvailable` and `updateRequired` already decided is what lets a school begin
+requiring an update without anyone installing anything first. The wording is the app's, though —
+a banner is a label on a screen the client owns and `lib/l10n/strings.dart` has both halves of it,
+where a sentence fetched over the wire would be the one thing on that banner that comes back blank
+on a slow connection.
+
+**`updateRequired` is withheld when no published build satisfies the minimum.** The usual mistake
+is raising the setting before uploading the APK, and enforcing it then would empty the app of every
+family at once and send them to a page offering a build that still would not do. A minimum that
+cannot be read at all is treated as no minimum. Both cases log a warning naming the setting.
+
+**Anonymous, deliberately.** The case this exists for at its sharpest is a client too old to sign
+in: if the check needed a token, that phone would be answered with a sign-in failure instead of the
+one message that would help it. It is also the first call of a cold start, before the keystore has
+been read. What it discloses is a version string and a path the school hands to every family
+anyway — no school name, no person, no record. The package itself stays behind sign-in, as before.
+
+The caller's build arrives as two parameters rather than one `1.1.0+2` string because `+` in a
+query string decodes to a space; the one-parameter form would need percent-encoding from every
+client forever, and forgetting it once would look like a build with no versionCode rather than like
+a mistake.
 
 ### `/api/v1/auth` — sign-in *(reachable by portal accounts)*
 
@@ -253,7 +296,7 @@ section instead of showing one that 503s.
 | **Student homework submission** (`§8.10`) and **timed sittings** (`§8.11`) | There is no submission entity in the domain. `PortalSetWork` says so in as many words: *"Carries no submission and no mark. Both are later slices."* This is a gap in module 37, not in the API — building it means an entity, a migration, an engine and its tests, and it cannot be faked at the transport layer. |
 | **Self-service payslip** ("my own payslip") | Would need a permission `ScreenCatalog` does not define. Inventing one on a second transport is a security decision made by accident. An employee reads their payslip today through a role holding `EMP/Payroll/View`, which is the school's whole staff-pay grant; narrowing it is a `ScreenCatalog` change and its own slice. |
 | **File upload** (attachments, photos) | The API links an already-uploaded `doc.Attachment` (e.g. lesson resources) but does not accept bytes. An attachment carries a document type, a size limit and a virus scan; duplicating that intake pipeline for a second transport is how the two stop agreeing about what a valid file is. |
-| **Push notifications** | Needs a device registry and a provider decision, both listed as pending in `docs/Status/`. |
+| **Push notifications** | Needs a device registry and a provider decision, both listed as pending in `docs/Status/`. `/api/v1/app/version` is **not** an exception to this: the phone asks when it starts and the school answers, so a family who never opens the app is never told. That is the honest limit of an in-app check, and it is still the difference between a fix reaching a school and sitting on the server while the complaint keeps arriving. |
 | **Per-device refresh tokens** | Owner decision, 2026-08-31 — see §1. |
 | **Journal posting from the app** | See §5, accounting. |
 | **`PUT /students/{id}/residence`**, and the `typeAr`/`typeEn` on a portal lesson resource | Built, then removed before landing: both lean on work that is still in another branch's working tree (`IStudentAdmin.SetResidenceAsync`, `PortalLessonResource.Type*`). A commit that only compiles once somebody else's lands is a broken commit, so they come back as a two-line follow-up the day that slice does. |
@@ -281,8 +324,11 @@ src/Sms.Web/Api/
   ApiProblem.cs               the refusal translation table + the raw JSON writer
   ApiFilters.cs               exception filter, status envelope, [PortalReachable], [PasswordChangeExempt]
   Auth/                       SessionTokenAuthenticationHandler + SessionTokenDefaults
-  Controllers/                seven controllers
+  Controllers/                eight controllers
   Models/                     request and response DTOs
+src/Sms.Web/Services/
+  MobileAppPackage.cs         the published .apk, discovered from a folder
+  MobileAppVersion.cs         1.4.0+12, parsed and ordered — see §5, /api/v1/app
 src/Sms.Web/Security/
   SessionPrincipalFactory.cs  shared by the cookie sign-in and the bearer handler
 src/Sms.Application/GlExport/IGlLedgerInsight.cs
